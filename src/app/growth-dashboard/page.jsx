@@ -11,8 +11,12 @@ import {
   Mail,
   Filter,
 } from 'lucide-react';
-import SetupWizard from '@/components/SetupWizard';
+import dynamic from 'next/dynamic';
 import api from '@/lib/api';
+
+const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
+  ssr: false,
+});
 
 function HeaderSummary({
   targetRevenue,
