@@ -1,57 +1,49 @@
-import { useNavigate, useLocation } from "react-router-dom";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+const NAV_ITEMS = [
+  { path: '/growth-dashboard', label: 'Dashboard', icon: '🔥' },
+  { path: '/contacts', label: 'People Hub', icon: '👥' },
+  { path: '/contacts/view', label: 'Contacts', icon: '📋' },
+  { path: '/contacts/manual', label: 'Add Contact', icon: '➕' },
+  { path: '/personas', label: 'Personas', icon: '🧠' },
+  { path: '/personas/builder', label: 'Persona Builder', icon: '🛠️' },
+  { path: '/outreach', label: 'Outreach', icon: '📣' },
+  { path: '/proposals', label: 'Proposals', icon: '📄' },
+];
 
 export default function Navigation() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const pathname = usePathname();
 
-  const isActive = (path) => {
-    return location.pathname === path || location.pathname.startsWith(path + '/');
-  };
-
-  const navItems = [
-    { path: '/bdpipeline', label: 'Pipeline', icon: '🎯' },
-    { path: '/growth-dashboard', label: 'Dashboard', icon: '🏠' },
-    { path: '/personas', label: 'Personas', icon: '👤' },
-    { path: '/outreach', label: 'Outreach', icon: '📧' },
-    { path: '/meetings', label: 'Meetings', icon: '📅' },
-    { path: '/proposals', label: 'Proposals', icon: '📄' },
-    { path: '/assessment', label: 'Assessment', icon: '📊' },
-    { path: '/settings', label: 'Settings', icon: '⚙️' },
-  ];
+  const isActive = (path) =>
+    pathname === path || pathname.startsWith(`${path}/`);
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-14">
-          
-          {/* Logo/Brand */}
-          <div className="flex items-center">
-            <button
-              onClick={() => navigate('/growth-dashboard')}
-              className="flex items-center space-x-2 text-lg font-bold text-red-600 hover:text-red-700 transition-colors"
-            >
-              <span className="text-2xl">🔥</span>
-              <span>Ignite BD</span>
-            </button>
-          </div>
+    <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Link
+          href="/growth-dashboard"
+          className="flex items-center space-x-2 text-lg font-bold text-red-600 transition hover:text-red-700"
+        >
+          <span className="text-2xl">🔥</span>
+          <span>Ignite BD</span>
+        </Link>
 
-          {/* Navigation Links */}
-          <div className="flex items-center space-x-1">
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  isActive(item.path)
-                    ? 'bg-red-600 text-white shadow-md'
-                    : 'text-gray-700 hover:text-red-600 hover:bg-red-50'
-                }`}
-              >
-                <span className="mr-1.5">{item.icon}</span>
-                <span className="hidden sm:inline">{item.label}</span>
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center space-x-1">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                isActive(item.path)
+                  ? 'bg-red-600 text-white shadow-md'
+                  : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
+              }`}
+            >
+              <span className="mr-1.5">{item.icon}</span>
+              <span className="hidden sm:inline">{item.label}</span>
+            </Link>
+          ))}
         </div>
       </div>
     </nav>
