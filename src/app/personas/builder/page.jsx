@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import api from '@/lib/api';
 
@@ -14,10 +14,9 @@ const DEFAULT_VALUES = {
   companyId: '',
 };
 
-export default function PersonaBuilderPage() {
+export default function PersonaBuilderPage({ searchParams }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const personaId = searchParams?.get('personaId') || null;
+  const personaId = searchParams?.personaId || null;
 
   const [isHydrating, setIsHydrating] = useState(Boolean(personaId));
   const [fetchError, setFetchError] = useState(null);
