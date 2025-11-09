@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Owner {
+  id                String      @id @default(cuid())
+  firebaseId        String      @unique
+  name              String?
+  email             String?
+  photoURL          String?
+  teamSize          String?     // Team size for owner context (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  managedCompanies  CompanyHQ[] @relation("ManagerOf")
+  ownedCompanies    CompanyHQ[] @relation("OwnerOf")
+
+  @@map("owners")
+}
+
+model CompanyHQ {
+  id               String        @id @default(cuid())
+  companyName      String
+  companyStreet    String?       // Street address
+  companyCity      String?       // City
+  companyState     String?       // State
+  companyWebsite   String?       // Website URL (for LinkedIn extraction, etc.)
+  whatYouDo        String?       // What the company does (description)
+  companyIndustry  String?
+  companyAnnualRev Float?
+  yearsInBusiness  Int?
+  teamSize         String?       // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  ownerId          String
+  managerId        String?
+  companies        Company[]
+  manager          Owner?        @relation("ManagerOf", fields: [managerId], references: [id])
+  owner            Owner         @relation("OwnerOf", fields: [ownerId], references: [id])
+  contactLists     ContactList[]
+  contacts         Contact[]
+  proposals        Proposal[]
+  products         Product[]
+  personas         Persona[]
+
+  @@map("company_hqs")
+}
+
+model Company {
+  id              String    @id @default(cuid())
+  companyHQId     String
+  companyName     String
+  address         String?
+  industry        String?
+  website         String?   // Website URL (inferred from email domain or manually entered)
+  revenue         Float?
+  yearsInBusiness Int?
+  proposalId      String?
+  contractId      String?
+  invoiceId       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  companyHQ       CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  contacts        Contact[]
+  proposals       Proposal[] // Reverse relation - proposals linked to this company
+
+  @@map("companies")
+}
+
+model ContactList {
+  id          String    @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  type        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  companyHQ   CompanyHQ @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contacts    Contact[]
+
+  @@map("contact_lists")
+}
+
+model Contact {
+  id               String       @id @default(cuid())
+  crmId            String       // CompanyHQId (tenant identifier) - renamed from companyId for clarity
+  firstName        String?
+  lastName         String?
+  goesBy           String?
+  email            String?
+  phone            String?
+  title            String?
+  contactCompanyId String?      // Company they work for (prospect/client company)
+  buyerDecision    String?
+  howMet           String?
+  notes            String?      // Notes/context about the contact
+  contactListId    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  companyHQ        CompanyHQ    @relation(fields: [crmId], references: [id])
+  contactCompany   Company?     @relation(fields: [contactCompanyId], references: [id])
+  contactList      ContactList? @relation(fields: [contactListId], references: [id])
+  pipeline         Pipeline?
+
+  @@map("contacts")
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  companyHQId String
+  name        String
+  description String?
+  valueProp   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  personas    Persona[]
+
+  @@map("products")
+}
+
+model Pipeline {
+  id        String   @id @default(cuid())
+  contactId String   @unique
+  pipeline  String
+  stage     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("pipelines")
+}
+
+model Proposal {
+  id              String    @id @default(cuid())
+  companyHQId     String    // Multi-tenancy - scoped to CompanyHQ
+  companyHQ       CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  
+  // Client information
+  clientName        String
+  clientCompany   String    // Company name (can link to Company model later via companyId)
+  companyId       String?   // Optional: Link to Company model (prospect/client company)
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  
+  // Proposal details
+  purpose         String?   // Purpose/description of the proposal
+  status          String    @default("draft") // "draft" | "active" | "approved" | "rejected"
+  totalPrice      Float?    // Total price of all services
+  
+  // Proposal structure (stored as JSON for flexibility)
+  serviceInstances Json?    // Array of ProposalServiceInstance (from ProposalBuilder)
+  phases           Json?    // Array of Phase objects (with deliverables, activities, kpis)
+  milestones       Json?    // Array of Milestone objects (week, label, completed)
+  compensation     Json?    // Compensation object (total, currency, breakdown, paymentSchedule)
+  
+  // Metadata
+  dateIssued      DateTime? // Date proposal was issued
+  preparedBy      String?   // Who prepared the proposal
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("proposals")
+}
+
+model Persona {
+  id                 String    @id @default(cuid())
+  companyHQId        String
+  name               String
+  role               String?
+  title              String?
+  industry           String?
+  goals              String?
+  painPoints         String?
+  desiredOutcome     String?
+  valuePropToPersona String?
+  alignmentScore     Int?
+  productId          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  companyHQ          CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  product            Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("personas")
+}

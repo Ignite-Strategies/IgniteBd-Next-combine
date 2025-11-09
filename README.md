@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+## Ignite BD Intelligence – Next.js Stack
 
-## Getting Started
+Unified Next.js (App Router) application that powers the Ignite BD BusinessIntelligence “create flow”:
 
-First, run the development server:
+- `/product` – capture product value propositions.  
+- `/persona` – define personas and compute real-time alignment to a product.  
+- `/api/products` & `/api/personas` – JSON-safe API routes backed by Prisma & OpenAI.
+
+### Requirements
+
+- Node.js 18+
+- PostgreSQL connection string (`DATABASE_URL`)
+- OpenAI API key (`OPENAI_API_KEY`)
+- Default tenant identifier (`DEFAULT_COMPANY_HQ_ID`)
+
+> Expose `DEFAULT_COMPANY_HQ_ID` to the client with `NEXT_PUBLIC_DEFAULT_COMPANY_HQ_ID` if you want the forms pre-filled.  
+> Alignment scoring gracefully falls back to `null` when no OpenAI key is present.
+
+### Environment
+
+Create `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+DATABASE_URL="postgresql://user:pass@host:5432/database?schema=public"
+OPENAI_API_KEY="sk-..."
+DEFAULT_COMPANY_HQ_ID="company-hq-id"
+NEXT_PUBLIC_DEFAULT_COMPANY_HQ_ID="company-hq-id"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Prisma
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+npx prisma generate
+npx prisma db push   # or prisma migrate dev --name business_intelligence_layer
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Development
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Visit:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [http://localhost:3000/product](http://localhost:3000/product)  
+- [http://localhost:3000/persona](http://localhost:3000/persona)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Scripts
 
-## Deploy on Vercel
+| Command          | Description                                |
+| ---------------- | ------------------------------------------ |
+| `npm run dev`    | Start Next.js dev server                   |
+| `npm run build`  | Production build (works without OpenAI key)|
+| `npm run start`  | Serve the production build                 |
+| `npm run lint`   | ESLint check                               |
+| `npm run prisma` | Run Prisma CLI (forward arguments manually)|
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Ready for Vercel (no custom server). Ensure environment variables are set in the Vercel dashboard. `npm run build` succeeds locally and `.next` is generated during deploy.
