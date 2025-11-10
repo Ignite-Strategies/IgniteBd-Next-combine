@@ -172,7 +172,7 @@ localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
 ### 3. Contacts Layout (`/contacts/layout.jsx`)
 
 **What it hydrates:**
-- All contacts for tenant
+- All contacts for tenant (with pipeline and company data included)
 - Contact lists (optional, can be separate)
 
 **localStorage writes:**
@@ -184,14 +184,22 @@ localStorage.setItem('contactLists', JSON.stringify(contactLists));
 
 **API:** `GET /api/contacts?companyHQId=${companyHQId}`
 
+**API Response:** Contacts array with `pipeline: true` and `contactCompany: true` included in Prisma query
+
 **When:** On mount of any `/contacts/*` route
 
 **Pattern:**
 1. Read `companyHQId` from localStorage
 2. Check `localStorage.getItem('contacts')` for cache
-3. If cached, use for fast initial render
-4. Fetch fresh from API
-5. Update localStorage
+3. If cached, use for fast initial render (set hydrated = true)
+4. Fetch fresh from API (includes pipeline and company data)
+5. Update localStorage with full contact objects
+
+**Contact Detail Page:**
+- Uses cached contacts array from ContactsContext for fast initial render
+- Fetches fresh data from API in background
+- Updates contacts cache when fresh data arrives
+- See `CONTACT_MANAGEMENT_ARCHITECTURE.md` for detailed documentation
 
 ---
 
