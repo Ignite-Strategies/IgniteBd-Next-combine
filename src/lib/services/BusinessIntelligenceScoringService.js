@@ -97,9 +97,10 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
     const stageName = pipeline?.stage || 'Not specified';
     const contactNotes = contact.notes || 'None';
 
-    // Product schema doesn't have price_point field, so we'll use "Not specified"
-    // If you add a price field later, update this mapping
-    const offerPrice = 'Not specified'; // Product schema has no price field currently
+    // Format product price for OpenAI prompt
+    const offerPrice = product.price
+      ? `${product.priceCurrency || 'USD'} ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : 'Not specified';
 
     // Build the user prompt - matching exact template structure
     // Free text fields (goals, painPoints) are inserted as-is - OpenAI handles formatted text well

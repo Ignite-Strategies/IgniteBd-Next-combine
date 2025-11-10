@@ -7,6 +7,7 @@ import api from '@/lib/api';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
+  const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,15 +28,25 @@ export default function ProductsPage() {
       return;
     }
 
-    // Fetch products from API
-    const fetchProducts = async () => {
+    // Fetch products and personas from API
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/api/products?companyHQId=${storedCompanyHQId}`);
         
-        // API returns array directly
-        const productsData = Array.isArray(response.data) ? response.data : [];
+        // Fetch products
+        const productsResponse = await api.get(`/api/products?companyHQId=${storedCompanyHQId}`);
+        const productsData = Array.isArray(productsResponse.data) ? productsResponse.data : [];
         setProducts(productsData);
+        
+        // Fetch personas to resolve targetedTo persona names
+        try {
+          const personasResponse = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
+          const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
+          setPersonas(personasData);
+        } catch (err) {
+          console.warn('Failed to fetch personas:', err);
+        }
+        
         setError(null);
       } catch (err) {
         console.error('Failed to fetch products:', err);
@@ -46,7 +57,7 @@ export default function ProductsPage() {
       }
     };
 
-    fetchProducts();
+    fetchData();
   }, []);
 
   return (
@@ -138,6 +149,22 @@ export default function ProductsPage() {
                     <div>
                       <p className="font-semibold text-gray-800 mb-1">Description:</p>
                       <p className="text-gray-600 whitespace-pre-wrap">{product.description}</p>
+                    </div>
+                  )}
+                  {(product.price || product.priceCurrency) && (
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">Price:</p>
+                      <p className="text-gray-600">
+                        {product.priceCurrency || 'USD'} {product.price ? product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                      </p>
+                    </div>
+                  )}
+                  {product.targetedTo && (
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">Targeted To:</p>
+                      <p className="text-gray-600">
+                        {personas.find(p => p.id === product.targetedTo)?.name || `Persona ID: ${product.targetedTo}`}
+                      </p>
                     </div>
                   )}
                   <div className="pt-2 border-t border-gray-100">

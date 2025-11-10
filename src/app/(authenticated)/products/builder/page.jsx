@@ -36,6 +36,7 @@ export default function ProductBuilderPage({ searchParams }) {
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimerRef = useRef(null);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [personas, setPersonas] = useState([]);
 
   const derivedCompanyId = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -68,7 +69,21 @@ export default function ProductBuilderPage({ searchParams }) {
   }, []);
 
   // Pre-fill form with test data when creating a new product (not editing)
+  // Also fetch personas for dropdown
   useEffect(() => {
+    if (!derivedCompanyId) return;
+    
+    // Fetch personas for "Targeted To" dropdown
+    const fetchPersonas = async () => {
+      try {
+        const response = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
+        const personasData = Array.isArray(response.data) ? response.data : [];
+        setPersonas(personasData);
+      } catch (err) {
+        console.warn('Failed to fetch personas:', err);
+      }
+    };
+    
     if (!productId && derivedCompanyId && !hasInitialized) {
       // Pre-fill with template for testing upsert logic
       reset({
@@ -76,9 +91,11 @@ export default function ProductBuilderPage({ searchParams }) {
         companyId: derivedCompanyId,
       });
       setHasInitialized(true);
+      fetchPersonas();
     } else if (derivedCompanyId && !hasInitialized) {
       setValue('companyId', derivedCompanyId);
       setHasInitialized(true);
+      fetchPersonas();
     }
   }, [derivedCompanyId, productId, setValue, reset, hasInitialized]);
 
@@ -110,9 +127,21 @@ export default function ProductBuilderPage({ searchParams }) {
           name: product.name ?? '',
           valueProp: product.valueProp ?? '',
           description: product.description ?? '',
+          price: product.price?.toString() ?? '',
+          priceCurrency: product.priceCurrency ?? 'USD',
+          targetedTo: product.targetedTo ?? '',
           companyId: product.companyHQId ?? derivedCompanyId ?? '',
         });
         setHasInitialized(true);
+        
+        // Also fetch personas for dropdown
+        try {
+          const personasResponse = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
+          const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
+          setPersonas(personasData);
+        } catch (err) {
+          console.warn('Failed to fetch personas:', err);
+        }
       } catch (error) {
         if (!isMounted) return;
         const message =
@@ -155,6 +184,9 @@ export default function ProductBuilderPage({ searchParams }) {
           name: values.name,
           valueProp: values.valueProp || null,
           description: values.description || null,
+          price: values.price ? parseFloat(values.price) : null,
+          priceCurrency: values.priceCurrency || null,
+          targetedTo: values.targetedTo || null,
           companyHQId: values.companyId,
         });
 
@@ -172,6 +204,9 @@ export default function ProductBuilderPage({ searchParams }) {
           name: values.name,
           valueProp: values.valueProp || null,
           description: values.description || null,
+          price: values.price ? parseFloat(values.price) : null,
+          priceCurrency: values.priceCurrency || null,
+          targetedTo: values.targetedTo || null,
           companyHQId: values.companyId,
         });
 
@@ -311,6 +346,59 @@ export default function ProductBuilderPage({ searchParams }) {
                 disabled={isBusy}
                 {...register('description')}
               />
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Price
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={isBusy}
+                    {...register('priceCurrency')}
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="CAD">CAD ($)</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={isBusy}
+                    {...register('price')}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional: Product/service price for BD Intelligence scoring
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Targeted To
+                </label>
+                <select
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  disabled={isBusy}
+                  {...register('targetedTo')}
+                >
+                  <option value="">Select a persona (optional)</option>
+                  {personas.map((persona) => (
+                    <option key={persona.id} value={persona.id}>
+                      {persona.name || 'Unnamed Persona'}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional: Which persona is this product targeted to?
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end gap-4 border-t border-gray-100 pt-6">
