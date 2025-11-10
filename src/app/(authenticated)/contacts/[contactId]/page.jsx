@@ -1,0 +1,186 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Mail, Phone, Building2, ArrowLeft } from 'lucide-react';
+import api from '@/lib/api';
+import PageHeader from '@/components/PageHeader.jsx';
+import { useContactsContext } from '../layout.jsx';
+
+export default function ContactDetailPage({ params }) {
+  const router = useRouter();
+  const { contacts, refreshContacts, companyHQId } = useContactsContext();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [contact, setContact] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadContact = async () => {
+      try {
+        setLoading(true);
+        const cachedContact = contacts.find((item) => item.id === params.contactId);
+        if (cachedContact) {
+          setContact(cachedContact);
+        }
+
+        const response = await api.get(`/api/contacts/${params.contactId}`);
+        if (!isMounted) return;
+        if (response.data?.success) {
+          setContact(response.data.contact);
+          await refreshContacts(companyHQId);
+        } else if (!cachedContact) {
+          setError(response.data?.error || 'Contact not found.');
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        if (!contact) {
+          setError('Unable to load contact details.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadContact();
+    return () => {
+      isMounted = false;
+    };
+  }, [companyHQId, contacts, contact, params.contactId, refreshContacts]);
+
+  const displayName = useMemo(() => {
+    if (!contact) return 'Contact';
+    return (
+      contact.goesBy ||
+      [contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
+      'Contact'
+    );
+  }, [contact]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-16">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="rounded-2xl bg-white p-8 text-center shadow">
+            <p className="text-lg font-semibold text-gray-800">Loading contact…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !contact) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-16">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="rounded-2xl bg-white p-8 text-center shadow">
+            <p className="text-lg font-semibold text-red-600">
+              {error || 'Contact not found.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push('/contacts')}
+              className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              Back to People Hub
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <PageHeader
+          title={displayName}
+          subtitle="Full profile, pipeline status, and relationship notes."
+          backTo="/contacts/view"
+          backLabel="Back to Contacts"
+        />
+
+        <div className="mb-6 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-gray-600 shadow hover:text-gray-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+          <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600">
+            {contact.pipeline?.pipeline || 'Prospect'}
+          </span>
+          <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-600">
+            {contact.pipeline?.stage || 'Unassigned Stage'}
+          </span>
+        </div>
+
+        <div className="space-y-6">
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">
+              Contact Information
+            </h3>
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm font-semibold text-gray-500">Preferred Name</dt>
+                <dd className="mt-1 text-base text-gray-900">
+                  {contact.goesBy || '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-semibold text-gray-500">Full Name</dt>
+                <dd className="mt-1 text-base text-gray-900">
+                  {[contact.firstName, contact.lastName].filter(Boolean).join(' ') || '—'}
+                </dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-gray-400" />
+                <div>
+                  <dt className="text-sm font-semibold text-gray-500">Email</dt>
+                  <dd className="mt-1 text-base text-gray-900">
+                    {contact.email || '—'}
+                  </dd>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-5 w-5 text-gray-400" />
+                <div>
+                  <dt className="text-sm font-semibold text-gray-500">Phone</dt>
+                  <dd className="mt-1 text-base text-gray-900">
+                    {contact.phone || '—'}
+                  </dd>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-gray-400" />
+                <div>
+                  <dt className="text-sm font-semibold text-gray-500">Company</dt>
+                  <dd className="mt-1 text-base text-gray-900">
+                    {contact.contactCompany?.companyName || '—'}
+                  </dd>
+                </div>
+              </div>
+              <div>
+                <dt className="text-sm font-semibold text-gray-500">Title</dt>
+                <dd className="mt-1 text-base text-gray-900">
+                  {contact.title || '—'}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Notes</h3>
+            <p className="text-sm text-gray-600">
+              {contact.notes || 'Add notes from meetings, emails, and relationship updates.'}
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}

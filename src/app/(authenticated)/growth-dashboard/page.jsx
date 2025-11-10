@@ -366,7 +366,7 @@ export default function GrowthDashboardPage() {
         targetRevenue={dashboardData.targetRevenue}
         currentRevenue={dashboardData.currentRevenue}
         timeHorizon={dashboardData.timeHorizon}
-        onRoadmapClick={() => router.push('/roadmap')}
+        onRoadmapClick={() => router.push('/pipelines/roadmap')}
         hasCompany={hasCompany}
         companyName={companyName}
       />

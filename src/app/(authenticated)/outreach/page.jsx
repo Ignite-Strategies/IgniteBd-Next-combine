@@ -1,0 +1,187 @@
+'use client';
+
+import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Mail,
+  Plus,
+  Send,
+  Users,
+  FileText,
+  BarChart3,
+} from 'lucide-react';
+import PageHeader from '@/components/PageHeader.jsx';
+import { useOutreachContext } from './layout.jsx';
+
+export default function OutreachDashboardPage() {
+  const router = useRouter();
+  const { campaigns, hydrating } = useOutreachContext();
+
+  const metrics = useMemo(() => {
+    const totalCampaigns = campaigns.length;
+    const activeCampaigns = campaigns.filter(
+      (campaign) => ['active', 'sending', 'scheduled'].includes(campaign.status),
+    ).length;
+    const totalRecipients = campaigns.reduce(
+      (total, campaign) => total + (campaign.contactList?.totalContacts ?? 0),
+      0,
+    );
+    return {
+      totalCampaigns,
+      activeCampaigns,
+      totalRecipients,
+      responseRate: campaigns.length > 0 ? 18.5 : 0,
+    };
+  }, [campaigns]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <PageHeader
+          title="Outreach Dashboard"
+          subtitle="Launch nurture campaigns and track engagement performance."
+          backTo="/growth-dashboard"
+          backLabel="Back to Growth Dashboard"
+          actions={
+            <button
+              type="button"
+              onClick={() => router.push('/outreach/campaigns/create')}
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              <Plus className="h-4 w-4" />
+              New Campaign
+            </button>
+          }
+        />
+
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
+          <MetricCard
+            icon={<Mail className="h-6 w-6 text-blue-600" />}
+            value={metrics.totalCampaigns}
+            label="Total Campaigns"
+            onClick={() => router.push('/outreach/campaigns')}
+          />
+          <MetricCard
+            icon={<Send className="h-6 w-6 text-green-600" />}
+            value={metrics.activeCampaigns}
+            label="Active Campaigns"
+            onClick={() => router.push('/outreach/campaigns')}
+          />
+          <MetricCard
+            icon={<Users className="h-6 w-6 text-purple-600" />}
+            value={metrics.totalRecipients}
+            label="Recipients"
+          />
+          <MetricCard
+            icon={<BarChart3 className="h-6 w-6 text-orange-600" />}
+            value={`${metrics.responseRate}%`}
+            label="Avg. Response"
+          />
+        </div>
+
+        <div className="mb-8 rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-8 shadow-sm transition hover:border-indigo-400">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-500 text-white">
+                <Plus className="h-8 w-8" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Set Up Your Next Campaign
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Craft targeted outreach, add templates, and schedule multi-touch sequences.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/outreach/campaigns/create')}
+              className="self-start rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            >
+              Launch Builder →
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-lg">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Recent Campaigns</h3>
+              <p className="text-sm text-gray-500">
+                {hydrating ? 'Refreshing campaigns…' : 'Latest emails and nurture flows.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/outreach/campaigns')}
+              className="text-sm font-semibold text-red-600 transition hover:text-red-700"
+            >
+              View all campaigns
+            </button>
+          </div>
+
+          {campaigns.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 p-10 text-center text-sm text-gray-500">
+              No campaigns yet. Create your first nurture email to kick things off.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {campaigns.slice(0, 6).map((campaign) => (
+                <div
+                  key={campaign.id}
+                  className="rounded-xl border border-gray-200 p-5 shadow-sm transition hover:border-red-200 hover:shadow-md"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="text-base font-semibold text-gray-900">
+                      {campaign.name || 'Untitled Campaign'}
+                    </h4>
+                    <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-600">
+                      {campaign.status || 'draft'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {campaign.subject || 'No email subject assigned yet.'}
+                  </p>
+                  <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      List: {campaign.contactList?.name || 'Unassigned'} (
+                      {campaign.contactList?.totalContacts ?? 0})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/outreach/campaigns/${campaign.id}`)}
+                      className="font-semibold text-red-600 transition hover:text-red-700"
+                    >
+                      View →
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ icon, value, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md"
+    >
+      <div className="mb-3 flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50">
+          {icon}
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <p className="text-sm text-gray-500">{label}</p>
+        </div>
+      </div>
+    </button>
+  );
+}

@@ -21,7 +21,7 @@ Next.js 16 powers both **server-rendered UI** and **API functions**. Everything 
 
 * `src/app/page.js` redirects to `/splash`.
 * Auth pages (`/splash`, `/signup`, `/signin`) run as client components with Firebase hooks.
-* Onboarding pages (`/profilesetup`, `/company/create-or-choose`, `/companyprofile`, `/company/create-success`, `/welcome`) mirror the old React routes one-for-one.
+* Onboarding pages (`/profilesetup`, `/company/create-or-choose`, `/company/profile`, `/company/create-success`, `/welcome`) mirror the old React routes one-for-one.
 * Feature pages (e.g. `/product`, `/persona`, `/growth-dashboard`) live beside their API routes under the same `/app` tree.
 * Sidebar navigation is handled globally by `src/app/providers.jsx` → `src/components/AppShell.jsx`, which decides when to render the left rail.
 

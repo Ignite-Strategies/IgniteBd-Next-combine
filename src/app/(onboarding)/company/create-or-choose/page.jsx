@@ -26,7 +26,7 @@ export default function CompanyCreateOrChoosePage() {
 
         <div
           className="bg-white/10 backdrop-blur-md rounded-2xl shadow-xl p-6 border-2 border-white/30 hover:bg-white/15 transition-all cursor-pointer group mb-6 max-w-2xl mx-auto"
-          onClick={() => router.push('/companyprofile')}
+          onClick={() => router.push('/company/profile')}
         >
           <div className="text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
