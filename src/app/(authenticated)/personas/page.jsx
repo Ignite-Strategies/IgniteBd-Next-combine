@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
+import api from '@/lib/api';
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Load from localStorage immediately (always show page)
+  // Get companyHQId and fetch personas from API
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -19,23 +21,33 @@ export default function PersonasPage() {
       '';
     setCompanyHQId(storedCompanyHQId);
 
-    // Try to load personas from localStorage first
-    try {
-      const storedPersonas = localStorage.getItem('personas');
-      if (storedPersonas) {
-        const parsed = JSON.parse(storedPersonas);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setPersonas(parsed);
-          return; // We have data, show it immediately
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to parse stored personas:', err);
+    if (!storedCompanyHQId) {
+      setLoading(false);
+      setError('Company context is required');
+      return;
     }
-  }, []);
 
-  // No hydration calls here - Growth Dashboard handles all hydration
-  // This page just reads from localStorage
+    // Fetch personas from API
+    const fetchPersonas = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
+        
+        // API returns array directly
+        const personasData = Array.isArray(response.data) ? response.data : [];
+        setPersonas(personasData);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch personas:', err);
+        setError('Failed to load personas. Please try again.');
+        setPersonas([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPersonas();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -66,7 +78,12 @@ export default function PersonasPage() {
           </div>
         )}
 
-        {personas.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <span className="ml-2 text-sm text-gray-500">Loading personas...</span>
+          </div>
+        ) : personas.length === 0 ? (
           <div className="rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 p-12 text-center shadow-lg">
             <div className="mb-6 flex justify-center">
               <div className="rounded-full bg-red-100 p-6">
@@ -113,45 +130,47 @@ export default function PersonasPage() {
                   </Link>
                 </div>
 
-                <div className="space-y-2 text-sm text-gray-600">
+                <div className="space-y-3 text-sm">
                   {persona.industry && (
-                    <p>
-                      <span className="font-semibold text-gray-800">
-                        Industry:
-                      </span>{' '}
-                      {persona.industry}
-                    </p>
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">Industry:</p>
+                      <p className="text-gray-600">{persona.industry}</p>
+                    </div>
                   )}
                   {persona.goals && (
-                    <p>
-                      <span className="font-semibold text-gray-800">Goals:</span>{' '}
-                      {persona.goals}
-                    </p>
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">Goals:</p>
+                      <p className="text-gray-600 whitespace-pre-wrap">{persona.goals}</p>
+                    </div>
                   )}
                   {persona.painPoints && (
-                    <p>
-                      <span className="font-semibold text-gray-800">
-                        Pain Points:
-                      </span>{' '}
-                      {persona.painPoints}
-                    </p>
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">Pain Points:</p>
+                      <p className="text-gray-600 whitespace-pre-wrap">{persona.painPoints}</p>
+                    </div>
+                  )}
+                  {persona.valuePropToPersona && (
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">What They Want:</p>
+                      <p className="text-gray-600 whitespace-pre-wrap">{persona.valuePropToPersona}</p>
+                    </div>
                   )}
                   {persona.desiredOutcome && (
-                    <p>
-                      <span className="font-semibold text-gray-800">
-                        Desired Outcome:
-                      </span>{' '}
-                      {persona.desiredOutcome}
-                    </p>
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">Desired Outcome:</p>
+                      <p className="text-gray-600">{persona.desiredOutcome}</p>
+                    </div>
                   )}
                   {persona.alignmentScore !== null &&
                     persona.alignmentScore !== undefined && (
-                      <p>
-                        <span className="font-semibold text-gray-800">
-                          Alignment Score:
-                        </span>{' '}
-                        {persona.alignmentScore}/100
-                      </p>
+                      <div className="pt-2 border-t border-gray-100">
+                        <p className="text-sm">
+                          <span className="font-semibold text-gray-800">
+                            Alignment Score:
+                          </span>{' '}
+                          <span className="text-blue-600 font-medium">{persona.alignmentScore}/100</span>
+                        </p>
+                      </div>
                     )}
                 </div>
               </div>

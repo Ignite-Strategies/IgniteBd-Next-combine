@@ -57,11 +57,15 @@ export default function PersonaBuilderPage({ searchParams }) {
     handleSubmit,
     reset,
     setValue,
-    formState: { errors, isSubmitting, isDirty },
+    watch,
+    formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: DEFAULT_VALUES,
     mode: 'onBlur',
   });
+
+  // Watch personaName to enable/disable save button
+  const personaName = watch('personaName');
 
   useEffect(() => () => {
     if (toastTimerRef.current) {
@@ -72,15 +76,15 @@ export default function PersonaBuilderPage({ searchParams }) {
   // Pre-fill form with test data when creating a new persona (not editing)
   useEffect(() => {
     if (!personaId && derivedCompanyId && !hasInitialized) {
-      setValue('companyId', derivedCompanyId);
       // Pre-fill with test template for testing upsert logic
       reset({
         ...SOLO_BIZ_OWNER_TEMPLATE,
         companyId: derivedCompanyId,
       });
       setHasInitialized(true);
-    } else if (derivedCompanyId) {
+    } else if (derivedCompanyId && !hasInitialized) {
       setValue('companyId', derivedCompanyId);
+      setHasInitialized(true);
     }
   }, [derivedCompanyId, personaId, setValue, reset, hasInitialized]);
 
@@ -167,7 +171,7 @@ export default function PersonaBuilderPage({ searchParams }) {
       }
 
       handleShowToast('Persona saved.', () => {
-        router.push('/persona');
+        router.push('/personas');
       });
     } catch (error) {
       const message =
@@ -328,8 +332,8 @@ export default function PersonaBuilderPage({ searchParams }) {
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-70"
-              disabled={isBusy || (!isDirty && !personaId)}
+              className="rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-70 disabled:cursor-not-allowed"
+              disabled={isBusy || !personaName?.trim()}
             >
               {isSubmitting ? 'Saving…' : 'Save Persona'}
             </button>

@@ -82,8 +82,13 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
     const contactRole = contact.title || 'Not specified';
     const contactOrg =
       contact.contactCompany?.companyName || 'Not specified';
+    
+    // Get goals and pain points from persona (founder's manual input) or contact notes
+    // These are stored as free text in DB - can include dashes, newlines, bullet points
+    // OpenAI handles this formatted text just fine
     const contactGoals = persona?.goals || contact.notes || 'Not specified';
     const contactPainPoints = persona?.painPoints || 'Not specified';
+    
     const budgetSensitivity = inferBudgetSensitivity(
       pipeline?.stage,
       pipeline?.pipeline,
@@ -97,6 +102,7 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
     const offerPrice = 'Not specified'; // Product schema has no price field currently
 
     // Build the user prompt - matching exact template structure
+    // Free text fields (goals, painPoints) are inserted as-is - OpenAI handles formatted text well
     const userPrompt = `Offer:
 Title: ${product.name}
 Value Prop: ${product.valueProp || product.description || 'Not specified'}
