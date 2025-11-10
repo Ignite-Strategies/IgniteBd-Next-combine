@@ -94,21 +94,14 @@ export async function GET(req) {
     // Calculate token expiration
     const expiresAt = new Date(Date.now() + (tokenResponse.expiresIn || 3600) * 1000);
 
-    // Store or update tokens in database
-    await prisma.microsoftAuth.upsert({
-      where: { ownerId },
-      update: {
-        accessToken: tokenResponse.accessToken,
-        refreshToken: tokenResponse.refreshToken || '',
-        expiresAt,
-        email: microsoftEmail,
-      },
-      create: {
-        ownerId,
-        accessToken: tokenResponse.accessToken,
-        refreshToken: tokenResponse.refreshToken || '',
-        expiresAt,
-        email: microsoftEmail,
+    // Store or update tokens directly on Owner model
+    await prisma.owner.update({
+      where: { id: ownerId },
+      data: {
+        microsoftAccessToken: tokenResponse.accessToken,
+        microsoftRefreshToken: tokenResponse.refreshToken || '',
+        microsoftExpiresAt: expiresAt,
+        microsoftEmail: microsoftEmail,
       },
     });
 

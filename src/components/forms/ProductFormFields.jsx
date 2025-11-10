@@ -144,38 +144,41 @@ export function ProductFormFields({ register, errors, isBusy, personas = [] }) {
               {group.name}
             </h3>
             <div className="space-y-6">
-              {/* Special handling for price + currency */}
-              {group.name === 'Pricing' && (
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">
-                      Currency
-                    </label>
-                    <select
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      disabled={isBusy}
-                      {...register('priceCurrency')}
-                    >
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="CAD">CAD ($)</option>
-                    </select>
+              {/* Special handling for pricing group - currency and price side by side */}
+              {group.name === 'Pricing' ? (
+                <>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700">
+                        Currency
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        disabled={isBusy}
+                        {...register('priceCurrency')}
+                      >
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="CAD">CAD ($)</option>
+                      </select>
+                      <p className="text-xs text-gray-500">
+                        Currency for the price
+                      </p>
+                    </div>
+                    {renderField('price')}
                   </div>
-                  {renderField('price')}
+                  {renderField('pricingModel')}
+                </>
+              ) : group.name === 'Targeting & Market' ? (
+                // Grid layout for targeting fields
+                <div className="grid gap-6 md:grid-cols-2">
+                  {fields.map((fieldName) => renderField(fieldName))}
                 </div>
+              ) : (
+                // Render all fields in the group normally (stacked)
+                fields.map((fieldName) => renderField(fieldName))
               )}
-              
-              {/* Render other fields in the group */}
-              {fields
-                .filter((fieldName) => {
-                  // Skip price if we're in pricing group (handled above)
-                  if (group.name === 'Pricing' && fieldName === 'price') return false;
-                  // Skip priceCurrency (handled above)
-                  if (fieldName === 'priceCurrency') return false;
-                  return true;
-                })
-                .map((fieldName) => renderField(fieldName))}
             </div>
           </div>
         );

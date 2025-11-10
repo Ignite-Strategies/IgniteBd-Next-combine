@@ -14,11 +14,17 @@ model Owner {
   email            String?
   photoURL         String?
   teamSize         String? // Team size for owner context (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  
+  // Microsoft OAuth integration (bolted directly onto Owner)
+  microsoftAccessToken  String?  // Microsoft Graph access token
+  microsoftRefreshToken String?  // Refresh token for getting new access tokens
+  microsoftExpiresAt    DateTime? // Token expiration timestamp
+  microsoftEmail        String?  // Microsoft account email (for display)
+  
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   managedCompanies CompanyHQ[]    @relation("ManagerOf")
   ownedCompanies   CompanyHQ[]    @relation("OwnerOf")
-  microsoftAuth    MicrosoftAuth?
 
   @@map("owners")
 }
@@ -199,16 +205,3 @@ model Persona {
   @@map("personas")
 }
 
-model MicrosoftAuth {
-  id           String   @id @default(cuid())
-  ownerId      String   @unique
-  accessToken  String
-  refreshToken String
-  expiresAt    DateTime
-  email        String? // Store Microsoft account email for display
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  owner        Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  @@map("microsoft_auth")
-}

@@ -24,9 +24,15 @@ export async function DELETE(request) {
       );
     }
 
-    // Delete Microsoft auth record
-    await prisma.microsoftAuth.deleteMany({
-      where: { ownerId: owner.id },
+    // Clear Microsoft auth fields from Owner
+    await prisma.owner.update({
+      where: { id: owner.id },
+      data: {
+        microsoftAccessToken: null,
+        microsoftRefreshToken: null,
+        microsoftExpiresAt: null,
+        microsoftEmail: null,
+      },
     });
 
     console.log('✅ Microsoft OAuth disconnected for owner:', owner.id);

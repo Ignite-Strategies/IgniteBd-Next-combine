@@ -15,9 +15,6 @@ export async function GET(request) {
     // Get Owner record
     const owner = await prisma.owner.findUnique({
       where: { firebaseId: firebaseUser.uid },
-      include: {
-        microsoftAuth: true,
-      },
     });
 
     if (!owner) {
@@ -28,13 +25,10 @@ export async function GET(request) {
     }
 
     // Return Microsoft auth status (without sensitive tokens)
-    const microsoftAuth = owner.microsoftAuth
+    const microsoftAuth = owner.microsoftAccessToken
       ? {
-          id: owner.microsoftAuth.id,
-          email: owner.microsoftAuth.email,
-          expiresAt: owner.microsoftAuth.expiresAt,
-          createdAt: owner.microsoftAuth.createdAt,
-          updatedAt: owner.microsoftAuth.updatedAt,
+          email: owner.microsoftEmail,
+          expiresAt: owner.microsoftExpiresAt,
         }
       : null;
 
