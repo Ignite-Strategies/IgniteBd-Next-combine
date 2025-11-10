@@ -38,6 +38,7 @@ export default function SettingsPage() {
 
   // Load data from owner hook (uses localStorage + hydration)
   useEffect(() => {
+    // Load profile data from owner
     if (owner) {
       setProfileData({
         name: owner.name || '',
@@ -45,14 +46,15 @@ export default function SettingsPage() {
       });
     }
     
+    // Load company data from companyHQ object
     if (companyHQ) {
       setCompanyData({
-        companyName: companyHQ.companyName || 'GoFast',
+        companyName: companyHQ.companyName || '',
         whatYouDo: companyHQ.whatYouDo || '',
-        companyStreet: companyHQ.companyStreet || '2614 N. George Mason Dr.',
-        companyCity: companyHQ.companyCity || 'Arlington',
-        companyState: companyHQ.companyState || 'VA',
-        companyWebsite: companyHQ.companyWebsite || 'gofastcrushgoals.com',
+        companyStreet: companyHQ.companyStreet || '',
+        companyCity: companyHQ.companyCity || '',
+        companyState: companyHQ.companyState || '',
+        companyWebsite: companyHQ.companyWebsite || '',
         companyIndustry: companyHQ.companyIndustry || '',
         companyAnnualRev: companyHQ.companyAnnualRev?.toString() || '',
         yearsInBusiness: companyHQ.yearsInBusiness?.toString() || '',
@@ -60,9 +62,11 @@ export default function SettingsPage() {
       });
     }
     
-    // Fetch Microsoft status in background (non-blocking)
-    fetchConnectionStatus();
-  }, [owner, companyHQ]);
+    // Fetch Microsoft integration status (checks by ownerId via API)
+    if (ownerId) {
+      fetchConnectionStatus();
+    }
+  }, [owner, companyHQ, ownerId]);
 
   // Fetch Microsoft connection status (non-blocking)
   const fetchConnectionStatus = async () => {

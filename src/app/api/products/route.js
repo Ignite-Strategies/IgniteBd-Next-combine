@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  getProductSelect,
+  getProductData,
+  validateAndMapRequest,
+  mapDatabaseToApi,
+} from '@/lib/services/ProductServiceMapper';
 
 const DEFAULT_COMPANY_HQ_ID = process.env.DEFAULT_COMPANY_HQ_ID || null;
 
@@ -10,22 +16,14 @@ export async function GET(request) {
 
     const products = await prisma.product.findMany({
       where: companyHQId ? { companyHQId } : undefined,
-      select: {
-        id: true,
-        companyHQId: true,
-        name: true,
-        valueProp: true,
-        description: true,
-        price: true,
-        priceCurrency: true,
-        targetedTo: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: getProductSelect(),
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(products);
+    // Map to API format
+    const mappedProducts = products.map(mapDatabaseToApi);
+
+    return NextResponse.json(mappedProducts);
   } catch (error) {
     console.error('❌ Products GET error:', error);
     return NextResponse.json(
@@ -38,15 +36,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const {
-      name,
-      description = null,
-      valueProp = null,
-      price = null,
-      priceCurrency = 'USD',
-      targetedTo = null,
-      companyHQId,
-    } = body ?? {};
+    const { companyHQId } = body ?? {};
 
     const tenantId = companyHQId || DEFAULT_COMPANY_HQ_ID;
 
@@ -57,37 +47,26 @@ export async function POST(request) {
       );
     }
 
-    if (!name) {
+    // Validate and map request data
+    const validation = validateAndMapRequest(body);
+    if (!validation.valid) {
       return NextResponse.json(
-        { error: 'name is required' },
+        { error: 'Validation failed', errors: validation.errors },
         { status: 400 },
       );
     }
 
+    const productData = getProductData(body);
+
     const product = await prisma.product.create({
       data: {
         companyHQId: tenantId,
-        name,
-        description,
-        valueProp,
-        price,
-        priceCurrency: price ? (priceCurrency || 'USD') : null,
-        targetedTo,
+        ...productData,
       },
-      select: {
-        id: true,
-        companyHQId: true,
-        name: true,
-        description: true,
-        valueProp: true,
-        price: true,
-        priceCurrency: true,
-        targetedTo: true,
-        createdAt: true,
-      },
+      select: getProductSelect(),
     });
 
-    return NextResponse.json(product, { status: 201 });
+    return NextResponse.json(mapDatabaseToApi(product), { status: 201 });
   } catch (error) {
     console.error('❌ Product POST error:', error);
     return NextResponse.json(

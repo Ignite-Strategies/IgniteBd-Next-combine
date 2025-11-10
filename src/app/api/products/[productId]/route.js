@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  getProductSelect,
+  getProductData,
+  validateAndMapRequest,
+  mapDatabaseToApi,
+} from '@/lib/services/ProductServiceMapper';
 
 const DEFAULT_COMPANY_HQ_ID = process.env.DEFAULT_COMPANY_HQ_ID || null;
 
@@ -14,18 +20,7 @@ export async function GET(request, { params }) {
         id: productId,
         ...(companyHQId ? { companyHQId } : {}),
       },
-      select: {
-        id: true,
-        companyHQId: true,
-        name: true,
-        valueProp: true,
-        description: true,
-        price: true,
-        priceCurrency: true,
-        targetedTo: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: getProductSelect(),
     });
 
     if (!product) {
@@ -35,7 +30,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    return NextResponse.json({ product });
+    return NextResponse.json({ product: mapDatabaseToApi(product) });
   } catch (error) {
     console.error('❌ Product GET error:', error);
     return NextResponse.json(
@@ -49,15 +44,7 @@ export async function PUT(request, { params }) {
   try {
     const { productId } = params;
     const body = await request.json();
-    const {
-      name,
-      description = null,
-      valueProp = null,
-      price = null,
-      priceCurrency = 'USD',
-      targetedTo = null,
-      companyHQId,
-    } = body ?? {};
+    const { companyHQId } = body ?? {};
 
     const tenantId = companyHQId || DEFAULT_COMPANY_HQ_ID;
 
@@ -68,9 +55,11 @@ export async function PUT(request, { params }) {
       );
     }
 
-    if (!name) {
+    // Validate and map request data
+    const validation = validateAndMapRequest(body);
+    if (!validation.valid) {
       return NextResponse.json(
-        { error: 'name is required' },
+        { error: 'Validation failed', errors: validation.errors },
         { status: 400 },
       );
     }
@@ -90,32 +79,16 @@ export async function PUT(request, { params }) {
       );
     }
 
+    const productData = getProductData(body);
+
     // Update the product
     const product = await prisma.product.update({
       where: { id: productId },
-      data: {
-        name,
-        description,
-        valueProp,
-        price,
-        priceCurrency: price ? (priceCurrency || 'USD') : null,
-        targetedTo,
-      },
-      select: {
-        id: true,
-        companyHQId: true,
-        name: true,
-        description: true,
-        valueProp: true,
-        price: true,
-        priceCurrency: true,
-        targetedTo: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      data: productData,
+      select: getProductSelect(),
     });
 
-    return NextResponse.json({ product });
+    return NextResponse.json({ product: mapDatabaseToApi(product) });
   } catch (error) {
     console.error('❌ Product PUT error:', error);
     return NextResponse.json(

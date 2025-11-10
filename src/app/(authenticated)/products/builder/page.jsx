@@ -5,13 +5,24 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { Package } from 'lucide-react';
 import api from '@/lib/api';
+import { PRODUCT_CONFIG } from '@/lib/config/productConfig';
+import { mapDatabaseToForm } from '@/lib/services/ProductServiceMapper';
+import { ProductFormFields } from '@/components/forms/ProductFormFields';
 
+// Default values from config
 const DEFAULT_VALUES = {
   name: '',
   valueProp: '',
   description: '',
   price: '',
-  priceCurrency: 'USD',
+  priceCurrency: PRODUCT_CONFIG.defaults.priceCurrency || 'USD',
+  pricingModel: '',
+  category: '',
+  deliveryTimeline: '',
+  targetMarketSize: '',
+  salesCycleLength: '',
+  features: '',
+  competitiveAdvantages: '',
   targetedTo: '',
   companyId: '',
 };
@@ -23,6 +34,13 @@ const BD_PLATFORM_TEMPLATE = {
   description: '',
   price: '',
   priceCurrency: 'USD',
+  pricingModel: '',
+  category: '',
+  deliveryTimeline: '',
+  targetMarketSize: '',
+  salesCycleLength: '',
+  features: '',
+  competitiveAdvantages: '',
   targetedTo: '',
 };
 
@@ -123,15 +141,10 @@ export default function ProductBuilderPage({ searchParams }) {
           return;
         }
 
-        reset({
-          name: product.name ?? '',
-          valueProp: product.valueProp ?? '',
-          description: product.description ?? '',
-          price: product.price?.toString() ?? '',
-          priceCurrency: product.priceCurrency ?? 'USD',
-          targetedTo: product.targetedTo ?? '',
-          companyId: product.companyHQId ?? derivedCompanyId ?? '',
-        });
+        // Use mapper to convert database record to form data
+        const formData = mapDatabaseToForm(product);
+        formData.companyId = product.companyHQId ?? derivedCompanyId ?? '';
+        reset(formData);
         setHasInitialized(true);
         
         // Also fetch personas for dropdown
@@ -296,110 +309,13 @@ export default function ProductBuilderPage({ searchParams }) {
               {...register('companyId', { required: true })}
             />
 
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Product/Service Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Business Development Platform, Ignite CRM Automation"
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                disabled={isBusy}
-                {...register('name', {
-                  required: 'Product/Service name is required.',
-                })}
-              />
-              {errors.name && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.name.message}
-                </p>
-              )}
-              <p className="mt-1 text-xs text-gray-500">
-                A clear, concise name for your product or service
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Value Proposition
-              </label>
-              <textarea
-                rows={4}
-                placeholder="What specific outcome or benefit does this product deliver? e.g., Turn follow-ups into closed deals automatically."
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                disabled={isBusy}
-                {...register('valueProp')}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                This is used by BD Intelligence to calculate fit scores with contacts
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Description
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Optional: Additional details about the product experience, features, or use cases."
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                disabled={isBusy}
-                {...register('description')}
-              />
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Price
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    className="rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    disabled={isBusy}
-                    {...register('priceCurrency')}
-                  >
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="CAD">CAD ($)</option>
-                  </select>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    disabled={isBusy}
-                    {...register('price')}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Optional: Product/service price for BD Intelligence scoring
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Targeted To
-                </label>
-                <select
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  disabled={isBusy}
-                  {...register('targetedTo')}
-                >
-                  <option value="">Select a persona (optional)</option>
-                  {personas.map((persona) => (
-                    <option key={persona.id} value={persona.id}>
-                      {persona.name || 'Unnamed Persona'}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Optional: Which persona is this product targeted to?
-                </p>
-              </div>
-            </div>
+            {/* Config-driven form fields */}
+            <ProductFormFields
+              register={register}
+              errors={errors}
+              isBusy={isBusy}
+              personas={personas}
+            />
 
             <div className="flex justify-end gap-4 border-t border-gray-100 pt-6">
               <button
