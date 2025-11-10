@@ -169,16 +169,7 @@ export default function GrowthDashboardPage() {
     stats,
   } = useCompanyHydration(companyHQId);
 
-  const [minLoadTimeElapsed, setMinLoadTimeElapsed] = useState(false);
   const [hasStartedHydration, setHasStartedHydration] = useState(false);
-
-  // Minimum 1000ms load time to prevent jerky transitions
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinLoadTimeElapsed(true);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Hydrate company data on mount if we have companyHQId and no cached data
   useEffect(() => {
@@ -188,19 +179,20 @@ export default function GrowthDashboardPage() {
     }
   }, [companyHQId, hasStartedHydration, hydrated, refreshCompanyData]);
 
-  // Show loading screen if:
-  // 1. Still actively loading AND not hydrated yet, OR
-  // 2. Minimum 1000ms hasn't elapsed yet, OR
-  // 3. We have companyHQId but haven't started hydration and aren't hydrated
-  const isActivelyLoading = hydrationLoading && !hydrated;
-  const needsInitialHydration = companyHQId && !hydrated && !hasStartedHydration;
-  const loading = isActivelyLoading || !minLoadTimeElapsed || needsInitialHydration;
+  // Determine loading state - only show loading when actively fetching data
+  // If we have cached data (hydrated=true), show content immediately
+  // If we have companyHQId but no data yet, show loading until data arrives
+  const loading = companyHQId && hydrationLoading && !hydrated;
+  
   const hasCompany = !!companyHQ && !!companyHQId;
   const companyName = companyHQ?.companyName ?? 'Your Company';
 
-  // Calculate dashboard metrics from hydrated data
+  // Calculate dashboard metrics from hydrated data - ensure stable defaults
   const dashboardMetrics = useMemo(() => {
-    if (!contacts || contacts.length === 0) {
+    // Always return stable structure, even if contacts is undefined
+    const contactsArray = Array.isArray(contacts) ? contacts : [];
+    
+    if (contactsArray.length === 0) {
       return {
         contactCount: 0,
         prospectCount: 0,
@@ -213,15 +205,15 @@ export default function GrowthDashboardPage() {
       };
     }
 
-    const prospectCount = contacts.filter(
+    const prospectCount = contactsArray.filter(
       (contact) => contact.pipeline?.pipeline === 'prospect',
     ).length;
-    const clientCount = contacts.filter(
+    const clientCount = contactsArray.filter(
       (contact) => contact.pipeline?.pipeline === 'client',
     ).length;
 
     return {
-      contactCount: contacts.length,
+      contactCount: contactsArray.length,
       prospectCount,
       clientCount,
       eventsThisMonth: 0,
@@ -251,13 +243,14 @@ export default function GrowthDashboardPage() {
     );
   }
 
-  const dashboardData = {
+  const dashboardData = useMemo(() => ({
     targetRevenue: 1_000_000,
     currentRevenue: 0,
     timeHorizon: 12,
-  };
+  }), []);
 
-  const stackCards = [
+  // Memoize stackCards to prevent unnecessary re-renders and jerky updates
+  const stackCards = useMemo(() => [
     {
       name: 'Attract',
       metrics: hasCompany
@@ -284,19 +277,15 @@ export default function GrowthDashboardPage() {
         ? [
             {
               label: 'Contacts',
-              value: loading ? '...' : dashboardMetrics.contactCount.toString(),
+              value: dashboardMetrics.contactCount.toString(),
             },
             {
               label: 'Events This Month',
-              value: loading
-                ? '...'
-                : dashboardMetrics.eventsThisMonth.toString(),
+              value: dashboardMetrics.eventsThisMonth.toString(),
             },
             {
               label: 'Meetings Scheduled',
-              value: loading
-                ? '...'
-                : dashboardMetrics.meetingsScheduled.toString(),
+              value: dashboardMetrics.meetingsScheduled.toString(),
             },
           ]
         : [
@@ -319,19 +308,15 @@ export default function GrowthDashboardPage() {
         ? [
             {
               label: 'Campaigns Active',
-              value: loading
-                ? '...'
-                : dashboardMetrics.campaignsActive.toString(),
+              value: dashboardMetrics.campaignsActive.toString(),
             },
             {
               label: 'Newsletters Sent',
-              value: loading
-                ? '...'
-                : dashboardMetrics.newslettersSent.toString(),
+              value: dashboardMetrics.newslettersSent.toString(),
             },
             {
               label: 'Response Rate',
-              value: loading ? '...' : `${dashboardMetrics.responseRate}%`,
+              value: `${dashboardMetrics.responseRate}%`,
             },
           ]
         : [
@@ -348,10 +333,10 @@ export default function GrowthDashboardPage() {
       color: 'bg-purple-500',
       route: '/outreach',
     },
-  ];
+  ], [hasCompany, dashboardMetrics]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 transition-opacity duration-300">
       {hasCompany && (
         <SetupWizard
           companyHQ={companyHQ}

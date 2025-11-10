@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Mail,
   Plus,
@@ -9,13 +9,62 @@ import {
   Users,
   FileText,
   BarChart3,
+  Target,
+  CheckCircle,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useOutreachContext } from './layout.jsx';
+import api from '@/lib/api';
 
 export default function OutreachDashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { campaigns, hydrating } = useOutreachContext();
+  const [targetContact, setTargetContact] = useState(null);
+  const [targetProduct, setTargetProduct] = useState(null);
+  
+  // Check if we came from BD Intelligence with targeting info
+  useEffect(() => {
+    const contactId = searchParams.get('contactId');
+    const productId = searchParams.get('productId');
+    
+    if (contactId || productId) {
+      // Fetch contact and product details if provided
+      const fetchTargets = async () => {
+        try {
+          if (contactId) {
+            try {
+              const contactRes = await api.get(`/api/contacts/${contactId}`);
+              if (contactRes.data?.contact) {
+                setTargetContact(contactRes.data.contact);
+              }
+            } catch (err) {
+              console.warn('Failed to fetch contact:', err);
+            }
+          }
+          if (productId) {
+            try {
+              const companyHQId = typeof window !== 'undefined' 
+                ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyHQId') || ''
+                : '';
+              const productRes = await api.get(`/api/products${companyHQId ? `?companyHQId=${companyHQId}` : ''}`);
+              const products = Array.isArray(productRes.data) ? productRes.data : [];
+              const product = products.find(p => p.id === productId);
+              if (product) {
+                setTargetProduct(product);
+              }
+            } catch (err) {
+              console.warn('Failed to fetch product:', err);
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch target details:', err);
+        }
+      };
+      
+      fetchTargets();
+    }
+  }, [searchParams]);
 
   const metrics = useMemo(() => {
     const totalCampaigns = campaigns.length;
@@ -45,7 +94,12 @@ export default function OutreachDashboardPage() {
           actions={
             <button
               type="button"
-              onClick={() => router.push('/outreach/campaigns/create')}
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (targetContact?.id) params.set('contactId', targetContact.id);
+                if (targetProduct?.id) params.set('productId', targetProduct.id);
+                router.push(`/outreach/campaigns/create?${params.toString()}`);
+              }}
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
             >
               <Plus className="h-4 w-4" />
@@ -53,6 +107,48 @@ export default function OutreachDashboardPage() {
             </button>
           }
         />
+
+        {/* Target Info Banner */}
+        {(targetContact || targetProduct) && (
+          <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <Target className="h-5 w-5 mt-0.5 text-blue-600" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                  Targeting from BD Intelligence
+                </h3>
+                <div className="space-y-1 text-sm text-gray-700">
+                  {targetContact && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>
+                        <strong>Contact:</strong>{' '}
+                        {targetContact.goesBy ||
+                          [targetContact.firstName, targetContact.lastName]
+                            .filter(Boolean)
+                            .join(' ') ||
+                          targetContact.email ||
+                          'Unknown'}
+                        {targetContact.title && ` - ${targetContact.title}`}
+                      </span>
+                    </div>
+                  )}
+                  {targetProduct && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>
+                        <strong>Product:</strong> {targetProduct.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-gray-600">
+                  Create a campaign to start targeting with hunter.io integration
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
           <MetricCard

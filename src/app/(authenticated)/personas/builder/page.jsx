@@ -41,10 +41,7 @@ export default function PersonaBuilderPage({ searchParams }) {
   const [submitError, setSubmitError] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimerRef = useRef(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedPersona, setGeneratedPersona] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState('');
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   const derivedCompanyId = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -72,69 +69,20 @@ export default function PersonaBuilderPage({ searchParams }) {
     }
   }, []);
 
+  // Pre-fill form with test data when creating a new persona (not editing)
   useEffect(() => {
-    if (derivedCompanyId) {
+    if (!personaId && derivedCompanyId && !hasInitialized) {
       setValue('companyId', derivedCompanyId);
-      // Fetch products for this company
-      fetchProducts(derivedCompanyId);
-    }
-  }, [derivedCompanyId, setValue]);
-
-  const fetchProducts = async (companyHQId) => {
-    try {
-      const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
-      const productsData = Array.isArray(response.data) ? response.data : [];
-      setProducts(productsData);
-    } catch (error) {
-      console.warn('Failed to fetch products:', error);
-      setProducts([]);
-    }
-  };
-
-  const handleGeneratePersona = async () => {
-    if (!derivedCompanyId) {
-      setSubmitError('Company context is required to generate a persona.');
-      return;
-    }
-
-    setIsGenerating(true);
-    setGeneratedPersona(null);
-    setSubmitError(null);
-
-    try {
-      const response = await api.post('/api/personas/generate', {
-        companyHQId: derivedCompanyId,
-        productId: selectedProductId || null,
-      });
-
-      if (!response.data?.success) {
-        throw new Error(response.data?.error || 'Failed to generate persona');
-      }
-
-      const generated = response.data.persona;
-      setGeneratedPersona(generated);
-
-      // Map generated persona to form fields
+      // Pre-fill with test template for testing upsert logic
       reset({
-        personaName: generated.persona_name || '',
-        role: generated.ideal_roles?.join(', ') || '',
-        painPoints: generated.pain_points?.join('\n') || '',
-        goals: generated.core_goals?.join('\n') || '',
-        whatTheyWant: generated.value_prop || '',
+        ...SOLO_BIZ_OWNER_TEMPLATE,
         companyId: derivedCompanyId,
       });
-
-      handleShowToast('Persona generated! Review and edit as needed.');
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Failed to generate persona. Please try again.';
-      setSubmitError(message);
-    } finally {
-      setIsGenerating(false);
+      setHasInitialized(true);
+    } else if (derivedCompanyId) {
+      setValue('companyId', derivedCompanyId);
     }
-  };
+  }, [derivedCompanyId, personaId, setValue, reset, hasInitialized]);
 
   useEffect(() => {
     if (!personaId) {
@@ -166,6 +114,7 @@ export default function PersonaBuilderPage({ searchParams }) {
           whatTheyWant: persona.valuePropToPersona ?? '',
           companyId: persona.companyHQId ?? derivedCompanyId ?? '',
         });
+        setHasInitialized(true);
       } catch (error) {
         if (!isMounted) return;
         const message =
@@ -210,7 +159,6 @@ export default function PersonaBuilderPage({ searchParams }) {
         goals: values.goals,
         valuePropToPersona: values.whatTheyWant,
         companyHQId: values.companyId,
-        productId: selectedProductId || null,
       });
 
       const savedPersona = response.data?.persona;
@@ -230,7 +178,7 @@ export default function PersonaBuilderPage({ searchParams }) {
     }
   });
 
-  const isBusy = isHydrating || isSubmitting || isGenerating;
+  const isBusy = isHydrating || isSubmitting;
 
   return (
     <div className="relative mx-auto max-w-3xl space-y-6 p-6">
@@ -265,72 +213,26 @@ export default function PersonaBuilderPage({ searchParams }) {
           </div>
         )}
 
-        {/* Generate Persona Section */}
+        {/* Template Helper - Only show when creating new persona */}
         {!personaId && (
-          <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-6">
-            <h2 className="mb-3 text-lg font-semibold text-gray-900">
-              🤖 Generate Persona with AI
-            </h2>
-            <p className="mb-4 text-sm text-gray-600">
-              Let AI create a persona based on your company and product information.
+          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="mb-3 text-sm text-gray-600">
+              Form is pre-filled with test data. Edit as needed to test upsert logic.
             </p>
-            <div className="mb-4">
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Product (Optional)
-              </label>
-              <select
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                disabled={isGenerating}
-              >
-                <option value="">General Company Persona</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleGeneratePersona}
-                disabled={isGenerating || isBusy}
-                className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-70"
-              >
-                {isGenerating ? 'Generating...' : 'Generate Persona'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  reset({
-                    ...SOLO_BIZ_OWNER_TEMPLATE,
-                    companyId: derivedCompanyId,
-                  });
-                  handleShowToast('Solo Biz Owner template loaded!');
-                }}
-                disabled={isBusy}
-                className="rounded-lg border-2 border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 disabled:opacity-70"
-              >
-                Use Solo Biz Owner Template
-              </button>
-            </div>
-            {generatedPersona && (
-              <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-                <h3 className="mb-2 text-sm font-semibold text-gray-900">
-                  Generated Persona Preview:
-                </h3>
-                <pre className="max-h-60 overflow-auto rounded bg-gray-50 p-3 text-xs text-gray-700">
-                  {JSON.stringify(generatedPersona, null, 2)}
-                </pre>
-                {generatedPersona.impact_statement && (
-                  <p className="mt-3 text-sm italic text-gray-600">
-                    "{generatedPersona.impact_statement}"
-                  </p>
-                )}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                reset({
+                  ...SOLO_BIZ_OWNER_TEMPLATE,
+                  companyId: derivedCompanyId,
+                });
+                handleShowToast('Template reloaded!');
+              }}
+              disabled={isBusy}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:opacity-60"
+            >
+              Reload Template
+            </button>
           </div>
         )}
 

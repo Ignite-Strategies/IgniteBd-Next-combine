@@ -1,8 +1,29 @@
 import { OpenAI } from 'openai';
 import { prisma } from '../prisma';
 
-// Initialize OpenAI (reads OPENAI_API_KEY from env automatically)
-const openai = new OpenAI();
+// Initialize OpenAI client for Next.js
+// In Next.js API routes, process.env is available on the server
+let openaiClient = null;
+
+function getOpenAIClient() {
+  if (openaiClient) {
+    return openaiClient;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      'OPENAI_API_KEY is not configured. Please set it in your environment variables.',
+    );
+  }
+
+  openaiClient = new OpenAI({
+    apiKey: apiKey,
+  });
+
+  return openaiClient;
+}
 
 /**
  * Business Intelligence Scoring Service
@@ -53,7 +74,7 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
       throw new Error(`Product not found: ${productId}`);
     }
 
-    // Map fields to prompt template
+    // Map fields to prompt template - using actual DB schema field names
     const contactName =
       contact.goesBy ||
       [contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
@@ -71,11 +92,15 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
     const stageName = pipeline?.stage || 'Not specified';
     const contactNotes = contact.notes || 'None';
 
-    // Build the user prompt
+    // Product schema doesn't have price_point field, so we'll use "Not specified"
+    // If you add a price field later, update this mapping
+    const offerPrice = 'Not specified'; // Product schema has no price field currently
+
+    // Build the user prompt - matching exact template structure
     const userPrompt = `Offer:
 Title: ${product.name}
 Value Prop: ${product.valueProp || product.description || 'Not specified'}
-Price: ${product.description || 'Not specified'}
+Price: ${offerPrice}
 
 Contact:
 Name: ${contactName}
@@ -99,7 +124,7 @@ Evaluate the fit and return ONLY a valid JSON object with these exact keys:
   "summary": "<brief explanation>"
 }`;
 
-    // System prompt
+    // System prompt - matches exact template structure
     const systemPrompt = `You are a Business Intelligence Logic Scorer.
 
 Your job is to evaluate how well a business offer matches a contact's current situation.
@@ -123,13 +148,19 @@ Use these anchors:
 Compute total_score = sum(all five) and return JSON with keys:
 { point_of_need, pain_alignment, willingness_to_pay, impact_potential, context_fit, total_score, summary }
 
-Return ONLY valid JSON. No markdown, no code blocks, just the JSON object.`;
+You must return valid JSON only. All scores must be integers between 0-20. The total_score must be the sum of all five dimension scores.`;
 
     // Call OpenAI
-    console.log('🤖 Calling OpenAI for fit score calculation...');
+    // Using gpt-4o for better performance and cost efficiency
+    // Can be overridden with OPENAI_MODEL env variable
+    const model = process.env.OPENAI_MODEL || 'gpt-4o';
+    console.log(`🤖 Calling OpenAI (${model}) for fit score calculation...`);
+    
+    // Get OpenAI client (validates API key is configured)
+    const openai = getOpenAIClient();
     
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: model,
       temperature: 0.7,
       messages: [
         {
@@ -141,6 +172,7 @@ Return ONLY valid JSON. No markdown, no code blocks, just the JSON object.`;
           content: userPrompt,
         },
       ],
+      response_format: { type: 'json_object' }, // Ensure JSON response (requires gpt-4o, gpt-4-turbo, or gpt-3.5-turbo)
     });
 
     const content = completion.choices?.[0]?.message?.content;

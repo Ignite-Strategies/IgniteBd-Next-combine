@@ -15,6 +15,7 @@ import {
   UserCircle,
   Lightbulb,
   FileCheck,
+  Brain,
 } from 'lucide-react';
 
 const navigationGroups = [
@@ -23,6 +24,7 @@ const navigationGroups = [
     items: [
       { name: 'Growth Dashboard', path: '/growth-dashboard', icon: TrendingUp },
       { name: 'BD Roadmap', path: '/pipelines/roadmap', icon: Map },
+      { name: 'BD Intelligence', path: '/bd-intelligence', icon: Brain },
       { name: 'Insights', path: '/insights', icon: Lightbulb },
     ],
   },
