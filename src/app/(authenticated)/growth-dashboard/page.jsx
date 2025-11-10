@@ -12,8 +12,7 @@ import {
   Filter,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useOwner } from '@/hooks/useOwner';
-import { useCompanyHydration } from '@/hooks/useCompanyHydration';
+import api from '@/lib/api';
 
 const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
   ssr: false,
@@ -154,36 +153,60 @@ function StackCard({ name, metrics, insight, icon, color, route }) {
 
 export default function GrowthDashboardPage() {
   const router = useRouter();
-  const { companyHQId: ownerCompanyHQId } = useOwner();
-  const companyHQId = ownerCompanyHQId || (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : null);
-  
-  const {
-    data,
-    loading: hydrationLoading,
-    hydrated,
-    refresh: refreshCompanyData,
-    companyHQ,
-    personas,
-    contacts,
-    products,
-    stats,
-  } = useCompanyHydration(companyHQId);
+  const [companyHQId, setCompanyHQId] = useState('');
+  const [companyHQ, setCompanyHQ] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [hasStartedHydration, setHasStartedHydration] = useState(false);
-
-  // Hydrate company data on mount if we have companyHQId and no cached data
+  // Get companyHQId and fetch data from API (no auto-hydration)
   useEffect(() => {
-    if (companyHQId && !hasStartedHydration && !hydrated) {
-      setHasStartedHydration(true);
-      refreshCompanyData();
-    }
-  }, [companyHQId, hasStartedHydration, hydrated, refreshCompanyData]);
+    if (typeof window === 'undefined') return;
 
-  // Determine loading state - only show loading when actively fetching data
-  // If we have cached data (hydrated=true), show content immediately
-  // If we have companyHQId but no data yet, show loading until data arrives
-  const loading = companyHQId && hydrationLoading && !hydrated;
-  
+    const storedCompanyHQId =
+      window.localStorage.getItem('companyHQId') ||
+      window.localStorage.getItem('companyId') ||
+      '';
+    setCompanyHQId(storedCompanyHQId);
+
+    if (!storedCompanyHQId) {
+      setLoading(false);
+      return;
+    }
+
+    // Fetch contacts and company data directly from API
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch contacts
+        const contactsResponse = await api.get(`/api/contacts?companyHQId=${storedCompanyHQId}`);
+        const contactsData = Array.isArray(contactsResponse.data) ? contactsResponse.data : [];
+        setContacts(contactsData);
+
+        // Try to get company from localStorage first (faster)
+        try {
+          const storedCompany = localStorage.getItem('companyHQ');
+          if (storedCompany) {
+            setCompanyHQ(JSON.parse(storedCompany));
+          }
+        } catch (err) {
+          console.warn('Failed to parse stored company:', err);
+        }
+
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        setError('Failed to load dashboard data');
+        setContacts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const hasCompany = !!companyHQ && !!companyHQId;
   const companyName = companyHQ?.companyName ?? 'Your Company';
 
