@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 
 const ContactsContext = createContext({
@@ -19,74 +20,65 @@ const ContactsContext = createContext({
   refreshContacts: async () => {},
 });
 
-export function useContactsContext() {
+export function useContacts() {
   const context = useContext(ContactsContext);
   if (!context) {
-    throw new Error('useContactsContext must be used within ContactsLayout');
+    throw new Error('useContacts must be used within ContactsLayout');
   }
   return context;
 }
 
 export default function ContactsLayout({ children }) {
+  const { companyHQId } = useCompanyHQ(); // Get companyHQId from hook
   const [contacts, setContacts] = useState([]);
-  const [companyHQId, setCompanyHQId] = useState('');
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
 
+  // Step 1: Check localStorage cache
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    if (typeof window === 'undefined') return;
 
-    const storedCompanyHQId =
-      window.localStorage.getItem('companyHQId') ||
-      window.localStorage.getItem('companyId') ||
-      '';
-
-    if (storedCompanyHQId) {
-      setCompanyHQId(storedCompanyHQId);
-      const cached = window.localStorage.getItem('contacts');
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
-            setContacts(parsed);
-            setHydrated(true);
-          }
-        } catch (error) {
-          console.warn('Failed to parse cached contacts', error);
+    const cached = window.localStorage.getItem('contacts');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setContacts(parsed);
+          setHydrated(true);
         }
+      } catch (error) {
+        console.warn('Failed to parse cached contacts', error);
       }
     }
   }, []);
 
-  const refreshContacts = useCallback(
-    async (tenantId = companyHQId) => {
-      if (!tenantId) {
-        return;
-      }
+  // Step 2: Fetch from API when companyHQId is available
+  const refreshContacts = useCallback(async () => {
+    if (!companyHQId) return;
 
-      try {
-        setHydrating(true);
-        const response = await api.get(`/api/contacts?companyHQId=${tenantId}`);
-        const fetchedContacts = response.data?.contacts ?? [];
-        setContacts(fetchedContacts);
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem('contacts', JSON.stringify(fetchedContacts));
-        }
-        setHydrated(true);
-      } catch (error) {
-        console.error('Error hydrating contacts:', error);
-      } finally {
-        setHydrating(false);
+    setHydrating(true);
+    try {
+      const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+      const fetchedContacts = response.data?.contacts ?? [];
+      
+      setContacts(fetchedContacts);
+      
+      // Step 3: Store in localStorage
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('contacts', JSON.stringify(fetchedContacts));
       }
-    },
-    [companyHQId],
-  );
+      setHydrated(true);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+    } finally {
+      setHydrating(false);
+    }
+  }, [companyHQId]);
 
+  // Step 4: Auto-fetch if not hydrated
   useEffect(() => {
     if (companyHQId && !hydrated) {
-      refreshContacts(companyHQId);
+      refreshContacts();
     }
   }, [companyHQId, hydrated, refreshContacts]);
 

@@ -3,68 +3,41 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuth } from 'firebase/auth';
-import api from '@/lib/api';
+import { useOwner } from '@/hooks/useOwner';
 
 export default function WelcomePage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [hydrated, setHydrated] = useState(false);
-  const [owner, setOwner] = useState(null);
+  const { ownerId, owner, companyHQId, loading, hydrated, error, refresh } = useOwner();
   const [nextRoute, setNextRoute] = useState(null);
-  const [error, setError] = useState(null);
 
+  // Refresh from API if not hydrated
   useEffect(() => {
-    const hydrateOwner = async () => {
-      try {
-        const firebaseUser = getAuth().currentUser;
-        if (!firebaseUser) {
-          router.replace('/signup');
-          return;
-        }
+    if (!hydrated && !loading) {
+      const timer = setTimeout(() => {
+        refresh();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [hydrated, loading, refresh]);
 
-        const response = await api.get('/api/owner/hydrate');
-        if (!response.data?.success) {
-          setError('Failed to load your account. Please try again.');
-          setLoading(false);
-          return;
-        }
-
-        const ownerData = response.data.owner;
-        localStorage.setItem('ownerId', ownerData.id);
-        localStorage.setItem('owner', JSON.stringify(ownerData));
-        if (ownerData.companyHQId) {
-          localStorage.setItem('companyHQId', ownerData.companyHQId);
-        }
-        if (ownerData.companyHQ) {
-          localStorage.setItem('companyHQ', JSON.stringify(ownerData.companyHQ));
-        }
-
-        setOwner(ownerData);
-
-        if (!ownerData.companyHQId || !ownerData.ownedCompanies?.length) {
-          setNextRoute('/company/create-or-choose');
-        } else {
-          setNextRoute('/growth-dashboard');
-        }
-
-        setHydrated(true);
-        setLoading(false);
-      } catch (err) {
-        if (err.response?.status === 401 || err.response?.status === 404) {
-          router.replace('/signup');
-          return;
-        }
-        setError('Failed to load your account. Please try again.');
-        setLoading(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      hydrateOwner();
-    }, 500);
-
-    return () => clearTimeout(timer);
+  // Check Firebase auth
+  useEffect(() => {
+    const firebaseUser = getAuth().currentUser;
+    if (!firebaseUser) {
+      router.replace('/signup');
+    }
   }, [router]);
+
+  // Determine next route based on hydration
+  useEffect(() => {
+    if (!hydrated || loading) return;
+
+    if (!companyHQId || !owner?.ownedCompanies?.length) {
+      setNextRoute('/company/create-or-choose');
+    } else {
+      setNextRoute('/growth-dashboard');
+    }
+  }, [hydrated, loading, companyHQId, owner]);
 
   const handleContinue = () => {
     if (nextRoute) {
@@ -90,7 +63,7 @@ export default function WelcomePage() {
           <div className="bg-white rounded-xl shadow-xl p-8">
             <p className="text-red-600 text-lg mb-4">{error}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => refresh()}
               className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium"
             >
               Try Again
@@ -101,7 +74,7 @@ export default function WelcomePage() {
     );
   }
 
-  if (!hydrated) {
+  if (!hydrated || !nextRoute) {
     return null;
   }
 
