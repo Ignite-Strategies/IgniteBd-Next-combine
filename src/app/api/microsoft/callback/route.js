@@ -9,6 +9,9 @@ import { prisma } from '@/lib/prisma';
  * Exchanges authorization code for tokens and stores them in database
  */
 export async function GET(req) {
+  // Get app URL once at the top
+  const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
+  
   try {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
@@ -17,7 +20,6 @@ export async function GET(req) {
     const errorDescription = searchParams.get('error_description');
 
     // Check for OAuth errors
-    const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
     if (error) {
       console.error('OAuth error:', error, errorDescription);
       return NextResponse.redirect(
@@ -43,7 +45,6 @@ export async function GET(req) {
       }
     } catch (err) {
       console.error('Invalid state parameter:', err);
-      const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
       return NextResponse.redirect(
         `${appUrl}/settings/integrations?error=invalid_state`
       );
@@ -114,13 +115,11 @@ export async function GET(req) {
     console.log('✅ Microsoft OAuth tokens stored for owner:', ownerId);
 
     // Redirect to success page
-    const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
     return NextResponse.redirect(
       `${appUrl}/settings/integrations?success=1`
     );
   } catch (err) {
     console.error('OAuth callback error:', err);
-    const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
     return NextResponse.redirect(
       `${appUrl}/settings/integrations?error=${encodeURIComponent(err.message || 'oauth_failed')}`
     );
