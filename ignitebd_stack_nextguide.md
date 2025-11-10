@@ -348,6 +348,54 @@ api.interceptors.request.use(async (config) => {
 - **API Routes**: `verifyFirebaseToken()` middleware validates tokens
 - **Automatic**: Axios interceptor adds token to all requests
 
+### Authentication Pattern: Read vs Write
+
+**Owner-Based Architecture Pattern:**
+
+The owner is authenticated once via Firebase session. Data is scoped by `companyHQId` (tenant identifier). We don't need to verify the token on every read operation.
+
+#### Route Authentication Strategy
+
+**GET Requests (Read Operations) → `optionalAuth`**
+- **Purpose:** "Show me stuff" - Displaying data
+- **Middleware:** `optionalAuth`
+- **Why:** Data is already scoped by `companyHQId` in query params
+- **Benefits:**
+  - Better UX: No 401 errors on page loads
+  - Better performance: Fewer token verifications
+  - Simpler flow: Owner authenticated once, then scoped by tenant
+
+**Example:**
+```javascript
+// GET /api/contacts?companyHQId=xxx
+export async function GET(request) {
+  // optionalAuth - token not required
+  const { companyHQId } = request.nextUrl.searchParams;
+  // ... fetch contacts scoped by companyHQId
+}
+```
+
+**POST/PUT/DELETE (Write Operations) → `verifyFirebaseToken`**
+- **Purpose:** "Change stuff" - Creating, updating, or deleting data
+- **Middleware:** `verifyFirebaseToken`
+- **Why:** Security - prevent unauthorized modifications
+- **Requirement:** Valid Firebase token must be present
+
+**Example:**
+```javascript
+// POST /api/contacts
+export async function POST(request) {
+  const firebaseUser = await verifyFirebaseToken(request); // Required
+  // ... create contact
+}
+```
+
+**Pattern Summary:**
+- ✅ **GET** = `optionalAuth` (scoped by `companyHQId`)
+- 🔒 **POST/PUT/DELETE** = `verifyFirebaseToken` (requires valid token)
+
+The frontend axios interceptor automatically sends Firebase tokens when available (for analytics/logging) and handles token refresh, but GET requests won't fail if the token is missing or expired.
+
 ---
 
 ## Database & Prisma

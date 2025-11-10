@@ -41,36 +41,45 @@ export default function ContactDetailPage({ params }) {
         
         // Try to find in cached contacts first (fast initial render)
         const cachedContact = contacts.find((item) => item.id === contactId);
-        if (cachedContact) {
+        if (cachedContact && isMounted) {
           setContact(cachedContact);
-          // Don't set loading to false yet - still fetch fresh data
+          setLoading(false); // Show cached data immediately
         }
 
         // Fetch fresh data from API
-        const response = await api.get(`/api/contacts/${contactId}`);
-        if (!isMounted) return;
-        
-        if (response.data?.success && response.data.contact) {
-          setContact(response.data.contact);
-          // Update the contact in the contacts list cache
-          if (refreshContacts) {
-            refreshContacts();
+        try {
+          const response = await api.get(`/api/contacts/${contactId}`);
+          if (!isMounted) return;
+          
+          if (response.data?.success && response.data.contact) {
+            setContact(response.data.contact);
+            setLoading(false);
+            // Update the contact in the contacts list cache
+            if (refreshContacts) {
+              refreshContacts();
+            }
+          } else {
+            if (!cachedContact && isMounted) {
+              setError(response.data?.error || 'Contact not found.');
+              setLoading(false);
+            }
           }
-        } else {
-          if (!cachedContact) {
-            setError(response.data?.error || 'Contact not found.');
+        } catch (apiErr) {
+          console.error('Error fetching contact from API:', apiErr);
+          // If we have cached contact, keep showing it even if API fails
+          if (!cachedContact && isMounted) {
+            setError('Unable to load contact details.');
+            setLoading(false);
+          } else if (isMounted) {
+            setLoading(false); // We have cached data, just stop loading
           }
         }
       } catch (err) {
         console.error('Error loading contact:', err);
         if (!isMounted) return;
-        // Only show error if we don't have cached contact
         const cachedContact = contacts.find((item) => item.id === contactId);
         if (!cachedContact) {
           setError('Unable to load contact details.');
-        }
-      } finally {
-        if (isMounted) {
           setLoading(false);
         }
       }
@@ -80,7 +89,7 @@ export default function ContactDetailPage({ params }) {
     return () => {
       isMounted = false;
     };
-  }, [contactId, refreshContacts]);
+  }, [contactId, contacts, refreshContacts]);
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';

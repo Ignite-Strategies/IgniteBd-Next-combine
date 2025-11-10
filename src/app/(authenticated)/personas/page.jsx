@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, UserCircle, Edit2, Target } from 'lucide-react';
+import api from '@/lib/api';
+import PageHeader from '@/components/PageHeader';
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState([]);
@@ -28,14 +30,18 @@ export default function PersonasPage() {
 
       try {
         if (showLoading) setLoading(true);
-        const response = await fetch(`/api/personas?companyHQId=${tenantId}`, {
-          cache: 'no-store',
-        });
-        if (!response.ok) {
-          throw new Error('Failed to load personas');
+        setError(null);
+        
+        const response = await api.get(`/api/personas?companyHQId=${tenantId}`);
+        
+        if (response.data?.success && response.data.personas) {
+          setPersonas(Array.isArray(response.data.personas) ? response.data.personas : []);
+        } else if (Array.isArray(response.data)) {
+          // Handle case where API returns array directly
+          setPersonas(response.data);
+        } else {
+          setPersonas([]);
         }
-        const data = await response.json();
-        setPersonas(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Error fetching personas:', err);
         setError(err.message);

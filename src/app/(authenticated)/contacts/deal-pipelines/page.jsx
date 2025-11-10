@@ -60,11 +60,25 @@ export default function DealPipelinesPage() {
   
   // Filter contacts by selected stage
   const activeContacts = useMemo(() => {
-    if (!selectedStage) return allActiveContacts;
-    return allActiveContacts.filter((contact) => {
+    if (!selectedStage) {
+      return allActiveContacts;
+    }
+    const filtered = allActiveContacts.filter((contact) => {
       const contactStage = slugify(contact.pipeline?.stage);
-      return contactStage === selectedStage;
+      const matches = contactStage === selectedStage;
+      return matches;
     });
+    console.log('Filtering contacts:', {
+      selectedStage,
+      totalContacts: allActiveContacts.length,
+      filteredCount: filtered.length,
+      sampleStages: allActiveContacts.slice(0, 3).map(c => ({
+        id: c.id,
+        stage: c.pipeline?.stage,
+        slugified: slugify(c.pipeline?.stage)
+      }))
+    });
+    return filtered;
   }, [allActiveContacts, selectedStage]);
   
   // Reset stage filter when pipeline changes
@@ -131,7 +145,10 @@ export default function DealPipelinesPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedStage(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedStage(null);
+                }}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                   selectedStage === null
                     ? 'bg-indigo-600 text-white'
@@ -149,7 +166,10 @@ export default function DealPipelinesPage() {
                   <button
                     key={stageId}
                     type="button"
-                    onClick={() => setSelectedStage(isSelected ? null : stageId)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedStage(isSelected ? null : stageId);
+                    }}
                     className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                       isSelected
                         ? 'bg-indigo-600 text-white'
@@ -203,7 +223,12 @@ export default function DealPipelinesPage() {
                       <tr
                         key={contact.id}
                         className="hover:bg-gray-50 cursor-pointer transition"
-                        onClick={() => router.push(`/contacts/${contact.id}`)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (contact.id) {
+                            router.push(`/contacts/${contact.id}`);
+                          }
+                        }}
                       >
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
                           {displayName}

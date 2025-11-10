@@ -1,19 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAlignmentScore } from '@/lib/alignmentScore';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 const DEFAULT_COMPANY_HQ_ID = process.env.DEFAULT_COMPANY_HQ_ID || null;
 
 export async function GET(request) {
-  try {
-    await verifyFirebaseToken(request);
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 },
-    );
-  }
+  // Use optionalAuth for GET requests (read operations)
+  // Data is scoped by companyHQId, so auth is optional
+  await optionallyVerifyFirebaseToken(request);
 
   try {
     const { searchParams } = new URL(request.url);
