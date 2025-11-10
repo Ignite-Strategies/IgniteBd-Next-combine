@@ -31,6 +31,9 @@ export function useContacts() {
   return context;
 }
 
+// Alias for backward compatibility
+export const useContactsContext = useContacts;
+
 export default function ContactsLayout({ children }) {
   const { companyHQId } = useCompanyHQ(); // Get companyHQId from hook
   const [contacts, setContacts] = useState([]);
