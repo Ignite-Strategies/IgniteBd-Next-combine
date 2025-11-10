@@ -16,6 +16,7 @@ import {
   Lightbulb,
   FileCheck,
   Brain,
+  Package,
 } from 'lucide-react';
 
 const navigationGroups = [
@@ -34,6 +35,7 @@ const navigationGroups = [
       { name: 'People Hub', path: '/contacts', icon: Users },
       { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: Building2 },
       { name: 'Personas', path: '/personas', icon: UserCircle },
+      { name: 'Products', path: '/products', icon: Package },
       { name: 'Proposals', path: '/proposals', icon: FileCheck },
     ],
   },

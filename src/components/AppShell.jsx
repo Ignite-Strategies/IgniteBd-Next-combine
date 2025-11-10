@@ -9,6 +9,8 @@ const ROUTES_WITH_SIDEBAR = [
   '/contacts',
   '/personas',
   '/persona',
+  '/products',
+  '/product',
   '/outreach',
   '/pipelines',
   '/proposals',
