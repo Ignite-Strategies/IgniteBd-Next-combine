@@ -12,7 +12,8 @@ import {
   Filter,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import api from '@/lib/api';
+import { useOwner } from '@/hooks/useOwner';
+import { useCompanyHydration } from '@/hooks/useCompanyHydration';
 
 const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
   ssr: false,
@@ -153,88 +154,102 @@ function StackCard({ name, metrics, insight, icon, color, route }) {
 
 export default function GrowthDashboardPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [companyHQ, setCompanyHQ] = useState(null);
-  const [companyHQId, setCompanyHQId] = useState(null);
-  const [dashboardMetrics, setDashboardMetrics] = useState({
-    contactCount: 0,
-    prospectCount: 0,
-    clientCount: 0,
-    eventsThisMonth: 0,
-    meetingsScheduled: 0,
-    campaignsActive: 0,
-    newslettersSent: 0,
-    responseRate: 0,
-  });
+  const { companyHQId: ownerCompanyHQId } = useOwner();
+  const companyHQId = ownerCompanyHQId || (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : null);
+  
+  const {
+    data,
+    loading: hydrationLoading,
+    hydrated,
+    refresh: refreshCompanyData,
+    companyHQ,
+    personas,
+    contacts,
+    products,
+    stats,
+  } = useCompanyHydration(companyHQId);
 
-  const hasCompany = useMemo(() => {
-    if (!companyHQ || !companyHQId) return false;
-    return companyHQ?.id === companyHQId;
-  }, [companyHQ, companyHQId]);
+  const [minLoadTimeElapsed, setMinLoadTimeElapsed] = useState(false);
+  const [hasStartedHydration, setHasStartedHydration] = useState(false);
 
-  const companyName = companyHQ?.companyName ?? 'Your Company';
-
+  // Minimum 1000ms load time to prevent jerky transitions
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const storedHQ = localStorage.getItem('companyHQ');
-      const storedHQId = localStorage.getItem('companyHQId');
-
-      if (storedHQ) {
-        setCompanyHQ(JSON.parse(storedHQ));
-      }
-      if (storedHQId) {
-        setCompanyHQId(storedHQId);
-      }
-    } catch (error) {
-      console.warn('Failed to read onboarding cache:', error);
-    } finally {
-      setLoading(false);
-    }
+    const timer = setTimeout(() => {
+      setMinLoadTimeElapsed(true);
+    }, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
+  // Hydrate company data on mount if we have companyHQId and no cached data
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!companyHQId) return;
-
-      setLoading(true);
-
-      try {
-        const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
-        const contacts = response.data?.contacts ?? [];
-
-        const prospectCount = contacts.filter(
-          (contact) => contact.pipeline?.pipeline === 'prospect',
-        ).length;
-        const clientCount = contacts.filter(
-          (contact) => contact.pipeline?.pipeline === 'client',
-        ).length;
-
-        setDashboardMetrics((prev) => ({
-          ...prev,
-          contactCount: contacts.length,
-          prospectCount,
-          clientCount,
-        }));
-      } catch (error) {
-        console.warn('Contacts API unavailable, using fallback data:', error);
-
-        if (companyHQ?.contacts && Array.isArray(companyHQ.contacts)) {
-          setDashboardMetrics((prev) => ({
-            ...prev,
-            contactCount: companyHQ.contacts.length,
-          }));
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (hasCompany) {
-      fetchDashboardData();
+    if (companyHQId && !hasStartedHydration && !hydrated) {
+      setHasStartedHydration(true);
+      refreshCompanyData();
     }
-  }, [companyHQ, companyHQId, hasCompany]);
+  }, [companyHQId, hasStartedHydration, hydrated, refreshCompanyData]);
+
+  // Show loading screen if:
+  // 1. Still actively loading AND not hydrated yet, OR
+  // 2. Minimum 1000ms hasn't elapsed yet, OR
+  // 3. We have companyHQId but haven't started hydration and aren't hydrated
+  const isActivelyLoading = hydrationLoading && !hydrated;
+  const needsInitialHydration = companyHQId && !hydrated && !hasStartedHydration;
+  const loading = isActivelyLoading || !minLoadTimeElapsed || needsInitialHydration;
+  const hasCompany = !!companyHQ && !!companyHQId;
+  const companyName = companyHQ?.companyName ?? 'Your Company';
+
+  // Calculate dashboard metrics from hydrated data
+  const dashboardMetrics = useMemo(() => {
+    if (!contacts || contacts.length === 0) {
+      return {
+        contactCount: 0,
+        prospectCount: 0,
+        clientCount: 0,
+        eventsThisMonth: 0,
+        meetingsScheduled: 0,
+        campaignsActive: 0,
+        newslettersSent: 0,
+        responseRate: 0,
+      };
+    }
+
+    const prospectCount = contacts.filter(
+      (contact) => contact.pipeline?.pipeline === 'prospect',
+    ).length;
+    const clientCount = contacts.filter(
+      (contact) => contact.pipeline?.pipeline === 'client',
+    ).length;
+
+    return {
+      contactCount: contacts.length,
+      prospectCount,
+      clientCount,
+      eventsThisMonth: 0,
+      meetingsScheduled: 0,
+      campaignsActive: 0,
+      newslettersSent: 0,
+      responseRate: 0,
+    };
+  }, [contacts]);
+
+  // Show loading screen while hydrating
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="h-16 w-16 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
+          </div>
+          <h2 className="mb-2 text-2xl font-bold text-gray-900">
+            Getting your dashboard ready...
+          </h2>
+          <p className="text-gray-600">
+            Loading your company data and metrics
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const dashboardData = {
     targetRevenue: 1_000_000,

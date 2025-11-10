@@ -1,80 +1,41 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, UserCircle, Edit2, Target } from 'lucide-react';
-import api from '@/lib/api';
-import PageHeader from '@/components/PageHeader';
+import { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
 
+  // Load from localStorage immediately (always show page)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
     const storedCompanyHQId =
       window.localStorage.getItem('companyHQId') ||
       window.localStorage.getItem('companyId') ||
       '';
     setCompanyHQId(storedCompanyHQId);
+
+    // Try to load personas from localStorage first
+    try {
+      const storedPersonas = localStorage.getItem('personas');
+      if (storedPersonas) {
+        const parsed = JSON.parse(storedPersonas);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPersonas(parsed);
+          return; // We have data, show it immediately
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to parse stored personas:', err);
+    }
   }, []);
 
-  const fetchPersonas = useMemo(
-    () => async (tenantId, showLoading = true) => {
-      if (!tenantId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        if (showLoading) setLoading(true);
-        setError(null);
-        
-        const response = await api.get(`/api/personas?companyHQId=${tenantId}`);
-        
-        if (response.data?.success && response.data.personas) {
-          setPersonas(Array.isArray(response.data.personas) ? response.data.personas : []);
-        } else if (Array.isArray(response.data)) {
-          // Handle case where API returns array directly
-          setPersonas(response.data);
-        } else {
-          setPersonas([]);
-        }
-      } catch (err) {
-        console.error('Error fetching personas:', err);
-        setError(err.message);
-        setPersonas([]);
-      } finally {
-        if (showLoading) setLoading(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    fetchPersonas(companyHQId);
-  }, [companyHQId, fetchPersonas]);
-
-  const handleRefresh = async () => {
-    await fetchPersonas(companyHQId);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mb-2 text-2xl font-bold text-gray-900">
-            Loading Personas…
-          </div>
-          <div className="text-gray-600">
-            Fetching persona profiles for your company.
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // No hydration calls here - Growth Dashboard handles all hydration
+  // This page just reads from localStorage
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -89,14 +50,6 @@ export default function PersonasPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </button>
             <Link
               href="/personas/builder"
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
@@ -114,18 +67,26 @@ export default function PersonasPage() {
         )}
 
         {personas.length === 0 ? (
-          <div className="rounded-xl bg-white p-12 text-center shadow">
-            <h2 className="mb-2 text-xl font-semibold text-gray-900">
-              No personas yet
+          <div className="rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 p-12 text-center shadow-lg">
+            <div className="mb-6 flex justify-center">
+              <div className="rounded-full bg-red-100 p-6">
+                <span className="text-5xl">🧠</span>
+              </div>
+            </div>
+            <h2 className="mb-3 text-2xl font-bold text-gray-900">
+              Create Your First Persona
             </h2>
-            <p className="mb-6 text-gray-600">
-              Capture your first persona to align messaging and outreach.
+            <p className="mb-2 text-lg text-gray-700">
+              Personas help you understand your ideal buyers
+            </p>
+            <p className="mb-8 text-gray-600">
+              Define their goals, pain points, and how your offer aligns with their needs
             </p>
             <Link
               href="/personas/builder"
-              className="rounded-lg bg-red-600 px-6 py-3 text-white transition hover:bg-red-700"
+              className="rounded-lg bg-red-600 px-8 py-3 text-lg font-semibold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg"
             >
-              Create Persona
+              Get Started →
             </Link>
           </div>
         ) : (

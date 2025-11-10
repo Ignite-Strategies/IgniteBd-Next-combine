@@ -222,7 +222,7 @@ export default function DealPipelinesPage() {
                     return (
                       <tr
                         key={contact.id}
-                        className="hover:bg-gray-50 cursor-pointer transition"
+                        className="group cursor-pointer transition-all hover:bg-indigo-50 hover:shadow-sm"
                         onClick={(e) => {
                           e.preventDefault();
                           if (contact.id) {
@@ -230,10 +230,12 @@ export default function DealPipelinesPage() {
                           }
                         }}
                       >
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                          {displayName}
+                        <td className="px-4 py-3 text-sm font-medium">
+                          <span className="text-gray-900 group-hover:text-indigo-600 group-hover:underline transition-colors">
+                            {displayName}
+                          </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
+                        <td className="px-4 py-3 text-sm text-gray-600 group-hover:text-gray-700 transition-colors">
                           {contact.contactCompany?.companyName || '—'}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -247,8 +249,10 @@ export default function DealPipelinesPage() {
                             {formatLabel(contact.pipeline?.stage) || 'Unassigned'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {contact.email || '—'}
+                        <td className="px-4 py-3 text-sm">
+                          <span className="text-gray-600 group-hover:text-indigo-600 transition-colors">
+                            {contact.email || '—'}
+                          </span>
                         </td>
                       </tr>
                     );
