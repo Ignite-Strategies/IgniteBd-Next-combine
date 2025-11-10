@@ -1,15 +1,12 @@
+'use client';
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { TrendingUp, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { path: '/growth-dashboard', label: 'Dashboard', icon: '🔥' },
-  { path: '/contacts', label: 'People Hub', icon: '👥' },
-  { path: '/contacts/view', label: 'Contacts', icon: '📋' },
-  { path: '/contacts/manual', label: 'Add Contact', icon: '➕' },
-  { path: '/personas', label: 'Personas', icon: '🧠' },
-  { path: '/personas/builder', label: 'Persona Builder', icon: '🛠️' },
-  { path: '/outreach', label: 'Outreach', icon: '📣' },
-  { path: '/proposals', label: 'Proposals', icon: '📄' },
+  { path: '/growth-dashboard', label: 'Growth Dashboard', icon: TrendingUp },
+  { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Navigation() {
@@ -29,21 +26,24 @@ export default function Navigation() {
           <span>Ignite BD</span>
         </Link>
 
-        <div className="flex items-center space-x-1">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                isActive(item.path)
-                  ? 'bg-red-600 text-white shadow-md'
-                  : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
-              }`}
-            >
-              <span className="mr-1.5">{item.icon}</span>
-              <span className="hidden sm:inline">{item.label}</span>
-            </Link>
-          ))}
+        <div className="flex items-center space-x-2">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  isActive(item.path)
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </nav>

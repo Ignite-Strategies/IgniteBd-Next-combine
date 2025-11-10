@@ -224,25 +224,7 @@ export default function GrowthDashboardPage() {
     };
   }, [contacts]);
 
-  // Show loading screen while hydrating
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mb-4 flex justify-center">
-            <div className="h-16 w-16 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
-          </div>
-          <h2 className="mb-2 text-2xl font-bold text-gray-900">
-            Getting your dashboard ready...
-          </h2>
-          <p className="text-gray-600">
-            Loading your company data and metrics
-          </p>
-        </div>
-      </div>
-    );
-  }
-
+  // Move all hooks BEFORE any conditional returns to avoid React error #310
   const dashboardData = useMemo(() => ({
     targetRevenue: 1_000_000,
     currentRevenue: 0,
@@ -334,6 +316,25 @@ export default function GrowthDashboardPage() {
       route: '/outreach',
     },
   ], [hasCompany, dashboardMetrics]);
+
+  // Show loading screen while hydrating - AFTER all hooks are called
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="h-16 w-16 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
+          </div>
+          <h2 className="mb-2 text-2xl font-bold text-gray-900">
+            Getting your dashboard ready...
+          </h2>
+          <p className="text-gray-600">
+            Loading your company data and metrics
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 transition-opacity duration-300">
