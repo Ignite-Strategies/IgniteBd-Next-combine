@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '../layout.jsx';
 import { usePipelinesContext } from '../../pipelines/layout.jsx';
@@ -35,11 +36,13 @@ const slugify = (value) =>
     .replace(/\s+/g, '-');
 
 export default function DealPipelinesPage() {
+  const router = useRouter();
   const { contacts } = useContactsContext();
   const { pipelineConfig, hydrating } = usePipelinesContext();
   const pipelines = pipelineConfig?.pipelines ?? FALLBACK_PIPELINES;
   const pipelineKeys = Object.keys(pipelines);
   const [activePipeline, setActivePipeline] = useState(pipelineKeys[0] ?? 'prospect');
+  const [selectedStage, setSelectedStage] = useState(null); // null = show all stages
 
   const contactsByPipeline = useMemo(() => {
     return contacts.reduce((acc, contact) => {
@@ -53,7 +56,22 @@ export default function DealPipelinesPage() {
   }, [contacts]);
 
   const activeStages = pipelines[activePipeline] ?? [];
-  const activeContacts = contactsByPipeline.get(activePipeline) ?? [];
+  const allActiveContacts = contactsByPipeline.get(activePipeline) ?? [];
+  
+  // Filter contacts by selected stage
+  const activeContacts = useMemo(() => {
+    if (!selectedStage) return allActiveContacts;
+    return allActiveContacts.filter((contact) => {
+      const contactStage = slugify(contact.pipeline?.stage);
+      return contactStage === selectedStage;
+    });
+  }, [allActiveContacts, selectedStage]);
+  
+  // Reset stage filter when pipeline changes
+  const handlePipelineChange = (pipelineId) => {
+    setActivePipeline(pipelineId);
+    setSelectedStage(null); // Reset stage filter
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -76,7 +94,7 @@ export default function DealPipelinesPage() {
                 <button
                   key={pipelineId}
                   type="button"
-                  onClick={() => setActivePipeline(pipelineId)}
+                  onClick={() => handlePipelineChange(pipelineId)}
                   className={`rounded-xl border-2 p-4 text-left transition ${
                     isActive
                       ? 'border-indigo-500 bg-indigo-50'
@@ -111,14 +129,37 @@ export default function DealPipelinesPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {activeStages.map((stageId) => (
-                <span
-                  key={stageId}
-                  className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600"
-                >
-                  {formatLabel(stageId)}
-                </span>
-              ))}
+              <button
+                type="button"
+                onClick={() => setSelectedStage(null)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  selectedStage === null
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                All Stages
+              </button>
+              {activeStages.map((stageId) => {
+                const isSelected = selectedStage === stageId;
+                const stageCount = allActiveContacts.filter(
+                  (contact) => slugify(contact.pipeline?.stage) === stageId
+                ).length;
+                return (
+                  <button
+                    key={stageId}
+                    type="button"
+                    onClick={() => setSelectedStage(isSelected ? null : stageId)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                    }`}
+                  >
+                    {formatLabel(stageId)} ({stageCount})
+                  </button>
+                );
+              })}
               {activeStages.length === 0 && (
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
                   No stages defined yet
@@ -153,24 +194,40 @@ export default function DealPipelinesPage() {
                     </td>
                   </tr>
                 ) : (
-                  activeContacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        {contact.goesBy ||
-                          [contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
-                          'Unnamed Contact'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {contact.contactCompany?.companyName || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {formatLabel(slugify(contact.pipeline?.stage)) || 'Unassigned'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {contact.email || '—'}
-                      </td>
-                    </tr>
-                  ))
+                  activeContacts.map((contact) => {
+                    const contactStage = slugify(contact.pipeline?.stage);
+                    const displayName = contact.goesBy ||
+                      [contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
+                      'Unnamed Contact';
+                    return (
+                      <tr
+                        key={contact.id}
+                        className="hover:bg-gray-50 cursor-pointer transition"
+                        onClick={() => router.push(`/contacts/${contact.id}`)}
+                      >
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {displayName}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {contact.contactCompany?.companyName || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              contactStage && activeStages.includes(contactStage)
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {formatLabel(contact.pipeline?.stage) || 'Unassigned'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {contact.email || '—'}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

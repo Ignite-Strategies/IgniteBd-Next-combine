@@ -9,32 +9,64 @@ import { useContactsContext } from '../layout.jsx';
 
 export default function ContactDetailPage({ params }) {
   const router = useRouter();
-  const { contacts, refreshContacts, companyHQId } = useContactsContext();
+  const { contacts, refreshContacts } = useContactsContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [contact, setContact] = useState(null);
+  const [contactId, setContactId] = useState(null);
+
+  // Handle params (may be sync or async in Next.js)
+  useEffect(() => {
+    const resolveParams = async () => {
+      if (params && typeof params.then === 'function') {
+        // Params is a Promise (Next.js 15+)
+        const resolvedParams = await params;
+        setContactId(resolvedParams?.contactId);
+      } else if (params?.contactId) {
+        // Params is an object
+        setContactId(params.contactId);
+      }
+    };
+    resolveParams();
+  }, [params]);
 
   useEffect(() => {
+    if (!contactId) return;
+
     let isMounted = true;
     const loadContact = async () => {
       try {
         setLoading(true);
-        const cachedContact = contacts.find((item) => item.id === params.contactId);
+        setError('');
+        
+        // Try to find in cached contacts first (fast initial render)
+        const cachedContact = contacts.find((item) => item.id === contactId);
         if (cachedContact) {
           setContact(cachedContact);
+          // Don't set loading to false yet - still fetch fresh data
         }
 
-        const response = await api.get(`/api/contacts/${params.contactId}`);
+        // Fetch fresh data from API
+        const response = await api.get(`/api/contacts/${contactId}`);
         if (!isMounted) return;
-        if (response.data?.success) {
+        
+        if (response.data?.success && response.data.contact) {
           setContact(response.data.contact);
-          await refreshContacts(companyHQId);
-        } else if (!cachedContact) {
-          setError(response.data?.error || 'Contact not found.');
+          // Update the contact in the contacts list cache
+          if (refreshContacts) {
+            refreshContacts();
+          }
+        } else {
+          if (!cachedContact) {
+            setError(response.data?.error || 'Contact not found.');
+          }
         }
       } catch (err) {
+        console.error('Error loading contact:', err);
         if (!isMounted) return;
-        if (!contact) {
+        // Only show error if we don't have cached contact
+        const cachedContact = contacts.find((item) => item.id === contactId);
+        if (!cachedContact) {
           setError('Unable to load contact details.');
         }
       } finally {
@@ -48,7 +80,7 @@ export default function ContactDetailPage({ params }) {
     return () => {
       isMounted = false;
     };
-  }, [companyHQId, contacts, contact, params.contactId, refreshContacts]);
+  }, [contactId, refreshContacts]);
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
