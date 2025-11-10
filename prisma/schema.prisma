@@ -111,15 +111,18 @@ model Contact {
 }
 
 model Product {
-  id          String    @id @default(cuid())
-  companyHQId String
-  name        String
-  description String?
-  valueProp   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  personas    Persona[]
+  id            String    @id @default(cuid())
+  companyHQId   String
+  name          String
+  description   String?
+  valueProp     String?
+  price         Float?    // Price in base currency
+  priceCurrency String?   @default("USD") // Currency code (USD, EUR, etc.)
+  targetedTo    String?   // Persona IDs (comma-separated) or description of target audience
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  companyHQ     CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  personas      Persona[]
 
   @@map("products")
 }

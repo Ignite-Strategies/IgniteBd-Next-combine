@@ -10,6 +10,9 @@ const DEFAULT_VALUES = {
   name: '',
   valueProp: '',
   description: '',
+  price: '',
+  priceCurrency: 'USD',
+  targetedTo: '',
   companyId: '',
 };
 
@@ -18,6 +21,9 @@ const BD_PLATFORM_TEMPLATE = {
   name: 'Business Development Platform',
   valueProp: 'Provide a platform for business development growth.',
   description: '',
+  price: '',
+  priceCurrency: 'USD',
+  targetedTo: '',
 };
 
 export default function ProductBuilderPage({ searchParams }) {

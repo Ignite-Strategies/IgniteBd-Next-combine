@@ -16,6 +16,9 @@ export async function GET(request) {
         name: true,
         valueProp: true,
         description: true,
+        price: true,
+        priceCurrency: true,
+        targetedTo: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -39,6 +42,9 @@ export async function POST(request) {
       name,
       description = null,
       valueProp = null,
+      price = null,
+      priceCurrency = 'USD',
+      targetedTo = null,
       companyHQId,
     } = body ?? {};
 
@@ -64,6 +70,9 @@ export async function POST(request) {
         name,
         description,
         valueProp,
+        price,
+        priceCurrency: price ? (priceCurrency || 'USD') : null,
+        targetedTo,
       },
       select: {
         id: true,
@@ -71,6 +80,9 @@ export async function POST(request) {
         name: true,
         description: true,
         valueProp: true,
+        price: true,
+        priceCurrency: true,
+        targetedTo: true,
         createdAt: true,
       },
     });
