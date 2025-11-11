@@ -52,9 +52,8 @@ export async function GET(request) {
       state: encodedState,
     });
 
-    // For multi-tenant apps, always use 'common' endpoint
-    // This allows users from any organization to sign in
-    const tenantId = 'common'; // Multi-tenant: use 'common' instead of specific tenant ID
+    // Use tenant ID from environment variable (or default to 'common' for multi-tenant)
+    const tenantId = process.env.AZURE_TENANT_ID || 'common';
     const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params}`;
 
     // Return JSON with auth URL for client-side redirect

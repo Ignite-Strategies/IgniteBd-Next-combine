@@ -51,11 +51,12 @@ export async function GET(req) {
     }
 
     // MSAL configuration for server-side token exchange
-    // For multi-tenant apps, use 'common' endpoint to accept tokens from any tenant
+    // Use tenant ID from environment variable (must match the tenant used in login)
+    const tenantId = process.env.AZURE_TENANT_ID || 'common';
     const msalConfig = {
       auth: {
         clientId: process.env.AZURE_CLIENT_ID,
-        authority: 'https://login.microsoftonline.com/common', // Multi-tenant: always use 'common'
+        authority: `https://login.microsoftonline.com/${tenantId}`,
         clientSecret: process.env.AZURE_CLIENT_SECRET,
       },
     };
