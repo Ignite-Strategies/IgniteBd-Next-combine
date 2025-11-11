@@ -71,10 +71,12 @@ export async function refreshAccessToken(ownerId) {
     }
 
     // MSAL configuration for token refresh
+    // For multi-tenant apps, use 'common' endpoint
+    // The actual tenant is determined by the refresh token itself
     const msalConfig = {
       auth: {
         clientId: process.env.AZURE_CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID || 'common'}`,
+        authority: 'https://login.microsoftonline.com/common', // Multi-tenant: always use 'common'
         clientSecret: process.env.AZURE_CLIENT_SECRET,
       },
     };
