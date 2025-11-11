@@ -37,6 +37,32 @@ export default function SettingsPage() {
     teamSize: '',
   });
 
+  // Fetch Microsoft connection status (non-blocking)
+  const fetchConnectionStatus = useCallback(async () => {
+    try {
+      const response = await api.get('/api/microsoft/status');
+      if (response.data.success) {
+        setMicrosoftAuth(response.data.microsoftAuth);
+      }
+    } catch (err) {
+      // Not an error if not connected
+      setMicrosoftAuth(null);
+    }
+  }, []);
+
+  // Fetch SendGrid configuration (non-blocking)
+  const fetchSendGridConfig = useCallback(async () => {
+    try {
+      const response = await api.get('/api/email/config');
+      if (response.data.success) {
+        setSendGridConfig(response.data);
+      }
+    } catch (err) {
+      // Not an error if not configured
+      setSendGridConfig({ configured: false });
+    }
+  }, []);
+
   // Load data from owner hook (uses localStorage + hydration)
   useEffect(() => {
     // Load profile data from owner
@@ -69,32 +95,6 @@ export default function SettingsPage() {
       fetchSendGridConfig();
     }
   }, [owner, companyHQ, ownerId, fetchConnectionStatus, fetchSendGridConfig]);
-
-  // Fetch Microsoft connection status (non-blocking)
-  const fetchConnectionStatus = useCallback(async () => {
-    try {
-      const response = await api.get('/api/microsoft/status');
-      if (response.data.success) {
-        setMicrosoftAuth(response.data.microsoftAuth);
-      }
-    } catch (err) {
-      // Not an error if not connected
-      setMicrosoftAuth(null);
-    }
-  }, []);
-
-  // Fetch SendGrid configuration (non-blocking)
-  const fetchSendGridConfig = useCallback(async () => {
-    try {
-      const response = await api.get('/api/email/config');
-      if (response.data.success) {
-        setSendGridConfig(response.data);
-      }
-    } catch (err) {
-      // Not an error if not configured
-      setSendGridConfig({ configured: false });
-    }
-  }, []);
 
   // Handle Microsoft connection
   const handleConnectMicrosoft = async () => {
