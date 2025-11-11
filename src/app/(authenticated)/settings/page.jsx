@@ -420,7 +420,46 @@ export default function SettingsPage() {
           {/* Integrations View */}
           {activeSection === 'integrations' && (
             <div className="space-y-6">
-              {/* Microsoft Outlook Integration */}
+              {/* SendGrid Email Integration */}
+              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div className="p-6">
+                  <div className="flex items-start space-x-6">
+                    {/* SendGrid Logo/Icon */}
+                    <div className="flex-shrink-0">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-blue-50 border border-blue-200">
+                        <Mail className="h-12 w-12 text-blue-600" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        Email Sending (SendGrid)
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Send outreach emails via SendGrid. No OAuth required - just configure your API key.
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm font-medium text-blue-900 mb-1">
+                            Status: {process.env.NEXT_PUBLIC_SENDGRID_CONFIGURED ? 'Configured' : 'Not Configured'}
+                          </p>
+                          <p className="text-xs text-blue-700">
+                            SendGrid is configured server-side. Emails will be sent from: {process.env.NEXT_PUBLIC_SENDGRID_FROM_EMAIL || 'noreply@ignitegrowth.biz'}
+                          </p>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          <p>• Configure SENDGRID_API_KEY in your environment variables</p>
+                          <p>• Set SENDGRID_FROM_EMAIL and SENDGRID_FROM_NAME for sender info</p>
+                          <p>• No user authentication required - works immediately</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Microsoft Outlook Integration (Optional) */}
               <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="p-6">
                   <div className="flex items-start space-x-6">
@@ -438,10 +477,10 @@ export default function SettingsPage() {
                     
                     <div className="flex-1">
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        Microsoft Outlook
+                        Microsoft Outlook (Optional)
                       </h3>
                       <p className="text-sm text-gray-600 mb-4">
-                        Connect your Microsoft account to send outreach emails directly from IgniteGrowth.
+                        Connect your Microsoft account to sync contacts and send emails from your Outlook inbox.
                       </p>
                       
                       {isConnected ? (
@@ -488,7 +527,7 @@ export default function SettingsPage() {
                             <ArrowRight className="h-5 w-5 ml-2" />
                           </button>
                           <p className="text-xs text-gray-500 text-center">
-                            You'll be redirected to Microsoft to authorize the connection
+                            Optional: Connect to sync contacts and send from your Outlook inbox
                           </p>
                         </div>
                       )}
