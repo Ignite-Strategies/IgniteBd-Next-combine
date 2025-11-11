@@ -51,12 +51,12 @@ export async function GET(req) {
     }
 
     // MSAL configuration for server-side token exchange
-    // Use tenant ID from environment variable (must match the tenant used in login)
-    const tenantId = process.env.AZURE_TENANT_ID || 'common';
+    // Use 'common' endpoint to accept tokens from any tenant
+    // The actual tenant ID will be extracted from the ID token
     const msalConfig = {
       auth: {
         clientId: process.env.AZURE_CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${tenantId}`,
+        authority: 'https://login.microsoftonline.com/common', // Multi-tenant endpoint
         clientSecret: process.env.AZURE_CLIENT_SECRET,
       },
     };
@@ -67,7 +67,7 @@ export async function GET(req) {
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://ignitegrowth.biz/api/microsoft/callback';
     const tokenResponse = await cca.acquireTokenByCode({
       code,
-      scopes: ['https://graph.microsoft.com/.default', 'offline_access'],
+      scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Send', 'Mail.Read', 'Contacts.Read', 'Contacts.ReadWrite', 'Calendars.Read'],
       redirectUri,
     });
 
@@ -75,30 +75,59 @@ export async function GET(req) {
       throw new Error('Failed to acquire tokens');
     }
 
-    // Get user's email and display name from Microsoft Graph
+    // Extract tenant ID from ID token
+    // The ID token contains 'tid' (tenant ID) which identifies the user's organization
+    let microsoftTenantId = null;
     let microsoftEmail = null;
     let microsoftDisplayName = null;
+    
     try {
-      const graphResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-        headers: {
-          Authorization: `Bearer ${tokenResponse.accessToken}`,
-        },
-      });
-      
-      if (graphResponse.ok) {
-        const userData = await graphResponse.json();
-        microsoftEmail = userData.mail || userData.userPrincipalName;
-        microsoftDisplayName = userData.displayName || userData.givenName || userData.mail || null;
+      // Decode ID token to extract tenant ID and user info
+      if (tokenResponse.idToken) {
+        // ID token is a JWT: header.payload.signature
+        const idTokenParts = tokenResponse.idToken.split('.');
+        if (idTokenParts.length === 3) {
+          // Decode the payload (base64url)
+          const payload = JSON.parse(
+            Buffer.from(idTokenParts[1], 'base64url').toString('utf-8')
+          );
+          
+          // Extract tenant ID (tid) from ID token
+          microsoftTenantId = payload.tid || null;
+          
+          // Extract user info from ID token
+          microsoftEmail = payload.email || payload.upn || payload.preferred_username || null;
+          microsoftDisplayName = payload.name || payload.given_name || null;
+        }
       }
     } catch (err) {
-      console.warn('Failed to fetch user data from Graph:', err);
-      // Continue without email/name - not critical
+      console.warn('Failed to decode ID token:', err);
+    }
+
+    // If we didn't get user info from ID token, fetch from Graph API
+    if (!microsoftEmail || !microsoftDisplayName) {
+      try {
+        const graphResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+          headers: {
+            Authorization: `Bearer ${tokenResponse.accessToken}`,
+          },
+        });
+        
+        if (graphResponse.ok) {
+          const userData = await graphResponse.json();
+          microsoftEmail = microsoftEmail || userData.mail || userData.userPrincipalName;
+          microsoftDisplayName = microsoftDisplayName || userData.displayName || userData.givenName || null;
+        }
+      } catch (err) {
+        console.warn('Failed to fetch user data from Graph:', err);
+      }
     }
 
     // Calculate token expiration
     const expiresAt = new Date(Date.now() + (tokenResponse.expiresIn || 3600) * 1000);
 
     // Store or update tokens directly on Owner model
+    // Include tenant ID for tenant-specific token refresh
     await prisma.owner.update({
       where: { id: ownerId },
       data: {
@@ -107,6 +136,7 @@ export async function GET(req) {
         microsoftExpiresAt: expiresAt,
         microsoftEmail: microsoftEmail,
         microsoftDisplayName: microsoftDisplayName,
+        microsoftTenantId: microsoftTenantId, // Store tenant ID for future token refresh
       },
     });
 

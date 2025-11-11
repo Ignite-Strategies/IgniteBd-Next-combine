@@ -33,6 +33,7 @@ export async function DELETE(request) {
         microsoftExpiresAt: null,
         microsoftEmail: null,
         microsoftDisplayName: null,
+        microsoftTenantId: null, // Clear tenant ID as well
       },
     });
 

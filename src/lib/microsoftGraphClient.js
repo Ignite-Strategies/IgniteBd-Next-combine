@@ -59,6 +59,7 @@ export async function refreshAccessToken(ownerId) {
         microsoftAccessToken: true,
         microsoftRefreshToken: true,
         microsoftExpiresAt: true,
+        microsoftTenantId: true, // Get tenant ID from user record
       },
     });
 
@@ -71,12 +72,14 @@ export async function refreshAccessToken(ownerId) {
     }
 
     // MSAL configuration for token refresh
-    // Use tenant ID from environment variable (must match the tenant used in login/callback)
-    const tenantId = process.env.AZURE_TENANT_ID || 'common';
+    // Use the tenant ID stored with the user (extracted from ID token)
+    // This allows tenant-specific token refresh for multi-tenant scenarios
+    // If no tenant ID is stored, fall back to 'common' (shouldn't happen, but safe fallback)
+    const tenantId = owner.microsoftTenantId || 'common';
     const msalConfig = {
       auth: {
         clientId: process.env.AZURE_CLIENT_ID,
-        authority: `https://login.microsoftonline.com/${tenantId}`,
+        authority: `https://login.microsoftonline.com/${tenantId}`, // Use user's specific tenant
         clientSecret: process.env.AZURE_CLIENT_SECRET,
       },
     };
