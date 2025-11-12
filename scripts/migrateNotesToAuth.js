@@ -6,7 +6,15 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+// Use DATABASE_URL from environment (from Vercel or .env.local)
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
 
 async function main() {
   console.log('🔍 Finding contacts with notes...');
