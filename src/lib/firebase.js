@@ -1,6 +1,12 @@
+/**
+ * Firebase Client SDK - CLIENT-ONLY
+ * 
+ * ⚠️ Only import this in client components (files with 'use client')
+ * Never use in server routes or API handlers
+ */
+
 'use client';
 
-import { initializeApp } from 'firebase/app';
 import {
   getAuth,
   setPersistence,
@@ -13,18 +19,9 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
+import { firebaseClientApp } from './firebaseClient';
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyDNsO_LnQ7t3L_KWejjCuUQxxkI3r0iRxM',
-  authDomain: 'ignite-strategies-313c0.firebaseapp.com',
-  projectId: 'ignite-strategies-313c0',
-  storageBucket: 'ignite-strategies-313c0.firebasestorage.app',
-  messagingSenderId: '252461468255',
-  appId: '1:252461468255:web:0d62b1a63e3e8da77329ea',
-  measurementId: 'G-J2YCGRF1ZJ',
-};
-
-const app = initializeApp(firebaseConfig);
+const app = firebaseClientApp;
 
 let analytics = null;
 if (typeof window !== 'undefined') {

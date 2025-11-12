@@ -209,12 +209,16 @@ export async function POST(request) {
       message: `✅ Portal access ready! ${firebaseUserWasCreated ? 'Created new Firebase user' : 'Using existing Firebase user'} and generated invite token.`,
     });
   } catch (error) {
-    console.error('❌ Invite send error:', error);
+    // Explicit error handling - ensure errors are caught and returned properly
+    console.error('🔥 invite/send server error:', error?.message || error);
+    console.error('Error stack:', error?.stack);
+    
+    // Return proper error response
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to send invite',
-        details: error.message,
+        error: error?.message || 'Failed to send invite',
+        details: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
       },
       { status: 500 },
     );

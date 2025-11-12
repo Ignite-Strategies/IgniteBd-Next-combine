@@ -1,3 +1,13 @@
+/**
+ * Axios API Client - CLIENT-ONLY
+ * 
+ * ⚠️ Only import this in client components (files with 'use client')
+ * Never use in server routes or API handlers
+ * 
+ * This sets up global axios interceptors that run in the browser.
+ * If imported server-side, it can interfere with serverless function execution.
+ */
+
 'use client';
 
 import axios from 'axios';
@@ -11,6 +21,7 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Request interceptor - adds Firebase token to requests
 api.interceptors.request.use(
   async (config) => {
     try {
@@ -38,6 +49,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
+// Response interceptor - handles errors globally
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

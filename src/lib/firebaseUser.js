@@ -1,13 +1,19 @@
-import { getFirebaseAdmin } from './firebaseAdmin';
+/**
+ * Firebase User Helper - SERVER-ONLY
+ * 
+ * ⚠️ NEVER import this file in client components
+ * Only use in /app/api/**/route.js or other server modules
+ */
+
+import { admin } from './firebaseAdmin';
 
 /**
  * Ensure Firebase user exists for email
  * Returns { user, wasCreated: boolean }
  */
 export async function ensureFirebaseUser(email, displayName = null) {
-  const admin = getFirebaseAdmin();
-  if (!admin) {
-    throw new Error('Firebase admin not configured');
+  if (!admin.apps.length) {
+    throw new Error('Firebase admin not configured. Check FIREBASE_SERVICE_ACCOUNT_KEY.');
   }
 
   const auth = admin.auth();
