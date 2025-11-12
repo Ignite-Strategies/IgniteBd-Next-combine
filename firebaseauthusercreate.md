@@ -142,11 +142,12 @@ return NextResponse.json({
 ```
 
 **What Frontend Receives:**
-- ✅ `passwordResetLink` - The Firebase reset link (string URL)
+- ✅ `passwordResetLink` - A **complete URL string** like `https://your-project.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=...`
 - ✅ `contactId` - For reference
 - ✅ `contactEmail` - For display
 - ❌ **NOT** the Firebase UID (stored in DB, not sent to frontend)
-- ❌ **NOT** a token (no token needed - link is the credential)
+- ❌ **NOT** a token (no token needed - the URL itself is the credential)
+- ❌ **NOT** a parameter (it's a full URL the client clicks)
 
 ## Answering Your Questions
 
@@ -333,10 +334,10 @@ https://[project].firebaseapp.com/__/auth/action?
    → Store in Prisma: Contact.notes.clientPortalAuth.firebaseUid
    
 3. Generate password reset link
-   → Returns: String URL (reset link)
+   → Returns: Full URL string (e.g., "https://project.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=...")
    
 4. Return to frontend
-   → { passwordResetLink, contactId, contactEmail }
+   → { passwordResetLink: "https://...", contactId, contactEmail }
 ```
 
 ### What Gets Stored Where
@@ -346,21 +347,23 @@ https://[project].firebaseapp.com/__/auth/action?
 - Stored server-side, not hydrated to frontend directly
 
 **Sent to Frontend:**
-- `passwordResetLink` - The URL string to send to client
+- `passwordResetLink` - A **complete URL string** (e.g., `"https://project.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=ABC123..."`)
 - `contactId` - For reference
 - `contactEmail` - For display
 
 **NOT Sent to Frontend:**
 - ❌ Firebase UID (stored in DB only)
-- ❌ Token (not needed - link is the credential)
+- ❌ Token (not needed - the URL itself contains the credential)
 - ❌ Password (doesn't exist yet)
+- ❌ Parameter (it's a full URL, not a query param)
 
 ### Frontend Hydration
 
 **Frontend does NOT hydrate Firebase user data:**
-- Frontend only receives the password reset link
-- Frontend sends link to client
-- Client clicks link → Sets password on Firebase's page
+- Frontend only receives the password reset link (full URL string)
+- Frontend displays/copies the URL to send to client
+- Client clicks the URL → Redirects to Firebase's password reset page
+- Client sets password on Firebase's page
 - Client then logs in using Firebase Client SDK (not Admin SDK)
 
 ## Summary
