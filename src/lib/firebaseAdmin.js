@@ -2,7 +2,7 @@
  * Firebase Admin SDK - SERVER-ONLY
  * 
  * ⚠️ NEVER import this file in client components or client-side code
- * Only use in /app/api/**/route.js or other server modules
+ * Only use in /app/api routes or other server modules
  */
 
 import admin from 'firebase-admin';
