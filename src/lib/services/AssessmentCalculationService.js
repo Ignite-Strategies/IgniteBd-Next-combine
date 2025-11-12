@@ -1,9 +1,27 @@
 import OpenAI from 'openai';
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client
+let openaiClient = null;
+
+function getOpenAIClient() {
+  if (openaiClient) {
+    return openaiClient;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error(
+      'OPENAI_API_KEY is not configured. Please set it in your environment variables.',
+    );
+  }
+
+  openaiClient = new OpenAI({
+    apiKey: apiKey,
+  });
+
+  return openaiClient;
+}
 
 /**
  * AssessmentCalculationService
@@ -148,6 +166,7 @@ IMPORTANT:
       const prompt = this.buildAssessmentPrompt(assessmentData, baseScore);
       
       // Call OpenAI
+      const openai = getOpenAIClient();
       const completion = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [

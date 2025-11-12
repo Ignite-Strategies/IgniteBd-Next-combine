@@ -4,8 +4,8 @@ import { verifyFirebaseToken, getFirebaseAdmin } from '@/lib/firebaseAdmin';
 
 /**
  * POST /api/contacts/:contactId/generate-portal-access
- * Generate username/password for Contact to access client portal
- * Called by IgniteBD user to invite a Contact
+ * Generate portal access for Contact using Firebase
+ * Creates Firebase account and generates password reset link
  * 
  * Universal personhood - same Contact, now has portal access
  */
@@ -51,9 +51,6 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Generate secure password
-    const password = generateSecurePassword();
-
     // Create Firebase user account for this contact
     const admin = getFirebaseAdmin();
     if (!admin) {
@@ -67,23 +64,19 @@ export async function POST(request, { params }) {
       // Try to get existing user by email
       try {
         firebaseUser = await auth.getUserByEmail(contact.email);
-        // User exists - update password
-        await auth.updateUser(firebaseUser.uid, {
-          password: password,
-          emailVerified: false, // They'll verify via password reset
-        });
+        // User exists - we'll just generate a new reset link
       } catch (error) {
         // User doesn't exist - create new
         firebaseUser = await auth.createUser({
           email: contact.email,
-          password: password,
           displayName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
           emailVerified: false,
           disabled: false,
         });
       }
 
-      // Generate password reset link so they can set their own password
+      // Generate password reset link - Firebase handles this!
+      // Client clicks link → Sets their own password → Can log in
       const resetLink = await auth.generatePasswordResetLink(contact.email);
       
       // Store Firebase UID in Contact (link Contact to Firebase user)
@@ -102,16 +95,15 @@ export async function POST(request, { params }) {
         },
       });
 
-      // Return credentials and reset link
+      // Return reset link
       return NextResponse.json({
         success: true,
-        credentials: {
+        invite: {
           contactId,
           contactName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
           contactEmail: contact.email,
-          temporaryPassword: password, // Temporary - they should use reset link
+          passwordResetLink: resetLink, // Firebase password reset link
           loginUrl: `${process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001'}/login`,
-          passwordResetLink: resetLink, // Send this to client to set their own password
         },
         message: 'Portal access generated. Send the password reset link to the client to set their password.',
       });
@@ -138,14 +130,3 @@ export async function POST(request, { params }) {
     );
   }
 }
-
-function generateSecurePassword() {
-  const length = 12;
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  return password;
-}
-
