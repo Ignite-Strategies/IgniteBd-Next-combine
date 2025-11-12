@@ -122,19 +122,28 @@ export async function POST(request) {
         } catch (error) {
           // Firebase user doesn't exist anymore - create new
           console.warn('⚠️  Firebase user not found, creating new:', error.message);
-          const result = await ensureFirebaseUser(email);
+          const displayName = contact.firstName || contact.lastName 
+            ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+            : null;
+          const result = await ensureFirebaseUser(email, displayName);
           firebaseUser = result.user;
           firebaseUserWasCreated = result.wasCreated;
         }
       } else {
         // Fallback if admin not available
-        const result = await ensureFirebaseUser(email);
+        const displayName = contact.firstName || contact.lastName 
+          ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+          : null;
+        const result = await ensureFirebaseUser(email, displayName);
         firebaseUser = result.user;
         firebaseUserWasCreated = result.wasCreated;
       }
     } else {
       // No Firebase user - create one
-      const result = await ensureFirebaseUser(email);
+      const displayName = contact.firstName || contact.lastName 
+        ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+        : null;
+      const result = await ensureFirebaseUser(email, displayName);
       firebaseUser = result.user;
       firebaseUserWasCreated = result.wasCreated;
     }

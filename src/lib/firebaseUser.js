@@ -4,7 +4,7 @@ import { getFirebaseAdmin } from './firebaseAdmin';
  * Ensure Firebase user exists for email
  * Returns { user, wasCreated: boolean }
  */
-export async function ensureFirebaseUser(email) {
+export async function ensureFirebaseUser(email, displayName = null) {
   const admin = getFirebaseAdmin();
   if (!admin) {
     throw new Error('Firebase admin not configured');
@@ -19,11 +19,18 @@ export async function ensureFirebaseUser(email) {
   } catch (err) {
     // User doesn't exist - create new
     if (err.code === 'auth/user-not-found') {
-      const user = await auth.createUser({
+      const userData = {
         email,
         emailVerified: false,
         disabled: false,
-      });
+      };
+      
+      // Add displayName if provided
+      if (displayName) {
+        userData.displayName = displayName;
+      }
+      
+      const user = await auth.createUser(userData);
       return { user, wasCreated: true };
     }
     throw err;

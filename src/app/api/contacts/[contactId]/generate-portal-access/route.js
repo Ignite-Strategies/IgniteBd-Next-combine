@@ -56,7 +56,10 @@ export async function POST(request, { params }) {
     }
 
     // Ensure Firebase user exists
-    const { user: firebaseUser, wasCreated } = await ensureFirebaseUser(contact.email);
+    const displayName = contact.firstName || contact.lastName 
+      ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+      : null;
+    const { user: firebaseUser, wasCreated } = await ensureFirebaseUser(contact.email, displayName);
     
     const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
     
