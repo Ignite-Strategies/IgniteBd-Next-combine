@@ -368,24 +368,6 @@ export default function GrowthDashboardPage() {
         />
       )}
 
-      {!hasCompany && (
-        <div className="mb-8 rounded-xl border-2 border-yellow-200 bg-yellow-50 p-6">
-          <h2 className="mb-2 text-xl font-semibold text-yellow-900">
-            Welcome to Ignite Strategies!
-          </h2>
-          <p className="mb-4 text-yellow-800">
-            Set up your company profile to start building customer relationships
-            and maximizing growth.
-          </p>
-          <button
-            onClick={() => router.push('/company/create-or-choose')}
-            className="rounded-lg bg-yellow-600 px-4 py-2 font-semibold text-white transition hover:bg-yellow-700"
-          >
-            Set Up Company →
-          </button>
-        </div>
-      )}
-
       <HeaderSummary
         targetRevenue={dashboardData.targetRevenue}
         currentRevenue={dashboardData.currentRevenue}

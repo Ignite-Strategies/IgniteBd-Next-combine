@@ -1,15 +1,44 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react';
+import api from '@/lib/api';
 
 export default function SetupWizard({ companyHQ, hasContacts = false, onComplete }) {
   const router = useRouter();
+  const [hasAssessment, setHasAssessment] = useState(false);
   
   // Check what's been completed
   const hasCompany = companyHQ && companyHQ.id;
-  const hasAssessment = false; // TODO: Check if assessment completed
   const hasOutreach = false; // TODO: Check if outreach setup
+
+  // Check if assessment is completed
+  useEffect(() => {
+    const checkAssessment = async () => {
+      try {
+        const companyHQId = companyHQ?.id || 
+          (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : null);
+        
+        if (!companyHQId) {
+          setHasAssessment(false);
+          return;
+        }
+
+        const response = await api.get(`/api/assessment?companyHQId=${companyHQId}`);
+        if (response.data.success && response.data.assessments?.length > 0) {
+          setHasAssessment(true);
+        } else {
+          setHasAssessment(false);
+        }
+      } catch (err) {
+        console.warn('Failed to check assessment status:', err);
+        setHasAssessment(false);
+      }
+    };
+
+    checkAssessment();
+  }, [companyHQ]);
   
   const steps = [
     {

@@ -28,6 +28,7 @@ model Owner {
   managedCompanies CompanyHQ[]     @relation("ManagerOf")
   ownedCompanies   CompanyHQ[]     @relation("OwnerOf")
   emailActivities  EmailActivity[] // Outreach email tracking
+  assessments      Assessment[]    // Growth assessments
 
   @@map("owners")
 }
@@ -77,6 +78,7 @@ model CompanyHQ {
   proposals        Proposal[]
   products         Product[]
   personas         Persona[]
+  assessments      Assessment[]
 
   @@map("company_hqs")
 }
@@ -117,27 +119,34 @@ model ContactList {
 }
 
 model Contact {
-  id               String       @id @default(cuid())
-  crmId            String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
-  firstName        String?
-  lastName         String?
-  goesBy           String?
-  email            String?
-  phone            String?
-  title            String?
-  contactCompanyId String? // Company they work for (prospect/client company)
-  buyerDecision    String?
-  howMet           String?
-  notes            String? // Notes/context about the contact
-  contactListId    String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  companyHQ        CompanyHQ    @relation(fields: [crmId], references: [id])
-  contactCompany   Company?     @relation(fields: [contactCompanyId], references: [id])
-  contactList      ContactList? @relation(fields: [contactListId], references: [id])
-  pipeline         Pipeline?
-  deliverables     ConsultantDeliverable[]
+  id                  String       @id @default(cuid())
+  crmId               String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
+  firstName           String?
+  lastName            String?
+  goesBy              String?
+  email               String?  @unique
+  phone               String?
+  title               String?
+  contactCompanyId    String? // Company they work for (prospect/client company)
+  buyerDecision       String?
+  howMet              String?
+  notes               String? // Notes/context about the contact
+  contactListId       String?
+  domain              String? // Domain from enrichment
+  companyName         String? // Company name from enrichment
+  enrichmentSource    String? // Source of enrichment (e.g., "Lusha")
+  enrichmentFetchedAt DateTime? // When enrichment was fetched
+  enrichmentPayload   Json? // Full enrichment payload
+  createdById         String? // User who created this contact
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  companyHQ           CompanyHQ    @relation(fields: [crmId], references: [id])
+  contactCompany      Company?     @relation(fields: [contactCompanyId], references: [id])
+  contactList         ContactList? @relation(fields: [contactListId], references: [id])
+  pipeline            Pipeline?
+  deliverables        ConsultantDeliverable[]
 
+  @@index([email])
   @@map("contacts")
 }
 
@@ -261,4 +270,52 @@ model ConsultantDeliverable {
   @@index([contactId])
   @@index([proposalId])
   @@map("consultant_deliverables")
+}
+
+model ProspectCandidate {
+  id          String   @id @default(cuid())
+  userId      String
+  firstName   String?
+  lastName    String?
+  companyName String?
+  domain      String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@map("prospect_candidates")
+}
+
+model Assessment {
+  id                   String   @id @default(cuid())
+  ownerId              String
+  owner                Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  companyHQId          String?  // Optional: Link to CompanyHQ
+  companyHQ            CompanyHQ? @relation(fields: [companyHQId], references: [id], onDelete: SetNull)
+  
+  // Assessment responses
+  name                 String
+  company              String
+  industry             String?
+  workTooMuch          String?  // "always" | "often" | "sometimes" | "rarely"
+  assignTasks          String?  // "never" | "rarely" | "sometimes" | "always"
+  wantMoreClients      String?  // "yes" | "maybe" | "no"
+  revenueGrowthPercent Float?   // Percentage (e.g., 25 for 25%)
+  totalVolume          Float?   // Total revenue/volume
+  bdSpend              Float?   // Business development spend
+  
+  // Calculated results
+  score                Int?     // 0-100 score
+  scoreInterpretation  String?  // "High Growth Potential" | "Medium Growth Potential" | etc.
+  relateWithUser       String?  // First paragraph of insights
+  growthNeeds          String?  // Second paragraph of insights
+  rawGptResponse       String?  // Full GPT response
+  
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  
+  @@index([ownerId])
+  @@index([companyHQId])
+  @@map("assessments")
 }

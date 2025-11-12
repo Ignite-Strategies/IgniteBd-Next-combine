@@ -16,6 +16,7 @@
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@prisma/client": "^6.19.0",
     "@sendgrid/mail": "^8.1.6",
+    "@upstash/redis": "^1.35.6",
     "axios": "^1.13.2",
     "firebase": "^12.5.0",
     "firebase-admin": "^13.6.0",
