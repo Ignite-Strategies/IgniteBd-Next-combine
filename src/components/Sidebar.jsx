@@ -19,6 +19,8 @@ import {
   Mail,
   Calendar,
   Share2,
+  List,
+  GitBranch,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -48,9 +50,12 @@ const navigationGroups = [
   },
   {
     name: 'Engage',
-    hubPath: '/outreach',
+    hubPath: '/contacts',
     items: [
-      { name: 'People Hub', path: '/contacts', icon: Users },
+      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
+      { name: 'Manage Contacts', path: '/contacts/view', icon: Users },
+      { name: 'Contact Lists', path: '/contacts/list-manager', icon: List },
+      { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: GitBranch },
       { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
