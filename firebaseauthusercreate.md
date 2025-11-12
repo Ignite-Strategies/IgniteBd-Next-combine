@@ -51,16 +51,17 @@ const admin = getFirebaseAdmin();
 - Generate password reset links
 - Manage users without their password
 
-### 4. User Creation/Upsert Logic
+### 4. User Creation/Upsert Logic (Server-Side Only)
 
 **File:** `src/app/api/contacts/[contactId]/generate-portal-access/route.js`
 
 ```javascript
-const auth = admin.auth(); // Firebase Admin Auth instance
+const auth = admin.auth(); // Firebase Admin Auth instance (SERVER-SIDE)
 
 // Try to get existing user by email
 try {
   firebaseUser = await auth.getUserByEmail(contact.email);
+  // Returns: { uid, email, displayName, ... } - Firebase UserRecord object
   // User already exists in Firebase - we'll reuse it
 } catch (error) {
   // User doesn't exist - CREATE NEW USER
@@ -71,8 +72,15 @@ try {
     disabled: false,                          // Account is active
     // NOTE: NO PASSWORD SET HERE!
   });
+  // Returns: { uid, email, displayName, ... } - Firebase UserRecord object
 }
 ```
+
+**What Admin SDK Returns:**
+- `firebaseUser` is a **Firebase UserRecord object** (server-side only)
+- Contains: `uid`, `email`, `displayName`, `emailVerified`, `disabled`, `metadata`, etc.
+- **NOT a token** - it's the user record itself
+- This happens **entirely server-side** - frontend never sees this
 
 **Critical:** We're **NOT setting a password** when creating the user. Firebase creates the account in a "passwordless" state.
 
@@ -90,7 +98,7 @@ const resetLink = await auth.generatePasswordResetLink(contact.email);
 - Works even if user has no password yet
 - Link expires after a set time (Firebase default)
 
-### 6. Store Firebase UID in Contact
+### 6. Store Firebase UID in Database (Server-Side)
 
 ```javascript
 // Link Contact to Firebase user
@@ -100,7 +108,7 @@ await prisma.contact.update({
     notes: JSON.stringify({
       ...existingNotes,
       clientPortalAuth: {
-        firebaseUid: firebaseUser.uid,  // Link: Contact.id → Firebase UID
+        firebaseUid: firebaseUser.uid,  // Extract UID from Firebase UserRecord
         generatedAt: new Date().toISOString(),
         portalUrl: 'http://localhost:3001',
       },
@@ -109,9 +117,36 @@ await prisma.contact.update({
 });
 ```
 
+**What Gets Stored:**
+- `firebaseUser.uid` → Stored in `Contact.notes.clientPortalAuth.firebaseUid` (Prisma DB)
+- This is the **link** between our Contact and Firebase user
+- Stored server-side in database - frontend doesn't hydrate this directly
+
 **The Link:**
 - `Contact.id` (Prisma) → `Contact.notes.clientPortalAuth.firebaseUid` → `Firebase User.uid`
 - This is how we connect our Contact record to Firebase user
+
+### 7. Return Password Reset Link to Frontend
+
+```javascript
+// Return reset link to frontend
+return NextResponse.json({
+  success: true,
+  invite: {
+    contactId,
+    contactEmail: contact.email,
+    passwordResetLink: resetLink,  // This is what frontend gets
+    loginUrl: 'http://localhost:3001/login',
+  },
+});
+```
+
+**What Frontend Receives:**
+- ✅ `passwordResetLink` - The Firebase reset link (string URL)
+- ✅ `contactId` - For reference
+- ✅ `contactEmail` - For display
+- ❌ **NOT** the Firebase UID (stored in DB, not sent to frontend)
+- ❌ **NOT** a token (no token needed - link is the credential)
 
 ## Answering Your Questions
 
@@ -287,13 +322,57 @@ https://[project].firebaseapp.com/__/auth/action?
    - Contact.id → Contact.notes.firebaseUid → Firebase User.uid
    - Universal personhood maintained
 
+## Data Flow Summary
+
+### Server-Side (API Route)
+```
+1. Admin SDK creates/gets Firebase user
+   → Returns: Firebase UserRecord { uid, email, ... }
+   
+2. Extract firebaseUser.uid
+   → Store in Prisma: Contact.notes.clientPortalAuth.firebaseUid
+   
+3. Generate password reset link
+   → Returns: String URL (reset link)
+   
+4. Return to frontend
+   → { passwordResetLink, contactId, contactEmail }
+```
+
+### What Gets Stored Where
+
+**In Prisma Database:**
+- `Contact.notes.clientPortalAuth.firebaseUid` - Firebase UID (for linking)
+- Stored server-side, not hydrated to frontend directly
+
+**Sent to Frontend:**
+- `passwordResetLink` - The URL string to send to client
+- `contactId` - For reference
+- `contactEmail` - For display
+
+**NOT Sent to Frontend:**
+- ❌ Firebase UID (stored in DB only)
+- ❌ Token (not needed - link is the credential)
+- ❌ Password (doesn't exist yet)
+
+### Frontend Hydration
+
+**Frontend does NOT hydrate Firebase user data:**
+- Frontend only receives the password reset link
+- Frontend sends link to client
+- Client clicks link → Sets password on Firebase's page
+- Client then logs in using Firebase Client SDK (not Admin SDK)
+
 ## Summary
 
 **We ARE creating Firebase users internally:**
-- ✅ Using Firebase Admin SDK (server-side)
+- ✅ Using Firebase Admin SDK (server-side only)
+- ✅ Admin SDK returns UserRecord object (not a token)
+- ✅ Extract `firebaseUser.uid` and store in Prisma DB
+- ✅ Generate password reset link (string URL)
+- ✅ Return link to frontend (not the UID or token)
 - ✅ Creating users WITHOUT passwords
-- ✅ Generating password reset links
-- ✅ Clients set their own passwords
+- ✅ Clients set their own passwords via reset link
 - ✅ We never see or store passwords
 
 **This is the standard pattern for:**
