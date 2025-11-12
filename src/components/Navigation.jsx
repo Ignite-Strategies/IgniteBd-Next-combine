@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TrendingUp, Settings } from 'lucide-react';
+import { TrendingUp, Settings, Menu, X } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/growth-dashboard', label: 'Growth Dashboard', icon: TrendingUp },
@@ -11,6 +12,7 @@ const NAV_ITEMS = [
 
 export default function Navigation() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActive = (path) =>
     pathname === path || pathname.startsWith(`${path}/`);
@@ -23,10 +25,11 @@ export default function Navigation() {
           className="flex items-center space-x-2 text-lg font-bold text-red-600 transition hover:text-red-700"
         >
           <span className="text-2xl">🔥</span>
-          <span>Ignite BD</span>
+          <span className="hidden sm:inline">Ignite BD</span>
         </Link>
 
-        <div className="flex items-center space-x-2">
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center space-x-2">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -45,7 +48,47 @@ export default function Navigation() {
             );
           })}
         </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-500"
+          aria-label="Toggle menu"
+        >
+          {mobileMenuOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </button>
       </div>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-gray-200 bg-white">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 rounded-lg px-4 py-3 text-base font-semibold transition ${
+                    isActive(item.path)
+                      ? 'bg-red-600 text-white shadow-md'
+                      : 'text-gray-700 hover:bg-red-50 hover:text-red-600'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

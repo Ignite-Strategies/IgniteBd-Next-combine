@@ -19,29 +19,43 @@ import {
   Package,
 } from 'lucide-react';
 
+// Home link - Growth Dashboard
+const homeLink = {
+  name: 'Growth Dashboard',
+  path: '/growth-dashboard',
+  icon: TrendingUp,
+};
+
 const navigationGroups = [
   {
-    name: 'Overview',
+    name: 'Growth Ops',
     items: [
-      { name: 'Growth Dashboard', path: '/growth-dashboard', icon: TrendingUp },
       { name: 'BD Roadmap', path: '/pipelines/roadmap', icon: Map },
-      { name: 'BD Intelligence', path: '/bd-intelligence', icon: Brain },
       { name: 'Insights', path: '/insights', icon: Lightbulb },
-    ],
-  },
-  {
-    name: 'People',
-    items: [
       { name: 'People Hub', path: '/contacts', icon: Users },
       { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: Building2 },
+      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
+      { name: 'Campaigns', path: '/outreach/campaigns', icon: Mail },
+      { name: 'Meetings', path: '/meetings', icon: Calendar },
+      { name: 'Events', path: '/events', icon: Calendar },
     ],
   },
   {
-    name: 'BD Assets',
+    name: 'Persona',
     items: [
       { name: 'Personas', path: '/personas', icon: UserCircle },
+    ],
+  },
+  {
+    name: 'Product Services',
+    items: [
       { name: 'Products & Services', path: '/products', icon: Package },
-      { name: 'Proposals', path: '/proposals', icon: FileCheck },
+    ],
+  },
+  {
+    name: 'Targeting Intelligence',
+    items: [
+      { name: 'BD Intelligence', path: '/bd-intelligence', icon: Brain },
     ],
   },
   {
@@ -49,15 +63,6 @@ const navigationGroups = [
     items: [
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
-    ],
-  },
-  {
-    name: 'Engage',
-    items: [
-      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
-      { name: 'Campaigns', path: '/outreach/campaigns', icon: Mail },
-      { name: 'Meetings', path: '/meetings', icon: Calendar },
-      { name: 'Events', path: '/events', icon: Calendar },
     ],
   },
   {
@@ -82,7 +87,7 @@ function Sidebar() {
   const isActive = (path) => pathname.startsWith(path);
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 overflow-y-auto">
+    <div className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-3.5rem)] fixed left-0 top-14 overflow-y-auto">
       <div className="p-4 border-b border-gray-200">
         <Link href="/growth-dashboard" className="flex items-center gap-3">
           <span className="text-2xl">🔥</span>
@@ -93,6 +98,32 @@ function Sidebar() {
       </div>
 
       <nav className="p-4 space-y-6">
+        {/* Home Link - Growth Dashboard */}
+        <div>
+          <ul className="space-y-1">
+            <li>
+              {(() => {
+                const HomeIcon = homeLink.icon;
+                const active = isActive(homeLink.path);
+                return (
+                  <Link
+                    href={homeLink.path}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      active
+                        ? 'border border-red-200 bg-red-50 text-red-700'
+                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <HomeIcon className="h-5 w-5" />
+                    <span>{homeLink.name}</span>
+                  </Link>
+                );
+              })()}
+            </li>
+          </ul>
+        </div>
+
+        {/* Navigation Groups */}
         {navigationGroups.map((group) => (
           <div key={group.name}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
