@@ -30,24 +30,25 @@ Plus foundational sections:
 - Content (FileText) - Content management
 - Branding Hub (Palette) - Branding assets
 
-### **ENGAGE** (Outreach & Engagement - Hub-Spoke)
-- **Engage Hub** (MessageSquare) - Hub at `/engage` (or `/outreach`)
-  - Outreach Dashboard (shows campaigns, metrics)
-  - Campaigns (Mail) - Email campaigns
-  - Compose (Send) - Compose individual emails
-  - Meetings (Calendar) - 1:1 or small group meetings
-  - Events (Calendar) - Larger events/webinars
+### **ENGAGE** (Outreach & Engagement - Hub-Spoke) ✅ CURRENT
+- **People Hub** (Users) - Hub at `/contacts` (clickable header)
+  - **Outreach** (MessageSquare) → `/outreach` - Outreach dashboard with campaigns
+  - **Manage Contacts** (Users) → `/contacts/view` - View and manage contacts
+  - **Contact Lists** (List) → `/contacts/list-manager` - Manage contact lists
+  - **Deal Pipelines** (GitBranch) → `/contacts/deal-pipelines` - Configure deal pipeline stages
+  - **Meetings** (Calendar) → `/meetings` - 1:1 or small group meetings
   
-  **CURRENT**: Outreach Dashboard at `/outreach` shows campaigns but doesn't include Meetings/Events
-  **PROPOSED**: Rename to "Engage Hub" and add action cards for Meetings and Events
+  **CURRENT**: Engage header clicks to `/contacts` (People Hub)
+  - People Hub is the main hub for engagement activities
+  - Outreach is an item under Engage (not the hub)
+  - All contact management and engagement tools are under Engage
 
-### **NURTURE** (Contacts & Relationship Management)
-- People Hub (Users) - Contact management dashboard
-  - Contact Lists (List) - Manage contact lists
-  - Companies (Building2) - Prospect/client companies
-  - Deal Pipelines (GitBranch) - Configure deal pipeline stages
-- Proposals (FileCheck) - Client proposals
-- Deliverables (FileText) - Client deliverables
+### **NURTURE** (Email Marketing & Social Media) ⚠️ NOT BUILT YET
+- **Nurture section is disabled** - Not built yet
+  - Email Marketing (Mail) - Coming soon (disabled/shaded)
+  - Social Media (Share2) - Coming soon (disabled/shaded)
+  
+  **NOTE**: Nurture is not built yet - section header and items are disabled/shaded
 
 ### **Settings**
 - Settings (Settings) - Workspace settings
@@ -215,23 +216,23 @@ The sidebar should link to **Hub pages**, organized by **Attract → Engage → 
 ├── Content
 └── Branding Hub
 
-📧 ENGAGE (Outreach & Engagement)
-└── Engage Hub (links to /engage hub - or keep /outreach)
-    ├── Campaigns (via hub action cards)
-    ├── Compose (via hub action cards)
-    ├── Meetings (via hub action cards)
-    └── Events (via hub action cards)
+📧 ENGAGE (Outreach & Engagement) ✅ CURRENT
+└── People Hub (header clicks to /contacts)
+    ├── Outreach → /outreach
+    ├── Manage Contacts → /contacts/view
+    ├── Contact Lists → /contacts/list-manager
+    ├── Deal Pipelines → /contacts/deal-pipelines
+    └── Meetings → /meetings
     
-    **NOTE**: Currently "Outreach Dashboard" at `/outreach` only shows campaigns
-    - Should be renamed to "Engage Hub" 
-    - Should include action cards for all engagement activities
-    - Or create new `/engage` hub that consolidates everything
+    **CURRENT**: Engage header is clickable and goes to People Hub at `/contacts`
+    - People Hub is the main hub for engagement activities
+    - Outreach is an item under Engage (not the hub)
+    - All contact management tools are under Engage
 
-💼 NURTURE (Contacts & Relationships)
-└── People Hub (links to /people-hub hub)
-    ├── Contact Lists (via hub)
-    ├── Companies (via hub)
-    ├── Deal Pipelines (via hub)
+💼 NURTURE (Email Marketing & Social Media) ⚠️ NOT BUILT YET
+└── Nurture section disabled
+    ├── Email Marketing (disabled - coming soon)
+    └── Social Media (disabled - coming soon)
 
 🔧 CLIENT OPERATIONS (Client Journey Management) ✅ IMPLEMENTED
 └── Initiate Client Journey (Rocket) - Hub at /client-operations ✅
@@ -330,28 +331,27 @@ The sidebar should link to **Hub pages**, organized by **Attract → Engage → 
 - Hub page shows action cards linking to `/contacts/...` spoke pages
 - Update BD Roadmap link from `/contacts` to `/people-hub`
 
-### Step 3: Create Engage Hub (Consolidate Engagement Activities)
-- **Transform Outreach Dashboard into "Engage Hub"**
-  - Current: `/outreach` only shows campaigns
-  - Proposed: Add action cards section (like People Hub)
-  - Add action cards for: Campaigns, Compose, Meetings, Events
-  - Keep campaign metrics and recent campaigns below action cards
-  - OR create new `/engage` hub page that consolidates everything
-- **Move Meetings and Events INTO Engage Hub**
-  - Currently separate pages (`/meetings`, `/events`)
-  - Add as action cards in Engage Hub
-  - Hub becomes single entry point for all engagement
-- **Move Outreach FROM "Growth Ops" TO "Engage"**
-  - Already done (Outreach Dashboard exists)
-  - Just needs to be renamed to "Engage Hub" and expanded
+### Step 3: Engage Section ✅ COMPLETED
+- **People Hub is now the Engage hub**
+  - ✅ Engage header clicks to `/contacts` (People Hub)
+  - ✅ People Hub is the main hub for all engagement activities
+  - ✅ Outreach moved to item under Engage (not the hub)
+  - ✅ All contact management tools are under Engage:
+    - Outreach → `/outreach`
+    - Manage Contacts → `/contacts/view`
+    - Contact Lists → `/contacts/list-manager`
+    - Deal Pipelines → `/contacts/deal-pipelines`
+    - Meetings → `/meetings`
 
-### Step 4: Reorder by Core Principle (Attract → Engage → Nurture → Client Operations)
-- **Attract** section comes first (Ads & SEO, Content, Branding)
-- **Engage** section (Engage Hub - single hub with all engagement activities)
-  - Engage Hub at `/engage` (or keep `/outreach` but rename page)
-  - Hub has action cards: Campaigns, Compose, Meetings, Events
-- **Nurture** section (People Hub)
-  - People Hub already in Nurture
+### Step 4: Reorder by Core Principle (Attract → Engage → Nurture → Client Operations) ✅ COMPLETED
+- **Attract** section ✅ (Ads & SEO, Content, Branding Hub - header clicks to Branding Hub)
+- **Engage** section ✅ COMPLETED
+  - Engage header clicks to `/contacts` (People Hub)
+  - People Hub is the main hub for engagement
+  - Items: Outreach, Manage Contacts, Contact Lists, Deal Pipelines, Meetings
+- **Nurture** section ⚠️ NOT BUILT YET
+  - Section disabled - not built yet
+  - Items: Email Marketing, Social Media (both disabled/shaded)
 - **Client Operations** section ✅ IMPLEMENTED
   - ✅ "Initiate Client Journey" hub at `/client-operations`
   - ✅ Hub has action cards: "Set Your Proposal" and "Invite Prospect to Portal"
@@ -417,21 +417,22 @@ const navigationGroups = [
     ],
   },
   {
-    name: 'Engage', // Outreach & Engagement
+    name: 'Engage', // Outreach & Engagement ✅ CURRENT
+    hubPath: '/contacts', // Header clicks to People Hub
     items: [
-      // Single link to hub - hub has action cards to all engagement activities
-      // NOTE: Currently "Outreach Dashboard" at /outreach only shows campaigns
-      // Should be renamed to "Engage Hub" and include Meetings/Events action cards
-      { name: 'Engage Hub', path: '/engage', icon: MessageSquare },
-      // OR keep /outreach but rename page to "Engage Hub" and add Meetings/Events
+      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
+      { name: 'Manage Contacts', path: '/contacts/view', icon: Users },
+      { name: 'Contact Lists', path: '/contacts/list-manager', icon: List },
+      { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: GitBranch },
+      { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
   {
-    name: 'Nurture', // Contacts & Relationships
+    name: 'Nurture', // Email Marketing & Social Media ⚠️ NOT BUILT YET
+    disabled: true, // Section disabled - not built yet
     items: [
-      // Single link to hub - hub has action cards to spokes
-      // NOTE: Currently at /contacts but should be /people-hub
-      { name: 'People Hub', path: '/people-hub', icon: Users },
+      { name: 'Email Marketing', path: '#', icon: Mail, disabled: true },
+      { name: 'Social Media', path: '#', icon: Share2, disabled: true },
     ],
   },
   {
@@ -531,18 +532,15 @@ import {
 
 - **Growth Ops** = Foundation/Strategy (4 items) - Direct links, each is standalone
 - **Attract** = Marketing & Branding (3 items) - Direct links
-- **Engage** = Outreach & Engagement (hub with all activities)
-  - **CURRENT**: Outreach Dashboard at `/outreach` (1 sidebar link)
-    - Only shows campaigns
-    - Missing: Meetings, Events, Compose links in hub
-  - **PROPOSED**: Engage Hub (1 sidebar link)
-    - Hub should have action cards for: Campaigns, Compose, Meetings, Events
-    - Keep campaign metrics and recent campaigns
-    - Single entry point for all engagement activities
-- **Nurture** = Contacts & Relationships (hub + 2 direct links)
-  - People Hub at `/people-hub` (1 sidebar link) - Hub links to 6+ spoke pages
-    - **FIX NEEDED**: Currently at `/contacts` - confusing! Should be `/people-hub`
-  - Proposals, Deliverables (direct links - part of nurture)
+- **Engage** = Outreach & Engagement ✅ CURRENT
+  - **CURRENT**: Engage header clicks to `/contacts` (People Hub)
+    - People Hub is the main hub for engagement activities
+    - Items under Engage: Outreach, Manage Contacts, Contact Lists, Deal Pipelines, Meetings
+    - All engagement and contact management tools consolidated under Engage
+- **Nurture** = Email Marketing & Social Media ⚠️ NOT BUILT YET
+  - Section disabled - not built yet
+  - Items: Email Marketing, Social Media (both disabled/shaded)
+  - Will be built in the future
 - **Settings** = Direct link (1 item)
 
 ### Sidebar Count
