@@ -1,20 +1,61 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Mail, User, CheckCircle, Copy, Send } from 'lucide-react';
+import { Search, Mail, User, CheckCircle, Copy, Send, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
-import { useContactsContext } from '@/app/(authenticated)/contacts/layout';
 import api from '@/lib/api';
 
 export default function InviteProspectPage() {
   const router = useRouter();
-  const { contacts, hydrated } = useContactsContext();
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [inviteLink, setInviteLink] = useState(null);
   const [error, setError] = useState('');
+  const [companyHQId, setCompanyHQId] = useState('');
+
+  // Get companyHQId from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedCompanyHQId =
+      window.localStorage.getItem('companyHQId') ||
+      window.localStorage.getItem('companyId') ||
+      '';
+    setCompanyHQId(storedCompanyHQId);
+  }, []);
+
+  // Fetch contacts from API
+  const fetchContacts = useCallback(async () => {
+    if (!companyHQId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+      if (response.data?.success && response.data.contacts) {
+        setContacts(response.data.contacts || []);
+      } else {
+        setContacts([]);
+      }
+    } catch (err) {
+      console.error('Error fetching contacts:', err);
+      setError('Failed to load contacts. Please try again.');
+      setContacts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [companyHQId]);
+
+  // Load contacts on mount
+  useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
 
   // Filter contacts by search term and ensure they have email
   const availableContacts = useMemo(() => {
@@ -94,9 +135,9 @@ export default function InviteProspectPage() {
                 Select Your Prospect
               </h2>
 
-              {/* Search */}
-              <div className="mb-6">
-                <div className="relative">
+              {/* Search and Refresh */}
+              <div className="mb-6 flex gap-3">
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
                     type="text"
@@ -106,11 +147,20 @@ export default function InviteProspectPage() {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+                <button
+                  onClick={fetchContacts}
+                  disabled={loading}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  title="Refresh contacts"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
               </div>
 
               {/* Contacts List */}
-              {!hydrated ? (
+              {loading ? (
                 <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
                   <p className="text-gray-500">Loading contacts...</p>
                 </div>
               ) : availableContacts.length === 0 ? (
