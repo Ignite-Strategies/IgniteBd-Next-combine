@@ -85,13 +85,23 @@ export default function InviteProspectPage() {
   };
 
   const handleGenerateInvite = async () => {
-    if (!selectedContact) return;
+    if (!selectedContact) {
+      setError('Please select a contact first');
+      return;
+    }
+
+    if (!selectedContact.id) {
+      console.error('Selected contact missing id:', selectedContact);
+      setError('Contact ID is missing. Please try selecting the contact again.');
+      return;
+    }
 
     setGenerating(true);
     setError('');
     setInviteLink(null);
 
     try {
+      console.log('Generating portal access for contact:', selectedContact.id, selectedContact.email);
       const response = await api.post(
         `/api/contacts/${selectedContact.id}/generate-portal-access`
       );
