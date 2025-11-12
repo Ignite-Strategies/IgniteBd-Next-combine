@@ -9,7 +9,6 @@ import api from '@/lib/api';
 export default function InviteProspectPage() {
   const router = useRouter();
   const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
   const [generating, setGenerating] = useState(false);
