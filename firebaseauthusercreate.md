@@ -84,19 +84,23 @@ try {
 
 **Critical:** We're **NOT setting a password** when creating the user. Firebase creates the account in a "passwordless" state.
 
-### 5. Generate Password Reset Link
+### 5. Generate Password Reset Link (Full URL String)
 
 ```javascript
 // Firebase generates a password reset link
 const resetLink = await auth.generatePasswordResetLink(contact.email);
-// Returns: https://firebase-auth-link...?oobCode=xxx&mode=resetPassword
+// Returns: "https://your-project.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=ABC123xyz&apiKey=..."
 ```
 
-**What This Does:**
+**What This Returns:**
+- A **complete URL string** (not a parameter, not a token)
+- Example: `https://your-project.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=ABC123xyz&apiKey=...`
+- This is a **clickable link** that the client will use in their browser
 - Firebase creates a secure, time-limited link
 - Link allows user to SET their password (not reset an existing one)
 - Works even if user has no password yet
 - Link expires after a set time (Firebase default)
+- The URL contains an `oobCode` (out-of-band code) parameter that Firebase uses to verify the request
 
 ### 6. Store Firebase UID in Database (Server-Side)
 
