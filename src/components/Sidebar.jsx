@@ -6,17 +6,15 @@ import {
   TrendingUp,
   Users,
   MessageSquare,
-  Calendar,
   FileText,
   Map,
   Settings,
-  Building2,
-  Mail,
   UserCircle,
-  Lightbulb,
   FileCheck,
   Brain,
   Package,
+  BarChart,
+  Palette,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -31,52 +29,37 @@ const navigationGroups = [
     name: 'Growth Ops',
     items: [
       { name: 'BD Roadmap', path: '/pipelines/roadmap', icon: Map },
-      { name: 'Insights', path: '/insights', icon: Lightbulb },
-      { name: 'People Hub', path: '/contacts', icon: Users },
-      { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: Building2 },
-      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
-      { name: 'Campaigns', path: '/outreach/campaigns', icon: Mail },
-      { name: 'Meetings', path: '/meetings', icon: Calendar },
-      { name: 'Events', path: '/events', icon: Calendar },
-    ],
-  },
-  {
-    name: 'Persona',
-    items: [
       { name: 'Personas', path: '/personas', icon: UserCircle },
-    ],
-  },
-  {
-    name: 'Product Services',
-    items: [
-      { name: 'Products & Services', path: '/products', icon: Package },
-    ],
-  },
-  {
-    name: 'Targeting Intelligence',
-    items: [
+      { name: 'Products', path: '/products', icon: Package },
       { name: 'BD Intelligence', path: '/bd-intelligence', icon: Brain },
-    ],
-  },
-  {
-    name: 'Client Operations',
-    items: [
-      { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
-      { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
     ],
   },
   {
     name: 'Attract',
     items: [
-      { name: 'Ads & SEO', path: '/ads', icon: Mail },
+      { name: 'Ads & SEO', path: '/ads', icon: BarChart },
       { name: 'Content', path: '/content', icon: FileText },
-      { name: 'Branding Hub', path: '/branding-hub', icon: UserCircle },
+      { name: 'Branding Hub', path: '/branding-hub', icon: Palette },
+    ],
+  },
+  {
+    name: 'Engage',
+    items: [
+      { name: 'Engage Hub', path: '/outreach', icon: MessageSquare },
+    ],
+  },
+  {
+    name: 'Nurture',
+    items: [
+      { name: 'People Hub', path: '/contacts', icon: Users },
+      { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
+      { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
     ],
   },
   {
     name: 'Settings',
     items: [
-      { name: 'Workspace Settings', path: '/settings', icon: Settings },
+      { name: 'Settings', path: '/settings', icon: Settings },
     ],
   },
 ];
