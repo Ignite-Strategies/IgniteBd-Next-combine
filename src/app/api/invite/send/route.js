@@ -106,19 +106,55 @@ export async function POST(request) {
       });
     }
 
-    // Ensure Firebase user exists (upsert - creates if doesn't exist, gets if exists)
-    const { user: firebaseUser, wasCreated: firebaseUserWasCreated } = await ensureFirebaseUser(email);
-
+    // Check if Firebase user already exists (contact already has firebaseUid)
+    let firebaseUser;
+    let firebaseUserWasCreated = false;
     const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+
+    if (contact.firebaseUid) {
+      // Firebase user already exists - just verify it's still valid
+      const { getFirebaseAdmin } = require('@/lib/firebaseAdmin');
+      const admin = getFirebaseAdmin();
+      if (admin) {
+        try {
+          firebaseUser = await admin.auth().getUser(contact.firebaseUid);
+          console.log('✅ Using existing Firebase user:', firebaseUser.uid);
+        } catch (error) {
+          // Firebase user doesn't exist anymore - create new
+          console.warn('⚠️  Firebase user not found, creating new:', error.message);
+          const result = await ensureFirebaseUser(email);
+          firebaseUser = result.user;
+          firebaseUserWasCreated = result.wasCreated;
+        }
+      } else {
+        // Fallback if admin not available
+        const result = await ensureFirebaseUser(email);
+        firebaseUser = result.user;
+        firebaseUserWasCreated = result.wasCreated;
+      }
+    } else {
+      // No Firebase user - create one
+      const result = await ensureFirebaseUser(email);
+      firebaseUser = result.user;
+      firebaseUserWasCreated = result.wasCreated;
+    }
     
     // Update contact with Firebase UID and portal URL (NOT in notes!)
-    await prisma.contact.update({
-      where: { id: contactId },
-      data: {
-        firebaseUid: firebaseUser.uid,
-        clientPortalUrl: clientPortalUrl,
-      },
-    });
+    // Only update if firebaseUid changed or clientPortalUrl is missing
+    const updateData = {};
+    if (contact.firebaseUid !== firebaseUser.uid) {
+      updateData.firebaseUid = firebaseUser.uid;
+    }
+    if (!contact.clientPortalUrl) {
+      updateData.clientPortalUrl = clientPortalUrl;
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: updateData,
+      });
+    }
 
     // Generate invite token (16 hex characters = 8 bytes)
     const token = randomBytes(8).toString('hex');
