@@ -33,8 +33,8 @@ export default function SplashPage() {
     <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
       <div className="text-center">
         <Image
-          src="/logo.png"
-          alt="Ignite Strategies"
+          src="/favicon.png"
+          alt="Ignite"
           width={128}
           height={128}
           className="mx-auto mb-8 h-32 w-32 object-contain"

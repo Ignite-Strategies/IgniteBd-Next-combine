@@ -288,6 +288,19 @@ export default function ContactsViewPage() {
               )}
               <button
                 type="button"
+                onClick={async () => {
+                  setSyncing(true);
+                  await refreshContactsFromAPI(true);
+                  setSyncing(false);
+                }}
+                disabled={syncing || !companyHQId}
+                className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-white transition hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync'}
+              </button>
+              <button
+                type="button"
                 onClick={() => router.push('/contacts')}
                 className="rounded-lg bg-gray-600 px-4 py-2 text-white transition hover:bg-gray-700"
               >

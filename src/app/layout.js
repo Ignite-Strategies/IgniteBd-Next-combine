@@ -16,9 +16,9 @@ export const metadata = {
   title: "Ignite BD Intelligence",
   description: "Unified product + persona intelligence stack for business development",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   },
 };
 
