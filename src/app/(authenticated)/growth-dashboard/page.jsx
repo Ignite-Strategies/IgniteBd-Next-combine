@@ -174,17 +174,25 @@ export default function GrowthDashboardPage() {
       return;
     }
 
-    // Fetch contacts and company data directly from API
-    const fetchData = async () => {
+    // Load from localStorage first, then optionally refresh from API
+    const loadData = async () => {
       try {
         setLoading(true);
         
-        // Fetch contacts
-        const contactsResponse = await api.get(`/api/contacts?companyHQId=${storedCompanyHQId}`);
-        const contactsData = Array.isArray(contactsResponse.data) ? contactsResponse.data : [];
-        setContacts(contactsData);
+        // Load contacts from localStorage first
+        const cachedContacts = localStorage.getItem('contacts');
+        if (cachedContacts) {
+          try {
+            const parsed = JSON.parse(cachedContacts);
+            if (Array.isArray(parsed)) {
+              setContacts(parsed);
+            }
+          } catch (err) {
+            console.warn('Failed to parse cached contacts:', err);
+          }
+        }
 
-        // Try to get company from localStorage first (faster)
+        // Load company from localStorage
         try {
           const storedCompany = localStorage.getItem('companyHQ');
           if (storedCompany) {
@@ -196,15 +204,14 @@ export default function GrowthDashboardPage() {
 
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
+        console.error('Failed to load dashboard data:', err);
         setError('Failed to load dashboard data');
-        setContacts([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    loadData();
   }, []);
 
   const hasCompany = !!companyHQ && !!companyHQId;

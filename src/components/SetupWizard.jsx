@@ -17,6 +17,15 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
   useEffect(() => {
     const checkAssessment = async () => {
       try {
+        // Check if Firebase auth is ready
+        const { getAuth } = await import('firebase/auth');
+        const auth = getAuth();
+        if (!auth.currentUser) {
+          // User not authenticated yet, skip check
+          setHasAssessment(false);
+          return;
+        }
+
         const companyHQId = companyHQ?.id || 
           (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : null);
         
@@ -37,7 +46,10 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
       }
     };
 
-    checkAssessment();
+    // Only check if companyHQ is available
+    if (companyHQ?.id) {
+      checkAssessment();
+    }
   }, [companyHQ]);
   
   const steps = [
