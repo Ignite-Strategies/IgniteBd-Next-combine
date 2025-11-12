@@ -15,19 +15,19 @@ export default function SigninPage() {
     password: '',
   });
 
-  const createOrFindUser = async (payload) => {
-    const response = await api.post('/api/user/create', payload);
-    const { user } = response.data || {};
-    if (!user) {
-      throw new Error('User creation failed - no user returned');
+  const createOrFindOwner = async (payload) => {
+    const response = await api.post('/api/owner/create', payload);
+    const { owner } = response.data || {};
+    if (!owner) {
+      throw new Error('Owner creation failed - no owner returned');
     }
-    return user;
+    return owner;
   };
 
-  const persistSession = async (firebaseUser, userRecord) => {
+  const persistSession = async (firebaseUser, ownerRecord) => {
     localStorage.setItem('firebaseId', firebaseUser.uid);
-    localStorage.setItem('userId', userRecord.id);
-    localStorage.setItem('email', userRecord.email || firebaseUser.email);
+    localStorage.setItem('ownerId', ownerRecord.id);
+    localStorage.setItem('email', ownerRecord.email || firebaseUser.email);
 
     if (auth.currentUser) {
       const idToken = await auth.currentUser.getIdToken();
