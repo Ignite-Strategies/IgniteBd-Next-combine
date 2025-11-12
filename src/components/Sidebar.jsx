@@ -55,7 +55,7 @@ const navigationGroups = [
   },
   {
     name: 'Nurture',
-    hubPath: '/contacts',
+    disabled: true,
     items: [
       { name: 'Email Marketing', path: '#', icon: Mail, disabled: true },
       { name: 'Social Media', path: '#', icon: Share2, disabled: true },
@@ -124,7 +124,11 @@ function Sidebar() {
           const hubActive = group.hubPath ? isActive(group.hubPath) : false;
           return (
             <div key={group.name}>
-              {group.hubPath ? (
+              {group.disabled ? (
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 opacity-50">
+                  {group.name}
+                </h3>
+              ) : group.hubPath ? (
                 <Link
                   href={group.hubPath}
                   className={`mb-3 block text-xs font-semibold uppercase tracking-wider transition-colors ${
