@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { convertProposalToDeliverables } from '@/lib/services/ProposalToDeliverablesService';
 
 export async function GET(request, { params }) {
   try {
@@ -103,7 +104,21 @@ export async function PUT(request, { params }) {
     if (clientCompany !== undefined) updateData.clientCompany = clientCompany;
     if (companyId !== undefined) updateData.companyId = companyId || null;
     if (purpose !== undefined) updateData.purpose = purpose || null;
-    if (status !== undefined) updateData.status = status;
+    if (status !== undefined) {
+      updateData.status = status;
+      
+      // If status is changing to "approved", trigger deliverables conversion
+      if (status === 'approved' && existingProposal.status !== 'approved') {
+        try {
+          const conversionResult = await convertProposalToDeliverables(proposalId);
+          console.log('✅ Proposal approved, deliverables created:', conversionResult);
+        } catch (conversionError) {
+          console.error('⚠️ Failed to convert proposal to deliverables:', conversionError);
+          // Don't fail the proposal update if conversion fails
+          // Deliverables can be created manually later
+        }
+      }
+    }
     if (serviceInstances !== undefined) {
       updateData.serviceInstances = serviceInstances ? JSON.parse(JSON.stringify(serviceInstances)) : null;
     }

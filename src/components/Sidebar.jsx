@@ -45,6 +45,13 @@ const navigationGroups = [
     ],
   },
   {
+    name: 'Client Operations',
+    items: [
+      { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
+      { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
+    ],
+  },
+  {
     name: 'Engage',
     items: [
       { name: 'Outreach', path: '/outreach', icon: MessageSquare },

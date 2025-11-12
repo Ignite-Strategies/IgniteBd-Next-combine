@@ -75,3 +75,4 @@ Based on the Microsoft consent screen you saw:
 
 If you can't access Azure Portal, you can also try using `common` as the tenant ID - this should work for most Microsoft 365 accounts!
 
+

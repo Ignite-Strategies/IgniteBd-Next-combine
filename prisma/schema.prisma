@@ -136,6 +136,7 @@ model Contact {
   contactCompany   Company?     @relation(fields: [contactCompanyId], references: [id])
   contactList      ContactList? @relation(fields: [contactListId], references: [id])
   pipeline         Pipeline?
+  deliverables     ConsultantDeliverable[]
 
   @@map("contacts")
 }
@@ -202,8 +203,9 @@ model Proposal {
   dateIssued DateTime? // Date proposal was issued
   preparedBy String? // Who prepared the proposal
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  deliverables ConsultantDeliverable[]
 
   @@map("proposals")
 }
@@ -227,4 +229,36 @@ model Persona {
   product            Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@map("personas")
+}
+
+model ConsultantDeliverable {
+  id          String   @id @default(cuid())
+  contactId   String   // Link to Contact (the client)
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  // What we're delivering
+  title       String
+  description String?
+  category    String? // "foundation", "integration", "enrichment", etc.
+  
+  // Status tracking
+  status      String   @default("pending") // "pending" | "in-progress" | "completed" | "blocked"
+  
+  // Link to proposal/milestone
+  proposalId  String?
+  proposal    Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  milestoneId String? // Reference to milestone in Proposal.milestones JSON (e.g., "milestone-1", "week-4")
+  
+  // Delivery tracking
+  dueDate     DateTime?
+  completedAt DateTime?
+  notes       String?
+  
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([contactId])
+  @@index([proposalId])
+  @@map("consultant_deliverables")
 }
