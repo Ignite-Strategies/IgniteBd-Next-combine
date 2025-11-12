@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useProposals } from '../layout';
 import { useContacts } from '@/app/(authenticated)/contacts/layout';
+import { Plus, X, Package, Calendar, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function ProposalWizardPage() {
@@ -12,15 +13,26 @@ export default function ProposalWizardPage() {
   const { addProposal, companyHQId } = useProposals();
   const { contacts, refreshContacts, hydrated: contactsHydrated } = useContacts();
 
+  const [step, setStep] = useState(1); // 1: Contact, 2: Business, 3: Proposal Details, 4: Services, 5: Phases
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [companyNameInput, setCompanyNameInput] = useState('');
-  const [proposalFields, setProposalFields] = useState({
-    purpose: '',
-    totalPrice: '',
-  });
-  const [deliverables, setDeliverables] = useState([]);
+  const [companyConfirmed, setCompanyConfirmed] = useState(false);
+  
+  // Proposal fields
+  const [proposalName, setProposalName] = useState('');
+  const [proposalDescription, setProposalDescription] = useState('');
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
+  
+  // Services
+  const [savedServices, setSavedServices] = useState([]);
+  const [selectedServices, setSelectedServices] = useState([]); // { serviceId, quantity, price }
+  const [loadingServices, setLoadingServices] = useState(false);
+  
+  // Phases
+  const [phases, setPhases] = useState([]);
+  
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loadingCompany, setLoadingCompany] = useState(false);
@@ -31,6 +43,37 @@ export default function ProposalWizardPage() {
       refreshContacts();
     }
   }, [contactsHydrated, contacts.length, refreshContacts]);
+
+  // Load saved services
+  useEffect(() => {
+    if (companyHQId && step >= 4) {
+      loadSavedServices();
+    }
+  }, [companyHQId, step]);
+
+  // Auto-generate proposal name when company/contact selected
+  useEffect(() => {
+    if (selectedContact && selectedCompany) {
+      const contactName = `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || selectedContact.email;
+      setProposalName(`Proposal for ${selectedCompany.companyName} ${contactName}`);
+    }
+  }, [selectedContact, selectedCompany]);
+
+  const loadSavedServices = async () => {
+    setLoadingServices(true);
+    try {
+      // TODO: Create API endpoint for saved services
+      // For now, use localStorage or empty array
+      const saved = typeof window !== 'undefined' 
+        ? JSON.parse(localStorage.getItem('savedServices') || '[]')
+        : [];
+      setSavedServices(saved);
+    } catch (err) {
+      console.error('Error loading services:', err);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
 
   // Filter contacts by search
   const filteredContacts = useMemo(() => {
@@ -61,11 +104,14 @@ export default function ProposalWizardPage() {
     if (contact.contactCompany) {
       setSelectedCompany(contact.contactCompany);
       setCompanyNameInput(contact.contactCompany.companyName);
+      setCompanyConfirmed(true);
     } else {
       // No company - clear and let them enter
       setSelectedCompany(null);
       setCompanyNameInput('');
+      setCompanyConfirmed(false);
     }
+    setStep(2); // Move to business confirmation step
   };
 
   // Handle company confirmation/creation
@@ -113,6 +159,9 @@ export default function ProposalWizardPage() {
         setSelectedCompany(company);
         setCompanyNameInput(company.companyName);
       }
+      
+      setCompanyConfirmed(true);
+      setStep(3); // Move to proposal details step
     } catch (err) {
       console.error('Error confirming company:', err);
       setError('Failed to confirm company. Please try again.');
@@ -121,29 +170,126 @@ export default function ProposalWizardPage() {
     }
   };
 
-  // Add deliverable
-  const handleAddDeliverable = () => {
-    setDeliverables([
-      ...deliverables,
+  // Handle service selection
+  const handleSelectService = (service) => {
+    const existing = selectedServices.find(s => s.serviceId === service.id);
+    if (existing) {
+      // Update quantity
+      setSelectedServices(selectedServices.map(s => 
+        s.serviceId === service.id 
+          ? { ...s, quantity: s.quantity + 1 }
+          : s
+      ));
+    } else {
+      // Add new service
+      setSelectedServices([
+        ...selectedServices,
+        {
+          serviceId: service.id,
+          name: service.name,
+          description: service.description,
+          type: service.type,
+          unitPrice: service.price || 0,
+          quantity: 1,
+          price: service.price || 0, // Total = unitPrice * quantity
+        }
+      ]);
+    }
+  };
+
+  const handleUpdateServiceQuantity = (serviceId, quantity) => {
+    setSelectedServices(selectedServices.map(s => {
+      if (s.serviceId === serviceId) {
+        const newQuantity = Math.max(1, quantity);
+        return {
+          ...s,
+          quantity: newQuantity,
+          price: s.unitPrice * newQuantity,
+        };
+      }
+      return s;
+    }));
+  };
+
+  const handleRemoveService = (serviceId) => {
+    setSelectedServices(selectedServices.filter(s => s.serviceId !== serviceId));
+  };
+
+  // Calculate total price
+  const totalPrice = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (s.price || 0), 0);
+  }, [selectedServices]);
+
+  // Add phase
+  const handleAddPhase = () => {
+    setPhases([
+      ...phases,
       {
-        id: `temp-${Date.now()}`,
-        typeOfWork: '',
-        quantity: 1,
-        actualDeliverable: '',
-      },
+        id: `phase-${Date.now()}`,
+        name: '',
+        weeks: '',
+        color: phases.length === 0 ? 'red' : phases.length === 1 ? 'yellow' : 'purple',
+        goal: '',
+        deliverables: [],
+        coreWork: [],
+        outcome: '',
+      }
     ]);
   };
 
-  // Remove deliverable
-  const handleRemoveDeliverable = (id) => {
-    setDeliverables(deliverables.filter((d) => d.id !== id));
+  // Update phase
+  const handleUpdatePhase = (phaseId, updates) => {
+    setPhases(phases.map(p => p.id === phaseId ? { ...p, ...updates } : p));
   };
 
-  // Update deliverable
-  const handleUpdateDeliverable = (id, updates) => {
-    setDeliverables(
-      deliverables.map((d) => (d.id === id ? { ...d, ...updates } : d))
-    );
+  // Add deliverable to phase
+  const handleAddDeliverableToPhase = (phaseId) => {
+    setPhases(phases.map(p => {
+      if (p.id === phaseId) {
+        return {
+          ...p,
+          deliverables: [...(p.deliverables || []), ''],
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Update deliverable in phase
+  const handleUpdateDeliverableInPhase = (phaseId, index, value) => {
+    setPhases(phases.map(p => {
+      if (p.id === phaseId) {
+        const deliverables = [...(p.deliverables || [])];
+        deliverables[index] = value;
+        return { ...p, deliverables };
+      }
+      return p;
+    }));
+  };
+
+  // Add core work to phase
+  const handleAddCoreWorkToPhase = (phaseId) => {
+    setPhases(phases.map(p => {
+      if (p.id === phaseId) {
+        return {
+          ...p,
+          coreWork: [...(p.coreWork || []), ''],
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Update core work in phase
+  const handleUpdateCoreWorkInPhase = (phaseId, index, value) => {
+    setPhases(phases.map(p => {
+      if (p.id === phaseId) {
+        const coreWork = [...(p.coreWork || [])];
+        coreWork[index] = value;
+        return { ...p, coreWork };
+      }
+      return p;
+    }));
   };
 
   // Submit proposal
@@ -153,61 +299,69 @@ export default function ProposalWizardPage() {
       return;
     }
 
-    if (!selectedCompany && !companyNameInput.trim()) {
-      setError('Please confirm or enter a company name');
+    if (!companyConfirmed || !selectedCompany) {
+      setError('Please confirm the business');
       return;
     }
 
-    // If company not confirmed yet, confirm it first
-    if (!selectedCompany && companyNameInput.trim()) {
-      await handleCompanyConfirm();
-      if (!selectedCompany) {
-        return; // Error already set
-      }
+    if (!proposalName.trim()) {
+      setError('Please enter a proposal name');
+      return;
     }
 
     setSubmitting(true);
     setError('');
 
     try {
-      // Build phases from deliverables
-      const phases = deliverables.length > 0
-        ? [
-            {
-              id: 1,
-              name: 'Foundation',
-              weeks: '1-4',
-              color: 'red',
-              goal: 'Deliver core deliverables',
-              deliverables: deliverables.map((d) => d.actualDeliverable).filter(Boolean),
-              outcome: 'Core deliverables completed',
-            },
-          ]
-        : null;
-
-      // Build milestones from deliverables
-      const milestones = deliverables.map((deliverable, index) => ({
-        week: index + 1,
-        phase: 'Foundation',
-        phaseColor: 'red',
-        milestone: deliverable.typeOfWork || `Deliverable ${index + 1}`,
-        deliverable: deliverable.actualDeliverable,
-        phaseId: 1,
+      // Build serviceInstances from selected services
+      const serviceInstances = selectedServices.map(s => ({
+        name: s.name,
+        description: s.description,
+        type: s.type,
+        quantity: s.quantity,
+        unitPrice: s.unitPrice,
+        price: s.price,
       }));
+
+      // Build milestones from phases
+      const milestones = [];
+      phases.forEach((phase, phaseIndex) => {
+        phase.deliverables?.forEach((deliverable, delIndex) => {
+          milestones.push({
+            week: phaseIndex * 3 + delIndex + 1,
+            phase: phase.name,
+            phaseColor: phase.color,
+            milestone: deliverable,
+            phaseId: phase.id,
+          });
+        });
+      });
+
+      // Build compensation
+      const compensation = {
+        total: totalPrice,
+        currency: 'USD',
+        paymentStructure: phases.length > 0 
+          ? `${phases.length} payments of $${Math.round(totalPrice / phases.length)}`
+          : `$${totalPrice.toLocaleString()}`,
+      };
 
       const payload = {
         companyHQId,
         clientName: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || selectedContact.email,
         clientCompany: selectedCompany.companyName,
         companyId: selectedCompany.id,
-        purpose: proposalFields.purpose,
-        totalPrice: proposalFields.totalPrice
-          ? Number.parseFloat(proposalFields.totalPrice.replace(/[^0-9.]/g, ''))
-          : null,
+        purpose: proposalDescription, // Using description as purpose for now
+        proposalName, // Store in purpose field or add new field
+        totalPrice,
+        expectedDeliveryDate: expectedDeliveryDate || null,
         status: 'draft',
+        serviceInstances,
         phases,
         milestones,
+        compensation,
         preparedBy: typeof window !== 'undefined' ? window.localStorage.getItem('ownerId') : null,
+        dateIssued: new Date(),
       };
 
       const response = await api.post('/api/proposals', payload);
@@ -235,10 +389,34 @@ export default function ProposalWizardPage() {
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Create Proposal"
-          subtitle="Contact-first proposal creation"
+          subtitle="Step-by-step proposal creation"
           backTo="/client-operations/proposals"
           backLabel="Back to Proposals"
         />
+
+        {/* Progress Steps */}
+        <div className="mb-8 flex items-center justify-between">
+          {[1, 2, 3, 4, 5].map((stepNum) => (
+            <div key={stepNum} className="flex items-center flex-1">
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                  step >= stepNum
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {step > stepNum ? <CheckCircle className="h-5 w-5" /> : stepNum}
+              </div>
+              {stepNum < 5 && (
+                <div
+                  className={`h-1 flex-1 mx-2 ${
+                    step > stepNum ? 'bg-red-600' : 'bg-gray-200'
+                  }`}
+                />
+              )}
+            </div>
+          ))}
+        </div>
 
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -246,11 +424,11 @@ export default function ProposalWizardPage() {
           </div>
         )}
 
-        <div className="space-y-6">
-          {/* Contact Selection */}
+        {/* Step 1: Contact Selection */}
+        {step === 1 && (
           <div className="rounded-2xl bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              1. Select Contact
+              1. Find Contact
             </h2>
             <input
               type="text"
@@ -273,6 +451,7 @@ export default function ProposalWizardPage() {
                       setSelectedContact(null);
                       setSelectedCompany(null);
                       setCompanyNameInput('');
+                      setCompanyConfirmed(false);
                     }}
                     className="text-sm text-gray-600 hover:text-gray-900"
                   >
@@ -314,199 +493,437 @@ export default function ProposalWizardPage() {
                 )}
               </div>
             )}
+            {selectedContact && (
+              <button
+                onClick={() => setStep(2)}
+                className="mt-4 w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Continue to Business Confirmation
+              </button>
+            )}
           </div>
+        )}
 
-          {/* Company Confirmation - Only show if contact selected */}
-          {selectedContact && (
-            <div className="rounded-2xl bg-white p-6 shadow">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">
-                2. Confirm Business
-              </h2>
-              {selectedCompany ? (
-                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                  <p className="text-sm text-gray-600 mb-1">Company</p>
-                  <p className="font-semibold text-gray-900">{selectedCompany.companyName}</p>
-                  <button
-                    onClick={() => {
-                      setSelectedCompany(null);
-                      setCompanyNameInput(selectedCompany.companyName);
+        {/* Step 2: Business Confirmation */}
+        {step === 2 && selectedContact && (
+          <div className="rounded-2xl bg-white p-6 shadow">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              2. Confirm Business
+            </h2>
+            {companyConfirmed && selectedCompany ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="text-sm text-gray-600 mb-1">Company</p>
+                <p className="font-semibold text-gray-900">{selectedCompany.companyName}</p>
+                <button
+                  onClick={() => {
+                    setCompanyConfirmed(false);
+                    setSelectedCompany(null);
+                    setCompanyNameInput(selectedCompany.companyName);
+                  }}
+                  className="mt-2 text-sm text-red-600 hover:text-red-700"
+                >
+                  Change Company
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="mb-4 text-sm text-gray-600">
+                  Enter the company name for this proposal:
+                </p>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={companyNameInput}
+                    onChange={(e) => setCompanyNameInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && companyNameInput.trim()) {
+                        handleCompanyConfirm();
+                      }
                     }}
-                    className="mt-2 text-sm text-red-600 hover:text-red-700"
+                    placeholder="Company name"
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={loadingCompany}
+                  />
+                  <button
+                    onClick={handleCompanyConfirm}
+                    disabled={loadingCompany || !companyNameInput.trim()}
+                    className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Change Company
+                    {loadingCompany ? 'Confirming...' : 'Confirm'}
                   </button>
                 </div>
-              ) : (
-                <div>
-                  <p className="mb-4 text-sm text-gray-600">
-                    Enter the company name for this proposal:
-                  </p>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      value={companyNameInput}
-                      onChange={(e) => setCompanyNameInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && companyNameInput.trim()) {
-                          handleCompanyConfirm();
-                        }
-                      }}
-                      placeholder="Company name"
-                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                      disabled={loadingCompany}
-                    />
-                    <button
-                      onClick={handleCompanyConfirm}
-                      disabled={loadingCompany || !companyNameInput.trim()}
-                      className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loadingCompany ? 'Confirming...' : 'Confirm'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+            {companyConfirmed && (
+              <button
+                onClick={() => setStep(3)}
+                className="mt-4 w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Continue to Proposal Details
+              </button>
+            )}
+          </div>
+        )}
 
-          {/* Proposal Fields - Only show if company confirmed */}
-          {selectedCompany && (
-            <>
-              <div className="rounded-2xl bg-white p-6 shadow">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900">
-                  3. Proposal Details
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Purpose / Summary
-                    </label>
-                    <textarea
-                      value={proposalFields.purpose}
-                      onChange={(e) =>
-                        setProposalFields({ ...proposalFields, purpose: e.target.value })
-                      }
-                      rows={4}
-                      placeholder="Describe the engagement objective, desired outcomes, or solution."
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Total Price (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={proposalFields.totalPrice}
-                      onChange={(e) =>
-                        setProposalFields({ ...proposalFields, totalPrice: e.target.value })
-                      }
-                      placeholder="$12,000"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    />
-                  </div>
+        {/* Step 3: Proposal Name & Description */}
+        {step === 3 && companyConfirmed && (
+          <div className="rounded-2xl bg-white p-6 shadow">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              3. Proposal Details
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Proposal Name *
+                </label>
+                <input
+                  type="text"
+                  value={proposalName}
+                  onChange={(e) => setProposalName(e.target.value)}
+                  placeholder="Proposal for Company Contact Name"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Suggested: Proposal for {selectedCompany?.companyName} {selectedContact?.firstName} {selectedContact?.lastName}
+                </p>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Description <span className="text-gray-500">(Internal Use)</span>
+                </label>
+                <textarea
+                  value={proposalDescription}
+                  onChange={(e) => setProposalDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Brief description of what this offering includes (internal use only)"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Internal note about what this proposal covers
+                </p>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Expected Delivery Date
+                </label>
+                <input
+                  type="date"
+                  value={expectedDeliveryDate}
+                  onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => setStep(4)}
+              disabled={!proposalName.trim()}
+              className="mt-6 w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+            >
+              Continue to Services
+            </button>
+          </div>
+        )}
+
+        {/* Step 4: Choose or Add Services */}
+        {step === 4 && (
+          <div className="rounded-2xl bg-white p-6 shadow">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">
+                4. Choose or Add Services/Deliverables
+              </h2>
+              <button
+                onClick={() => router.push('/client-operations/services/create')}
+                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              >
+                <Plus className="h-4 w-4" />
+                Create Service
+              </button>
+            </div>
+            
+            {loadingServices ? (
+              <p className="py-8 text-center text-sm text-gray-500">Loading services...</p>
+            ) : savedServices.length === 0 ? (
+              <div className="py-8 text-center">
+                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm text-gray-600 mb-4">No saved services yet.</p>
+                <button
+                  onClick={() => router.push('/client-operations/services/create')}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                >
+                  Create Your First Service
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {savedServices.map((service) => {
+                  const selected = selectedServices.find(s => s.serviceId === service.id);
+                  return (
+                    <div
+                      key={service.id}
+                      className={`rounded-lg border p-4 ${
+                        selected
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-gray-900">{service.name}</h3>
+                            {service.type && (
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                                {service.type}
+                              </span>
+                            )}
+                          </div>
+                          {service.description && (
+                            <p className="text-sm text-gray-600 mb-2">{service.description}</p>
+                          )}
+                          <p className="text-sm font-semibold text-gray-900">
+                            ${(service.price || 0).toLocaleString()} per unit
+                          </p>
+                        </div>
+                        {selected ? (
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity - 1)}
+                                className="rounded border border-gray-300 px-2 py-1 text-sm"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                value={selected.quantity}
+                                onChange={(e) => handleUpdateServiceQuantity(service.id, parseInt(e.target.value) || 1)}
+                                className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm"
+                                min="1"
+                              />
+                              <button
+                                onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity + 1)}
+                                className="rounded border border-gray-300 px-2 py-1 text-sm"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              ${selected.price.toLocaleString()}
+                            </p>
+                            <button
+                              onClick={() => handleRemoveService(service.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleSelectService(service)}
+                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                          >
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {selectedServices.length > 0 && (
+              <div className="mt-6 rounded-lg border-2 border-red-200 bg-red-50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-900">Total Price:</span>
+                  <span className="text-2xl font-bold text-red-600">
+                    ${totalPrice.toLocaleString()}
+                  </span>
                 </div>
               </div>
+            )}
 
-              {/* Deliverables */}
-              <div className="rounded-2xl bg-white p-6 shadow">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900">
-                  4. Deliverables
-                </h2>
-                <p className="mb-6 text-sm text-gray-600">
-                  Define what you'll deliver for this engagement.
-                </p>
-                <div className="space-y-4">
-                  {deliverables.map((deliverable) => (
-                    <div
-                      key={deliverable.id}
-                      className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-                    >
-                      <div className="grid grid-cols-3 gap-4">
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setStep(3)}
+                className="flex-1 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setStep(5)}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Continue to Phases
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Phases (Optional) */}
+        {step === 5 && (
+          <div className="rounded-2xl bg-white p-6 shadow">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              5. Phases (Optional)
+            </h2>
+            <p className="mb-6 text-sm text-gray-600">
+              Define phases with goals, deliverables, core work, and outcomes. This helps structure the engagement.
+            </p>
+
+            <div className="space-y-6">
+              {phases.map((phase, index) => {
+                const colorClasses = {
+                  red: 'border-red-200 bg-red-50',
+                  yellow: 'border-yellow-200 bg-yellow-50',
+                  purple: 'border-purple-200 bg-purple-50',
+                };
+                return (
+                  <div
+                    key={phase.id}
+                    className={`rounded-lg border p-6 ${colorClasses[phase.color] || colorClasses.red}`}
+                  >
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Phase {index + 1}
+                      </h3>
+                      <button
+                        onClick={() => setPhases(phases.filter(p => p.id !== phase.id))}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="mb-1 block text-xs font-semibold text-gray-700">
-                            Type of Work
+                            Phase Name
                           </label>
                           <input
                             type="text"
-                            value={deliverable.typeOfWork}
-                            onChange={(e) =>
-                              handleUpdateDeliverable(deliverable.id, {
-                                typeOfWork: e.target.value,
-                              })
-                            }
-                            placeholder="e.g., Strategy, Design"
-                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            value={phase.name}
+                            onChange={(e) => handleUpdatePhase(phase.id, { name: e.target.value })}
+                            placeholder="e.g., Foundation"
+                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                           />
                         </div>
                         <div>
                           <label className="mb-1 block text-xs font-semibold text-gray-700">
-                            How Many
-                          </label>
-                          <input
-                            type="number"
-                            value={deliverable.quantity}
-                            onChange={(e) =>
-                              handleUpdateDeliverable(deliverable.id, {
-                                quantity: parseInt(e.target.value) || 1,
-                              })
-                            }
-                            min="1"
-                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold text-gray-700">
-                            Actual Deliverable
+                            Weeks
                           </label>
                           <input
                             type="text"
-                            value={deliverable.actualDeliverable}
-                            onChange={(e) =>
-                              handleUpdateDeliverable(deliverable.id, {
-                                actualDeliverable: e.target.value,
-                              })
-                            }
-                            placeholder="e.g., 3 Target Personas"
-                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            value={phase.weeks}
+                            onChange={(e) => handleUpdatePhase(phase.id, { weeks: e.target.value })}
+                            placeholder="e.g., 1-3"
+                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                           />
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleRemoveDeliverable(deliverable.id)}
-                        className="mt-2 text-xs text-red-600 hover:text-red-700"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={handleAddDeliverable}
-                    className="w-full rounded-lg border-2 border-dashed border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-red-500 hover:bg-red-50"
-                  >
-                    + Add Deliverable
-                  </button>
-                </div>
-              </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => router.push('/client-operations/proposals')}
-                  className="rounded-lg bg-gray-100 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
-                >
-                  {submitting ? 'Creating...' : 'Create Proposal'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-700">
+                          Goal
+                        </label>
+                        <textarea
+                          value={phase.goal}
+                          onChange={(e) => handleUpdatePhase(phase.id, { goal: e.target.value })}
+                          placeholder="e.g., Stand up the IgniteBD environment and core strategy"
+                          rows={2}
+                          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-xs font-semibold text-gray-700">
+                          Deliverables
+                        </label>
+                        <div className="space-y-2">
+                          {phase.deliverables?.map((deliverable, delIndex) => (
+                            <input
+                              key={delIndex}
+                              type="text"
+                              value={deliverable}
+                              onChange={(e) => handleUpdateDeliverableInPhase(phase.id, delIndex, e.target.value)}
+                              placeholder="e.g., 3 Target Personas"
+                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            />
+                          ))}
+                          <button
+                            onClick={() => handleAddDeliverableToPhase(phase.id)}
+                            className="text-sm text-red-600 hover:text-red-700"
+                          >
+                            + Add Deliverable
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-xs font-semibold text-gray-700">
+                          Core Work
+                        </label>
+                        <div className="space-y-2">
+                          {phase.coreWork?.map((work, workIndex) => (
+                            <input
+                              key={workIndex}
+                              type="text"
+                              value={work}
+                              onChange={(e) => handleUpdateCoreWorkInPhase(phase.id, workIndex, e.target.value)}
+                              placeholder="e.g., Configure IgniteBD CRM + domain layer"
+                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            />
+                          ))}
+                          <button
+                            onClick={() => handleAddCoreWorkToPhase(phase.id)}
+                            className="text-sm text-red-600 hover:text-red-700"
+                          >
+                            + Add Core Work Item
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-700">
+                          Outcome
+                        </label>
+                        <textarea
+                          value={phase.outcome}
+                          onChange={(e) => handleUpdatePhase(phase.id, { outcome: e.target.value })}
+                          placeholder="e.g., A structured IgniteBD workspace — branded, wired, and ready"
+                          rows={2}
+                          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <button
+                onClick={handleAddPhase}
+                className="w-full rounded-lg border-2 border-dashed border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-red-500 hover:bg-red-50"
+              >
+                + Add Phase
+              </button>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setStep(4)}
+                className="flex-1 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || !proposalName.trim()}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {submitting ? 'Creating...' : 'Create Proposal'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
