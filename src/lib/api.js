@@ -21,8 +21,11 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor - adds Firebase token to requests
-api.interceptors.request.use(
+// Step 2: Split Axios usage - only register interceptors in browser
+// Prevent interceptors from running in serverless runtime
+if (typeof window !== 'undefined') {
+  // Request interceptor - adds Firebase token to requests
+  api.interceptors.request.use(
   async (config) => {
     try {
       const firebaseAuth = getAuth();
@@ -47,24 +50,25 @@ api.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error),
-);
+  );
 
-// Response interceptor - handles errors globally
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    // Silently handle 401s - they're expected when user isn't authenticated yet
-    // Only log in development mode for debugging
-    if (error.response?.status === 401 && process.env.NODE_ENV === 'development') {
-      // Suppress console warnings for 401s - they're handled by components
-    }
-    // Silently handle 404s - they're expected for missing resources
-    if (error.response?.status === 404) {
-      // Suppress console warnings for 404s
-    }
-    return Promise.reject(error);
-  },
-);
+  // Response interceptor - handles errors globally
+  api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      // Silently handle 401s - they're expected when user isn't authenticated yet
+      // Only log in development mode for debugging
+      if (error.response?.status === 401 && process.env.NODE_ENV === 'development') {
+        // Suppress console warnings for 401s - they're handled by components
+      }
+      // Silently handle 404s - they're expected for missing resources
+      if (error.response?.status === 404) {
+        // Suppress console warnings for 404s
+      }
+      return Promise.reject(error);
+    },
+  );
+}
 
 export default api;
 

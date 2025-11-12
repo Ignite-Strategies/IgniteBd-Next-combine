@@ -9,9 +9,17 @@ import { randomBytes } from 'crypto';
  * Generate invite token and send activation email
  */
 export async function POST(request) {
+  // Step 1: Add visibility - ENV check
+  console.log('🔍 ENV check:', {
+    hasFirebaseKey: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
+    hasDb: !!process.env.DATABASE_URL,
+    firebaseKeyLength: process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.length || 0,
+  });
+
   try {
     await verifyFirebaseToken(request);
   } catch (error) {
+    console.error('❌ Auth verification failed:', error?.message);
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
       { status: 401 },
@@ -21,6 +29,8 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const { contactId, email } = body;
+    
+    console.log('📥 Request received:', { contactId, email });
 
     if (!contactId || !email) {
       return NextResponse.json(
