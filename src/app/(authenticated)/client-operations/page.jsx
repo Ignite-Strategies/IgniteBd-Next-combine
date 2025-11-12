@@ -120,7 +120,7 @@ export default function ClientOperationsPage() {
             </div>
             <div className="mt-6">
               <button
-                onClick={() => router.push('/contacts')}
+                onClick={() => router.push('/client-operations/invite-prospect')}
                 className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 Select Contact to Invite
