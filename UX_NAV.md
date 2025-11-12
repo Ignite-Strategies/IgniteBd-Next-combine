@@ -171,10 +171,23 @@ The **Sidebar** links to the Hub, and the Hub links to individual Spoke pages.
     ├── Contact Lists → /contacts/list-manager
     ├── Companies → /contacts/companies
     ├── Deal Pipelines → /contacts/deal-pipelines
+
+🔧 CLIENT OPERATIONS (Client Journey Management - Hub-Spoke) ✅ IMPLEMENTED
+└── Initiate Client Journey (Rocket) - Hub at /client-operations ✅
+    ├── Set Your Proposal → /client-operations/proposals/wizard
+    ├── Invite Prospect to Portal → /contacts (via contact detail page)
     ├── Proposals → /client-operations/proposals
     └── Deliverables → /client-operations/deliverables
     
-    **ROUTING ISSUE**: Currently hub is at `/contacts` which is confusing
+    **STATUS**: ✅ Fully implemented
+    - Hub page at `/client-operations` with welcome message and action cards
+    - "Set Your Proposal" card links to proposal wizard
+    - "Invite Prospect to Portal" card links to contacts
+    - Portal access generation available on contact detail pages
+    - Shows recent proposals and contacts for quick access
+    - Quick stats showing proposal counts
+    
+    **ROUTING**: Currently hub is at `/contacts` which is confusing
     - `/contacts` sounds like "add contacts" action
     - Should be `/people-hub` to reflect it's a dashboard/hub
     - Spoke pages can stay at `/contacts/...` routes (contact-specific actions)
@@ -219,8 +232,13 @@ The sidebar should link to **Hub pages**, organized by **Attract → Engage → 
     ├── Contact Lists (via hub)
     ├── Companies (via hub)
     ├── Deal Pipelines (via hub)
-    ├── Proposals
-    └── Deliverables
+
+🔧 CLIENT OPERATIONS (Client Journey Management) ✅ IMPLEMENTED
+└── Initiate Client Journey (Rocket) - Hub at /client-operations ✅
+    ├── Set Your Proposal (via hub action card)
+    ├── Invite Prospect to Portal (via hub action card)
+    ├── Proposals (direct link)
+    └── Deliverables (direct link)
 
 ⚙️ SETTINGS
 └── Settings
@@ -327,15 +345,18 @@ The sidebar should link to **Hub pages**, organized by **Attract → Engage → 
   - Already done (Outreach Dashboard exists)
   - Just needs to be renamed to "Engage Hub" and expanded
 
-### Step 4: Reorder by Core Principle (Attract → Engage → Nurture)
+### Step 4: Reorder by Core Principle (Attract → Engage → Nurture → Client Operations)
 - **Attract** section comes first (Ads & SEO, Content, Branding)
 - **Engage** section (Engage Hub - single hub with all engagement activities)
   - Engage Hub at `/engage` (or keep `/outreach` but rename page)
   - Hub has action cards: Campaigns, Compose, Meetings, Events
-- **Nurture** section (People Hub, Proposals, Deliverables)
-  - Move Proposals FROM "Client Operations" TO "Nurture"
-  - Move Deliverables FROM "Client Operations" TO "Nurture"
+- **Nurture** section (People Hub)
   - People Hub already in Nurture
+- **Client Operations** section ✅ IMPLEMENTED
+  - ✅ "Initiate Client Journey" hub at `/client-operations`
+  - ✅ Hub has action cards: "Set Your Proposal" and "Invite Prospect to Portal"
+  - ✅ Proposals and Deliverables remain in Client Operations (not moved to Nurture)
+  - ✅ Portal access generation available on contact detail pages
 
 ### Step 5: Fix Icon Duplicates
 - Change Ads & SEO icon from Mail to BarChart
@@ -411,7 +432,14 @@ const navigationGroups = [
       // Single link to hub - hub has action cards to spokes
       // NOTE: Currently at /contacts but should be /people-hub
       { name: 'People Hub', path: '/people-hub', icon: Users },
-      // Proposals and Deliverables are part of Nurture
+    ],
+  },
+  {
+    name: 'Client Operations', // Client Journey Management ✅ IMPLEMENTED
+    items: [
+      // ✅ Hub page implemented at /client-operations
+      // Hub has action cards: "Set Your Proposal" and "Invite Prospect to Portal"
+      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket },
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
     ],
@@ -490,6 +518,7 @@ import {
   FileText,    // Deliverables/Content
   BarChart,    // Ads & SEO
   Palette,     // Branding Hub
+  Rocket,      // Initiate Client Journey ✅
   Settings,    // Settings
 } from 'lucide-react';
 ```
@@ -517,9 +546,24 @@ import {
 - **Settings** = Direct link (1 item)
 
 ### Sidebar Count
-- **Sidebar**: ~13 links (cleaner, less overwhelming)
+- **Sidebar**: ~14 links (cleaner, less overwhelming)
 - **Hub pages**: Provide context and access to ~20+ spoke pages
-- **Order**: Growth Ops → Attract → Engage → Nurture → Settings
+- **Order**: Growth Ops → Attract → Engage → Nurture → Client Operations → Settings
+
+### Client Operations Section ✅ IMPLEMENTED
+- **Initiate Client Journey** (Rocket icon) - Hub at `/client-operations`
+  - Welcome message: "Welcome to Ignite Client Operations - this is where all the pieces and parts you put in here lead a client through the journey to contract sign and then delivery. Ready to get going?"
+  - Action card: "Set Your Proposal" → links to proposal wizard
+  - Action card: "Invite Prospect to Portal" → links to contacts list
+  - Shows recent proposals and contacts for quick access
+  - Quick stats showing proposal counts (Total, Draft, Active, Approved)
+- **Proposals** (FileCheck icon) - Direct link to proposals list
+- **Deliverables** (FileText icon) - Direct link to deliverables
+- **Portal Access Generation**: Available on contact detail pages (`/contacts/[contactId]`)
+  - Button appears if contact has email
+  - Generates Firebase password reset link
+  - Copies link to clipboard automatically
+  - Option to email link directly
 
 ### Core Principle: Attract → Engage → Nurture
 
