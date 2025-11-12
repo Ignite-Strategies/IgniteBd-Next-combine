@@ -141,8 +141,9 @@ model Contact {
   
   // Client Portal Activation
   firebaseUid         String?  @unique // Firebase Auth UID
-  isActivated         Boolean  @default(false) // Has completed activation flow
-  activatedAt         DateTime? // When activation was completed
+  clientPortalUrl    String?  @default("https://clientportal.ignitegrowth.biz") // Portal URL for this contact
+  isActivated        Boolean  @default(false) // Has completed activation flow
+  activatedAt        DateTime? // When activation was completed
   
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt

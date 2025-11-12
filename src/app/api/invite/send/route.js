@@ -51,10 +51,15 @@ export async function POST(request) {
     // Ensure Firebase user exists (upsert - creates if doesn't exist, gets if exists)
     const { user: firebaseUser, wasCreated: firebaseUserWasCreated } = await ensureFirebaseUser(email);
 
-    // Update contact with Firebase UID
+    const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+    
+    // Update contact with Firebase UID and portal URL (NOT in notes!)
     await prisma.contact.update({
       where: { id: contactId },
-      data: { firebaseUid: firebaseUser.uid },
+      data: {
+        firebaseUid: firebaseUser.uid,
+        clientPortalUrl: clientPortalUrl,
+      },
     });
 
     // Generate invite token (16 hex characters = 8 bytes)
@@ -71,6 +76,8 @@ export async function POST(request) {
       },
     });
 
+    const activationLink = `${clientPortalUrl}/activate?token=${token}`;
+
     console.log('✅ Invite created:', {
       contactId,
       email,
@@ -78,10 +85,8 @@ export async function POST(request) {
       firebaseUserStatus: firebaseUserWasCreated ? 'CREATED' : 'EXISTING',
       inviteTokenId: inviteToken.id,
       tokenPreview: token.substring(0, 8) + '...', // Log partial token for security
+      clientPortalUrl,
     });
-
-    const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
-    const activationLink = `${clientPortalUrl}/activate?token=${token}`;
 
     // TODO: Send branded email with activationLink
     // For now, return the link
