@@ -50,6 +50,7 @@ const navigationGroups = [
     name: 'Engage',
     hubPath: '/outreach',
     items: [
+      { name: 'People Hub', path: '/contacts', icon: Users },
       { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
