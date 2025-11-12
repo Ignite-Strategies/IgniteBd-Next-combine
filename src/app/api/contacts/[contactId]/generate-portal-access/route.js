@@ -81,20 +81,19 @@ export async function POST(request, { params }) {
       // Client clicks link → Goes to our reset-password page → Sets password → Redirects to login
       const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
       
-      // Firebase Admin SDK generatePasswordResetLink format
+      // Firebase Admin SDK: generatePasswordResetLink(email, actionCodeSettings?)
+      // Try with ActionCodeSettings first, fallback to basic if it fails
       let resetLink;
       try {
+        // Try with ActionCodeSettings (if supported by your Firebase Admin SDK version)
         resetLink = await auth.generatePasswordResetLink(contact.email, {
           url: `${clientPortalUrl}/reset-password`,
         });
       } catch (linkError) {
-        console.error('Error generating password reset link:', linkError);
-        // Fallback: generate without ActionCodeSettings
+        console.error('Error generating password reset link with ActionCodeSettings:', linkError.message);
+        // Fallback: generate basic link (Firebase default page)
         resetLink = await auth.generatePasswordResetLink(contact.email);
-        // Manually append our URL - Firebase will redirect to it
-        const urlObj = new URL(resetLink);
-        urlObj.searchParams.set('continueUrl', `${clientPortalUrl}/reset-password`);
-        resetLink = urlObj.toString();
+        console.log('Generated basic reset link (will use Firebase default page):', resetLink);
       }
       
       // Store Firebase UID in Contact (link Contact to Firebase user)
