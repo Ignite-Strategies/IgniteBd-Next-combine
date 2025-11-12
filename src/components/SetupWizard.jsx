@@ -32,7 +32,7 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
           setHasAssessment(false);
         }
       } catch (err) {
-        console.warn('Failed to check assessment status:', err);
+        // Silently handle assessment check failures - not critical
         setHasAssessment(false);
       }
     };

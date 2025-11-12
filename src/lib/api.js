@@ -41,8 +41,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      console.warn('Received 401 from API. Ensure user session is valid.');
+    // Silently handle 401s - they're expected when user isn't authenticated yet
+    // Only log in development mode for debugging
+    if (error.response?.status === 401 && process.env.NODE_ENV === 'development') {
+      // Suppress console warnings for 401s - they're handled by components
+    }
+    // Silently handle 404s - they're expected for missing resources
+    if (error.response?.status === 404) {
+      // Suppress console warnings for 404s
     }
     return Promise.reject(error);
   },
