@@ -109,19 +109,11 @@ export async function POST(request, { params }) {
       
       const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
       
-      // Store Firebase UID in Contact (link Contact to Firebase user)
-      const existingNotes = contact.notes ? JSON.parse(contact.notes) : {};
+      // Store Firebase UID in Contact model (NOT in notes!)
       await prisma.contact.update({
         where: { id: contactId },
         data: {
-          notes: JSON.stringify({
-            ...existingNotes,
-            clientPortalAuth: {
-              firebaseUid: firebaseUser.uid,
-              generatedAt: new Date().toISOString(),
-              portalUrl: process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz',
-            },
-          }),
+          firebaseUid: firebaseUser.uid,
         },
       });
 

@@ -135,20 +135,11 @@ export async function POST(request, { params }) {
                 // Note: Firebase Admin SDK will include oobCode in the URL automatically
               });
               
-              // Store Firebase UID in Contact notes
-              const existingNotes = primaryContact.notes ? JSON.parse(primaryContact.notes) : {};
+              // Store Firebase UID in Contact model (NOT in notes!)
               await prisma.contact.update({
                 where: { id: primaryContact.id },
                 data: {
-                  notes: JSON.stringify({
-                    ...existingNotes,
-                    clientPortalAuth: {
-                      firebaseUid: firebaseUser.uid,
-                      generatedAt: new Date().toISOString(),
-                      portalUrl: process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz',
-                      generatedFromProposal: proposalId,
-                    },
-                  }),
+                  firebaseUid: firebaseUser.uid,
                 },
               });
 
