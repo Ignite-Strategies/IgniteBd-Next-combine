@@ -39,9 +39,12 @@ export async function POST(request) {
       );
     }
 
-    // Get contact
+    // Get contact WITH invites relation (direct foreign key relationship)
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
+      include: {
+        invites: true, // Include the InviteToken relation
+      },
     });
 
     if (!contact) {
@@ -74,19 +77,11 @@ export async function POST(request) {
       });
     }
 
-    // Check for existing unused, non-expired invite token
-    const existingToken = await prisma.inviteToken.findFirst({
-      where: {
-        contactId,
-        used: false,
-        expiresAt: {
-          gt: new Date(), // Not expired
-        },
-      },
-      orderBy: {
-        createdAt: 'desc', // Get most recent
-      },
-    });
+    // Check for existing unused, non-expired invite token via Contact relation
+    // Sort by createdAt desc to get most recent, then find first valid token
+    const existingToken = contact.invites
+      ?.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .find((token) => !token.used && new Date(token.expiresAt) > new Date());
 
     // If valid token exists, return it instead of creating new
     if (existingToken) {

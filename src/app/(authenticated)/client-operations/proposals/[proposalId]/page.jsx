@@ -295,26 +295,50 @@ export default function ProposalDetailPage({ params }) {
           )}
         </section>
 
-        {/* Services Section */}
+        {/* Services Section - Inline Editing */}
         <section className="rounded-2xl bg-white p-8 shadow">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Package className="h-6 w-6 text-red-600" />
               Services
             </h2>
-            <button
-              onClick={() =>
-                router.push(
-                  `/client-operations/proposals/${params.proposalId}/services`,
-                )
-              }
-              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-            >
-              Manage Services
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            {editing !== 'services' && (
+              <button
+                onClick={() => setEditing('services')}
+                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              >
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </button>
+            )}
           </div>
-          {serviceInstances.length > 0 ? (
+          {editing === 'services' ? (
+            <ServicesInlineEditor
+              services={serviceInstances}
+              onSave={async (updatedServices) => {
+                try {
+                  setSaving(true);
+                  const response = await api.put(`/api/proposals/${params.proposalId}`, {
+                    serviceInstances: updatedServices,
+                  });
+                  if (response.data?.proposal) {
+                    setProposal(response.data.proposal);
+                    setLocalData((prev) => ({ ...prev, serviceInstances: updatedServices }));
+                    setEditing(null);
+                  }
+                } catch (err) {
+                  console.error('Error saving services:', err);
+                  alert('Failed to save services. Please try again.');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              onCancel={() => {
+                setEditing(null);
+              }}
+              saving={saving}
+            />
+          ) : serviceInstances.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2">
               {serviceInstances.map((service, index) => (
                 <div
@@ -340,11 +364,7 @@ export default function ProposalDetailPage({ params }) {
               <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
               <p>No services added yet.</p>
               <button
-                onClick={() =>
-                  router.push(
-                    `/client-operations/proposals/${params.proposalId}/services`,
-                  )
-                }
+                onClick={() => setEditing('services')}
                 className="mt-4 text-red-600 hover:text-red-700 font-semibold"
               >
                 Add Services →

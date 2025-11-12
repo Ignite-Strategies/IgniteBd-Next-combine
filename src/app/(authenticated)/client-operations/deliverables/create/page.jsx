@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
-import { Save, X, User, FileText, Calendar, Tag } from 'lucide-react';
+import { Save, X, FileText, Calendar, Tag, FileCheck } from 'lucide-react';
 import api from '@/lib/api';
 
 const STATUS_OPTIONS = [
@@ -26,7 +26,6 @@ const CATEGORY_OPTIONS = [
 
 export default function CreateDeliverablePage() {
   const router = useRouter();
-  const [contacts, setContacts] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,7 +33,6 @@ export default function CreateDeliverablePage() {
   const [companyHQId, setCompanyHQId] = useState('');
   
   const [formData, setFormData] = useState({
-    contactId: '',
     title: '',
     description: '',
     category: '',
@@ -52,10 +50,10 @@ export default function CreateDeliverablePage() {
       window.localStorage.getItem('companyId') ||
       '';
     setCompanyHQId(storedId);
-    loadData(storedId);
+    loadProposals(storedId);
   }, []);
 
-  const loadData = async (tenantId) => {
+  const loadProposals = async (tenantId) => {
     if (!tenantId) {
       setLoading(false);
       return;
@@ -64,18 +62,29 @@ export default function CreateDeliverablePage() {
     try {
       setLoading(true);
       
-      // Load contacts
-      const contactsResponse = await api.get(`/api/contacts?companyHQId=${tenantId}`);
-      const contactsData = contactsResponse.data?.contacts || [];
-      setContacts(contactsData);
-
-      // Load proposals
+      // Load proposals - we'll fetch each one individually to get company contacts
       const proposalsResponse = await api.get(`/api/proposals?companyHQId=${tenantId}`);
       const proposalsData = proposalsResponse.data?.proposals || [];
-      setProposals(proposalsData);
+      
+      // Fetch full proposal details with company contacts for each
+      const proposalsWithContacts = await Promise.all(
+        proposalsData.map(async (proposal) => {
+          if (proposal.id) {
+            try {
+              const detailResponse = await api.get(`/api/proposals/${proposal.id}`);
+              return detailResponse.data?.proposal || proposal;
+            } catch {
+              return proposal;
+            }
+          }
+          return proposal;
+        })
+      );
+      
+      setProposals(proposalsWithContacts);
     } catch (err) {
-      console.error('Error loading data:', err);
-      setError('Failed to load contacts and proposals');
+      console.error('Error loading proposals:', err);
+      setError('Failed to load proposals');
     } finally {
       setLoading(false);
     }
@@ -89,13 +98,48 @@ export default function CreateDeliverablePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.contactId) {
-      setError('Please select a contact');
+    if (!formData.title.trim()) {
+      setError('Title is required');
       return;
     }
 
-    if (!formData.title.trim()) {
-      setError('Title is required');
+    // Get contact from proposal's company
+    if (!formData.proposalId) {
+      setError('Please select a proposal');
+      return;
+    }
+
+    const selectedProposal = proposals.find((p) => p.id === formData.proposalId);
+    if (!selectedProposal) {
+      setError('Selected proposal not found');
+      return;
+    }
+
+    let contactId = null;
+    if (selectedProposal.companyId) {
+      // Fetch contacts for this company
+      try {
+        const contactsResponse = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+        const allContacts = contactsResponse.data?.contacts || [];
+        // Find contacts linked to this proposal's company
+        const proposalContacts = allContacts.filter(
+          (c) => c.contactCompanyId === selectedProposal.companyId
+        );
+        if (proposalContacts.length > 0) {
+          contactId = proposalContacts[0].id;
+        } else {
+          setError('Selected proposal does not have an associated contact. Please ensure the proposal is linked to a company with contacts.');
+          setSaving(false);
+          return;
+        }
+      } catch (err) {
+        setError('Failed to fetch contact for proposal');
+        setSaving(false);
+        return;
+      }
+    } else {
+      setError('Selected proposal is not linked to a company');
+      setSaving(false);
       return;
     }
 
@@ -104,7 +148,7 @@ export default function CreateDeliverablePage() {
 
     try {
       const payload = {
-        contactId: formData.contactId,
+        contactId: contactId, // Will be set from proposal if proposalId is provided
         title: formData.title.trim(),
         description: formData.description.trim() || null,
         category: formData.category || null,
@@ -128,18 +172,6 @@ export default function CreateDeliverablePage() {
       setSaving(false);
     }
   };
-
-  const selectedContact = useMemo(() => {
-    return contacts.find((c) => c.id === formData.contactId);
-  }, [contacts, formData.contactId]);
-
-  const filteredProposals = useMemo(() => {
-    if (!formData.contactId) return proposals;
-    // Filter proposals for the selected contact's company
-    const contact = contacts.find((c) => c.id === formData.contactId);
-    if (!contact?.contactCompanyId) return proposals;
-    return proposals.filter((p) => p.companyId === contact.contactCompanyId);
-  }, [proposals, formData.contactId, contacts]);
 
   if (loading) {
     return (
@@ -171,26 +203,28 @@ export default function CreateDeliverablePage() {
           )}
 
           <div className="space-y-6">
-            {/* Contact Selection */}
+            {/* Proposal Selection - Primary */}
             <div>
               <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <User className="h-4 w-4" />
-                Contact *
+                <FileCheck className="h-4 w-4" />
+                Proposal *
               </label>
               <select
-                value={formData.contactId}
-                onChange={(e) => handleChange('contactId', e.target.value)}
+                value={formData.proposalId}
+                onChange={(e) => handleChange('proposalId', e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                 required
               >
-                <option value="">Select a contact...</option>
-                {contacts.map((contact) => (
-                  <option key={contact.id} value={contact.id}>
-                    {contact.firstName} {contact.lastName} {contact.email ? `(${contact.email})` : ''}
-                    {contact.contactCompany ? ` - ${contact.contactCompany.companyName}` : ''}
+                <option value="">Select a proposal...</option>
+                {proposals.map((proposal) => (
+                  <option key={proposal.id} value={proposal.id}>
+                    {proposal.clientName} - {proposal.clientCompany} ({proposal.status})
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-gray-500">
+                The deliverable will be associated with the proposal's contact automatically
+              </p>
             </div>
 
             {/* Title */}
@@ -262,26 +296,6 @@ export default function CreateDeliverablePage() {
               </div>
             </div>
 
-            {/* Proposal (Optional) */}
-            {filteredProposals.length > 0 && (
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Link to Proposal (Optional)
-                </label>
-                <select
-                  value={formData.proposalId}
-                  onChange={(e) => handleChange('proposalId', e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                >
-                  <option value="">No proposal link</option>
-                  {filteredProposals.map((proposal) => (
-                    <option key={proposal.id} value={proposal.id}>
-                      {proposal.clientName} - {proposal.clientCompany} ({proposal.status})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             {/* Milestone ID */}
             {formData.proposalId && (

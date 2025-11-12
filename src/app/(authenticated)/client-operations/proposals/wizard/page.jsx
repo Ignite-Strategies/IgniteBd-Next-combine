@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useProposals } from '../layout';
-import { useContacts } from '@/app/(authenticated)/contacts/layout';
-import { Plus, X, Package, Calendar, CheckCircle, RefreshCw } from 'lucide-react';
+import { Plus, X, Package, Calendar, CheckCircle, RefreshCw, Search, Mail, User } from 'lucide-react';
 import api from '@/lib/api';
+import { getContactsRegistry } from '@/lib/services/contactsRegistry';
 
 export default function ProposalWizardPage() {
   const router = useRouter();
   const { addProposal, companyHQId } = useProposals();
-  const { contacts, refreshContacts, hydrated: contactsHydrated } = useContacts();
+  const [registry] = useState(() => getContactsRegistry());
 
   const [step, setStep] = useState(1); // 1: Contact, 2: Business, 3: Proposal Details, 4: Services, 5: Phases
   const [contactSearch, setContactSearch] = useState('');
@@ -19,6 +19,7 @@ export default function ProposalWizardPage() {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [companyNameInput, setCompanyNameInput] = useState('');
   const [companyConfirmed, setCompanyConfirmed] = useState(false);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   
   // Proposal fields
   const [proposalName, setProposalName] = useState('');
@@ -37,12 +38,54 @@ export default function ProposalWizardPage() {
   const [error, setError] = useState('');
   const [loadingCompany, setLoadingCompany] = useState(false);
 
-  // Hydrate contacts on mount
+  // Load contacts from registry on mount
   useEffect(() => {
-    if (!contactsHydrated && contacts.length === 0) {
-      refreshContacts();
+    if (!registry.hydrated) {
+      registry.loadFromCache();
     }
-  }, [contactsHydrated, contacts.length, refreshContacts]);
+  }, [registry]);
+
+  // Fetch contacts from API and hydrate registry
+  const fetchContactsFromAPI = useCallback(async () => {
+    if (!companyHQId) {
+      console.warn('No companyHQId available');
+      return;
+    }
+
+    setLoadingContacts(true);
+    setError('');
+    try {
+      const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+      if (response.data?.success && response.data.contacts) {
+        const fetched = response.data.contacts;
+        registry.hydrate(fetched);
+        registry.saveToCache();
+      } else {
+        console.warn('API response missing contacts:', response.data);
+        registry.clear();
+      }
+    } catch (err) {
+      console.error('Error fetching contacts:', err);
+      setError('Failed to load contacts. Please try again.');
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, [companyHQId, registry]);
+
+  // Refresh from cache
+  const refreshContacts = useCallback(() => {
+    registry.loadFromCache();
+  }, [registry]);
+
+  // Get available contacts using registry search
+  const availableContacts = useMemo(() => {
+    // If no search term, show all contacts
+    if (!contactSearch || !contactSearch.trim()) {
+      return registry.getAll().slice(0, 20);
+    }
+    // Otherwise search
+    return registry.search(contactSearch).slice(0, 20);
+  }, [contactSearch, registry]);
 
   // Load products from API
   useEffect(() => {
@@ -83,42 +126,22 @@ export default function ProposalWizardPage() {
     }
   };
 
-  // Filter contacts by search
-  const filteredContacts = useMemo(() => {
-    if (!contactSearch.trim()) {
-      return contacts.slice(0, 20);
-    }
-    const searchLower = contactSearch.toLowerCase().trim();
-    return contacts.filter(
-      (contact) => {
-        const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
-        const email = (contact.email || '').toLowerCase();
-        const company = (contact.contactCompany?.companyName || '').toLowerCase();
-        return (
-          fullName.includes(searchLower) ||
-          email.includes(searchLower) ||
-          company.includes(searchLower)
-        );
-      }
-    ).slice(0, 20);
-  }, [contacts, contactSearch]);
 
-  // Handle contact selection - auto-hydrate company
+  // Handle contact selection - move to company confirmation
   const handleContactSelect = async (contact) => {
     setSelectedContact(contact);
     setError('');
     
-    // Auto-hydrate company if contact has one
+    // Pre-fill company name if contact has one, but don't auto-confirm
     if (contact.contactCompany) {
-      setSelectedCompany(contact.contactCompany);
       setCompanyNameInput(contact.contactCompany.companyName);
-      setCompanyConfirmed(true);
+      // Don't auto-set selectedCompany - user needs to confirm
     } else {
-      // No company - clear and let them enter
-      setSelectedCompany(null);
+      // No company - clear input
       setCompanyNameInput('');
-      setCompanyConfirmed(false);
     }
+    setCompanyConfirmed(false);
+    setSelectedCompany(null);
     setStep(2); // Move to business confirmation step
   };
 
@@ -574,16 +597,19 @@ export default function ProposalWizardPage() {
           </div>
         )}
 
-        {/* Step 3: Proposal Name & Description */}
+        {/* Step 3: Proposal Title & Description (Internal Only) */}
         {step === 3 && companyConfirmed && (
           <div className="rounded-2xl bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              3. Proposal Details
+              3. Proposal Title & Description
             </h2>
+            <p className="mb-4 text-sm text-gray-600">
+              <strong>Internal use only</strong> - This helps you organize and track proposals internally.
+            </p>
             <div className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Proposal Name *
+                  Proposal Title *
                 </label>
                 <input
                   type="text"
@@ -593,43 +619,40 @@ export default function ProposalWizardPage() {
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Suggested: Proposal for {selectedCompany?.companyName} {selectedContact?.firstName} {selectedContact?.lastName}
+                  Suggested: Proposal for {selectedCompany?.companyName} - {selectedContact?.firstName} {selectedContact?.lastName}
                 </p>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Description <span className="text-gray-500">(Internal Use)</span>
+                  Description <span className="text-gray-500 font-normal">(Internal Use Only)</span>
                 </label>
                 <textarea
                   value={proposalDescription}
                   onChange={(e) => setProposalDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Brief description of what this offering includes (internal use only)"
+                  rows={4}
+                  placeholder="Internal notes about what this proposal covers, context, or special considerations..."
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Internal note about what this proposal covers
+                  This description is for your internal reference only and won't be shown to the client
                 </p>
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Expected Delivery Date
-                </label>
-                <input
-                  type="date"
-                  value={expectedDeliveryDate}
-                  onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                />
-              </div>
             </div>
-            <button
-              onClick={() => setStep(4)}
-              disabled={!proposalName.trim()}
-              className="mt-6 w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-            >
-              Continue to Services
-            </button>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setStep(2)}
+                className="flex-1 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setStep(4)}
+                disabled={!proposalName.trim()}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                Continue to Services
+              </button>
+            </div>
           </div>
         )}
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
-import { FileText, CheckCircle, Clock, AlertCircle, RefreshCw, FileCheck } from 'lucide-react';
+import { FileText, CheckCircle, Clock, AlertCircle, RefreshCw, FileCheck, Plus } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function DeliverablesPage() {
