@@ -13,7 +13,8 @@ export async function generateInviteLink(contactId: string, email: string) {
     data: { contactId, email, token, expiresAt },
   });
 
-  const base = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+  // Hardcoded client portal URL
+  const base = 'https://clientportal.ignitegrowth.biz';
   return `${base}/activate?token=${token}`;
 }
 

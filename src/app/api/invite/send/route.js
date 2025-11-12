@@ -80,7 +80,7 @@ export async function POST(request) {
 
     // If valid token exists, return it instead of creating new
     if (existingToken) {
-      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+      const clientPortalUrl = 'https://clientportal.ignitegrowth.biz';
       const activationLink = `${clientPortalUrl}/activate?token=${existingToken.token}`;
 
       console.log('✅ Using existing invite token:', {

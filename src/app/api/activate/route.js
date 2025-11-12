@@ -51,7 +51,7 @@ export async function POST(request) {
     });
 
     // Return redirect URL with Firebase UID
-    const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+    const clientPortalUrl = 'https://clientportal.ignitegrowth.biz';
     const redirectUrl = `${clientPortalUrl}/set-password?uid=${invite.contact.firebaseUid}&email=${encodeURIComponent(invite.email)}&contactId=${invite.contactId}`;
 
     return NextResponse.json({

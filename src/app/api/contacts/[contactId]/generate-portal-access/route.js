@@ -61,7 +61,7 @@ export async function POST(request, { params }) {
       : null;
     const { user: firebaseUser, wasCreated } = await ensureFirebaseUser(contact.email, displayName);
     
-    const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+    const clientPortalUrl = 'https://clientportal.ignitegrowth.biz';
     
     // Update contact with Firebase UID if needed
     if (contact.firebaseUid !== firebaseUser.uid) {
