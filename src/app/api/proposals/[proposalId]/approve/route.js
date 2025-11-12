@@ -132,7 +132,7 @@ export async function POST(request, { params }) {
               const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
               const resetLink = await auth.generatePasswordResetLink(primaryContact.email, {
                 url: `${clientPortalUrl}/reset-password`, // Our custom password reset page
-                handleCodeInApp: true, // Handle on our page, not Firebase's hosted page
+                // Note: Firebase Admin SDK will include oobCode in the URL automatically
               });
               
               // Store Firebase UID in Contact notes
