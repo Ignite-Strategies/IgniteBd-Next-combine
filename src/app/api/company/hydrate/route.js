@@ -36,7 +36,7 @@ export async function GET(request) {
     console.log(`🚀 COMPANY HYDRATE: Fetching all data for companyHQId: ${companyHQId}`);
 
     // Fetch all data in parallel
-    const [companyHQ, personas, contacts, products, pipelines] = await Promise.all([
+    const [companyHQ, personas, contacts, products, pipelines, proposals] = await Promise.all([
       // CompanyHQ
       prisma.companyHQ.findUnique({
         where: { id: companyHQId },
@@ -110,6 +110,20 @@ export async function GET(request) {
         },
         take: 100,
       }).catch(() => []), // Return empty array on error
+
+      // Proposals
+      prisma.proposal.findMany({
+        where: { companyHQId },
+        include: {
+          company: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }).catch(() => []), // Return empty array on error
     ]);
 
     if (!companyHQ) {
@@ -125,6 +139,7 @@ export async function GET(request) {
       contactCount: contacts.length,
       productCount: products.length,
       pipelineCount: pipelines.length,
+      proposalCount: proposals.length,
       prospectCount: contacts.filter(
         (c) => c.pipeline?.pipeline === 'prospect',
       ).length,
@@ -140,6 +155,7 @@ export async function GET(request) {
       contacts: contacts || [],
       products: products || [],
       pipelines: pipelines || [],
+      proposals: proposals || [],
       stats,
       timestamp: new Date().toISOString(),
     };

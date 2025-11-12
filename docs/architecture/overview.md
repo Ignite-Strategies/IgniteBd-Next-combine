@@ -1,4 +1,21 @@
-# IgniteBD Stack Next.js Development Guide
+# Architecture Overview
+
+Complete architecture guide for IgniteBD Next.js stack.
+
+## Table of Contents
+
+1. [Premise](#premise)
+2. [Stack Overview](#stack-overview)
+3. [Architecture Principles](#architecture-principles)
+4. [Next.js App Router Structure](#nextjs-app-router-structure)
+5. [API Architecture](#api-architecture)
+6. [Authentication Flow](#authentication-flow)
+7. [Database & Prisma](#database--prisma)
+8. [Development Workflow](#development-workflow)
+9. [Deployment](#deployment)
+10. [Key Differences from Original Stack](#key-differences-from-original-stack)
+
+---
 
 ## Premise
 
@@ -12,9 +29,10 @@ The core mission: **Attract → Engage → Nurture**
 
 ---
 
-## Stack Overview - Next.js Combined Architecture
+## Stack Overview
 
 ### Combined Stack: `IgniteBd-Next-combine`
+
 - **Framework**: Next.js 14+ (App Router)
 - **Frontend**: React 18 (Server & Client Components)
 - **Backend**: Next.js API Routes (replacing Express)
@@ -45,6 +63,7 @@ The core mission: **Attract → Engage → Nurture**
 ## Architecture Principles
 
 ### Core Architecture Pattern
+
 **Contact + Company First Architecture** - Designed to drive business growth through systematic relationship management.
 
 This architecture emphasizes:
@@ -118,136 +137,6 @@ src/app/
 - `(authenticated)`: Main application routes requiring full setup
 
 Route groups (parentheses) don't affect URLs but allow shared layouts.
-
----
-
-## Hydration Flow & Data Management
-
-### Quick Reference: What Gets Hydrated When
-
-**The hydration chain:**
-1. **ownerId** → Stored first (from signup/welcome)
-2. **companyHQId** → Stored after company creation (or from welcome if exists)
-3. **Everything else** → Hydrates off of `companyHQId`
-
-**Summary:**
-- **Welcome** hydrates: `ownerId`, `owner`, `companyHQId` (if exists), `companyHQ` (if exists)
-- **Company Creation** stores: `companyHQId`, `companyHQ`, then re-hydrates owner
-- **Contacts** hydrates off: `companyHQId` → stores `contacts` array
-- **Outreach** hydrates off: `companyHQId` → stores `outreachCampaigns` array
-- **Pipelines** hydrates off: `companyHQId` → stores `bdRoadmapItems` array
-
-**Key Point:** All feature data requires `companyHQId` to exist first. Features check localStorage for cached data, then fetch fresh from API using `companyHQId`.
-
-### localStorage Keys Hierarchy
-
-```
-Level 1: Owner (Required for all authenticated routes)
-├── ownerId          # Owner database ID
-├── owner            # Full Owner object (JSON)
-└── firebaseId       # Firebase UID (from signup)
-
-Level 2: Company (Required for main app)
-├── companyHQId      # CompanyHQ database ID (tenant identifier)
-└── companyHQ         # Full CompanyHQ object (JSON)
-
-Level 3: Feature Data (Hydrated on-demand per feature)
-├── contacts         # Array of Contact objects (hydrated by companyHQId)
-├── outreachCampaigns # Array of Campaign objects (hydrated by companyHQId)
-├── bdRoadmapItems   # Array of Roadmap items (hydrated by companyHQId)
-└── [other feature data]
-```
-
-### 1. Welcome Hydration (`/welcome`)
-
-**What it hydrates:**
-- Owner data from `/api/owner/hydrate`
-- Primary CompanyHQ (if exists)
-- All owned/managed companies
-
-**What gets stored in localStorage:**
-```javascript
-// Level 1: Owner (always stored)
-localStorage.setItem('ownerId', ownerData.id);
-localStorage.setItem('owner', JSON.stringify(ownerData));
-
-// Level 2: Company (if exists)
-if (ownerData.companyHQId) {
-  localStorage.setItem('companyHQId', ownerData.companyHQId);
-}
-if (ownerData.companyHQ) {
-  localStorage.setItem('companyHQ', JSON.stringify(ownerData.companyHQ));
-}
-```
-
-**Routing logic:**
-- No `companyHQId` or no `ownedCompanies` → `/company/create-or-choose`
-- Has company → `/growth-dashboard`
-
-**API Route:** `src/app/api/owner/hydrate/route.js`
-- Verifies Firebase token
-- Queries Prisma for Owner by `firebaseId`
-- Includes `ownedCompanies` and `managedCompanies` with relations
-- Returns hydrated owner object
-
-### 2. Company Creation (`/company/profile`)
-
-**What gets stored:**
-```javascript
-// After creating CompanyHQ
-localStorage.setItem('companyHQId', companyHQ.id);
-localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
-
-// Then re-hydrate owner to sync
-const hydrateResponse = await api.get('/api/owner/hydrate');
-localStorage.setItem('ownerId', hydrateResponse.data.owner.id);
-localStorage.setItem('owner', JSON.stringify(hydrateResponse.data.owner));
-if (hydrateResponse.data.owner.companyHQId) {
-  localStorage.setItem('companyHQId', hydrateResponse.data.owner.companyHQId);
-  localStorage.setItem('companyHQ', JSON.stringify(hydrateResponse.data.owner.companyHQ));
-}
-```
-
-### 3. Feature-Level Hydration (After companyHQId exists)
-
-**Contacts Hydration** (`/contacts/layout.jsx`):
-```javascript
-// Step 1: Get companyHQId from localStorage
-const companyHQId = localStorage.getItem('companyHQId');
-
-// Step 2: Check for cached contacts
-const cached = localStorage.getItem('contacts');
-if (cached) {
-  setContacts(JSON.parse(cached)); // Fast initial render
-}
-
-// Step 3: Fetch fresh contacts from API
-const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
-const contacts = response.data.contacts;
-
-// Step 4: Store in localStorage for next time
-localStorage.setItem('contacts', JSON.stringify(contacts));
-```
-
-**Pattern for all features:**
-1. Read `companyHQId` from localStorage
-2. Check localStorage for cached feature data
-3. If cached, use it for fast initial render
-4. Fetch fresh data from API using `companyHQId`
-5. Update localStorage with fresh data
-6. Provide via React Context to child components
-
-**Other Feature Layouts:**
-
-**Outreach Layout** (`/outreach/layout.jsx`):
-- Hydrates campaigns for the tenant using `companyHQId`
-- Provides `useOutreach()` hook
-- Stores `outreachCampaigns` in localStorage
-
-**Pipelines Layout** (`/pipelines/layout.jsx`):
-- Hydrates pipeline configuration using `companyHQId`
-- Provides `usePipelines()` hook
-- Stores `bdRoadmapItems` in localStorage
 
 ---
 
@@ -365,36 +254,15 @@ The owner is authenticated once via Firebase session. Data is scoped by `company
   - Better performance: Fewer token verifications
   - Simpler flow: Owner authenticated once, then scoped by tenant
 
-**Example:**
-```javascript
-// GET /api/contacts?companyHQId=xxx
-export async function GET(request) {
-  // optionalAuth - token not required
-  const { companyHQId } = request.nextUrl.searchParams;
-  // ... fetch contacts scoped by companyHQId
-}
-```
-
 **POST/PUT/DELETE (Write Operations) → `verifyFirebaseToken`**
 - **Purpose:** "Change stuff" - Creating, updating, or deleting data
 - **Middleware:** `verifyFirebaseToken`
 - **Why:** Security - prevent unauthorized modifications
 - **Requirement:** Valid Firebase token must be present
 
-**Example:**
-```javascript
-// POST /api/contacts
-export async function POST(request) {
-  const firebaseUser = await verifyFirebaseToken(request); // Required
-  // ... create contact
-}
-```
-
 **Pattern Summary:**
 - ✅ **GET** = `optionalAuth` (scoped by `companyHQId`)
 - 🔒 **POST/PUT/DELETE** = `verifyFirebaseToken` (requires valid token)
-
-The frontend axios interceptor automatically sends Firebase tokens when available (for analytics/logging) and handles token refresh, but GET requests won't fail if the token is missing or expired.
 
 ---
 
@@ -464,18 +332,43 @@ curl http://localhost:3000/api/owner/hydrate \
 
 ---
 
+## Deployment
+
+### Vercel Deployment
+
+1. **Connect Repository**: Link GitHub repo to Vercel
+2. **Environment Variables**:
+   - `DATABASE_URL` - PostgreSQL connection string
+   - `FIREBASE_SERVICE_ACCOUNT_KEY` - Firebase Admin SDK JSON
+   - `NEXT_PUBLIC_BACKEND_URL` - Leave empty or unset (use Next.js API routes)
+3. **Build**: Vercel automatically runs `npm run build`
+4. **Deploy**: Every push to main triggers deployment
+
+### Production URLs
+
+- **App**: https://app.ignitegrowth.biz
+- **API Routes**: https://app.ignitegrowth.biz/api/owner/hydrate (same domain)
+
+### Database
+
+- Same PostgreSQL database as Express backend
+- Shared Prisma schema
+- Can run migrations from either codebase
+
+---
+
 ## Key Differences from Original Stack
 
 ### 1. API Routes Location
 
 **Old:**
 ```
-ignitebd-backend/routes/Owner/IgniteUniversalHydrateRoute.js
+ignitebd-backend/routes/Owner/CreateOwnerRoute.js
 ```
 
 **New:**
 ```
-src/app/api/owner/hydrate/route.js
+src/app/api/owner/create/route.js
 ```
 
 ### 2. Routing
@@ -533,131 +426,12 @@ import Link from 'next/link';
 
 ---
 
-## Hydration Hooks Pattern
-
-### Custom Hooks for Feature Contexts
-
-**Contacts Hook:**
-```javascript
-// src/app/(authenticated)/contacts/layout.jsx
-export function useContacts() {
-  return useContext(ContactsContext);
-}
-
-// Usage in page:
-const { contacts, loading, refreshContacts } = useContacts();
-```
-
-**Outreach Hook:**
-```javascript
-// src/app/(authenticated)/outreach/layout.jsx
-export function useOutreach() {
-  return useContext(OutreachContext);
-}
-```
-
-**Pipelines Hook:**
-```javascript
-// src/app/(authenticated)/pipelines/layout.jsx
-export function usePipelines() {
-  return useContext(PipelinesContext);
-}
-```
-
-### Hook Usage Pattern
-
-1. Layout provides context via `useContext`
-2. Pages import and use the hook
-3. Hook provides: data, loading state, refresh function
-4. localStorage used for fast initial hydration
-
----
-
-## Deployment
-
-### Vercel Deployment
-
-1. **Connect Repository**: Link GitHub repo to Vercel
-2. **Environment Variables**:
-   - `DATABASE_URL` - PostgreSQL connection string
-   - `FIREBASE_SERVICE_ACCOUNT_KEY` - Firebase Admin SDK JSON
-   - `NEXT_PUBLIC_BACKEND_URL` - Leave empty or unset (use Next.js API routes)
-3. **Build**: Vercel automatically runs `npm run build`
-4. **Deploy**: Every push to main triggers deployment
-
-### Production URLs
-
-- **App**: https://app.ignitegrowth.biz
-- **API Routes**: https://app.ignitegrowth.biz/api/owner/hydrate (same domain)
-
-### Database
-
-- Same PostgreSQL database as Express backend
-- Shared Prisma schema
-- Can run migrations from either codebase
-
----
-
-## Troubleshooting
-
-### API Routes Not Working
-
-**Issue:** API calls failing, 404s on `/api/**` routes
-
-**Check:**
-1. Is `NEXT_PUBLIC_BACKEND_URL` set? If yes, it's calling external backend
-2. Are API route files in correct location? (`src/app/api/**/route.js`)
-3. Are route handlers exported correctly? (`export async function GET(request)`)
-4. Check Vercel function logs for errors
-
-### Hydration Errors
-
-**Issue:** React hydration mismatch errors
-
-**Check:**
-1. Are you using `react-router-dom` components? (should use Next.js `Link`)
-2. Are you accessing `window`/`localStorage` before mount? (use `useEffect`)
-3. Are Server Components trying to use hooks? (add `'use client'`)
-
-### Database Connection Issues
-
-**Issue:** Prisma errors, can't connect to database
-
-**Check:**
-1. Is `DATABASE_URL` set in environment variables?
-2. Is database accessible from Vercel? (check firewall/network)
-3. Run `npx prisma generate` after schema changes
-
----
-
-## Migration Notes
-
-### From Express Backend to Next.js API Routes
-
-**Route Mapping:**
-| Express Route | Next.js API Route |
-|--------------|-------------------|
-| `routes/Owner/CreateOwnerRoute.js` | `src/app/api/owner/create/route.js` |
-| `routes/Owner/IgniteUniversalHydrateRoute.js` | `src/app/api/owner/hydrate/route.js` |
-| `routes/Owner/OwnerProfileSetupRoute.js` | `src/app/api/owner/[ownerId]/profile/route.js` |
-
-**Middleware:**
-- Express: `verifyFirebaseToken` middleware
-- Next.js: `verifyFirebaseToken(request)` function call in route handler
-
-**Response:**
-- Express: `res.json({ success: true, data })`
-- Next.js: `NextResponse.json({ success: true, data })`
-
----
-
 ## Related Documentation
 
-- **`HYDRATION_ARCHITECTURE.md`** - **⭐ Core hydration architecture** (ownerId → companyHQId → everything)
-- **`Ignitebd_stack_devguide.md`** - Original stack documentation (React + Express)
-- **`docs/NextAppArchitecture.md`** - Next.js App Router architecture details
-- **`IGNITE_ARCHITECTURE.md`** - Complete database schema and data flow
-- **`FIREBASE-AUTH-AND-USER-MANAGEMENT.md`** - Authentication patterns
+- **`docs/architecture/hydration.md`** - Hydration architecture (ownerId → companyHQId → everything)
+- **`docs/architecture/contacts.md`** - Contact management architecture
+- **`docs/architecture/hooks.md`** - React hooks guide
+- **`docs/architecture/client-operations.md`** - Client operations architecture
 
 ---
 

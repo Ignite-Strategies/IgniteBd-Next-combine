@@ -19,11 +19,13 @@ export function useCompanyHydration(companyHQId) {
     contacts: [],
     products: [],
     pipelines: [],
+    proposals: [],
     stats: {
       personaCount: 0,
       contactCount: 0,
       productCount: 0,
       pipelineCount: 0,
+      proposalCount: 0,
       prospectCount: 0,
       clientCount: 0,
     },
@@ -88,11 +90,13 @@ export function useCompanyHydration(companyHQId) {
         contacts: response.data.contacts || [],
         products: response.data.products || [],
         pipelines: response.data.pipelines || [],
+        proposals: response.data.proposals || [],
         stats: response.data.stats || {
           personaCount: 0,
           contactCount: 0,
           productCount: 0,
           pipelineCount: 0,
+          proposalCount: 0,
           prospectCount: 0,
           clientCount: 0,
         },
@@ -122,6 +126,7 @@ export function useCompanyHydration(companyHQId) {
       localStorage.setItem('contacts', JSON.stringify(hydratedData.contacts));
       localStorage.setItem('products', JSON.stringify(hydratedData.products));
       localStorage.setItem('pipelines', JSON.stringify(hydratedData.pipelines));
+      localStorage.setItem('proposals', JSON.stringify(hydratedData.proposals));
 
       setLoading(false);
     } catch (err) {
@@ -143,6 +148,7 @@ export function useCompanyHydration(companyHQId) {
     contacts: data.contacts,
     products: data.products,
     pipelines: data.pipelines,
+    proposals: data.proposals,
     stats: data.stats,
   };
 }

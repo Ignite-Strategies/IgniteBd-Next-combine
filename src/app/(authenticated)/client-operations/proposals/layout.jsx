@@ -11,13 +11,16 @@ import {
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 
+// Note: Proposals are hydrated by Growth Dashboard via useCompanyHydration hook
+// This layout just reads from localStorage - no separate API calls
+
 const ProposalsContext = createContext({
   proposals: [],
   setProposals: () => {},
   companyHQId: '',
   hydrated: false,
-  hydrating: false,
-  refreshProposals: async () => {},
+  hydrating: false, // Always false - no auto-hydrating
+  refreshProposals: async () => {}, // Manual refresh only
   updateProposal: (proposalId, updates) => {},
   addProposal: (proposal) => {},
   removeProposal: (proposalId) => {},
@@ -37,7 +40,7 @@ export default function ProposalsLayout({ children }) {
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
 
-  // Step 1: Check localStorage cache on mount
+  // Read from localStorage only - hydrated by Growth Dashboard
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -55,7 +58,7 @@ export default function ProposalsLayout({ children }) {
     }
   }, []);
 
-  // Step 2: Fetch from API when companyHQId is available
+  // Manual refresh only (for when user explicitly wants to refresh/sync)
   const refreshProposals = useCallback(async () => {
     if (!companyHQId) return;
 
@@ -66,24 +69,17 @@ export default function ProposalsLayout({ children }) {
       
       setProposals(fetchedProposals);
       
-      // Step 3: Store in localStorage
+      // Update localStorage
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('proposals', JSON.stringify(fetchedProposals));
       }
       setHydrated(true);
     } catch (error) {
-      console.error('Error fetching proposals:', error);
+      console.error('Error syncing proposals:', error);
     } finally {
       setHydrating(false);
     }
   }, [companyHQId]);
-
-  // Step 4: Auto-fetch if not hydrated
-  useEffect(() => {
-    if (companyHQId && !hydrated) {
-      refreshProposals();
-    }
-  }, [companyHQId, hydrated, refreshProposals]);
 
   // Helper: Update a single proposal in state and localStorage
   const updateProposal = useCallback((proposalId, updates) => {
@@ -126,7 +122,7 @@ export default function ProposalsLayout({ children }) {
       setProposals,
       companyHQId,
       hydrated,
-      hydrating,
+      hydrating, // Only true when manually syncing
       refreshProposals,
       updateProposal,
       addProposal,
