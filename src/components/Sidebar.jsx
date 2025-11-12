@@ -52,10 +52,10 @@ const navigationGroups = [
     name: 'Engage',
     hubPath: '/contacts',
     items: [
-      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
       { name: 'Manage Contacts', path: '/contacts/view', icon: Users },
       { name: 'Contact Lists', path: '/contacts/list-manager', icon: List },
       { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: GitBranch },
+      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
       { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
