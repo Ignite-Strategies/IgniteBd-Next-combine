@@ -60,7 +60,8 @@ This document lists all environment variables that need to be configured in Verc
 
 ### Client Portal
 - `NEXT_PUBLIC_CLIENT_PORTAL_URL` - Client portal URL
-  - Example: `https://portal.ignitegrowth.biz` or `http://localhost:3001`
+  - Production: `https://clientportal.ignitegrowth.biz`
+  - Development: `http://localhost:3001` (default fallback)
 
 ---
 
@@ -111,7 +112,7 @@ OPENAI_API_KEY=sk-...
 LUSHA_API_KEY=...
 
 # Client Portal
-NEXT_PUBLIC_CLIENT_PORTAL_URL=https://portal.ignitegrowth.biz
+NEXT_PUBLIC_CLIENT_PORTAL_URL=https://clientportal.ignitegrowth.biz
 
 # Optional
 DEFAULT_COMPANY_HQ_ID=...

@@ -129,7 +129,7 @@ export async function POST(request, { params }) {
               }
 
               // Generate password reset link - handled on our client portal page
-              const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001';
+              const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
               const resetLink = await auth.generatePasswordResetLink(primaryContact.email, {
                 url: `${clientPortalUrl}/reset-password`, // Our custom password reset page
                 handleCodeInApp: true, // Handle on our page, not Firebase's hosted page
@@ -145,7 +145,7 @@ export async function POST(request, { params }) {
                     clientPortalAuth: {
                       firebaseUid: firebaseUser.uid,
                       generatedAt: new Date().toISOString(),
-                      portalUrl: process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001',
+                      portalUrl: process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz',
                       generatedFromProposal: proposalId,
                     },
                   }),
@@ -157,7 +157,7 @@ export async function POST(request, { params }) {
                 contactId: primaryContact.id,
                 contactEmail: primaryContact.email,
                 passwordResetLink: resetLink,
-                loginUrl: `${process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001'}/login`,
+                loginUrl: `${process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz'}/login`,
               };
               
               console.log('✅ Portal access generated for contact:', primaryContact.email);
