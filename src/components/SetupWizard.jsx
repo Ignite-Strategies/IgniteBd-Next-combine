@@ -48,7 +48,7 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
 
     // Only check if companyHQ is available
     if (companyHQ?.id) {
-      checkAssessment();
+    checkAssessment();
     }
   }, [companyHQ]);
   
