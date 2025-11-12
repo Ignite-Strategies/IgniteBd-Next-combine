@@ -68,8 +68,13 @@ export default function InviteProspectPage() {
     registry.loadFromCache();
   }, [registry]);
 
-  // Get available contacts using registry search
+  // Get available contacts using registry search - shows all with email when search is empty
   const availableContacts = useMemo(() => {
+    // If no search term, show all contacts with email
+    if (!searchTerm || !searchTerm.trim()) {
+      return registry.getWithEmail();
+    }
+    // Otherwise search and filter by email
     return registry.searchWithEmail(searchTerm);
   }, [searchTerm, registry]);
 
@@ -143,11 +148,21 @@ export default function InviteProspectPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search contacts by name, email, or company..."
+                    placeholder="Type to search contacts by name, email, or company..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    autoFocus
                   />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="Clear search"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={refreshContacts}
@@ -192,15 +207,30 @@ export default function InviteProspectPage() {
                 <div className="text-center py-8">
                   <p className="text-gray-500">
                     {searchTerm
-                      ? 'No contacts found matching your search'
+                      ? `No contacts found matching "${searchTerm}"`
                       : 'No contacts with email addresses available'}
                   </p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Found {registry.getCount()} total contacts, but none have email addresses.
-                  </p>
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      Clear search to see all contacts
+                    </button>
+                  )}
+                  {!searchTerm && registry.getCount() > 0 && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      Found {registry.getCount()} total contacts, but none have email addresses.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {searchTerm && (
+                    <p className="text-xs text-gray-500 mb-2 px-2">
+                      Showing {availableContacts.length} of {registry.getWithEmail().length} contacts with email
+                    </p>
+                  )}
                   {availableContacts.map((contact) => (
                     <button
                       key={contact.id}
