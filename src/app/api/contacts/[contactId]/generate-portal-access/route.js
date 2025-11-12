@@ -20,7 +20,9 @@ export async function POST(request, { params }) {
   }
 
   try {
-    const { contactId } = params || {};
+    // Await params in Next.js App Router
+    const resolvedParams = await params;
+    const { contactId } = resolvedParams || {};
     if (!contactId) {
       return NextResponse.json(
         { success: false, error: 'contactId is required' },
