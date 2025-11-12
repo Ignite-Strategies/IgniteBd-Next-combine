@@ -10,6 +10,7 @@ import {
   Search,
   Plus,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -23,6 +24,7 @@ export default function ContactsViewPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -67,33 +69,28 @@ export default function ContactsViewPage() {
     [companyHQId, pipelineFilter],
   );
 
-  const loadContacts = useCallback(async () => {
-    if (!companyHQId) {
-      setLoading(false);
-      return;
-    }
+  // Load from localStorage only - no auto-fetch
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const storedCompanyHQId =
+      window.localStorage.getItem('companyHQId') ||
+      window.localStorage.getItem('companyId') ||
+      '';
+    setCompanyHQId(storedCompanyHQId);
 
-    if (typeof window !== 'undefined') {
-      const cachedContacts = window.localStorage.getItem('contacts');
-      if (cachedContacts) {
-        try {
-          const parsed = JSON.parse(cachedContacts);
-          setContacts(parsed);
-          setLoading(false);
-          refreshContactsFromAPI(false);
-          return;
-        } catch (error) {
-          console.warn('Unable to parse cached contacts', error);
-        }
+    // Only load from localStorage
+    const cachedContacts = window.localStorage.getItem('contacts');
+    if (cachedContacts) {
+      try {
+        const parsed = JSON.parse(cachedContacts);
+        setContacts(parsed);
+      } catch (error) {
+        console.warn('Unable to parse cached contacts', error);
       }
     }
-
-    await refreshContactsFromAPI(true);
-  }, [companyHQId, refreshContactsFromAPI]);
-
-  useEffect(() => {
-    loadContacts();
-  }, [loadContacts]);
+    setLoading(false);
+  }, []);
 
   const handleSelectContact = (contactId) => {
     setSelectedContacts((prev) => {

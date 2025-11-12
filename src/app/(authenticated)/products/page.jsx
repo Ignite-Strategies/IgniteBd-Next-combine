@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Plus, Loader2, Package } from 'lucide-react';
+import { Plus, Package, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function ProductsPage() {
@@ -10,9 +10,9 @@ export default function ProductsPage() {
   const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
-  // Get companyHQId and fetch products from API
+  // Load from localStorage only - no auto-fetch
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -23,42 +23,82 @@ export default function ProductsPage() {
     setCompanyHQId(storedCompanyHQId);
 
     if (!storedCompanyHQId) {
-      setLoading(false);
       setError('Company context is required');
       return;
     }
 
-    // Fetch products and personas from API
-    const fetchData = async () => {
+    // Only load from localStorage
+    const cachedProducts = window.localStorage.getItem('products');
+    if (cachedProducts) {
       try {
-        setLoading(true);
-        
-        // Fetch products
-        const productsResponse = await api.get(`/api/products?companyHQId=${storedCompanyHQId}`);
-        const productsData = Array.isArray(productsResponse.data) ? productsResponse.data : [];
-        setProducts(productsData);
-        
-        // Fetch personas to resolve targetedTo persona names
+        const parsed = JSON.parse(cachedProducts);
+        if (Array.isArray(parsed)) {
+          setProducts(parsed);
+          setError(null);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached products', error);
+        setError('Failed to load products from cache');
+      }
+    }
+
+    // Load personas from localStorage for display
+    const cachedPersonas = window.localStorage.getItem('personas');
+    if (cachedPersonas) {
+      try {
+        const parsed = JSON.parse(cachedPersonas);
+        if (Array.isArray(parsed)) {
+          setPersonas(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached personas', error);
+      }
+    }
+  }, []);
+
+  // Manual sync function
+  const handleSync = async () => {
+    if (!companyHQId) {
+      setError('Company context is required');
+      return;
+    }
+
+    setSyncing(true);
+    setError(null);
+    try {
+      // Fetch products
+      const productsResponse = await api.get(`/api/products?companyHQId=${companyHQId}`);
+      const productsData = Array.isArray(productsResponse.data) ? productsResponse.data : [];
+      setProducts(productsData);
+      
+      // Store in localStorage
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('products', JSON.stringify(productsData));
+      }
+
+      // Also sync personas if needed (for display purposes)
+      const cachedPersonas = window.localStorage.getItem('personas');
+      if (!cachedPersonas) {
         try {
-          const personasResponse = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
+          const personasResponse = await api.get(`/api/personas?companyHQId=${companyHQId}`);
           const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
           setPersonas(personasData);
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('personas', JSON.stringify(personasData));
+          }
         } catch (err) {
           console.warn('Failed to fetch personas:', err);
         }
-        
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch products:', err);
-        setError('Failed to load products. Please try again.');
-        setProducts([]);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchData();
-  }, []);
+      
+      setError(null);
+    } catch (err) {
+      console.error('Failed to sync products:', err);
+      setError('Failed to sync products. Please try again.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -73,6 +113,14 @@ export default function ProductsPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleSync}
+              disabled={syncing || !companyHQId}
+              className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </button>
             <Link
               href="/products/builder"
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
@@ -89,12 +137,7 @@ export default function ProductsPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            <span className="ml-2 text-sm text-gray-500">Loading products...</span>
-          </div>
-        ) : products.length === 0 ? (
+        {products.length === 0 ? (
           <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 p-12 text-center shadow-lg">
             <div className="mb-6 flex justify-center">
               <div className="rounded-full bg-blue-100 p-6">

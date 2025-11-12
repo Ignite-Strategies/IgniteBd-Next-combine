@@ -91,6 +91,9 @@ export default function ContactDetailPage({ params }) {
     };
   }, [contactId, contacts, refreshContacts]);
 
+  const [generatingPortal, setGeneratingPortal] = useState(false);
+  const [portalLink, setPortalLink] = useState(null);
+
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
     return (
@@ -99,6 +102,41 @@ export default function ContactDetailPage({ params }) {
       'Contact'
     );
   }, [contact]);
+
+  const handleGeneratePortalAccess = async () => {
+    if (!contact?.id || !contact?.email) {
+      alert('Contact must have an email address to generate portal access.');
+      return;
+    }
+
+    setGeneratingPortal(true);
+    try {
+      const token = localStorage.getItem('firebaseToken');
+      const response = await api.post(
+        `/api/contacts/${contact.id}/generate-portal-access`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data?.success && response.data.invite) {
+        setPortalLink(response.data.invite.passwordResetLink);
+        // Copy to clipboard
+        navigator.clipboard.writeText(response.data.invite.passwordResetLink);
+        alert(`Portal access generated! Password reset link copied to clipboard. Send it to ${contact.email}`);
+      } else {
+        alert(response.data?.error || 'Failed to generate portal access');
+      }
+    } catch (error) {
+      console.error('Error generating portal access:', error);
+      alert(error.response?.data?.error || 'Failed to generate portal access');
+    } finally {
+      setGeneratingPortal(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -220,6 +258,47 @@ export default function ContactDetailPage({ params }) {
               {contact.notes || 'Add notes from meetings, emails, and relationship updates.'}
             </p>
           </section>
+
+          {/* Client Portal Access */}
+          {contact.email && (
+            <section className="rounded-2xl bg-white p-6 shadow">
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">Client Portal Access</h3>
+              <p className="mb-4 text-sm text-gray-600">
+                Generate portal access for this contact. They'll receive a password reset link to set up their account and access proposals and deliverables.
+              </p>
+              {portalLink ? (
+                <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                  <p className="text-sm font-semibold text-green-800 mb-2">Portal access generated!</p>
+                  <p className="text-xs text-green-700 mb-3">Password reset link copied to clipboard. Send it to {contact.email}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(portalLink);
+                        alert('Link copied to clipboard!');
+                      }}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
+                    >
+                      Copy Link Again
+                    </button>
+                    <a
+                      href={`mailto:${contact.email}?subject=Client Portal Access&body=Click this link to set up your client portal password: ${portalLink}`}
+                      className="rounded-lg bg-white border border-green-600 px-4 py-2 text-sm font-semibold text-green-600 transition hover:bg-green-50"
+                    >
+                      Email Link
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleGeneratePortalAccess}
+                  disabled={generatingPortal}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generatingPortal ? 'Generating...' : 'Generate Portal Access'}
+                </button>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>

@@ -31,13 +31,15 @@ export default function OutreachLayout({ children }) {
   const [hydrating, setHydrating] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
+  // Load from localStorage only - no auto-fetch
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
     const cached = window.localStorage.getItem('outreachCampaigns');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           setCampaigns(parsed);
           setHydrated(true);
         }
@@ -60,31 +62,12 @@ export default function OutreachLayout({ children }) {
       }
       setHydrated(true);
     } catch (error) {
-      console.warn('Outreach campaigns API unavailable, using cached data.', error);
-      if (!hydrated && typeof window !== 'undefined') {
-        const cached = window.localStorage.getItem('outreachCampaigns');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed)) {
-              setCampaigns(parsed);
-            }
-          } catch (parseError) {
-            console.warn('Unable to parse cached outreach campaigns', parseError);
-          }
-        }
-      }
+      console.warn('Outreach campaigns API unavailable.', error);
       setHydrated(true);
     } finally {
       setHydrating(false);
     }
-  }, [hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) {
-      refreshCampaigns();
-    }
-  }, [hydrated, refreshCampaigns]);
+  }, []);
 
   const value = useMemo(
     () => ({

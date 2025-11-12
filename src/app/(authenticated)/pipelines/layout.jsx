@@ -30,11 +30,33 @@ export default function PipelinesLayout({ children }) {
   const [hydrating, setHydrating] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
+  // Load from localStorage only - no auto-fetch
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const cached = window.localStorage.getItem('pipelineConfig');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        setPipelineConfig(parsed);
+        setHydrated(true);
+      } catch (error) {
+        console.warn('Failed to parse cached pipeline config', error);
+      }
+    }
+  }, []);
+
   const refreshPipelineConfig = useCallback(async () => {
     try {
       setHydrating(true);
       const response = await api.get('/api/pipelines/config');
-      setPipelineConfig(response.data ?? null);
+      const config = response.data ?? null;
+      setPipelineConfig(config);
+      
+      // Store in localStorage
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('pipelineConfig', JSON.stringify(config));
+      }
       setHydrated(true);
     } catch (error) {
       console.warn('Pipeline config API unavailable, falling back to default.', error);
@@ -44,12 +66,6 @@ export default function PipelinesLayout({ children }) {
       setHydrating(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (!hydrated) {
-      refreshPipelineConfig();
-    }
-  }, [hydrated, refreshPipelineConfig]);
 
   const value = useMemo(
     () => ({

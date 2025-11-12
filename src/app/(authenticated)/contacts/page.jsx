@@ -111,44 +111,28 @@ export default function ContactsHubPage() {
     }
   }, []);
 
-  const hydrateContacts = useCallback(
-    async (tenantId) => {
-      if (!tenantId) return;
-
-      if (typeof window !== 'undefined') {
-        const cachedContacts = window.localStorage.getItem('contacts');
-        if (cachedContacts) {
-          try {
-            const contacts = JSON.parse(cachedContacts);
-            setContactCount(contacts.length);
-            setHydrated(true);
-            refreshContacts(tenantId);
-            return;
-          } catch (error) {
-            console.warn('Failed to parse cached contacts', error);
-          }
-        }
-      }
-
-      await refreshContacts(tenantId);
-    },
-    [refreshContacts],
-  );
-
+  // Load from localStorage only - no auto-fetch
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
     const storedCompanyHQId =
       window.localStorage.getItem('companyHQId') ||
       window.localStorage.getItem('companyId') ||
       '';
     setCompanyHQId(storedCompanyHQId);
-  }, []);
 
-  useEffect(() => {
-    if (companyHQId) {
-      hydrateContacts(companyHQId);
+    // Only load from localStorage
+    const cachedContacts = window.localStorage.getItem('contacts');
+    if (cachedContacts) {
+      try {
+        const contacts = JSON.parse(cachedContacts);
+        setContactCount(contacts.length);
+        setHydrated(true);
+      } catch (error) {
+        console.warn('Failed to parse cached contacts', error);
+      }
     }
-  }, [companyHQId, hydrateContacts]);
+  }, []);
 
   const handleRefresh = async () => {
     if (companyHQId) {

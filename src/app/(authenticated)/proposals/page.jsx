@@ -13,13 +13,29 @@ export default function ProposalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Load from localStorage only - no auto-fetch
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
     const storedId =
       window.localStorage.getItem('companyHQId') ||
       window.localStorage.getItem('companyId') ||
       '';
     setCompanyHQId(storedId);
+
+    // Only load from localStorage
+    const cached = window.localStorage.getItem('proposals');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setProposals(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached proposals', error);
+      }
+    }
+    setLoading(false);
   }, []);
 
   const fetchProposals = async (tenantId) => {
@@ -28,7 +44,13 @@ export default function ProposalsPage() {
       setLoading(true);
       setError('');
       const response = await api.get(`/api/proposals?companyHQId=${tenantId}`);
-      setProposals(response.data?.proposals ?? []);
+      const proposalsData = response.data?.proposals ?? [];
+      setProposals(proposalsData);
+      
+      // Store in localStorage
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('proposals', JSON.stringify(proposalsData));
+      }
     } catch (err) {
       setError('Unable to load proposals.');
       setProposals([]);
@@ -36,12 +58,6 @@ export default function ProposalsPage() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (companyHQId) {
-      fetchProposals(companyHQId);
-    }
-  }, [companyHQId]);
 
   const stats = useMemo(() => {
     const total = proposals.length;

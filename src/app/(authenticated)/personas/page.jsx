@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  // Get companyHQId and fetch personas from API
+  // Load from localStorage only - no auto-fetch
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -22,32 +23,56 @@ export default function PersonasPage() {
     setCompanyHQId(storedCompanyHQId);
 
     if (!storedCompanyHQId) {
-      setLoading(false);
       setError('Company context is required');
       return;
     }
 
-    // Fetch personas from API
-    const fetchPersonas = async () => {
+    // Only load from localStorage
+    const cached = window.localStorage.getItem('personas');
+    if (cached) {
       try {
-        setLoading(true);
-        const response = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
-        
-        // API returns array directly
-        const personasData = Array.isArray(response.data) ? response.data : [];
-        setPersonas(personasData);
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch personas:', err);
-        setError('Failed to load personas. Please try again.');
-        setPersonas([]);
-      } finally {
-        setLoading(false);
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setPersonas(parsed);
+          setError(null);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached personas', error);
+        setError('Failed to load personas from cache');
       }
-    };
-
-    fetchPersonas();
+    } else {
+      setError('No personas found. Click Sync to load from server.');
+    }
   }, []);
+
+  // Manual sync function
+  const handleSync = async () => {
+    if (!companyHQId) {
+      setError('Company context is required');
+      return;
+    }
+
+    setSyncing(true);
+    setError(null);
+    try {
+      const response = await api.get(`/api/personas?companyHQId=${companyHQId}`);
+      
+      // API returns array directly
+      const personasData = Array.isArray(response.data) ? response.data : [];
+      setPersonas(personasData);
+      
+      // Store in localStorage
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('personas', JSON.stringify(personasData));
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Failed to sync personas:', err);
+      setError('Failed to sync personas. Please try again.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -62,6 +87,14 @@ export default function PersonasPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleSync}
+              disabled={syncing || !companyHQId}
+              className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </button>
             <Link
               href="/personas/builder"
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
@@ -78,12 +111,7 @@ export default function PersonasPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-            <span className="ml-2 text-sm text-gray-500">Loading personas...</span>
-          </div>
-        ) : personas.length === 0 ? (
+        {personas.length === 0 ? (
           <div className="rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 p-12 text-center shadow-lg">
             <div className="mb-6 flex justify-center">
               <div className="rounded-full bg-red-100 p-6">

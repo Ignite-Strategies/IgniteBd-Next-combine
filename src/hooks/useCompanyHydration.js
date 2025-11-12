@@ -34,7 +34,7 @@ export function useCompanyHydration(companyHQId) {
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount - no auto-fetch, no stale checks
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!companyHQId) {
@@ -46,23 +46,15 @@ export function useCompanyHydration(companyHQId) {
       const stored = localStorage.getItem(`companyHydration_${companyHQId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Check if data is stale (older than 5 minutes)
-        const timestamp = new Date(parsed.timestamp);
-        const now = new Date();
-        const ageMinutes = (now - timestamp) / (1000 * 60);
-
-        if (ageMinutes < 5) {
+        if (parsed.data) {
           setData(parsed.data);
           setHydrated(true);
-          setLoading(false);
-          return;
         }
       }
     } catch (err) {
       console.warn('Failed to load company hydration from localStorage:', err);
     }
 
-    // If no valid cached data, we'll hydrate
     setLoading(false);
   }, [companyHQId]);
 

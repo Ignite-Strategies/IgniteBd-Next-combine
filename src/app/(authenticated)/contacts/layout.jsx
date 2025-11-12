@@ -85,12 +85,7 @@ export default function ContactsLayout({ children }) {
     }
   }, [companyHQId]);
 
-  // Step 4: Auto-fetch if not hydrated
-  useEffect(() => {
-    if (companyHQId && !hydrated) {
-      refreshContacts();
-    }
-  }, [companyHQId, hydrated, refreshContacts]);
+  // No auto-fetch - only use localStorage. Use refreshContacts() manually via sync button
 
   // Helper: Update a single contact in state and localStorage
   const updateContact = useCallback((contactId, updates) => {
