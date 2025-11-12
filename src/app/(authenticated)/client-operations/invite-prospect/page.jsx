@@ -90,9 +90,9 @@ export default function InviteProspectPage() {
       return;
     }
 
-    if (!selectedContact.id) {
-      console.error('Selected contact missing id:', selectedContact);
-      setError('Contact ID is missing. Please try selecting the contact again.');
+    if (!selectedContact.id || !selectedContact.email) {
+      console.error('Selected contact missing id or email:', selectedContact);
+      setError('Contact ID and email are required. Please try selecting the contact again.');
       return;
     }
 
@@ -101,42 +101,36 @@ export default function InviteProspectPage() {
     setInviteCredentials(null);
 
     try {
-      console.log('Generating portal access for contact:', selectedContact.id, selectedContact.email);
-      const response = await api.post(
-        `/api/contacts/${selectedContact.id}/generate-portal-access`
-      );
+      console.log('Generating invite for contact:', selectedContact.id, selectedContact.email);
+      const response = await api.post('/api/invite/send', {
+        contactId: selectedContact.id,
+        email: selectedContact.email,
+      });
 
       if (response.data?.success && response.data.invite) {
         setInviteCredentials(response.data.invite);
       } else {
-        setError(response.data?.error || 'Failed to generate portal access');
+        setError(response.data?.error || 'Failed to generate invite');
       }
     } catch (err) {
       console.error('Error generating invite:', err);
-      setError(err.response?.data?.error || 'Failed to generate portal access');
+      setError(err.response?.data?.error || 'Failed to generate invite');
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleCopyPassword = () => {
-    if (inviteCredentials?.password) {
-      navigator.clipboard.writeText(inviteCredentials.password);
-      alert('Password copied to clipboard!');
+  const handleCopyActivationLink = () => {
+    if (inviteCredentials?.activationLink) {
+      navigator.clipboard.writeText(inviteCredentials.activationLink);
+      alert('Activation link copied to clipboard!');
     }
   };
 
-  const handleCopyLoginUrl = () => {
-    if (inviteCredentials?.loginUrl) {
-      navigator.clipboard.writeText(inviteCredentials.loginUrl);
-      alert('Login URL copied to clipboard!');
-    }
-  };
-
-  const handleEmailCredentials = () => {
+  const handleEmailInvite = () => {
     if (inviteCredentials && selectedContact?.email) {
       const subject = 'Client Portal Access - Ignite Strategies';
-      const body = `Hello ${selectedContact.firstName || ''},\n\nYou've been invited to access the Ignite Client Portal.\n\nLogin URL: ${inviteCredentials.loginUrl}\nEmail: ${inviteCredentials.contactEmail}\nPassword: ${inviteCredentials.password}\n\nPlease log in and change your password after your first login.\n\nBest regards,\nIgnite Strategies`;
+      const body = `Hello ${selectedContact.firstName || ''},\n\nYou've been invited to access the Ignite Client Portal.\n\nClick the link below to activate your account and set your password:\n\n${inviteCredentials.activationLink}\n\nThis link will expire in 24 hours.\n\nBest regards,\nIgnite Strategies`;
       window.location.href = `mailto:${selectedContact.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
   };
@@ -319,73 +313,49 @@ export default function InviteProspectPage() {
             </div>
           )}
 
-          {/* Success - Show Login Credentials */}
+          {/* Success - Show Activation Link */}
           {inviteCredentials && selectedContact && (
             <div className="rounded-2xl border border-green-200 bg-green-50 p-6 shadow-sm">
               <div className="flex items-start gap-3 mb-4">
                 <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <h3 className="text-lg font-semibold text-green-900">
-                    Portal Access Generated!
+                    Invite Generated!
                   </h3>
                   <p className="text-sm text-green-700 mt-1">
-                    Send these credentials to <strong>{selectedContact.firstName} {selectedContact.lastName}</strong> ({selectedContact.email})
+                    Send this activation link to <strong>{selectedContact.firstName} {selectedContact.lastName}</strong> ({selectedContact.email})
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border border-green-200 p-4 mb-4 space-y-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                    Login URL
+              <div className="bg-white rounded-lg border border-green-200 p-4 mb-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  Activation Link
+                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-700 font-mono flex-1 break-all">
+                    {inviteCredentials.activationLink}
                   </p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-gray-700 font-mono flex-1 break-all">
-                      {inviteCredentials.loginUrl}
-                    </p>
-                    <button
-                      onClick={handleCopyLoginUrl}
-                      className="p-1 hover:bg-gray-100 rounded"
-                      title="Copy URL"
-                    >
-                      <Copy className="h-4 w-4 text-gray-500" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleCopyActivationLink}
+                    className="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+                    title="Copy Link"
+                  >
+                    <Copy className="h-4 w-4 text-gray-500" />
+                  </button>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                    Email
-                  </p>
-                  <p className="text-sm text-gray-700 font-mono">
-                    {inviteCredentials.contactEmail}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                    Password
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-gray-700 font-mono font-bold">
-                      {inviteCredentials.password}
-                    </p>
-                    <button
-                      onClick={handleCopyPassword}
-                      className="p-1 hover:bg-gray-100 rounded"
-                      title="Copy Password"
-                    >
-                      <Copy className="h-4 w-4 text-gray-500" />
-                    </button>
-                  </div>
-                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Expires: {new Date(inviteCredentials.expiresAt).toLocaleString()}
+                </p>
               </div>
 
               <div className="flex gap-3">
                 <button
-                  onClick={handleEmailCredentials}
+                  onClick={handleEmailInvite}
                   className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 flex items-center justify-center gap-2"
                 >
                   <Send className="h-4 w-4" />
-                  Email Credentials
+                  Email Invite
                 </button>
               </div>
 

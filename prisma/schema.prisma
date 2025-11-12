@@ -138,6 +138,12 @@ model Contact {
   enrichmentFetchedAt DateTime? // When enrichment was fetched
   enrichmentPayload   Json? // Full enrichment payload
   createdById         String? // User who created this contact
+  
+  // Client Portal Activation
+  firebaseUid         String?  @unique // Firebase Auth UID
+  isActivated         Boolean  @default(false) // Has completed activation flow
+  activatedAt         DateTime? // When activation was completed
+  
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   companyHQ           CompanyHQ    @relation(fields: [crmId], references: [id])
@@ -145,8 +151,10 @@ model Contact {
   contactList         ContactList? @relation(fields: [contactListId], references: [id])
   pipeline            Pipeline?
   deliverables        ConsultantDeliverable[]
+  invites             InviteToken[] // Invite tokens for activation
 
   @@index([email])
+  @@index([firebaseUid])
   @@map("contacts")
 }
 
@@ -332,4 +340,21 @@ model ClientUpload {
 
   @@index([ownerId])
   @@map("client_uploads")
+}
+
+model InviteToken {
+  id          String   @id @default(cuid())
+  contactId   String
+  email       String
+  token       String   @unique
+  expiresAt   DateTime
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([contactId])
+  @@index([email])
+  @@map("invite_tokens")
 }
