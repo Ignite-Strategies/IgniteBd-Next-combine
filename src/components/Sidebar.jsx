@@ -40,31 +40,31 @@ const navigationGroups = [
   },
   {
     name: 'Attract',
+    hubPath: '/branding-hub',
     items: [
       { name: 'Ads & SEO', path: '/ads', icon: BarChart },
       { name: 'Content', path: '/content', icon: FileText },
-      { name: 'Branding Hub', path: '/branding-hub', icon: Palette },
     ],
   },
   {
     name: 'Engage',
+    hubPath: '/outreach',
     items: [
-      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
       { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
   {
     name: 'Nurture',
+    hubPath: '/contacts',
     items: [
-      { name: 'People Hub', path: '/contacts', icon: Users },
       { name: 'Email Marketing', path: '#', icon: Mail, disabled: true },
       { name: 'Social Media', path: '#', icon: Share2, disabled: true },
     ],
   },
   {
     name: 'Client Operations',
+    hubPath: '/client-operations',
     items: [
-      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket },
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
     ],
@@ -120,45 +120,61 @@ function Sidebar() {
         </div>
 
         {/* Navigation Groups */}
-        {navigationGroups.map((group) => (
-          <div key={group.name}>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-              {group.name}
-            </h3>
-            <ul className="space-y-1">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.path);
-                const disabled = item.disabled;
-                return (
-                  <li key={item.path}>
-                    {disabled ? (
-                      <div
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-400 opacity-50 cursor-not-allowed"
-                        title="Coming soon"
-                      >
-                        <Icon className="h-5 w-5" />
-                        <span>{item.name}</span>
-                      </div>
-                    ) : (
-                      <Link
-                        href={item.path}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                          active
-                            ? 'border border-red-200 bg-red-50 text-red-700'
-                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                        }`}
-                      >
-                        <Icon className="h-5 w-5" />
-                        <span>{item.name}</span>
-                      </Link>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+        {navigationGroups.map((group) => {
+          const hubActive = group.hubPath ? isActive(group.hubPath) : false;
+          return (
+            <div key={group.name}>
+              {group.hubPath ? (
+                <Link
+                  href={group.hubPath}
+                  className={`mb-3 block text-xs font-semibold uppercase tracking-wider transition-colors ${
+                    hubActive
+                      ? 'text-red-600 hover:text-red-700'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {group.name}
+                </Link>
+              ) : (
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  {group.name}
+                </h3>
+              )}
+              <ul className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  const disabled = item.disabled;
+                  return (
+                    <li key={item.path}>
+                      {disabled ? (
+                        <div
+                          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-400 opacity-50 cursor-not-allowed"
+                          title="Coming soon"
+                        >
+                          <Icon className="h-5 w-5" />
+                          <span>{item.name}</span>
+                        </div>
+                      ) : (
+                        <Link
+                          href={item.path}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            active
+                              ? 'border border-red-200 bg-red-50 text-red-700'
+                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                          <span>{item.name}</span>
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
     </div>
   );
