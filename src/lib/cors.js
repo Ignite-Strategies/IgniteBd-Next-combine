@@ -78,12 +78,20 @@ export function withCors(response, request = null) {
  * Create a CORS-enabled response
  */
 export function corsResponse(data, status = 200, request = null) {
-  const origin = request?.headers?.get('origin');
-  const headers = getCorsHeaders(origin);
-  
-  return NextResponse.json(data, {
-    status,
-    headers,
-  });
+  try {
+    const origin = request?.headers?.get('origin');
+    const headers = getCorsHeaders(origin);
+    
+    return NextResponse.json(data, {
+      status,
+      headers,
+    });
+  } catch (error) {
+    console.error('❌ CORS utility error:', error);
+    // Fallback: return response without CORS if utility fails
+    return NextResponse.json(data, {
+      status,
+    });
+  }
 }
 
