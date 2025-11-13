@@ -82,11 +82,25 @@ export async function POST(request) {
     );
   } catch (error) {
     console.error('❌ Activate error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    
+    // Return more detailed error in development
+    const errorDetails = process.env.NODE_ENV === 'development' 
+      ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+          code: error.code,
+        }
+      : { message: error.message };
+    
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to activate token',
-        details: error.message,
+        details: errorDetails,
       },
       { status: 500, headers: corsHeaders },
     );
