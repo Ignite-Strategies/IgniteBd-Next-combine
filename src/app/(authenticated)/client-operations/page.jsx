@@ -63,7 +63,7 @@ export default function ClientOperationsPage() {
             </div>
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => router.push('/client-operations/proposals/wizard')}
+                onClick={() => router.push('/client-operations/proposals/create')}
                 className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
               >
                 Create New Proposal

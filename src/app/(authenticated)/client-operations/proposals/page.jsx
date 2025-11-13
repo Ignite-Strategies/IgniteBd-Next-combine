@@ -63,7 +63,7 @@ export default function ClientOperationsProposalsPage() {
               {hydrating ? 'Syncing...' : 'Sync'}
             </button>
             <button
-              onClick={() => router.push('/client-operations/proposals/wizard')}
+              onClick={() => router.push('/client-operations/proposals/create')}
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
             >
               Create Proposal
@@ -83,7 +83,7 @@ export default function ClientOperationsProposalsPage() {
                 Create your first proposal to get started.
               </p>
               <button
-                onClick={() => router.push('/client-operations/proposals/wizard')}
+                onClick={() => router.push('/client-operations/proposals/create')}
                 className="mt-4 rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
               >
                 Create Proposal

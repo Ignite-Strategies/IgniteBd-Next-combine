@@ -64,12 +64,12 @@ export default function CreateServicePage() {
       savedServices.push(newService);
       localStorage.setItem('savedServices', JSON.stringify(savedServices));
 
-      // Navigate back to proposal wizard or services list
+      // Navigate back to proposal create or services list
       const returnTo = new URLSearchParams(window.location.search).get('returnTo');
       if (returnTo) {
         router.push(returnTo);
       } else {
-        router.push('/client-operations/proposals/wizard');
+        router.push('/client-operations/proposals/create');
       }
     } catch (err) {
       console.error('Error saving service:', err);
@@ -84,8 +84,8 @@ export default function CreateServicePage() {
         <PageHeader
           title="Create Service"
           subtitle="Create a reusable service/deliverable that can be added to proposals"
-          backTo="/client-operations/proposals/wizard"
-          backLabel="Back to Proposal Wizard"
+          backTo="/client-operations/proposals/create"
+          backLabel="Back to Create Proposal"
         />
 
         {error && (
