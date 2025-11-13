@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { optionallyVerifyFirebaseToken } from '@/lib/firebaseAdmin';
-
-// CORS headers for client portal
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://clientportal.ignitegrowth.biz',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+import { handleCorsPreflight, corsResponse } from '@/lib/cors';
 
 /**
  * OPTIONS /api/contacts/by-email
  * Handle CORS preflight requests
  */
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+export async function OPTIONS(request) {
+  return handleCorsPreflight(request);
 }
 
 /**
@@ -31,9 +24,10 @@ export async function GET(request) {
     const email = searchParams.get('email');
 
     if (!email) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'email is required' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
@@ -58,13 +52,14 @@ export async function GET(request) {
     });
 
     if (!contact) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Contact not found' },
-        { status: 404, headers: corsHeaders },
+        404,
+        request,
       );
     }
 
-    return NextResponse.json(
+    return corsResponse(
       {
         success: true,
         contact: {
@@ -78,17 +73,19 @@ export async function GET(request) {
           pipeline: contact.pipeline,
         },
       },
-      { headers: corsHeaders },
+      200,
+      request,
     );
   } catch (error) {
     console.error('❌ GetContactByEmail error:', error);
-    return NextResponse.json(
+    return corsResponse(
       {
         success: false,
         error: 'Failed to get contact',
         details: error.message,
       },
-      { status: 500, headers: corsHeaders },
+      500,
+      request,
     );
   }
 }

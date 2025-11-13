@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-
-// CORS headers for client portal
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://clientportal.ignitegrowth.biz',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+import { handleCorsPreflight, corsResponse } from '@/lib/cors';
 
 /**
  * OPTIONS /api/set-password
  * Handle CORS preflight requests
  */
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+export async function OPTIONS(request) {
+  return handleCorsPreflight(request);
 }
 
 /**
@@ -28,16 +21,18 @@ export async function POST(request) {
     const { uid, password, contactId } = body;
 
     if (!uid || !password) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'uid and password are required' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
     if (password.length < 8) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Password must be at least 8 characters' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
@@ -69,22 +64,24 @@ export async function POST(request) {
       });
     }
 
-    return NextResponse.json(
+    return corsResponse(
       {
         success: true,
         message: 'Password set successfully',
       },
-      { headers: corsHeaders },
+      200,
+      request,
     );
   } catch (error) {
     console.error('❌ SetPassword error:', error);
-    return NextResponse.json(
+    return corsResponse(
       {
         success: false,
         error: 'Failed to set password',
         details: error.message,
       },
-      { status: 500, headers: corsHeaders },
+      500,
+      request,
     );
   }
 }

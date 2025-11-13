@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useProposals } from '../layout';
-import { Plus, X, Package, Calendar, RefreshCw, Search, Mail, User, Save } from 'lucide-react';
+import { Plus, X, Package, Calendar, RefreshCw, Search, Mail, User, Save, DollarSign } from 'lucide-react';
 import api from '@/lib/api';
 import { getContactsRegistry } from '@/lib/services/contactsRegistry';
 
@@ -33,6 +33,10 @@ export default function CreateProposalPage() {
   
   // Phases
   const [phases, setPhases] = useState([]);
+  
+  // Compensation
+  const [manualTotalPrice, setManualTotalPrice] = useState(null);
+  const [paymentStructure, setPaymentStructure] = useState('');
   
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -193,8 +197,9 @@ export default function CreateProposalPage() {
   };
 
   const totalPrice = useMemo(() => {
+    if (manualTotalPrice !== null) return manualTotalPrice;
     return selectedServices.reduce((sum, s) => sum + (s.price || 0), 0);
-  }, [selectedServices]);
+  }, [selectedServices, manualTotalPrice]);
 
   const handleAddPhase = () => {
     setPhases([
@@ -288,9 +293,9 @@ export default function CreateProposalPage() {
       const compensation = {
         total: totalPrice,
         currency: 'USD',
-        paymentStructure: phases.length > 0 
+        paymentStructure: paymentStructure || (phases.length > 0 
           ? `${phases.length} payments of $${Math.round(totalPrice / phases.length)}`
-          : `$${totalPrice.toLocaleString()}`,
+          : `$${totalPrice.toLocaleString()}`),
       };
 
       const payload = {
@@ -475,9 +480,7 @@ export default function CreateProposalPage() {
           </section>
 
           {/* Proposal Details */}
-          {selectedContact && selectedCompany && (
-            <>
-              <section className="rounded-2xl bg-white p-8 shadow">
+          <section className="rounded-2xl bg-white p-8 shadow">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
                   <Package className="h-6 w-6 text-red-600" />
                   Proposal Details
@@ -508,10 +511,10 @@ export default function CreateProposalPage() {
                     />
                   </div>
                 </div>
-              </section>
+          </section>
 
-              {/* Services */}
-              <section className="rounded-2xl bg-white p-8 shadow">
+          {/* Services */}
+          <section className="rounded-2xl bg-white p-8 shadow">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                     <Package className="h-6 w-6 text-red-600" />
@@ -635,10 +638,10 @@ export default function CreateProposalPage() {
                     </div>
                   </div>
                 )}
-              </section>
+          </section>
 
-              {/* Phases */}
-              <section className="rounded-2xl bg-white p-8 shadow">
+          {/* Phases */}
+          <section className="rounded-2xl bg-white p-8 shadow">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                     <Calendar className="h-6 w-6 text-red-600" />
@@ -773,29 +776,79 @@ export default function CreateProposalPage() {
                     );
                   })}
                 </div>
-              </section>
+          </section>
 
-              {/* Submit Button */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 rounded-2xl shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Proposal Value</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      ${totalPrice.toLocaleString()}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || !proposalName.trim()}
-                    className="flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4" />
-                    {submitting ? 'Creating...' : 'Create Proposal'}
-                  </button>
+          {/* Compensation Section */}
+          <section className="rounded-2xl bg-white p-8 shadow">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <DollarSign className="h-6 w-6 text-red-600" />
+              Compensation & Payment Schedule
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Total Price *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    value={manualTotalPrice !== null ? manualTotalPrice : totalPrice || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        setManualTotalPrice(null);
+                      } else {
+                        setManualTotalPrice(parseFloat(value) || 0);
+                      }
+                    }}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    step="0.01"
+                    min="0"
+                  />
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Auto-calculated from services: ${totalPrice.toLocaleString()}
+                </p>
               </div>
-            </>
-          )}
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Payment Structure
+                </label>
+                <input
+                  type="text"
+                  value={paymentStructure}
+                  onChange={(e) => setPaymentStructure(e.target.value)}
+                  placeholder="e.g., 3 payments of $500 at beginning, middle, and on delivery"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Describe how payments will be structured
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Submit Button */}
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 rounded-2xl shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Proposal Value</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  ${totalPrice.toLocaleString()}
+                </p>
+              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || !proposalName.trim() || !selectedContact || !selectedCompany}
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {submitting ? 'Creating...' : 'Create Proposal'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

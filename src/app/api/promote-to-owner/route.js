@@ -2,21 +2,14 @@ import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { promoteToOwner } from '@/lib/services/promotion';
-
-// CORS headers for client portal
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://clientportal.ignitegrowth.biz',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+import { handleCorsPreflight, corsResponse } from '@/lib/cors';
 
 /**
  * OPTIONS /api/promote-to-owner
  * Handle CORS preflight requests
  */
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+export async function OPTIONS(request) {
+  return handleCorsPreflight(request);
 }
 
 /**
@@ -36,30 +29,33 @@ export async function POST(request) {
     });
 
     if (!contact) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Contact not found' },
-        { status: 404, headers: corsHeaders },
+        404,
+        request,
       );
     }
 
     if (contact.role === 'owner') {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Contact is already an owner' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
     if (!contact.firebaseUid) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Contact must be activated to become an owner' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
     // Promote to owner
     const newHq = await promoteToOwner(contact.id);
 
-    return NextResponse.json(
+    return corsResponse(
       {
         success: true,
         message: 'Successfully promoted to owner',
@@ -68,17 +64,19 @@ export async function POST(request) {
           companyName: newHq.companyName,
         },
       },
-      { headers: corsHeaders },
+      200,
+      request,
     );
   } catch (error) {
     console.error('❌ Promote to owner error:', error);
-    return NextResponse.json(
+    return corsResponse(
       {
         success: false,
         error: error.message || 'Failed to promote to owner',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },
-      { status: 500, headers: corsHeaders },
+      500,
+      request,
     );
   }
 }

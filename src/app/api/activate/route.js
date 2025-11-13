@@ -1,20 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-
-// CORS headers for client portal
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://clientportal.ignitegrowth.biz',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+import { handleCorsPreflight, corsResponse } from '@/lib/cors';
 
 /**
  * OPTIONS /api/activate
  * Handle CORS preflight requests
  */
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+export async function OPTIONS(request) {
+  return handleCorsPreflight(request);
 }
 
 /**
@@ -27,9 +20,10 @@ export async function POST(request) {
     const { token } = body;
 
     if (!token) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Token is required' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
@@ -52,23 +46,26 @@ export async function POST(request) {
     });
 
     if (!invite) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Invalid token' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
     if (invite.used) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Token has already been used' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
     if (invite.expiresAt < new Date()) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Token has expired' },
-        { status: 400, headers: corsHeaders },
+        400,
+        request,
       );
     }
 
@@ -82,7 +79,7 @@ export async function POST(request) {
     const clientPortalUrl = 'https://clientportal.ignitegrowth.biz';
     const redirectUrl = `${clientPortalUrl}/set-password?uid=${invite.contact.firebaseUid}&email=${encodeURIComponent(invite.email)}&contactId=${invite.contactId}`;
 
-    return NextResponse.json(
+    return corsResponse(
       {
         success: true,
         url: redirectUrl,
@@ -90,7 +87,8 @@ export async function POST(request) {
         email: invite.email,
         contactId: invite.contactId,
       },
-      { headers: corsHeaders },
+      200,
+      request,
     );
   } catch (error) {
     console.error('❌ Activate error:', error);
@@ -108,13 +106,14 @@ export async function POST(request) {
         }
       : { message: error.message };
     
-    return NextResponse.json(
+    return corsResponse(
       {
         success: false,
         error: 'Failed to activate token',
         details: errorDetails,
       },
-      { status: 500, headers: corsHeaders },
+      500,
+      request,
     );
   }
 }

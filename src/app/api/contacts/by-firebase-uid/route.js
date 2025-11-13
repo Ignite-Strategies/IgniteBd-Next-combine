@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-
-// CORS headers for client portal
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://clientportal.ignitegrowth.biz',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+import { handleCorsPreflight, corsResponse } from '@/lib/cors';
 
 /**
  * OPTIONS /api/contacts/by-firebase-uid
  * Handle CORS preflight requests
  */
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+export async function OPTIONS(request) {
+  return handleCorsPreflight(request);
 }
 
 /**
@@ -45,31 +38,31 @@ export async function GET(request) {
     });
 
     if (!contact) {
-      return NextResponse.json(
+      return corsResponse(
         { success: false, error: 'Contact not found' },
-        { status: 404, headers: corsHeaders },
+        404,
+        request,
       );
     }
 
-    return NextResponse.json(
+    return corsResponse(
       {
         success: true,
         contact,
       },
-      { headers: corsHeaders },
+      200,
+      request,
     );
   } catch (error) {
     console.error('❌ GetContactByFirebaseUid error:', error);
-    return NextResponse.json(
+    return corsResponse(
       {
         success: false,
         error: error.message?.includes('Unauthorized') ? 'Unauthorized' : 'Failed to get contact',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },
-      {
-        status: error.message?.includes('Unauthorized') ? 401 : 500,
-        headers: corsHeaders,
-      },
+      error.message?.includes('Unauthorized') ? 401 : 500,
+      request,
     );
   }
 }
