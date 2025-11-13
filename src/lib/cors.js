@@ -43,15 +43,26 @@ export function getCorsHeaders(origin = null) {
 /**
  * Handle OPTIONS preflight request
  * Returns 204 No Content with CORS headers
+ * CRITICAL: Must return proper CORS headers for preflight to pass
  */
 export function handleCorsPreflight(request) {
   const origin = request.headers.get('origin');
   const headers = getCorsHeaders(origin);
   
-  return NextResponse.json(null, {
+  console.log('🔍 CORS preflight - Origin:', origin);
+  console.log('🔍 CORS preflight - Headers:', headers);
+  
+  // Return 204 with CORS headers - MUST use new NextResponse for proper header setting
+  const response = new NextResponse(null, {
     status: 204,
-    headers,
   });
+  
+  // Set headers explicitly
+  Object.entries(headers).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  return response;
 }
 
 /**

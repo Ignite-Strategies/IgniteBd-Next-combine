@@ -6,9 +6,16 @@ import { handleCorsPreflight, corsResponse } from '@/lib/cors';
 /**
  * OPTIONS /api/contacts/by-firebase-uid
  * Handle CORS preflight requests
+ * CRITICAL: Must return CORS headers for preflight to pass
  */
 export async function OPTIONS(request) {
-  return handleCorsPreflight(request);
+  console.log('🔍 OPTIONS preflight request received for /api/contacts/by-firebase-uid');
+  const origin = request.headers.get('origin');
+  console.log('📍 Origin:', origin);
+  
+  const response = handleCorsPreflight(request);
+  console.log('✅ OPTIONS response headers:', Object.fromEntries(response.headers.entries()));
+  return response;
 }
 
 /**
