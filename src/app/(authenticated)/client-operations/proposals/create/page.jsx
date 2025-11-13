@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useProposals } from '../layout';
-import { Plus, X, Package, Calendar, RefreshCw, Search, Mail, User, Save, DollarSign } from 'lucide-react';
+import { Plus, X, Package, Calendar, RefreshCw, Search, Mail, User, Save, DollarSign, FileText } from 'lucide-react';
 import api from '@/lib/api';
 import { getContactsRegistry } from '@/lib/services/contactsRegistry';
 
@@ -13,50 +13,46 @@ export default function CreateProposalPage() {
   const { addProposal, companyHQId } = useProposals();
   const [registry] = useState(() => getContactsRegistry());
 
-  // Contact selection
+  // Contact & Company
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [companyNameInput, setCompanyNameInput] = useState('');
-  const [companyConfirmed, setCompanyConfirmed] = useState(false);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingCompany, setLoadingCompany] = useState(false);
-  
-  // Proposal fields
-  const [proposalName, setProposalName] = useState('');
-  const [proposalDescription, setProposalDescription] = useState('');
-  
+
+  // Proposal
+  const [proposalTitle, setProposalTitle] = useState('');
+  const [purpose, setPurpose] = useState('');
+
   // Services
   const [savedServices, setSavedServices] = useState([]);
   const [selectedServices, setSelectedServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(false);
-  
+
   // Phases
   const [phases, setPhases] = useState([]);
-  
+
   // Compensation
-  const [manualTotalPrice, setManualTotalPrice] = useState(null);
+  const [totalPrice, setTotalPrice] = useState(0);
   const [paymentStructure, setPaymentStructure] = useState('');
-  
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Load contacts from registry on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!registry.hydrated) {
       registry.loadFromCache();
     }
     if (companyHQId) {
-      loadSavedServices();
+      loadServices();
     }
-  }, [companyHQId, registry]);
+  }, [companyHQId]);
 
-  // Fetch contacts from API
-  const fetchContactsFromAPI = useCallback(async () => {
+  const fetchContacts = useCallback(async () => {
     if (!companyHQId) return;
     setLoadingContacts(true);
-    setError('');
     try {
       const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
       if (response.data?.success && response.data.contacts) {
@@ -65,15 +61,24 @@ export default function CreateProposalPage() {
       }
     } catch (err) {
       console.error('Error fetching contacts:', err);
-      setError('Failed to load contacts. Please try again.');
     } finally {
       setLoadingContacts(false);
     }
   }, [companyHQId, registry]);
 
-  const refreshContacts = useCallback(() => {
-    registry.loadFromCache();
-  }, [registry]);
+  const loadServices = async () => {
+    if (!companyHQId) return;
+    setLoadingServices(true);
+    try {
+      const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
+      setSavedServices(response.data || []);
+    } catch (err) {
+      console.error('Error loading services:', err);
+      setSavedServices([]);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
 
   const availableContacts = useMemo(() => {
     if (typeof window === 'undefined') return [];
@@ -83,81 +88,53 @@ export default function CreateProposalPage() {
     return registry.search(contactSearch).slice(0, 20);
   }, [contactSearch, registry]);
 
-  // Auto-generate proposal name
-  useEffect(() => {
-    if (selectedContact && selectedCompany) {
-      const contactName = `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || selectedContact.email;
-      setProposalName(`Proposal for ${selectedCompany.companyName}`);
-    }
-  }, [selectedContact, selectedCompany]);
-
-  const loadSavedServices = async () => {
-    if (!companyHQId) return;
-    setLoadingServices(true);
-    try {
-      const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
-      setSavedServices(response.data || []);
-    } catch (err) {
-      console.error('Error loading products:', err);
-      setSavedServices([]);
-    } finally {
-      setLoadingServices(false);
-    }
-  };
-
   const handleContactSelect = async (contact) => {
     setSelectedContact(contact);
-    setError('');
     if (contact.contactCompany) {
       setCompanyNameInput(contact.contactCompany.companyName);
+      setSelectedCompany(contact.contactCompany);
     } else {
       setCompanyNameInput('');
+      setSelectedCompany(null);
     }
-    setCompanyConfirmed(false);
-    setSelectedCompany(null);
   };
 
   const handleCompanyConfirm = async () => {
     if (!companyNameInput.trim() || !selectedContact) return;
     setLoadingCompany(true);
-    setError('');
     try {
       const upsertResponse = await api.post('/api/companies', {
         companyName: companyNameInput.trim(),
         companyHQId,
       });
       const company = upsertResponse.data?.company;
-      if (!company) throw new Error('Failed to create or find company');
+      if (!company) throw new Error('Failed to create company');
 
       await api.put(`/api/contacts/${selectedContact.id}`, {
         contactCompanyId: company.id,
       });
 
-      await fetchContactsFromAPI();
+      await fetchContacts();
       const updatedContact = registry.getById(selectedContact.id);
       if (updatedContact?.contactCompany) {
         setSelectedCompany(updatedContact.contactCompany);
         setSelectedContact(updatedContact);
-        setCompanyNameInput(updatedContact.contactCompany.companyName);
       } else {
         setSelectedCompany(company);
-        setCompanyNameInput(company.companyName);
-        registry.updateContact(selectedContact.id, { contactCompany: company });
       }
-      setCompanyConfirmed(true);
     } catch (err) {
       console.error('Error confirming company:', err);
-      setError('Failed to confirm company. Please try again.');
+      setError('Failed to confirm company');
     } finally {
       setLoadingCompany(false);
     }
   };
 
-  const handleSelectService = (service) => {
+  const handleAddService = (service) => {
     const existing = selectedServices.find(s => s.serviceId === service.id);
     if (existing) {
-      setSelectedServices(selectedServices.map(s => 
-        s.serviceId === service.id 
+      setSelectedServices(selectedServices.map(s =>
+        s.serviceId === service.id
           ? { ...s, quantity: s.quantity + 1, price: s.unitPrice * (s.quantity + 1) }
           : s
       ));
@@ -168,38 +145,46 @@ export default function CreateProposalPage() {
         {
           serviceId: service.id,
           name: service.name,
-          description: service.description || service.valueProp || '',
-          type: service.category || 'general',
+          description: service.description || '',
           unitPrice: unitPrice,
           quantity: 1,
           price: unitPrice,
         }
       ]);
     }
+    // Update total price
+    const newTotal = selectedServices.reduce((sum, s) => {
+      if (s.serviceId === service.id) {
+        return sum + (s.unitPrice * (s.quantity + 1));
+      }
+      return sum + s.price;
+    }, service.price || 0);
+    setTotalPrice(newTotal);
   };
 
   const handleUpdateServiceQuantity = (serviceId, quantity) => {
+    const newQuantity = Math.max(1, quantity);
     setSelectedServices(selectedServices.map(s => {
       if (s.serviceId === serviceId) {
-        const newQuantity = Math.max(1, quantity);
-        return {
-          ...s,
-          quantity: newQuantity,
-          price: s.unitPrice * newQuantity,
-        };
+        return { ...s, quantity: newQuantity, price: s.unitPrice * newQuantity };
       }
       return s;
     }));
+    // Recalculate total
+    const newTotal = selectedServices.reduce((sum, s) => {
+      if (s.serviceId === serviceId) {
+        return sum + (s.unitPrice * newQuantity);
+      }
+      return sum + s.price;
+    }, 0);
+    setTotalPrice(newTotal);
   };
 
   const handleRemoveService = (serviceId) => {
+    const removed = selectedServices.find(s => s.serviceId === serviceId);
     setSelectedServices(selectedServices.filter(s => s.serviceId !== serviceId));
+    setTotalPrice(totalPrice - (removed?.price || 0));
   };
-
-  const totalPrice = useMemo(() => {
-    if (manualTotalPrice !== null) return manualTotalPrice;
-    return selectedServices.reduce((sum, s) => sum + (s.price || 0), 0);
-  }, [selectedServices, manualTotalPrice]);
 
   const handleAddPhase = () => {
     setPhases([
@@ -221,19 +206,16 @@ export default function CreateProposalPage() {
     setPhases(phases.map(p => p.id === phaseId ? { ...p, ...updates } : p));
   };
 
-  const handleAddDeliverableToPhase = (phaseId) => {
+  const handleAddDeliverable = (phaseId) => {
     setPhases(phases.map(p => {
       if (p.id === phaseId) {
-        return {
-          ...p,
-          deliverables: [...(p.deliverables || []), ''],
-        };
+        return { ...p, deliverables: [...(p.deliverables || []), ''] };
       }
       return p;
     }));
   };
 
-  const handleUpdateDeliverableInPhase = (phaseId, index, value) => {
+  const handleUpdateDeliverable = (phaseId, index, value) => {
     setPhases(phases.map(p => {
       if (p.id === phaseId) {
         const deliverables = [...(p.deliverables || [])];
@@ -244,19 +226,16 @@ export default function CreateProposalPage() {
     }));
   };
 
-  const handleAddCoreWorkToPhase = (phaseId) => {
+  const handleAddCoreWork = (phaseId) => {
     setPhases(phases.map(p => {
       if (p.id === phaseId) {
-        return {
-          ...p,
-          coreWork: [...(p.coreWork || []), ''],
-        };
+        return { ...p, coreWork: [...(p.coreWork || []), ''] };
       }
       return p;
     }));
   };
 
-  const handleUpdateCoreWorkInPhase = (phaseId, index, value) => {
+  const handleUpdateCoreWork = (phaseId, index, value) => {
     setPhases(phases.map(p => {
       if (p.id === phaseId) {
         const coreWork = [...(p.coreWork || [])];
@@ -268,12 +247,12 @@ export default function CreateProposalPage() {
   };
 
   const handleSubmit = async () => {
-    if (!proposalName.trim()) {
+    if (!proposalTitle.trim()) {
       setError('Proposal title is required');
       return;
     }
     if (!selectedContact || !selectedCompany) {
-      setError('Please select a contact and confirm company');
+      setError('Please select a contact and company');
       return;
     }
 
@@ -284,7 +263,6 @@ export default function CreateProposalPage() {
       const serviceInstances = selectedServices.map(s => ({
         name: s.name,
         description: s.description,
-        type: s.type,
         quantity: s.quantity,
         unitPrice: s.unitPrice,
         price: s.price,
@@ -293,9 +271,7 @@ export default function CreateProposalPage() {
       const compensation = {
         total: totalPrice,
         currency: 'USD',
-        paymentStructure: paymentStructure || (phases.length > 0 
-          ? `${phases.length} payments of $${Math.round(totalPrice / phases.length)}`
-          : `$${totalPrice.toLocaleString()}`),
+        paymentStructure: paymentStructure || `$${totalPrice.toLocaleString()}`,
       };
 
       const payload = {
@@ -303,28 +279,27 @@ export default function CreateProposalPage() {
         clientName: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || selectedContact.email,
         clientCompany: selectedCompany.companyName,
         companyId: selectedCompany.id,
-        purpose: proposalDescription || proposalName,
+        purpose: purpose || proposalTitle,
         status: 'draft',
-        serviceInstances,
+        serviceInstances: serviceInstances.length > 0 ? serviceInstances : null,
         phases: phases.length > 0 ? phases : null,
         milestones: [],
         compensation,
         totalPrice,
-        preparedBy: null,
       };
 
       const response = await api.post('/api/proposals', payload);
       const proposal = response.data?.proposal;
 
       if (!proposal) {
-        throw new Error('Proposal response missing payload');
+        throw new Error('Failed to create proposal');
       }
 
       addProposal(proposal);
       router.push(`/client-operations/proposals/${proposal.id}`);
     } catch (err) {
       console.error('Error creating proposal:', err);
-      setError(err.response?.data?.error || 'Unable to save proposal. Please try again.');
+      setError(err.response?.data?.error || 'Failed to create proposal');
     } finally {
       setSubmitting(false);
     }
@@ -346,15 +321,14 @@ export default function CreateProposalPage() {
           </div>
         )}
 
-        {/* Single Page Vertical Scroll Form */}
         <div className="mt-8 space-y-8">
-          {/* Contact Selection */}
+          {/* 1. Contact & Company */}
           <section className="rounded-2xl bg-white p-8 shadow">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <User className="h-6 w-6 text-red-600" />
               Contact & Company
             </h2>
-            
+
             {selectedContact && selectedCompany ? (
               <div className="rounded-lg border border-green-200 bg-green-50 p-4">
                 <div className="flex items-center justify-between">
@@ -367,10 +341,7 @@ export default function CreateProposalPage() {
                         {selectedContact.firstName} {selectedContact.lastName}
                       </p>
                       {selectedContact.email && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <p className="text-sm text-gray-600">{selectedContact.email}</p>
-                        </div>
+                        <p className="text-sm text-gray-600">{selectedContact.email}</p>
                       )}
                       <p className="text-sm font-semibold text-gray-900 mt-1">
                         {selectedCompany.companyName}
@@ -381,7 +352,6 @@ export default function CreateProposalPage() {
                     onClick={() => {
                       setSelectedContact(null);
                       setSelectedCompany(null);
-                      setCompanyConfirmed(false);
                     }}
                     className="text-sm text-gray-600 hover:text-gray-900"
                   >
@@ -403,16 +373,16 @@ export default function CreateProposalPage() {
                     />
                   </div>
                   <button
-                    onClick={refreshContacts}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                    onClick={() => registry.loadFromCache()}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
                     <RefreshCw className="h-4 w-4" />
                   </button>
                   {companyHQId && (
                     <button
-                      onClick={fetchContactsFromAPI}
+                      onClick={fetchContacts}
                       disabled={loadingContacts}
-                      className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 flex items-center gap-2 text-blue-600"
+                      className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 text-blue-600"
                     >
                       <RefreshCw className={`h-4 w-4 ${loadingContacts ? 'animate-spin' : ''}`} />
                     </button>
@@ -448,8 +418,8 @@ export default function CreateProposalPage() {
                   </div>
                 )}
 
-                {selectedContact && !companyConfirmed && (
-                  <div className="mt-4 pt-4 border-t">
+                {selectedContact && !selectedCompany && (
+                  <div className="pt-4 border-t">
                     <p className="mb-2 text-sm text-gray-600">Confirm company name:</p>
                     <div className="flex gap-3">
                       <input
@@ -479,310 +449,292 @@ export default function CreateProposalPage() {
             )}
           </section>
 
-          {/* Proposal Details */}
+          {/* 2. Proposal Title & Purpose */}
           <section className="rounded-2xl bg-white p-8 shadow">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <Package className="h-6 w-6 text-red-600" />
-                  Proposal Details
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Proposal Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={proposalName}
-                      onChange={(e) => setProposalName(e.target.value)}
-                      placeholder="Proposal for Company Name"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Description <span className="text-gray-500 font-normal">(Internal Use Only)</span>
-                    </label>
-                    <textarea
-                      value={proposalDescription}
-                      onChange={(e) => setProposalDescription(e.target.value)}
-                      rows={4}
-                      placeholder="Internal notes about what this proposal covers..."
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    />
-                  </div>
-                </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <FileText className="h-6 w-6 text-red-600" />
+              Proposal Title & Purpose
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Proposal Title *
+                </label>
+                <input
+                  type="text"
+                  value={proposalTitle}
+                  onChange={(e) => setProposalTitle(e.target.value)}
+                  placeholder="e.g., Proposal for Growth Services for BusinessPoint Law"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Purpose / Description
+                </label>
+                <textarea
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                  rows={6}
+                  placeholder="Describe the purpose and goals of this proposal..."
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                />
+              </div>
+            </div>
           </section>
 
-          {/* Services */}
+          {/* 3. Services */}
           <section className="rounded-2xl bg-white p-8 shadow">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    <Package className="h-6 w-6 text-red-600" />
-                    Services
-                  </h2>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => router.push('/products/builder')}
-                      className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Create Product
-                    </button>
-                    <button
-                      onClick={loadSavedServices}
-                      disabled={loadingServices}
-                      className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${loadingServices ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </button>
-                  </div>
-                </div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Package className="h-6 w-6 text-red-600" />
+                Services
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push('/products/builder')}
+                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Product
+                </button>
+                <button
+                  onClick={loadServices}
+                  disabled={loadingServices}
+                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingServices ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+            </div>
 
-                {savedServices.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p className="text-sm text-gray-600 mb-4">No saved services yet.</p>
-                    <button
-                      onClick={() => router.push('/products/builder')}
-                      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            {savedServices.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm text-gray-600 mb-4">No services available</p>
+                <button
+                  onClick={() => router.push('/products/builder')}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                >
+                  Create Your First Product
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {savedServices.map((service) => {
+                  const selected = selectedServices.find(s => s.serviceId === service.id);
+                  return (
+                    <div
+                      key={service.id}
+                      className={`rounded-lg border p-4 ${
+                        selected
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
                     >
-                      Create Your First Product
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {savedServices.map((service) => {
-                      const selected = selectedServices.find(s => s.serviceId === service.id);
-                      return (
-                        <div
-                          key={service.id}
-                          className={`rounded-lg border p-4 ${
-                            selected
-                              ? 'border-red-500 bg-red-50'
-                              : 'border-gray-200 bg-white hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-semibold text-gray-900">{service.name}</h3>
-                                {service.type && (
-                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                                    {service.type}
-                                  </span>
-                                )}
-                              </div>
-                              {service.description && (
-                                <p className="text-sm text-gray-600 mb-2">{service.description}</p>
-                              )}
-                              <p className="text-sm font-semibold text-gray-900">
-                                ${(service.price || 0).toLocaleString()} per unit
-                              </p>
-                            </div>
-                            {selected ? (
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity - 1)}
-                                    className="rounded border border-gray-300 px-2 py-1 text-sm"
-                                  >
-                                    -
-                                  </button>
-                                  <input
-                                    type="number"
-                                    value={selected.quantity}
-                                    onChange={(e) => handleUpdateServiceQuantity(service.id, parseInt(e.target.value) || 1)}
-                                    className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm"
-                                    min="1"
-                                  />
-                                  <button
-                                    onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity + 1)}
-                                    className="rounded border border-gray-300 px-2 py-1 text-sm"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                                <p className="text-sm font-semibold text-gray-900">
-                                  ${selected.price.toLocaleString()}
-                                </p>
-                                <button
-                                  onClick={() => handleRemoveService(service.id)}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleSelectService(service)}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                              >
-                                Add
-                              </button>
-                            )}
-                          </div>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900">{service.name}</h3>
+                          {service.description && (
+                            <p className="text-sm text-gray-600 mt-1">{service.description}</p>
+                          )}
+                          <p className="text-sm font-semibold text-gray-900 mt-2">
+                            ${(service.price || 0).toLocaleString()} per unit
+                          </p>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {selectedServices.length > 0 && (
-                  <div className="mt-6 rounded-lg border-2 border-red-200 bg-red-50 p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-gray-900">Total Price:</span>
-                      <span className="text-2xl font-bold text-red-600">
-                        ${totalPrice.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                )}
-          </section>
-
-          {/* Phases */}
-          <section className="rounded-2xl bg-white p-8 shadow">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    <Calendar className="h-6 w-6 text-red-600" />
-                    Phases
-                  </h2>
-                  <button
-                    onClick={handleAddPhase}
-                    className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Phase
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {phases.map((phase, index) => {
-                    const colorClasses = {
-                      red: 'border-red-200 bg-red-50',
-                      yellow: 'border-yellow-200 bg-yellow-50',
-                      purple: 'border-purple-200 bg-purple-50',
-                    };
-                    return (
-                      <div
-                        key={phase.id}
-                        className={`rounded-lg border p-6 ${colorClasses[phase.color] || colorClasses.red}`}
-                      >
-                        <div className="mb-4 flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-gray-900">Phase {index + 1}</h3>
+                        {selected ? (
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity - 1)}
+                                className="rounded border border-gray-300 px-2 py-1 text-sm"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                value={selected.quantity}
+                                onChange={(e) => handleUpdateServiceQuantity(service.id, parseInt(e.target.value) || 1)}
+                                className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm"
+                                min="1"
+                              />
+                              <button
+                                onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity + 1)}
+                                className="rounded border border-gray-300 px-2 py-1 text-sm"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              ${selected.price.toLocaleString()}
+                            </p>
+                            <button
+                              onClick={() => handleRemoveService(service.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => setPhases(phases.filter(p => p.id !== phase.id))}
-                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleAddService(service)}
+                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
                           >
-                            <X className="h-5 w-5" />
+                            Add
                           </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* 4. Phases */}
+          <section className="rounded-2xl bg-white p-8 shadow">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Calendar className="h-6 w-6 text-red-600" />
+                Phases
+              </h2>
+              <button
+                onClick={handleAddPhase}
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                <Plus className="h-4 w-4" />
+                Add Phase
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {phases.map((phase, index) => {
+                const colorClasses = {
+                  red: 'border-red-200 bg-red-50',
+                  yellow: 'border-yellow-200 bg-yellow-50',
+                  purple: 'border-purple-200 bg-purple-50',
+                };
+                return (
+                  <div
+                    key={phase.id}
+                    className={`rounded-lg border p-6 ${colorClasses[phase.color] || colorClasses.red}`}
+                  >
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">Phase {index + 1}</h3>
+                      <button
+                        onClick={() => setPhases(phases.filter(p => p.id !== phase.id))}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-gray-700">Phase Name</label>
+                          <input
+                            type="text"
+                            value={phase.name}
+                            onChange={(e) => handleUpdatePhase(phase.id, { name: e.target.value })}
+                            placeholder="e.g., Foundation"
+                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                          />
                         </div>
-
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="mb-1 block text-xs font-semibold text-gray-700">Phase Name</label>
-                              <input
-                                type="text"
-                                value={phase.name}
-                                onChange={(e) => handleUpdatePhase(phase.id, { name: e.target.value })}
-                                placeholder="e.g., Foundation"
-                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-semibold text-gray-700">Weeks</label>
-                              <input
-                                type="text"
-                                value={phase.weeks}
-                                onChange={(e) => handleUpdatePhase(phase.id, { weeks: e.target.value })}
-                                placeholder="e.g., 1-3"
-                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="mb-1 block text-xs font-semibold text-gray-700">Goal</label>
-                            <textarea
-                              value={phase.goal}
-                              onChange={(e) => handleUpdatePhase(phase.id, { goal: e.target.value })}
-                              placeholder="Phase goal..."
-                              rows={2}
-                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                            />
-                          </div>
-
-                          <div>
-                            <div className="mb-2 flex items-center justify-between">
-                              <label className="block text-xs font-semibold text-gray-700">Deliverables</label>
-                              <button
-                                onClick={() => handleAddDeliverableToPhase(phase.id)}
-                                className="text-xs text-red-600 hover:text-red-700"
-                              >
-                                + Add
-                              </button>
-                            </div>
-                            <div className="space-y-2">
-                              {(phase.deliverables || []).map((deliverable, delIndex) => (
-                                <input
-                                  key={delIndex}
-                                  type="text"
-                                  value={deliverable}
-                                  onChange={(e) => handleUpdateDeliverableInPhase(phase.id, delIndex, e.target.value)}
-                                  placeholder="e.g., 3 Target Personas"
-                                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                                />
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="mb-2 flex items-center justify-between">
-                              <label className="block text-xs font-semibold text-gray-700">Core Work</label>
-                              <button
-                                onClick={() => handleAddCoreWorkToPhase(phase.id)}
-                                className="text-xs text-red-600 hover:text-red-700"
-                              >
-                                + Add
-                              </button>
-                            </div>
-                            <div className="space-y-2">
-                              {(phase.coreWork || []).map((work, workIndex) => (
-                                <input
-                                  key={workIndex}
-                                  type="text"
-                                  value={work}
-                                  onChange={(e) => handleUpdateCoreWorkInPhase(phase.id, workIndex, e.target.value)}
-                                  placeholder="e.g., Configure IgniteBD CRM + domain layer"
-                                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                                />
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="mb-1 block text-xs font-semibold text-gray-700">Outcome</label>
-                            <textarea
-                              value={phase.outcome}
-                              onChange={(e) => handleUpdatePhase(phase.id, { outcome: e.target.value })}
-                              placeholder="Expected outcome..."
-                              rows={2}
-                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                            />
-                          </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-gray-700">Weeks</label>
+                          <input
+                            type="text"
+                            value={phase.weeks}
+                            onChange={(e) => handleUpdatePhase(phase.id, { weeks: e.target.value })}
+                            placeholder="e.g., 1-3"
+                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                          />
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-700">Goal</label>
+                        <textarea
+                          value={phase.goal}
+                          onChange={(e) => handleUpdatePhase(phase.id, { goal: e.target.value })}
+                          placeholder="Phase goal..."
+                          rows={2}
+                          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <label className="block text-xs font-semibold text-gray-700">Deliverables</label>
+                          <button
+                            onClick={() => handleAddDeliverable(phase.id)}
+                            className="text-xs text-red-600 hover:text-red-700"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {(phase.deliverables || []).map((deliverable, delIndex) => (
+                            <input
+                              key={delIndex}
+                              type="text"
+                              value={deliverable}
+                              onChange={(e) => handleUpdateDeliverable(phase.id, delIndex, e.target.value)}
+                              placeholder="e.g., 3 Target Personas"
+                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <label className="block text-xs font-semibold text-gray-700">Core Work</label>
+                          <button
+                            onClick={() => handleAddCoreWork(phase.id)}
+                            className="text-xs text-red-600 hover:text-red-700"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {(phase.coreWork || []).map((work, workIndex) => (
+                            <input
+                              key={workIndex}
+                              type="text"
+                              value={work}
+                              onChange={(e) => handleUpdateCoreWork(phase.id, workIndex, e.target.value)}
+                              placeholder="e.g., Configure IgniteBD CRM + domain layer"
+                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-gray-700">Outcome</label>
+                        <textarea
+                          value={phase.outcome}
+                          onChange={(e) => handleUpdatePhase(phase.id, { outcome: e.target.value })}
+                          placeholder="Expected outcome..."
+                          rows={2}
+                          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
 
-          {/* Compensation Section */}
+          {/* 5. Compensation */}
           <section className="rounded-2xl bg-white p-8 shadow">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <DollarSign className="h-6 w-6 text-red-600" />
-              Compensation & Payment Schedule
+              Compensation
             </h2>
             <div className="space-y-4">
               <div>
@@ -793,24 +745,14 @@ export default function CreateProposalPage() {
                   <span className="absolute left-3 top-2.5 text-gray-500">$</span>
                   <input
                     type="number"
-                    value={manualTotalPrice !== null ? manualTotalPrice : totalPrice || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '') {
-                        setManualTotalPrice(null);
-                      } else {
-                        setManualTotalPrice(parseFloat(value) || 0);
-                      }
-                    }}
+                    value={totalPrice || ''}
+                    onChange={(e) => setTotalPrice(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
                     className="w-full pl-8 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     step="0.01"
                     min="0"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Auto-calculated from services: ${totalPrice.toLocaleString()}
-                </p>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-700">
@@ -823,14 +765,11 @@ export default function CreateProposalPage() {
                   placeholder="e.g., 3 payments of $500 at beginning, middle, and on delivery"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Describe how payments will be structured
-                </p>
               </div>
             </div>
           </section>
 
-          {/* Submit Button */}
+          {/* Submit */}
           <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 rounded-2xl shadow-lg">
             <div className="flex items-center justify-between">
               <div>
@@ -841,7 +780,7 @@ export default function CreateProposalPage() {
               </div>
               <button
                 onClick={handleSubmit}
-                disabled={submitting || !proposalName.trim() || !selectedContact || !selectedCompany}
+                disabled={submitting || !proposalTitle.trim() || !selectedContact || !selectedCompany}
                 className="flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
