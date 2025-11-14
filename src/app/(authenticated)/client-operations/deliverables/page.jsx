@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
 import ContactSelector from '@/components/ContactSelector';
 import { FileText, CheckCircle, Clock, AlertCircle, RefreshCw, FileCheck, Plus, User, Building2 } from 'lucide-react';
 import api from '@/lib/api';
 
-export default function DeliverablesPage() {
+function DeliverablesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [deliverables, setDeliverables] = useState([]);
@@ -330,6 +330,22 @@ export default function DeliverablesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DeliverablesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-gray-600">Loading...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <DeliverablesContent />
+    </Suspense>
   );
 }
 
