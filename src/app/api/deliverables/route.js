@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
  * GET /api/deliverables
@@ -12,8 +12,18 @@ import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/fireba
  * - status: Filter by status (pending, in-progress, completed, blocked)
  */
 export async function GET(request) {
-  // Optional auth for read operations
-  await optionallyVerifyFirebaseToken(request);
+  // Optional auth for read operations (but we need it to get companyHQId)
+  let decodedToken;
+  try {
+    decodedToken = await verifyFirebaseToken(request);
+  } catch (error) {
+    // If no auth, we can't filter by companyHQId, so return empty
+    return NextResponse.json({
+      success: true,
+      deliverables: [],
+      count: 0,
+    });
+  }
 
   try {
     const { searchParams } = request.nextUrl;
@@ -21,10 +31,25 @@ export async function GET(request) {
     const proposalId = searchParams.get('proposalId');
     const status = searchParams.get('status');
 
+    // Get companyHQId from authenticated user's contact
+    // For now, we'll get it from the contact if contactId is provided
+    // Or we can get it from the user's context if needed
+    let companyHQId = null;
+    if (contactId) {
+      const contact = await prisma.contact.findUnique({
+        where: { id: contactId },
+        select: { crmId: true },
+      });
+      if (contact) {
+        companyHQId = contact.crmId;
+      }
+    }
+
     const where = {};
     if (contactId) where.contactId = contactId;
     if (proposalId) where.proposalId = proposalId;
     if (status) where.status = status;
+    if (companyHQId) where.companyHQId = companyHQId; // Filter by tenant
 
     const deliverables = await prisma.consultantDeliverable.findMany({
       where,
@@ -107,6 +132,8 @@ export async function POST(request) {
       title,
       description,
       category,
+      type, // "persona", "blog", "upload", etc.
+      workContent, // JSON object with work artifact
       proposalId,
       milestoneId,
       dueDate,
@@ -127,9 +154,12 @@ export async function POST(request) {
       );
     }
 
-    // Verify contact exists
+    // Verify contact exists and get companyHQId and contactCompanyId
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
+      include: {
+        contactCompany: true,
+      },
     });
 
     if (!contact) {
@@ -138,6 +168,10 @@ export async function POST(request) {
         { status: 404 },
       );
     }
+
+    // Get companyHQId from contact (crmId)
+    const companyHQId = contact.crmId;
+    const contactCompanyId = contact.contactCompanyId;
 
     // Verify proposal exists if provided
     if (proposalId) {
@@ -159,6 +193,10 @@ export async function POST(request) {
         title,
         description: description || null,
         category: category || null,
+        type: type || null, // "persona", "blog", "upload", etc.
+        workContent: workContent || null, // JSON object with work artifact
+        companyHQId, // Always linked to owner's company
+        contactCompanyId: contactCompanyId || null, // Link to contact's company
         proposalId: proposalId || null,
         milestoneId: milestoneId || null,
         dueDate: dueDate ? new Date(dueDate) : null,
@@ -171,6 +209,12 @@ export async function POST(request) {
             firstName: true,
             lastName: true,
             email: true,
+            contactCompany: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
           },
         },
         proposal: {
