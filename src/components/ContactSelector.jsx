@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Users, ChevronDown, X } from 'lucide-react';
-import { useContacts } from '@/app/(authenticated)/contacts/layout';
+import api from '@/lib/api';
 
 /**
  * ContactSelector Component
@@ -12,6 +12,7 @@ import { useContacts } from '@/app/(authenticated)/contacts/layout';
  * - Shows dropdown/autocomplete of contacts
  * - Persists selection in localStorage and URL params
  * - Displays current selection with change option
+ * - Fetches contacts directly from API (no layout dependency)
  */
 export default function ContactSelector({ 
   contactId, 
@@ -21,10 +22,62 @@ export default function ContactSelector({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { contacts } = useContacts();
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedContactId, setSelectedContactId] = useState(contactId || null);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch contacts from API
+  useEffect(() => {
+    const fetchContacts = async () => {
+      if (typeof window === 'undefined') return;
+      
+      const companyHQId = 
+        window.localStorage.getItem('companyHQId') ||
+        window.localStorage.getItem('companyId') ||
+        '';
+      
+      if (!companyHQId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Try localStorage first
+        const cached = window.localStorage.getItem('contacts');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              setContacts(parsed);
+              setLoading(false);
+            }
+          } catch (err) {
+            console.warn('Failed to parse cached contacts', err);
+          }
+        }
+        
+        // Fetch from API
+        const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+        if (response.data?.success && response.data.contacts) {
+          const fetched = response.data.contacts;
+          setContacts(fetched);
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('contacts', JSON.stringify(fetched));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching contacts:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContacts();
+  }, []);
 
   // Initialize from URL param or localStorage
   useEffect(() => {
@@ -189,7 +242,11 @@ export default function ContactSelector({
 
             {/* Contact List */}
             <div className="max-h-60 overflow-y-auto">
-              {filteredContacts.length === 0 ? (
+              {loading ? (
+                <div className="px-4 py-8 text-center text-sm text-gray-500">
+                  Loading contacts...
+                </div>
+              ) : filteredContacts.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-gray-500">
                   {searchQuery ? 'No contacts found' : 'No contacts available'}
                 </div>

@@ -1,16 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
-import { FileText, CheckCircle, Clock, AlertCircle, RefreshCw, FileCheck, Plus } from 'lucide-react';
+import ContactSelector from '@/components/ContactSelector';
+import { FileText, CheckCircle, Clock, AlertCircle, RefreshCw, FileCheck, Plus, User, Building2 } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function DeliverablesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [deliverables, setDeliverables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedContact, setSelectedContact] = useState(null);
   const [companyHQId, setCompanyHQId] = useState('');
 
   useEffect(() => {
@@ -37,17 +40,30 @@ export default function DeliverablesPage() {
     setLoading(false);
   }, []);
 
-  const fetchDeliverables = async (isRefresh = false) => {
+  // Fetch deliverables when contact changes
+  useEffect(() => {
+    if (selectedContact?.id) {
+      fetchDeliverables(selectedContact.id);
+    } else {
+      // If no contact selected, fetch all deliverables for companyHQId
+      fetchDeliverables();
+    }
+  }, [selectedContact, companyHQId]);
+
+  const fetchDeliverables = async (contactId = null) => {
     if (!companyHQId) return;
     
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      
+      // Build query params
+      const params = new URLSearchParams();
+      if (contactId) {
+        params.append('contactId', contactId);
       }
-      // Fetch all deliverables - API will filter by companyHQId via auth
-      const response = await api.get('/api/deliverables');
+      
+      // Fetch deliverables - API will filter by contactId if provided
+      const response = await api.get(`/api/deliverables?${params.toString()}`);
       if (response.data?.success && response.data.deliverables) {
         const fetched = response.data.deliverables;
         setDeliverables(fetched);
@@ -60,6 +76,25 @@ export default function DeliverablesPage() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    if (selectedContact?.id) {
+      fetchDeliverables(selectedContact.id);
+    } else {
+      fetchDeliverables();
+    }
+  };
+
+  const handleContactChange = (contact) => {
+    setSelectedContact(contact);
+    // Fetch deliverables for this contact
+    if (contact?.id) {
+      fetchDeliverables(contact.id);
+    } else {
+      fetchDeliverables();
     }
   };
 
@@ -80,15 +115,15 @@ export default function DeliverablesPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Deliverables"
-          subtitle="Track and manage all deliverables for your active client engagements"
+          title="Client Delivery"
+          subtitle="Build and manage deliverables for your clients"
           backTo="/client-operations"
           backLabel="Back to Client Operations"
           actions={
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => fetchDeliverables(true)}
+                onClick={handleRefresh}
                 disabled={refreshing || loading}
                 className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow transition hover:bg-gray-100 disabled:opacity-50"
               >
@@ -103,20 +138,82 @@ export default function DeliverablesPage() {
                 <FileCheck className="h-4 w-4" />
                 View Proposals
               </button>
-              <button
-                type="button"
-                onClick={() => router.push('/client-operations/deliverables/create')}
-                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-              >
-                <Plus className="h-4 w-4" />
-                Create Deliverable
-              </button>
             </div>
           }
         />
 
+        {/* Contact Selector */}
+        <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <ContactSelector
+            contactId={selectedContact?.id}
+            onContactChange={handleContactChange}
+            showLabel={true}
+          />
+          
+          {/* Contact Banner */}
+          {selectedContact && (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center gap-3">
+                <User className="h-5 w-5 text-gray-400" />
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">
+                    Working for: {selectedContact.firstName} {selectedContact.lastName}
+                  </div>
+                  {selectedContact.contactCompany?.companyName && (
+                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                      <Building2 className="h-3 w-3" />
+                      {selectedContact.contactCompany.companyName}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Build Actions */}
+        {selectedContact && (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => router.push(`/client-operations/deliverables/client-persona-build?contactId=${selectedContact.id}`)}
+              className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-red-300 hover:shadow-md"
+            >
+              <div className="mb-2 text-sm font-semibold text-gray-900">Build Persona</div>
+              <div className="text-xs text-gray-500">Create a target persona for this contact</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/client-operations/deliverables/client-blog-build?contactId=${selectedContact.id}`)}
+              className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-red-300 hover:shadow-md"
+            >
+              <div className="mb-2 text-sm font-semibold text-gray-900">Build Blog</div>
+              <div className="text-xs text-gray-500">Create blog content for this contact</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/client-operations/deliverables/client-upload?contactId=${selectedContact.id}`)}
+              className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-red-300 hover:shadow-md"
+            >
+              <div className="mb-2 text-sm font-semibold text-gray-900">Upload Work</div>
+              <div className="text-xs text-gray-500">Upload or paste work content</div>
+            </button>
+          </div>
+        )}
+
+        {/* Deliverables List */}
         <div className="mt-8">
-          {loading ? (
+          {!selectedContact ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
+              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Select a Contact
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Select a contact above to view and manage their deliverables.
+              </p>
+            </div>
+          ) : loading ? (
             <div className="text-center py-12">
               <p className="text-gray-500">Loading deliverables...</p>
             </div>
@@ -127,32 +224,8 @@ export default function DeliverablesPage() {
                 No Deliverables Yet
               </h3>
               <p className="text-gray-600 mb-6">
-                Deliverables will appear here once proposals are approved and converted.
+                No deliverables found for {selectedContact.firstName} {selectedContact.lastName}. Start building work artifacts above.
               </p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => fetchDeliverables(true)}
-                  disabled={refreshing}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
-                <button
-                  onClick={() => router.push('/client-operations/proposals')}
-                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-                >
-                  <FileCheck className="h-4 w-4" />
-                  View Proposals
-                </button>
-                <button
-                  onClick={() => router.push('/client-operations/deliverables/create')}
-                  className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Deliverable
-                </button>
-              </div>
             </div>
           ) : (
             <div className="space-y-4">
