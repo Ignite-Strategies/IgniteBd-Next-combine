@@ -302,16 +302,302 @@ Dashboard loads
 
 ---
 
+## Client Delivery Architecture
+
+### Premise
+
+**Main App = Acquisition Tool**
+- IgniteBD is primarily for BD, outreach, pipeline, closing deals
+- Client delivery is an **optional feature** for owners who want to manage delivery themselves
+- Some owners use it; others sell and hand off to implementation teams
+- **Not global** - Keep it scoped to owners/contacts who use it
+
+### Architecture Overview
+
+**Client Delivery = Optional Feature**
+- Only for owners who want to manage delivery
+- Scoped to specific contacts (contactId-based)
+- Modular - can be ignored entirely if not needed
+- **Future State**: May be a paid feature (along with payment acceptance, etc.)
+
+### Contact-Based Delivery Flow
+
+**Core Principle:**
+- All deliverable work is tied to `contactId`
+- Owner selects contact → Creates deliverables → Uploads work
+- Each deliverable work artifact is linked to specific contact
+- Contact persistence across pages (localStorage/URL params)
+
+**The Flow:**
+```
+1. Owner selects Company (companyHQId) - already exists
+   ↓
+2. Owner selects Contact (contactId) within that company
+   ↓
+3. Persist contact selection (localStorage/URL params)
+   ↓
+4. Navigate to deliverable build page with ?contactId=xyz
+   ↓
+5. Page loads with contact banner: "Building for: [Contact Name]"
+   ↓
+6. Confirm/change contact if needed
+   ↓
+7. Build work artifact (reuse existing builders)
+   ↓
+8. On save: Link to contactId, companyHQId, contactCompanyId
+```
+
+### Deliverable Structure
+
+**DeliverableProp vs DeliverableWork:**
+
+**DeliverableProp (Template)**
+- Stored in Proposal JSON (phases, milestones)
+- Modular/template structure
+- Defines what COULD be delivered
+- Not linked to contact yet
+
+**DeliverableWork (Instance)**
+- Actual work artifact tied to contact
+- Created when owner selects from proposal
+- Links to `contactId`, `companyHQId`, `contactCompanyId`
+- Has status (pending, in-progress, completed)
+- Contains actual work content (persona, blog, etc.)
+
+**Schema:**
+```prisma
+model ConsultantDeliverable {
+  id              String   @id @default(cuid())
+  contactId       String   // Link to Contact (the client)
+  contact         Contact  @relation(fields: [contactId], references: [id])
+  
+  // What we're delivering
+  title           String
+  description     String?
+  category        String?  // "foundation", "integration", "enrichment", etc.
+  type            String?  // "persona", "blog", "upload", etc.
+  
+  // Work content (stored as JSON for flexibility)
+  workContent     Json?    // Actual work artifact (persona data, blog content, etc.)
+  
+  // Status tracking
+  status          String   @default("pending") // "pending" | "in-progress" | "completed" | "blocked"
+  
+  // Link to proposal/milestone (optional - can start fresh)
+  proposalId      String?
+  proposal        Proposal? @relation(fields: [proposalId], references: [id])
+  milestoneId     String?  // Reference to milestone in Proposal.milestones JSON
+  
+  // Delivery tracking
+  dueDate         DateTime?
+  completedAt     DateTime?
+  notes           String?
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Tenant scoping
+  companyHQId     String   // Always linked to owner's company
+  contactCompanyId String? // Link to contact's company
+  
+  @@index([contactId])
+  @@index([proposalId])
+  @@index([companyHQId])
+}
+```
+
+### Client Delivery Section (Main App)
+
+**Location:** `/client-operations/deliverables/*`
+
+**Routes:**
+- `/client-operations/deliverables` - Deliverables list (select contact)
+- `/client-operations/deliverables/client-persona-build?contactId=xyz` - Build persona for contact
+- `/client-operations/deliverables/client-blog-build?contactId=xyz` - Build blog for contact
+- `/client-operations/deliverables/client-upload?contactId=xyz` - Upload work for contact
+
+**UX Flow:**
+1. Owner navigates to Client Delivery section
+2. Selects contact (autocomplete/dropdown)
+3. Persists contact selection (localStorage/URL params)
+4. Navigates to build page with `?contactId=xyz`
+5. Page loads with contact banner at top
+6. Owner confirms/changes contact if needed
+7. Builds work artifact (reuses existing builders)
+8. Saves work linked to contactId
+
+### Work Upload UX
+
+**After Deliverables Are Set:**
+- Owner clicks "Begin Work" or "Provide Work Sample"
+- Creates work upload interface
+- Options:
+  1. Copy/paste content
+  2. Upload file
+  3. Build using existing builders (persona, blog, etc.)
+
+**Reuse Existing Builders:**
+- `clientbuildpersona` - Reuses persona builder from main app
+- `clientbuildblog` - Reuses blog builder from main app
+- Same capabilities, but scoped to contact
+- All work artifacts linked to `contactId`
+
+**Work Upload Interface:**
+```
+┌─────────────────────────────────────────┐
+│ [CompanyHQ] [Contact Selector] [Save]  │
+├─────────────────────────────────────────┤
+│ Building persona for: Joel Gulick      │
+│ BusinessPoint Law                       │
+│ [Change Contact]                        │
+├─────────────────────────────────────────┤
+│ [Reuse Persona Builder Component]      │
+│ ...                                     │
+└─────────────────────────────────────────┘
+```
+
+### Contract Management
+
+**Current State:**
+- **Approved Proposal = Contract** (for now)
+- Contract signing happens off-platform
+- No separate contract flag needed
+- **DeliverableWork existence = Work Has Begun**
+- If DeliverableWork exists, work has begun (or ready to begin)
+- No need for explicit contract flag
+
+**Routing Logic:**
+```
+Welcome Router → Check State:
+  1. Has DeliverableWork? → Dashboard (work has begun)
+  2. Has Approved Proposal? → "Set up deliverables" / Dashboard (empty state)
+  3. Has Draft Proposal? → Proposal view
+  4. No Proposals? → Onboarding
+```
+
+### Client Dashboard (Client Portal)
+
+**Two Sections:**
+
+1. **Status of Your Project**
+   - Stoplight chart of DeliverableWork items
+   - Green = Completed
+   - Yellow = In Progress
+   - Red = Blocked/Overdue
+   - Gray = Pending
+   - Click each to load work artifact
+
+2. **See the Deliverables**
+   - List view of all deliverables
+   - Similar UX to stoplight chart
+   - Click to view work artifact
+   - (May be redundant - can combine into single view)
+
+**Hydration:**
+- Hydrates DeliverableWork for contact
+- Shows status of each deliverable
+- Displays work artifacts when clicked
+- Keep it simple - don't over-hydrate
+
+### Contact Selection & Persistence
+
+**Contact Selector Component:**
+- Dropdown/autocomplete in header/nav
+- Shows current selection: "Working for: [Contact Name]"
+- Click to change contact
+- Persists across pages (localStorage/URL params)
+
+**Persistence Strategy:**
+- URL param (`?contactId=xyz`) - Source of truth, bookmarkable
+- localStorage (`currentClientContactId`) - Fallback, persists across sessions
+- Both - URL is source of truth, localStorage is fallback
+
+**Contact Confirmation:**
+- Banner at top with contact info
+- "Change Contact" button if wrong
+- Confirm dialog if switching mid-build
+
+### Implementation Approach
+
+**Phase 1: Schema Updates**
+- Update `ConsultantDeliverable` model with `workContent` (JSON)
+- Add `companyHQId` and `contactCompanyId` fields
+- Add `type` field for deliverable type (persona, blog, upload, etc.)
+
+**Phase 2: Client Delivery Section**
+- Create `/client-operations/deliverables/*` routes
+- Add contact selector component
+- Create build pages (persona, blog, upload)
+- Reuse existing builder components
+
+**Phase 3: Work Upload**
+- Create work upload interface
+- Link to existing builders (persona, blog)
+- Save work artifacts to `ConsultantDeliverable.workContent`
+- Link to `contactId`, `companyHQId`, `contactCompanyId`
+
+**Phase 4: Client Dashboard**
+- Update client portal dashboard
+- Add "Status of Your Project" (stoplight chart)
+- Add "See the Deliverables" (list view)
+- Load work artifacts on click
+
+### Key Principles
+
+**1. Main App = Acquisition Tool**
+- IgniteBD is for BD, outreach, pipeline, closing
+- Client delivery is optional, not core
+- Don't mess up existing wiring
+
+**2. Contact-Based Architecture**
+- All deliverable work tied to `contactId`
+- Owner selects contact first
+- Persist contact selection across pages
+- Each work artifact linked to specific contact
+
+**3. Modular & Scoped**
+- Client delivery is optional feature
+- Only for owners who use it
+- Scoped to specific contacts
+- Can be ignored entirely if not needed
+
+**4. Reuse Existing Builders**
+- Don't rebuild persona/blog builders
+- Reuse existing components
+- Same capabilities, scoped to contact
+- `clientbuildpersona`, `clientbuildblog`, etc.
+
+**5. Approved Proposal = Contract**
+- For now, approved proposal is contract signal
+- No separate contract flag needed
+- DeliverableWork existence = work has begun
+- Keep it simple
+
+**6. Keep It Simple**
+- Don't over-hydrate client dashboard
+- Simple stoplight chart or list view
+- Load work artifacts on click
+- MVP first, optimize later
+
+---
+
 ## Related Documentation
 
 - **`ignitebd_stack_nextguide.md`** - Main stack documentation
 - **`HYDRATION_ARCHITECTURE.md`** - Hydration patterns
 - **`ignitebd-clientportal/README.md`** - Client portal setup
+- **`ignitebd-clientportal/docs/WELCOME_ROUTER_ARCHITECTURE.md`** - Welcome router logic
+- **`ignitebd-clientportal/docs/CONTEXT_AWARE_HYDRATION.md`** - Context-aware hydration
 
 ---
 
 **Last Updated**: November 2025  
 **Architecture**: Contact-First (Universal Personhood)  
+**Main App**: Acquisition Tool (BD, Outreach, Pipeline, Closing)  
+**Client Delivery**: Optional Feature (Scoped to Contacts)  
+**Contract**: Approved Proposal (For Now)  
+**Work Has Begun**: DeliverableWork Existence  
 **Authentication**: Contact.email + Firebase  
 **Portal**: Separate Next.js app, shared database  
 **Password**: Generated → Reset Link → Set by Contact → Changeable
