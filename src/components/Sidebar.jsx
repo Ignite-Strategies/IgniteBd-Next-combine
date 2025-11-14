@@ -21,6 +21,7 @@ import {
   Share2,
   List,
   GitBranch,
+  Sparkles,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -55,6 +56,7 @@ const navigationGroups = [
       { name: 'Manage Contacts', path: '/contacts/view', icon: Users },
       { name: 'Contact Lists', path: '/contacts/list-manager', icon: List },
       { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: GitBranch },
+      { name: 'Enrich', path: '/contacts/enrich', icon: Sparkles },
       { name: 'Outreach', path: '/outreach', icon: MessageSquare },
       { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],

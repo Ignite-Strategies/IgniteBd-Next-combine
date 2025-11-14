@@ -75,6 +75,16 @@ const CORE_ACTIONS = [
       'from-orange-50 to-orange-100 border-orange-200 hover:border-orange-400',
     iconClasses: 'bg-orange-500 text-white',
   },
+  {
+    id: 'enrich',
+    title: 'Enrich Contacts',
+    description: 'Get more details on your contacts with Apollo',
+    route: '/contacts/enrich',
+    icon: Sparkles,
+    containerClasses:
+      'from-cyan-50 to-cyan-100 border-cyan-200 hover:border-cyan-400',
+    iconClasses: 'bg-cyan-500 text-white',
+  },
 ];
 
 export default function ContactsHubPage() {

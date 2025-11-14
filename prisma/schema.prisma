@@ -127,10 +127,17 @@ model Contact {
   crmId               String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
   firstName           String?
   lastName            String?
+  fullName            String? // Full name from enrichment
   goesBy              String?
   email               String?  @unique
   phone               String?
   title               String?
+  seniority           String? // Seniority level from enrichment
+  department          String? // Department from enrichment
+  linkedinUrl         String? // LinkedIn URL from enrichment
+  city                String? // City from enrichment
+  state               String? // State from enrichment
+  country             String? // Country from enrichment
   contactCompanyId    String? // Company they work for (prospect/client company)
   buyerDecision       String?
   howMet              String?
@@ -138,7 +145,8 @@ model Contact {
   contactListId       String?
   domain              String? // Domain inferred from email (e.g., "businesspointlaw.com")
   companyName         String? // Company name from enrichment
-  enrichmentSource    String? // Source of enrichment (e.g., "Lusha")
+  companyDomain       String? // Company domain from enrichment (e.g., "example.com")
+  enrichmentSource    String? // Source of enrichment (e.g., "Lusha", "Apollo")
   enrichmentFetchedAt DateTime? // When enrichment was fetched
   enrichmentPayload   Json? // Full enrichment payload
   createdById         String? // User who created this contact
