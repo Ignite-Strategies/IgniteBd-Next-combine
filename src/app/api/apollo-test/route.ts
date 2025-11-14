@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+// @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { searchPersonByEmail } from '@/lib/apollo';
 
