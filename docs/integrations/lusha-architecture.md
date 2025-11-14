@@ -1,7 +1,9 @@
 # Lusha Integration - Contact Enrichment
 
+> **⚠️ DEPRECATED**: This documentation has been replaced by [enrichment.md](./enrichment.md) which covers the current Apollo integration. This file is kept for historical reference.
+
 **Last Updated**: November 2025  
-**Status**: ⚠️ Partially Disabled (Redis queue disabled)  
+**Status**: ⚠️ Deprecated - Replaced by Apollo  
 **Purpose**: Contact enrichment service to find and populate contact information
 
 ---

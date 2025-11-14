@@ -18,6 +18,7 @@ export interface ApolloPersonMatchResponse {
     first_name?: string;
     last_name?: string;
     name?: string;
+    email?: string;
     title?: string;
     seniority?: string;
     department?: string;
@@ -35,6 +36,7 @@ export interface ApolloPersonMatchResponse {
 }
 
 export interface NormalizedContactData {
+  email?: string;
   fullName?: string;
   firstName?: string;
   lastName?: string;
@@ -60,6 +62,11 @@ function normalizeApolloResponse(apolloData: ApolloPersonMatchResponse): Normali
   }
 
   const normalized: NormalizedContactData = {};
+
+  // Email
+  if (person.email) {
+    normalized.email = person.email;
+  }
 
   // Name fields
   if (person.name) {
@@ -167,6 +174,63 @@ export async function searchPersonByEmail(email: string): Promise<ApolloPersonMa
 }
 
 /**
+ * Search for a person by LinkedIn URL using Apollo's People Match API
+ * 
+ * @param linkedinUrl - LinkedIn profile URL to search for
+ * @returns Promise<ApolloPersonMatchResponse>
+ */
+export async function searchPersonByLinkedInUrl(linkedinUrl: string): Promise<ApolloPersonMatchResponse> {
+  if (!APOLLO_API_KEY) {
+    throw new Error('APOLLO_API_KEY environment variable is not set');
+  }
+
+  if (!linkedinUrl) {
+    throw new Error('LinkedIn URL is required');
+  }
+
+  // Normalize LinkedIn URL - handle various formats
+  let normalizedUrl = linkedinUrl.trim();
+  if (!normalizedUrl.startsWith('http')) {
+    normalizedUrl = `https://${normalizedUrl}`;
+  }
+
+  // Extract LinkedIn profile identifier if it's a full URL
+  // e.g., https://www.linkedin.com/in/john-doe/ or linkedin.com/in/john-doe
+  try {
+    const url = new URL(normalizedUrl);
+    if (!url.hostname.includes('linkedin.com')) {
+      throw new Error('Invalid LinkedIn URL');
+    }
+  } catch {
+    throw new Error('Invalid LinkedIn URL format');
+  }
+
+  try {
+    const response = await fetch(`${APOLLO_API_URL}/people/match`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        api_key: APOLLO_API_KEY,
+        linkedin_url: normalizedUrl,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Apollo API error: ${response.status} - ${errorText}`);
+    }
+
+    const data: ApolloPersonMatchResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('❌ Apollo searchPersonByLinkedInUrl error:', error);
+    throw error;
+  }
+}
+
+/**
  * Search for a company by domain using Apollo's API
  * 
  * @param domain - Company domain (e.g., "example.com")
@@ -215,16 +279,28 @@ export async function searchCompanyByDomain(domain: string): Promise<Object> {
  * Enrich a contact using Apollo
  * This is the main enrichment function that normalizes Apollo's response
  * 
- * @param email - Email address to enrich
+ * @param email - Email address to enrich (optional if linkedinUrl is provided)
+ * @param linkedinUrl - LinkedIn URL to enrich (optional if email is provided)
  * @returns Promise<NormalizedContactData> Normalized contact data ready for Contact model
  */
-export async function enrichContact(email: string): Promise<NormalizedContactData> {
-  if (!email || !email.includes('@')) {
-    throw new Error('Valid email address is required');
+export async function enrichContact(email?: string, linkedinUrl?: string): Promise<NormalizedContactData> {
+  if (!email && !linkedinUrl) {
+    throw new Error('Either email or LinkedIn URL is required');
   }
 
   try {
-    const apolloResponse = await searchPersonByEmail(email);
+    let apolloResponse: ApolloPersonMatchResponse;
+    
+    if (linkedinUrl) {
+      // Prioritize LinkedIn URL if provided
+      apolloResponse = await searchPersonByLinkedInUrl(linkedinUrl);
+    } else if (email && email.includes('@')) {
+      // Fall back to email
+      apolloResponse = await searchPersonByEmail(email);
+    } else {
+      throw new Error('Valid email address or LinkedIn URL is required');
+    }
+
     const normalized = normalizeApolloResponse(apolloResponse);
     return normalized;
   } catch (error) {

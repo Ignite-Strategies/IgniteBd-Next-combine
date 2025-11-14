@@ -11,7 +11,8 @@ import { enrichContact, type NormalizedContactData } from '@/lib/apollo';
  * Body:
  * {
  *   "contactId": "xxxx",
- *   "email": "foo@bar.com"
+ *   "email": "foo@bar.com" (optional if linkedinUrl provided)
+ *   "linkedinUrl": "https://linkedin.com/in/..." (optional if email provided)
  * }
  */
 export async function POST(request: Request) {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { contactId, email } = body;
+    const { contactId, email, linkedinUrl } = body;
 
     // Validate inputs
     if (!contactId) {
@@ -36,7 +37,14 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!email || !email.includes('@')) {
+    if (!email && !linkedinUrl) {
+      return NextResponse.json(
+        { success: false, error: 'Either email or linkedinUrl is required' },
+        { status: 400 },
+      );
+    }
+
+    if (email && !email.includes('@')) {
       return NextResponse.json(
         { success: false, error: 'Valid email is required' },
         { status: 400 },
@@ -58,7 +66,7 @@ export async function POST(request: Request) {
     // Enrich contact using Apollo
     let enrichedData: NormalizedContactData;
     try {
-      enrichedData = await enrichContact(email);
+      enrichedData = await enrichContact(email, linkedinUrl);
     } catch (error: any) {
       console.error('❌ Apollo enrichment error:', error);
       return NextResponse.json(
@@ -94,17 +102,19 @@ export async function POST(request: Request) {
     if (enrichedData.companyName !== undefined) updateData.companyName = enrichedData.companyName;
     if (enrichedData.companyDomain !== undefined) updateData.companyDomain = enrichedData.companyDomain;
 
-    // Also update email if it's different (normalize case)
-    if (email.toLowerCase() !== existingContact.email?.toLowerCase()) {
-      updateData.email = email.toLowerCase();
+    // Also update email if we have it and it's different (normalize case)
+    // Use email from enriched data if available (from LinkedIn enrichment), otherwise use provided email
+    const enrichedEmail = enrichedData.email || email;
+    if (enrichedEmail && enrichedEmail.toLowerCase() !== existingContact.email?.toLowerCase()) {
+      updateData.email = enrichedEmail.toLowerCase();
     }
 
     // Update domain if we have a company domain
     if (enrichedData.companyDomain && !updateData.domain) {
       updateData.domain = enrichedData.companyDomain;
-    } else if (email && !updateData.domain && !existingContact.domain) {
+    } else if (enrichedEmail && enrichedEmail.includes('@') && !updateData.domain && !existingContact.domain) {
       // Fallback: extract domain from email if no company domain
-      const emailDomain = email.split('@')[1];
+      const emailDomain = enrichedEmail.split('@')[1];
       if (emailDomain) {
         updateData.domain = emailDomain.toLowerCase();
       }

@@ -12,6 +12,7 @@ import {
   ArrowRight,
   FileSpreadsheet,
   RefreshCw,
+  Linkedin,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -19,7 +20,9 @@ export default function EnrichPage() {
   const router = useRouter();
   const [companyHQId, setCompanyHQId] = useState('');
   const [mode, setMode] = useState('search'); // 'search', 'csv', 'microsoft'
+  const [searchType, setSearchType] = useState('email'); // 'email' or 'linkedin'
   const [searchEmail, setSearchEmail] = useState('');
+  const [searchLinkedInUrl, setSearchLinkedInUrl] = useState('');
   const [searching, setSearching] = useState(false);
   const [foundContact, setFoundContact] = useState(null);
   const [csvFile, setCsvFile] = useState(null);
@@ -38,23 +41,40 @@ export default function EnrichPage() {
     setCompanyHQId(storedCompanyHQId);
   }, []);
 
-  // Search for existing contact by email
+  // Search for existing contact by email or LinkedIn URL
   const handleSearchContact = useCallback(async () => {
-    if (!searchEmail || !searchEmail.includes('@')) {
-      alert('Please enter a valid email address');
-      return;
+    if (searchType === 'email') {
+      if (!searchEmail || !searchEmail.includes('@')) {
+        alert('Please enter a valid email address');
+        return;
+      }
+    } else {
+      if (!searchLinkedInUrl || !searchLinkedInUrl.includes('linkedin.com')) {
+        alert('Please enter a valid LinkedIn URL');
+        return;
+      }
     }
 
     setSearching(true);
     try {
-      const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(searchEmail)}&companyHQId=${companyHQId}`);
-      
-      if (response.data?.success && response.data.contact) {
-        setFoundContact(response.data.contact);
+      if (searchType === 'email') {
+        const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(searchEmail)}&companyHQId=${companyHQId}`);
+        
+        if (response.data?.success && response.data.contact) {
+          setFoundContact(response.data.contact);
+        } else {
+          // Contact not found, create a placeholder for enrichment
+          setFoundContact({
+            email: searchEmail,
+            linkedinUrl: null,
+            id: null, // Will be created during enrichment
+          });
+        }
       } else {
-        // Contact not found, create a placeholder for enrichment
+        // For LinkedIn URL, we'll create a placeholder since we can't search by LinkedIn URL in the database
         setFoundContact({
-          email: searchEmail,
+          email: null,
+          linkedinUrl: searchLinkedInUrl,
           id: null, // Will be created during enrichment
         });
       }
@@ -62,13 +82,14 @@ export default function EnrichPage() {
       console.error('Error searching contact:', error);
       // Contact not found, create a placeholder
       setFoundContact({
-        email: searchEmail,
+        email: searchType === 'email' ? searchEmail : null,
+        linkedinUrl: searchType === 'linkedin' ? searchLinkedInUrl : null,
         id: null,
       });
     } finally {
       setSearching(false);
     }
-  }, [searchEmail, companyHQId]);
+  }, [searchEmail, searchLinkedInUrl, searchType, companyHQId]);
 
   // Handle CSV file upload
   const handleCsvFileSelect = (event) => {
@@ -179,11 +200,15 @@ export default function EnrichPage() {
 
   // Handle enrich action
   const handleEnrich = useCallback(async () => {
-    const contactsToEnrich = [];
-    
-    if (mode === 'search' && foundContact) {
-      contactsToEnrich.push({ email: foundContact.email, contactId: foundContact.id });
-    } else if (mode === 'csv') {
+      const contactsToEnrich = [];
+      
+      if (mode === 'search' && foundContact) {
+        contactsToEnrich.push({ 
+          email: foundContact.email, 
+          linkedinUrl: foundContact.linkedinUrl,
+          contactId: foundContact.id 
+        });
+      } else if (mode === 'csv') {
       csvContacts
         .filter((c) => selectedContacts.has(c.email))
         .forEach((c) => contactsToEnrich.push({ email: c.email, contactId: c.id }));
@@ -203,15 +228,15 @@ export default function EnrichPage() {
 
     try {
       // For each contact, find or create it, then enrich
-      for (const { email, contactId } of contactsToEnrich) {
+      for (const { email, linkedinUrl, contactId } of contactsToEnrich) {
         try {
           let contact = null;
           
           if (contactId) {
             // Use existing contact
-            contact = { id: contactId, email };
-          } else {
-            // Search for existing contact or create new one
+            contact = { id: contactId, email, linkedinUrl };
+          } else if (email) {
+            // Search for existing contact or create new one by email
             const searchResponse = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(email)}&companyHQId=${companyHQId}`);
             
             if (searchResponse.data?.success && searchResponse.data.contact) {
@@ -220,11 +245,21 @@ export default function EnrichPage() {
               // Create new contact
               const createResponse = await api.post('/api/contacts', {
                 email,
+                linkedinUrl,
                 crmId: companyHQId,
               });
               if (createResponse.data?.success && createResponse.data.contact) {
                 contact = createResponse.data.contact;
               }
+            }
+          } else if (linkedinUrl) {
+            // Create new contact with just LinkedIn URL
+            const createResponse = await api.post('/api/contacts', {
+              linkedinUrl,
+              crmId: companyHQId,
+            });
+            if (createResponse.data?.success && createResponse.data.contact) {
+              contact = createResponse.data.contact;
             }
           }
 
@@ -233,6 +268,7 @@ export default function EnrichPage() {
             const enrichResponse = await api.post('/api/contacts/enrich', {
               contactId: contact.id,
               email: contact.email || email,
+              linkedinUrl: contact.linkedinUrl || linkedinUrl,
             });
 
             if (enrichResponse.data?.success) {
@@ -318,6 +354,8 @@ export default function EnrichPage() {
               setMode('search');
               setFoundContact(null);
               setSearchEmail('');
+              setSearchLinkedInUrl('');
+              setSearchType('email');
             }}
             className={`rounded-xl border-2 p-6 text-left transition ${
               mode === 'search'
@@ -330,7 +368,7 @@ export default function EnrichPage() {
               Search Contact
             </h3>
             <p className="text-sm text-gray-600">
-              Search for a contact by email
+              Search for a contact by email or LinkedIn URL
             </p>
           </button>
 
@@ -386,19 +424,69 @@ export default function EnrichPage() {
             <h2 className="mb-4 text-xl font-semibold text-gray-900">
               Search for a Contact
             </h2>
+            
+            {/* Search Type Toggle */}
+            <div className="mb-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchType('email');
+                  setFoundContact(null);
+                  setSearchEmail('');
+                  setSearchLinkedInUrl('');
+                }}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  searchType === 'email'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Mail className="h-4 w-4" />
+                Email
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchType('linkedin');
+                  setFoundContact(null);
+                  setSearchEmail('');
+                  setSearchLinkedInUrl('');
+                }}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  searchType === 'linkedin'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Linkedin className="h-4 w-4" />
+                LinkedIn URL
+              </button>
+            </div>
+
             <div className="flex gap-4">
-              <input
-                type="email"
-                placeholder="Enter email address"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              {searchType === 'email' ? (
+                <input
+                  type="email"
+                  placeholder="Enter email address"
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <input
+                  type="url"
+                  placeholder="Enter LinkedIn URL (e.g., https://linkedin.com/in/john-doe)"
+                  value={searchLinkedInUrl}
+                  onChange={(e) => setSearchLinkedInUrl(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
               <button
                 type="button"
                 onClick={handleSearchContact}
-                disabled={searching || !searchEmail}
+                disabled={searching || (searchType === 'email' ? !searchEmail : !searchLinkedInUrl)}
                 className="rounded-lg bg-blue-600 px-6 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {searching ? (
@@ -419,13 +507,29 @@ export default function EnrichPage() {
               <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-semibold text-gray-900">
-                      {foundContact.firstName} {foundContact.lastName}
-                    </div>
-                    <div className="text-sm text-gray-600">{foundContact.email}</div>
+                    {foundContact.firstName || foundContact.lastName ? (
+                      <div className="font-semibold text-gray-900">
+                        {foundContact.firstName} {foundContact.lastName}
+                      </div>
+                    ) : (
+                      <div className="font-semibold text-gray-900">
+                        {foundContact.email || foundContact.linkedinUrl || 'New Contact'}
+                      </div>
+                    )}
+                    {foundContact.email && (
+                      <div className="text-sm text-gray-600">{foundContact.email}</div>
+                    )}
+                    {foundContact.linkedinUrl && (
+                      <div className="text-sm text-gray-600">{foundContact.linkedinUrl}</div>
+                    )}
                     {foundContact.id && (
                       <div className="mt-2 text-xs text-gray-500">
                         Existing contact
+                      </div>
+                    )}
+                    {!foundContact.id && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Will be created during enrichment
                       </div>
                     )}
                   </div>
