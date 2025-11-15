@@ -55,7 +55,7 @@ export interface NormalizedContactData {
 /**
  * Normalize Apollo's response into our internal Contact shape
  */
-function normalizeApolloResponse(apolloData: ApolloPersonMatchResponse): NormalizedContactData {
+export function normalizeApolloResponse(apolloData: ApolloPersonMatchResponse): NormalizedContactData {
   const person = apolloData.person;
   if (!person) {
     return {};

@@ -22,6 +22,7 @@ import {
   List,
   GitBranch,
   Sparkles,
+  Box,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -74,7 +75,8 @@ const navigationGroups = [
     items: [
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
-      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket },
+      { name: 'Client Delivery', path: '/workpackages', icon: Box },
+      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket, exact: true },
     ],
   },
   {
@@ -88,7 +90,17 @@ const navigationGroups = [
 function Sidebar() {
   const pathname = usePathname();
 
-  const isActive = (path) => pathname.startsWith(path);
+  const isActive = (path, exact = false) => {
+    if (exact) {
+      // Exact match only
+      return pathname === path;
+    }
+    // For non-exact paths, check if pathname starts with path
+    // But also ensure it's not a parent path matching a child route
+    if (pathname === path) return true;
+    if (pathname.startsWith(path + '/')) return true;
+    return false;
+  };
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-3.5rem)] fixed left-0 top-14 overflow-y-auto">
@@ -155,7 +167,7 @@ function Sidebar() {
               <ul className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active = isActive(item.path);
+                  const active = isActive(item.path, item.exact);
                   const disabled = item.disabled;
                   return (
                     <li key={item.path}>

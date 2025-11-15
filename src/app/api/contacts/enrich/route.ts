@@ -7,11 +7,17 @@ import { enrichContact, type NormalizedContactData } from '@/lib/apollo';
 /**
  * POST /api/contacts/enrich
  * 
- * Enrich a contact using Apollo
+ * INTERNAL CRM CONTACT ENRICHMENT
+ * This route enriches EXISTING contacts only (by contactId).
+ * 
+ * IMPORTANT: This route is ONLY for enriching existing contacts in your CRM.
+ * For LinkedIn URL enrichment from external sources, use:
+ * - POST /api/enrich/preview (for preview)
+ * - POST /api/enrich/confirm (for confirm + upsert)
  * 
  * Body:
  * {
- *   "contactId": "xxxx",
+ *   "contactId": "xxxx", // Required - existing contact ID
  *   "email": "foo@bar.com" (optional if linkedinUrl provided)
  *   "linkedinUrl": "https://linkedin.com/in/..." (optional if email provided)
  * }

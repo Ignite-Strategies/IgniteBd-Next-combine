@@ -24,6 +24,7 @@ const ROUTES_WITH_SIDEBAR = [
   '/bd-intelligence',
   '/settings',
   '/client-operations',
+  '/workpackages',
 ];
 
 // Public routes that should NOT show navigation

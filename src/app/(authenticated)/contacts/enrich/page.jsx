@@ -108,22 +108,22 @@ export default function EnrichPage() {
           }
         }
       } else {
-        // For LinkedIn URL, fetch preview from Apollo first
+        // For LinkedIn URL, use EXTERNAL preview endpoint (NOT DB lookup)
         try {
-          const previewResponse = await api.post('/api/contacts/enrich/preview', {
+          const previewResponse = await api.post('/api/enrich/preview', {
             linkedinUrl: searchLinkedInUrl,
           });
-          if (previewResponse.data?.success && previewResponse.data.enrichedData) {
-            setPreviewData(previewResponse.data.enrichedData);
-            // Use enriched data to populate foundContact
+          if (previewResponse.data?.success && previewResponse.data.preview) {
+            setPreviewData(previewResponse.data.preview);
+            // Use preview data to populate foundContact
             setFoundContact({
-              email: previewResponse.data.enrichedData.email || null,
+              email: previewResponse.data.preview.email || null,
               linkedinUrl: searchLinkedInUrl,
-              firstName: previewResponse.data.enrichedData.firstName,
-              lastName: previewResponse.data.enrichedData.lastName,
-              title: previewResponse.data.enrichedData.title,
-              companyName: previewResponse.data.enrichedData.companyName,
-              id: null, // Will be created during enrichment
+              firstName: previewResponse.data.preview.firstName,
+              lastName: previewResponse.data.preview.lastName,
+              title: previewResponse.data.preview.title,
+              companyName: previewResponse.data.preview.companyName,
+              id: null, // Will be created during enrichment via /api/enrich/confirm
             });
           } else {
             // No preview data, just use placeholder
@@ -324,18 +324,35 @@ export default function EnrichPage() {
               }
             }
           } else if (linkedinUrl) {
-            // Create new contact with just LinkedIn URL
-            const createResponse = await api.post('/api/contacts', {
-              linkedinUrl,
+            // For LinkedIn URL, use EXTERNAL confirm endpoint (enrich + upsert)
+            // This creates/updates contact AFTER enrichment succeeds
+            const confirmResponse = await api.post('/api/enrich/confirm', {
               crmId: companyHQId,
+              linkedinUrl,
+              preview: previewData, // Pass preview data if available
             });
-            if (createResponse.data?.success && createResponse.data.contact) {
-              contact = createResponse.data.contact;
+
+            if (confirmResponse.data?.success) {
+              enrichmentResults.push({
+                email: confirmResponse.data.contact?.email || email || linkedinUrl,
+                linkedinUrl,
+                success: true,
+                contact: confirmResponse.data.contact,
+                enrichedData: confirmResponse.data.enrichedData,
+              });
+            } else {
+              enrichmentResults.push({
+                email: email || linkedinUrl,
+                linkedinUrl,
+                success: false,
+                error: confirmResponse.data?.error || 'Enrichment failed',
+              });
             }
+            continue; // Skip to next contact, already handled
           }
 
           if (contact?.id) {
-            // Enrich the contact
+            // Enrich the EXISTING contact using internal CRM enrichment endpoint
             const enrichResponse = await api.post('/api/contacts/enrich', {
               contactId: contact.id,
               email: contact.email || email,
@@ -358,11 +375,13 @@ export default function EnrichPage() {
             }
           }
         } catch (error) {
-          console.error(`Error enriching ${email}:`, error);
+          const contactIdentifier = email || linkedinUrl || 'contact';
+          console.error(`Error enriching ${contactIdentifier}:`, error);
           enrichmentResults.push({
-            email,
+            email: email || linkedinUrl || null,
+            linkedinUrl: linkedinUrl || null,
             success: false,
-            error: error.response?.data?.error || error.message || 'Enrichment failed',
+            error: error.response?.data?.error || error.response?.data?.details || error.message || 'Enrichment failed',
           });
         }
       }
@@ -387,7 +406,7 @@ export default function EnrichPage() {
     } finally {
       setEnriching(false);
     }
-  }, [mode, foundContact, csvContacts, microsoftContacts, selectedContacts, companyHQId, router]);
+  }, [mode, foundContact, csvContacts, microsoftContacts, selectedContacts, companyHQId, router, previewData]);
 
   const allContacts = mode === 'csv' ? csvContacts : mode === 'microsoft' ? microsoftContacts : [];
   const allSelected = allContacts.length > 0 && allContacts.every((c) => selectedContacts.has(c.email));
