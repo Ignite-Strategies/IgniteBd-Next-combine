@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { searchPersonByLinkedInUrl, normalizeApolloResponse } from '@/lib/apollo';
+import { lookupPerson, normalizeApolloResponse } from '@/lib/apollo';
 import type { ApolloPersonMatchResponse } from '@/lib/apollo';
 
 /**
@@ -31,28 +31,20 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { linkedinUrl } = body;
+    const { linkedinUrl, email } = body;
 
-    // Validate linkedinUrl is provided
-    if (!linkedinUrl) {
+    // Validate that either linkedinUrl or email is provided
+    if (!linkedinUrl && !email) {
       return NextResponse.json(
-        { success: false, error: 'linkedinUrl is required' },
+        { success: false, error: 'Either linkedinUrl or email is required' },
         { status: 400 },
       );
     }
 
-    // Validate LinkedIn URL format
-    if (!linkedinUrl.includes('linkedin.com')) {
-      return NextResponse.json(
-        { success: false, error: 'Valid LinkedIn URL is required' },
-        { status: 400 },
-      );
-    }
-
-    // Call Apollo lookup (NOT enrichment - just preview)
+    // Call Apollo LOOKUP (NOT enrichment - just preview using /people/match)
     let apolloResponse: ApolloPersonMatchResponse;
     try {
-      apolloResponse = await searchPersonByLinkedInUrl(linkedinUrl);
+      apolloResponse = await lookupPerson({ linkedinUrl, email });
     } catch (error: any) {
       console.error('❌ Apollo preview error:', error);
       console.error('Error details:', {

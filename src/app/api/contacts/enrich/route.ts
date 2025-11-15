@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { enrichContact, type NormalizedContactData } from '@/lib/apollo';
+import { enrichPerson, normalizeApolloResponse, type NormalizedContactData } from '@/lib/apollo';
 
 /**
  * POST /api/contacts/enrich
@@ -70,10 +70,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Enrich contact using Apollo
+    // Enrich contact using Apollo ENRICHMENT (/people/enrich - deep lookup)
     let enrichedData: NormalizedContactData;
     try {
-      enrichedData = await enrichContact(email, linkedinUrl);
+      const apolloResponse = await enrichPerson({ email, linkedinUrl });
+      enrichedData = normalizeApolloResponse(apolloResponse);
     } catch (error: any) {
       console.error('❌ Apollo enrichment error:', error);
       return NextResponse.json(

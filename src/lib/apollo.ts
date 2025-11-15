@@ -1,8 +1,14 @@
 /**
  * Apollo API Helper
  * 
- * Apollo enrichment service for Contact model.
- * Uses Apollo's People Match API to enrich contacts by email.
+ * Separates Apollo LOOKUP (light) from Apollo ENRICH (deep)
+ * 
+ * LOOKUP (/people/match) - Used for preview only
+ * - Returns: name, title, company, avatar
+ * - No emails, no phones, no full enrichment
+ * 
+ * ENRICH (/people/enrich) - Used for full enrichment
+ * - Returns: complete profile data including emails, phones, etc.
  */
 
 const APOLLO_API_URL = 'https://api.apollo.io/api/v1';
@@ -32,6 +38,7 @@ export interface ApolloPersonMatchResponse {
       website_url?: string;
       primary_domain?: string;
     };
+    photo_url?: string; // Avatar URL
   };
 }
 
@@ -50,6 +57,7 @@ export interface NormalizedContactData {
   country?: string;
   companyName?: string;
   companyDomain?: string;
+  avatarUrl?: string;
 }
 
 /**
@@ -112,6 +120,11 @@ export function normalizeApolloResponse(apolloData: ApolloPersonMatchResponse): 
     normalized.country = person.country;
   }
 
+  // Avatar
+  if (person.photo_url) {
+    normalized.avatarUrl = person.photo_url;
+  }
+
   // Company information
   if (person.organization) {
     if (person.organization.name) {
@@ -134,75 +147,15 @@ export function normalizeApolloResponse(apolloData: ApolloPersonMatchResponse): 
 }
 
 /**
- * Search for a person by email using Apollo's People Match API
- * 
- * @param email - Email address to search for
- * @returns Promise<ApolloPersonMatchResponse>
+ * Normalize LinkedIn URL for Apollo API
  */
-export async function searchPersonByEmail(email: string): Promise<ApolloPersonMatchResponse> {
-  if (!APOLLO_API_KEY) {
-    throw new Error('APOLLO_API_KEY environment variable is not set');
-  }
-
-  if (!email || !email.includes('@')) {
-    throw new Error('Valid email address is required');
-  }
-
-  try {
-    const response = await fetch(`${APOLLO_API_URL}/people/match`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        api_key: APOLLO_API_KEY,
-        email: email.trim().toLowerCase(),
-      }),
-    });
-
-    if (!response.ok) {
-      let errorMessage = `Apollo API error: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
-        const errorText = await response.text();
-        errorMessage = errorText || errorMessage;
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data: ApolloPersonMatchResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error('❌ Apollo searchPersonByEmail error:', error);
-    throw error;
-  }
-}
-
-/**
- * Search for a person by LinkedIn URL using Apollo's People Match API
- * 
- * @param linkedinUrl - LinkedIn profile URL to search for
- * @returns Promise<ApolloPersonMatchResponse>
- */
-export async function searchPersonByLinkedInUrl(linkedinUrl: string): Promise<ApolloPersonMatchResponse> {
-  if (!APOLLO_API_KEY) {
-    throw new Error('APOLLO_API_KEY environment variable is not set');
-  }
-
-  if (!linkedinUrl) {
-    throw new Error('LinkedIn URL is required');
-  }
-
-  // Normalize LinkedIn URL - handle various formats
+function normalizeLinkedInUrl(linkedinUrl: string): string {
   let normalizedUrl = linkedinUrl.trim();
   if (!normalizedUrl.startsWith('http')) {
     normalizedUrl = `https://${normalizedUrl}`;
   }
 
-  // Extract LinkedIn profile identifier if it's a full URL
-  // e.g., https://www.linkedin.com/in/john-doe/ or linkedin.com/in/john-doe
+  // Validate LinkedIn URL
   try {
     const url = new URL(normalizedUrl);
     if (!url.hostname.includes('linkedin.com')) {
@@ -212,16 +165,50 @@ export async function searchPersonByLinkedInUrl(linkedinUrl: string): Promise<Ap
     throw new Error('Invalid LinkedIn URL format');
   }
 
+  return normalizedUrl;
+}
+
+/**
+ * Apollo LOOKUP - Light lookup using /people/match
+ * 
+ * Used ONLY for preview - returns basic info (name, title, company, avatar)
+ * Does NOT return emails or phones
+ * 
+ * @param options - { linkedinUrl?: string, email?: string }
+ * @returns Promise<ApolloPersonMatchResponse> Light lookup response
+ */
+export async function lookupPerson(options: { linkedinUrl?: string; email?: string }): Promise<ApolloPersonMatchResponse> {
+  const { linkedinUrl, email } = options;
+
+  if (!APOLLO_API_KEY) {
+    throw new Error('APOLLO_API_KEY environment variable is not set');
+  }
+
+  if (!linkedinUrl && !email) {
+    throw new Error('Either linkedinUrl or email is required');
+  }
+
+  if (email && !email.includes('@')) {
+    throw new Error('Valid email address is required');
+  }
+
+  // Prepare request body
+  const requestBody: any = {};
+  if (linkedinUrl) {
+    requestBody.linkedin_url = normalizeLinkedInUrl(linkedinUrl);
+  }
+  if (email) {
+    requestBody.email = email.trim().toLowerCase();
+  }
+
   try {
     const response = await fetch(`${APOLLO_API_URL}/people/match`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Api-Key': APOLLO_API_KEY,
       },
-      body: JSON.stringify({
-        api_key: APOLLO_API_KEY,
-        linkedin_url: normalizedUrl,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -239,7 +226,69 @@ export async function searchPersonByLinkedInUrl(linkedinUrl: string): Promise<Ap
     const data: ApolloPersonMatchResponse = await response.json();
     return data;
   } catch (error) {
-    console.error('❌ Apollo searchPersonByLinkedInUrl error:', error);
+    console.error('❌ Apollo lookupPerson error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Apollo ENRICH - Deep lookup using /people/enrich
+ * 
+ * Used ONLY for enrichment - returns full profile data including emails, phones, etc.
+ * 
+ * @param options - { linkedinUrl?: string, email?: string }
+ * @returns Promise<ApolloPersonMatchResponse> Full enrichment response
+ */
+export async function enrichPerson(options: { linkedinUrl?: string; email?: string }): Promise<ApolloPersonMatchResponse> {
+  const { linkedinUrl, email } = options;
+
+  if (!APOLLO_API_KEY) {
+    throw new Error('APOLLO_API_KEY environment variable is not set');
+  }
+
+  if (!linkedinUrl && !email) {
+    throw new Error('Either linkedinUrl or email is required');
+  }
+
+  if (email && !email.includes('@')) {
+    throw new Error('Valid email address is required');
+  }
+
+  // Prepare request body
+  const requestBody: any = {};
+  if (linkedinUrl) {
+    requestBody.linkedin_url = normalizeLinkedInUrl(linkedinUrl);
+  }
+  if (email) {
+    requestBody.email = email.trim().toLowerCase();
+  }
+
+  try {
+    const response = await fetch(`${APOLLO_API_URL}/people/enrich`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': APOLLO_API_KEY,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Apollo API error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch {
+        const errorText = await response.text();
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data: ApolloPersonMatchResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('❌ Apollo enrichPerson error:', error);
     throw error;
   }
 }
@@ -263,14 +312,13 @@ export async function searchCompanyByDomain(domain: string): Promise<Object> {
   const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').trim();
 
   try {
-    // Apollo's organization search endpoint
     const response = await fetch(`${APOLLO_API_URL}/organizations/search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Api-Key': APOLLO_API_KEY,
       },
       body: JSON.stringify({
-        api_key: APOLLO_API_KEY,
         q_keywords: cleanDomain,
         per_page: 1,
       }),
@@ -290,31 +338,18 @@ export async function searchCompanyByDomain(domain: string): Promise<Object> {
 }
 
 /**
- * Enrich a contact using Apollo
- * This is the main enrichment function that normalizes Apollo's response
- * 
- * @param email - Email address to enrich (optional if linkedinUrl is provided)
- * @param linkedinUrl - LinkedIn URL to enrich (optional if email is provided)
- * @returns Promise<NormalizedContactData> Normalized contact data ready for Contact model
+ * @deprecated Use lookupPerson() for preview or enrichPerson() for enrichment
+ * This function is kept for backward compatibility but will be removed
  */
 export async function enrichContact(email?: string, linkedinUrl?: string): Promise<NormalizedContactData> {
+  console.warn('⚠️ enrichContact() is deprecated. Use enrichPerson() instead.');
+  
   if (!email && !linkedinUrl) {
     throw new Error('Either email or LinkedIn URL is required');
   }
 
   try {
-    let apolloResponse: ApolloPersonMatchResponse;
-    
-    if (linkedinUrl) {
-      // Prioritize LinkedIn URL if provided
-      apolloResponse = await searchPersonByLinkedInUrl(linkedinUrl);
-    } else if (email && email.includes('@')) {
-      // Fall back to email
-      apolloResponse = await searchPersonByEmail(email);
-    } else {
-      throw new Error('Valid email address or LinkedIn URL is required');
-    }
-
+    const apolloResponse = await enrichPerson({ email, linkedinUrl });
     const normalized = normalizeApolloResponse(apolloResponse);
     return normalized;
   } catch (error) {

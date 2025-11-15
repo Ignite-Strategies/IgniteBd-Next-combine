@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { enrichContact } from '@/lib/apollo';
+import { lookupPerson, normalizeApolloResponse } from '@/lib/apollo';
 
 /**
  * POST /api/contacts/enrich/preview
@@ -42,10 +42,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch enrichment data from Apollo (preview only, no database save)
+    // Fetch preview data from Apollo using LOOKUP (light lookup, not enrichment)
     let enrichedData;
     try {
-      enrichedData = await enrichContact(email, linkedinUrl);
+      const apolloResponse = await lookupPerson({ email, linkedinUrl });
+      enrichedData = normalizeApolloResponse(apolloResponse);
     } catch (error: any) {
       console.error('❌ Apollo preview error:', error);
       console.error('Error details:', {

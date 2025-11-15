@@ -645,7 +645,7 @@ export default function EnrichPage() {
                   <input
                     type="url"
                     autoComplete="off"
-                    placeholder="Enter LinkedIn URL to enrich contact (e.g., https://linkedin.com/in/john-doe)"
+                    placeholder="Enter LinkedIn URL to enrich contact"
                     value={searchLinkedInUrl}
                     onChange={(e) => setSearchLinkedInUrl(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
@@ -670,6 +670,7 @@ export default function EnrichPage() {
                   </>
                 )}
               </button>
+              </div>
             </div>
 
             {foundContact && (

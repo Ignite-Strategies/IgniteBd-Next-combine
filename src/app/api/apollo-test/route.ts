@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { searchPersonByEmail } from '@/lib/apollo';
+import { lookupPerson } from '@/lib/apollo';
 
 /**
  * GET /api/apollo-test
@@ -33,8 +33,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // Hit Apollo with the test email
-    const apolloResponse = await searchPersonByEmail(testEmail);
+    // Hit Apollo with the test email (using lookup for preview)
+    const apolloResponse = await lookupPerson({ email: testEmail });
 
     // Return the raw Apollo JSON
     return NextResponse.json({
