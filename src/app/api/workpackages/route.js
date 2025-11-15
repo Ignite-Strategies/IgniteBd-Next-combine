@@ -33,22 +33,33 @@ export async function POST(request) {
       status = 'ACTIVE',
     } = body ?? {};
 
-    if (!contactId || !title) {
+    if (!title) {
       return NextResponse.json(
-        { success: false, error: 'contactId and title are required' },
+        { success: false, error: 'title is required' },
         { status: 400 },
       );
     }
 
-    // Verify contact exists
-    const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
-    });
+    // If contactId provided, verify it exists
+    let contact = null;
+    if (contactId) {
+      contact = await prisma.contact.findUnique({
+        where: { id: contactId },
+      });
 
-    if (!contact) {
+      if (!contact) {
+        return NextResponse.json(
+          { success: false, error: 'Contact not found' },
+          { status: 404 },
+        );
+      }
+    }
+
+    // companyHQId is required if no contactId
+    if (!contactId && !companyHQId) {
       return NextResponse.json(
-        { success: false, error: 'Contact not found' },
-        { status: 404 },
+        { success: false, error: 'Either contactId or companyHQId is required' },
+        { status: 400 },
       );
     }
 
@@ -75,9 +86,9 @@ export async function POST(request) {
         })
       : await prisma.workPackage.create({
           data: {
-            contactId,
+            contactId: contactId || null,
             contactCompanyId: contactCompanyId || null,
-            companyHQId: companyHQId || contact.crmId || null,
+            companyHQId: companyHQId || contact?.crmId || null,
             title,
             description: description || null,
             status,
