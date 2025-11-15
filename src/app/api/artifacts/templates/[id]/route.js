@@ -68,14 +68,14 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const body = await request.json();
+    const requestBody = await request.json();
     const {
       name,
       subject,
       body,
       type,
       published,
-    } = body ?? {};
+    } = requestBody ?? {};
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;

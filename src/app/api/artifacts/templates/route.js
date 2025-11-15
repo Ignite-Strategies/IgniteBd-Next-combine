@@ -17,7 +17,7 @@ export async function POST(request) {
   }
 
   try {
-    const body = await request.json();
+    const requestBody = await request.json();
     const {
       companyHQId,
       name,
@@ -25,7 +25,7 @@ export async function POST(request) {
       body,
       type,
       published = false,
-    } = body ?? {};
+    } = requestBody ?? {};
 
     if (!companyHQId || !name) {
       return NextResponse.json(
