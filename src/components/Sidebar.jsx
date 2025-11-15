@@ -75,7 +75,7 @@ const navigationGroups = [
     items: [
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
-      { name: 'Client Delivery', path: '/workpackages', icon: Box },
+      { name: 'Work Packages', path: '/workpackages', icon: Box },
       { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket, exact: true },
     ],
   },

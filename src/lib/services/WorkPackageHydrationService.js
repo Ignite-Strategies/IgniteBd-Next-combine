@@ -111,9 +111,11 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
 
       return {
         id: item.id,
-        deliverableName: item.deliverableName,
+        label: item.label,
         type: item.type,
         quantity: item.quantity,
+        status: item.status,
+        clientArtifactId: item.clientArtifactId,
         completedCount,
         progress: Math.min(progress, 1), // Cap at 100%
         progressPercentage: Math.round(Math.min(progress, 1) * 100),

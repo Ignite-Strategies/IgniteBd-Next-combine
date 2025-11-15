@@ -110,7 +110,7 @@ export default function WorkPackageItemPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{item.deliverableName}</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{item.label}</h1>
             <p className="mt-1 text-sm text-gray-600">
               {item.completedCount} of {item.quantity} complete
             </p>

@@ -477,7 +477,14 @@ enum WorkItemType {
   OUTREACH_TEMPLATE
   EVENT_CLE_PLAN
   CLE_DECK
+  PRESENTATION_DECK
   LANDING_PAGE
+}
+
+enum WorkItemStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
 }
 
 model WorkPackage {
@@ -505,28 +512,25 @@ model WorkPackage {
 }
 
 model WorkPackageItem {
-  id            String      @id @default(cuid())
+  id            String          @id @default(cuid())
   workPackageId String
-  workPackage   WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  workPackage   WorkPackage     @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
 
-  // Human-facing label
-  deliverableName String // e.g. "Blog Posts", "Personas"
+  // What we owe
   type            WorkItemType
-  quantity        Int // number owed
+  label           String          // e.g. "Blog Posts", "Personas"
+  quantity        Int             // number owed
+  status          WorkItemStatus  @default(TODO)
+  
+  // Generated artifact (single ID - created when user clicks "Generate")
+  clientArtifactId String?        // Links to generated artifact (Blog, Persona, etc.)
 
-  // Actual artifacts produced (arrays of artifact IDs)
-  blogIds        String[] @default([])
-  personaIds     String[] @default([])
-  templateIds    String[] @default([])
-  eventPlanIds   String[] @default([])
-  cleDeckIds     String[] @default([])
-  landingPageIds String[] @default([])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([workPackageId])
   @@index([type])
+  @@index([status])
   @@map("work_package_items")
 }
 

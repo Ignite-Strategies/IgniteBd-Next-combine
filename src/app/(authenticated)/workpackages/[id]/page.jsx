@@ -100,7 +100,16 @@ export default function WorkPackagePage() {
 
         {/* Items */}
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-900">Deliverables</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Work Items</h2>
+            <button
+              onClick={() => router.push(`/workpackages/${workPackageId}/add-deliverable`)}
+              className="flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+            >
+              <Plus className="h-4 w-4" />
+              Add Deliverable
+            </button>
+          </div>
           {workPackage.items.map((item) => (
             <WorkPackageItemCard key={item.id} item={item} workPackageId={workPackageId} />
           ))}
@@ -109,7 +118,14 @@ export default function WorkPackagePage() {
         {workPackage.items.length === 0 && (
           <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
             <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <p className="mt-4 text-gray-500">No deliverables added yet</p>
+            <p className="mt-4 text-gray-500">No work items added yet</p>
+            <p className="mt-2 text-sm text-gray-400">Add deliverables from the catalog to get started</p>
+            <button
+              onClick={() => router.push(`/workpackages/${workPackageId}/add-deliverable`)}
+              className="mt-4 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700"
+            >
+              Add Deliverable
+            </button>
           </div>
         )}
       </div>
@@ -130,6 +146,7 @@ function WorkPackageItemCard({ item, workPackageId }) {
       OUTREACH_TEMPLATE: 'Templates',
       EVENT_CLE_PLAN: 'Event Plans',
       CLE_DECK: 'CLE Decks',
+      PRESENTATION_DECK: 'Presentation Decks',
       LANDING_PAGE: 'Landing Pages',
     };
     return labels[type] || type;
@@ -151,7 +168,7 @@ function WorkPackageItemCard({ item, workPackageId }) {
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{item.deliverableName}</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{item.label}</h3>
           <p className="text-sm text-gray-500">{getTypeLabel(item.type)}</p>
         </div>
         <Link

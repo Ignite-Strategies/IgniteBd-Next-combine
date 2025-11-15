@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
- * PATCH /api/workpackages/items/:itemId/add-artifact
- * Adds artifact ID to the appropriate array
+ * PATCH /api/workpackages/items/:itemId
+ * Update WorkPackageItem (label, quantity, status)
  */
 export async function PATCH(request, { params }) {
   try {
@@ -19,14 +19,7 @@ export async function PATCH(request, { params }) {
   try {
     const { itemId } = params;
     const body = await request.json();
-    const { type, artifactId, action = 'add' } = body ?? {}; // action: 'add' or 'remove'
-
-    if (!type || !artifactId) {
-      return NextResponse.json(
-        { success: false, error: 'type and artifactId are required' },
-        { status: 400 },
-      );
-    }
+    const { label, quantity, status, clientArtifactId } = body ?? {};
 
     const item = await prisma.workPackageItem.findUnique({
       where: { id: itemId },
@@ -39,43 +32,15 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    // Map type to array field
-    const arrayFieldMap = {
-      BLOG: 'blogIds',
-      PERSONA: 'personaIds',
-      OUTREACH_TEMPLATE: 'templateIds',
-      EVENT_CLE_PLAN: 'eventPlanIds',
-      CLE_DECK: 'cleDeckIds',
-      LANDING_PAGE: 'landingPageIds',
-    };
+    const updateData = {};
+    if (label !== undefined) updateData.label = label;
+    if (quantity !== undefined) updateData.quantity = quantity;
+    if (status !== undefined) updateData.status = status;
+    if (clientArtifactId !== undefined) updateData.clientArtifactId = clientArtifactId;
 
-    const arrayField = arrayFieldMap[type];
-    if (!arrayField) {
-      return NextResponse.json(
-        { success: false, error: `Invalid type: ${type}` },
-        { status: 400 },
-      );
-    }
-
-    // Get current array
-    const currentArray = item[arrayField] || [];
-
-    // Add or remove artifact ID
-    let updatedArray;
-    if (action === 'add') {
-      updatedArray = currentArray.includes(artifactId)
-        ? currentArray
-        : [...currentArray, artifactId];
-    } else {
-      updatedArray = currentArray.filter((id) => id !== artifactId);
-    }
-
-    // Update item
     const updated = await prisma.workPackageItem.update({
       where: { id: itemId },
-      data: {
-        [arrayField]: updatedArray,
-      },
+      data: updateData,
     });
 
     return NextResponse.json({

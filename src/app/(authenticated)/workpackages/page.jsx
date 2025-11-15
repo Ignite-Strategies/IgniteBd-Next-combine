@@ -57,8 +57,8 @@ export default function WorkPackagesPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-6xl px-4">
         <PageHeader
-          title="Client Delivery"
-          subtitle="Manage work packages and track deliverables"
+          title="Work Packages"
+          subtitle="Manage client work packages - the actual work being done"
         />
 
         {error && (
@@ -85,7 +85,7 @@ export default function WorkPackagesPage() {
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <p className="text-lg font-semibold text-gray-800">No work packages yet</p>
             <p className="mt-2 text-sm text-gray-500">
-              Create your first work package to start tracking deliverables
+              Create your first work package to start tracking client deliverables
             </p>
             <button
               onClick={() => router.push('/workpackages/new')}

@@ -10,7 +10,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
  * POST /api/workpackages/items
- * Create WorkPackageItem
+ * Create WorkPackageItem (CONFIG ONLY - no generation)
  */
 export async function POST(request) {
   try {
@@ -26,32 +26,31 @@ export async function POST(request) {
     const body = await request.json();
     const {
       workPackageId,
-      deliverableName,
       type,
+      label,
       quantity = 1,
     } = body ?? {};
 
-    if (!workPackageId || !deliverableName || !type) {
+    if (!workPackageId || !type || !label) {
       return NextResponse.json(
-        { success: false, error: 'workPackageId, deliverableName, and type are required' },
+        { success: false, error: 'workPackageId, type, and label are required' },
         { status: 400 },
       );
     }
 
+    // Create WorkPackageItem - CONFIG ONLY, no generation
     const item = await prisma.workPackageItem.create({
       data: {
         workPackageId,
-        deliverableName,
         type,
+        label,
         quantity,
-        blogIds: [],
-        personaIds: [],
-        templateIds: [],
-        eventPlanIds: [],
-        cleDeckIds: [],
-        landingPageIds: [],
+        status: 'TODO',
+        clientArtifactId: null, // Will be set when user clicks "Generate"
       },
     });
+
+    console.log('✅ WorkPackageItem created (config only):', item.id);
 
     return NextResponse.json({
       success: true,
