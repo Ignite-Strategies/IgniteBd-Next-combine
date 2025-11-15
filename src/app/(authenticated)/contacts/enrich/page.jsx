@@ -13,6 +13,8 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Linkedin,
+  User,
+  CheckCircle,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -504,54 +506,10 @@ export default function EnrichPage() {
             </div>
 
             {foundContact && (
-              <div className="mt-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    {foundContact.firstName || foundContact.lastName ? (
-                      <div className="font-semibold text-gray-900">
-                        {foundContact.firstName} {foundContact.lastName}
-                      </div>
-                    ) : (
-                      <div className="font-semibold text-gray-900">
-                        {foundContact.email || foundContact.linkedinUrl || 'New Contact'}
-                      </div>
-                    )}
-                    {foundContact.email && (
-                      <div className="text-sm text-gray-600">{foundContact.email}</div>
-                    )}
-                    {foundContact.linkedinUrl && (
-                      <div className="text-sm text-gray-600">{foundContact.linkedinUrl}</div>
-                    )}
-                    {foundContact.id && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        Existing contact
-                      </div>
-                    )}
-                    {!foundContact.id && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        Will be created during enrichment
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleEnrich}
-                      disabled={enriching}
-                      className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {enriching ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          Enriching...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4" />
-                          Enrich Now
-                        </>
-                      )}
-                    </button>
+              <div className="mt-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
+                <div className="mb-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Verify This Contact</h3>
                     <button
                       type="button"
                       onClick={() => setFoundContact(null)}
@@ -560,6 +518,94 @@ export default function EnrichPage() {
                       <X className="h-5 w-5" />
                     </button>
                   </div>
+                  
+                  {foundContact.linkedinUrl && (
+                    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Linkedin className="h-5 w-5 text-blue-600" />
+                        <span className="text-sm font-semibold text-gray-700">LinkedIn Profile</span>
+                      </div>
+                      <a
+                        href={foundContact.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {foundContact.linkedinUrl}
+                      </a>
+                      <p className="mt-2 text-xs text-gray-500">
+                        👆 Click to open LinkedIn profile in a new tab and verify this is the correct person
+                      </p>
+                    </div>
+                  )}
+
+                  {foundContact.email && (
+                    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Mail className="h-5 w-5 text-gray-400" />
+                        <span className="text-sm font-semibold text-gray-700">Email</span>
+                      </div>
+                      <div className="text-sm text-gray-600">{foundContact.email}</div>
+                    </div>
+                  )}
+
+                  {(foundContact.firstName || foundContact.lastName) && (
+                    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <User className="h-5 w-5 text-gray-400" />
+                        <span className="text-sm font-semibold text-gray-700">Name</span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {foundContact.firstName} {foundContact.lastName}
+                      </div>
+                    </div>
+                  )}
+
+                  {foundContact.id && (
+                    <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
+                      <div className="flex items-center gap-2 text-sm text-green-700">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Existing contact in your database</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {!foundContact.id && (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <div className="flex items-center gap-2 text-sm text-amber-700">
+                        <Sparkles className="h-4 w-4" />
+                        <span>New contact - will be created during enrichment</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-3 border-t border-blue-200 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setFoundContact(null)}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEnrich}
+                    disabled={enriching}
+                    className="flex items-center gap-2 rounded-lg bg-cyan-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {enriching ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Enriching...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Confirm & Enrich
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
