@@ -28,12 +28,14 @@ export default function EnrichPage() {
   const [searching, setSearching] = useState(false);
   const [foundContact, setFoundContact] = useState(null);
   const [previewData, setPreviewData] = useState(null);
+  const [enrichedProfile, setEnrichedProfile] = useState(null);
+  const [enriching, setEnriching] = useState(false);
+  const [creatingContact, setCreatingContact] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const [csvContacts, setCsvContacts] = useState([]);
   const [microsoftContacts, setMicrosoftContacts] = useState([]);
   const [loadingMicrosoft, setLoadingMicrosoft] = useState(false);
   const [selectedContacts, setSelectedContacts] = useState(new Set());
-  const [enriching, setEnriching] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -159,7 +161,7 @@ export default function EnrichPage() {
               lastName: previewResponse.data.preview.lastName,
               title: previewResponse.data.preview.title,
               companyName: previewResponse.data.preview.companyName,
-              id: null, // Does NOT exist in CRM - will be created during enrichment
+              id: null, // Does NOT exist in CRM - user must choose to save
             });
           } else {
             // No preview data, just use placeholder
@@ -305,7 +307,80 @@ export default function EnrichPage() {
     });
   };
 
-  // Handle enrich action
+  // Step 2: Enrich contact (deep enrichment, no DB write)
+  const handleEnrichContact = useCallback(async () => {
+    if (!foundContact) return;
+
+    const linkedinUrl = foundContact.linkedinUrl;
+    const email = foundContact.email;
+
+    if (!linkedinUrl && !email) {
+      alert('LinkedIn URL or email is required');
+      return;
+    }
+
+    setEnriching(true);
+    try {
+      const enrichResponse = await api.post('/api/enrich/enrich', {
+        linkedinUrl,
+        email,
+      });
+
+      if (enrichResponse.data?.success && enrichResponse.data.enrichedProfile) {
+        setEnrichedProfile(enrichResponse.data.enrichedProfile);
+        // Update foundContact with enriched data
+        setFoundContact({
+          ...foundContact,
+          ...enrichResponse.data.enrichedProfile,
+        });
+      } else {
+        alert('Enrichment failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Enrichment error:', error);
+      alert(error.response?.data?.details || error.message || 'Failed to enrich contact');
+    } finally {
+      setEnriching(false);
+    }
+  }, [foundContact]);
+
+  // Step 3: Create contact in CRM (user chooses to save)
+  const handleCreateContact = useCallback(async () => {
+    if (!enrichedProfile || !companyHQId) {
+      alert('Enriched profile and company context are required');
+      return;
+    }
+
+    setCreatingContact(true);
+    try {
+      const createResponse = await api.post('/api/enrich/create-contact', {
+        crmId: companyHQId,
+        enrichedProfile,
+        linkedinUrl: foundContact?.linkedinUrl,
+        email: foundContact?.email,
+      });
+
+      if (createResponse.data?.success && createResponse.data.contact) {
+        // Navigate to success or show success message
+        alert(`Contact created successfully! Contact ID: ${createResponse.data.contactId}`);
+        // Reset state
+        setFoundContact(null);
+        setPreviewData(null);
+        setEnrichedProfile(null);
+        setSearchEmail('');
+        setSearchLinkedInUrl('');
+      } else {
+        alert('Failed to create contact. Please try again.');
+      }
+    } catch (error) {
+      console.error('Create contact error:', error);
+      alert(error.response?.data?.details || error.message || 'Failed to create contact');
+    } finally {
+      setCreatingContact(false);
+    }
+  }, [enrichedProfile, companyHQId, foundContact]);
+
+  // Handle enrich action (legacy - for other modes)
   const handleEnrich = useCallback(async () => {
       const contactsToEnrich = [];
       
@@ -755,42 +830,91 @@ export default function EnrichPage() {
                     </div>
                   )}
 
-                  {!foundContact.id && (
+                  {!foundContact.id && !enrichedProfile && (
                     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
                       <div className="flex items-center gap-2 text-sm text-amber-700">
                         <Sparkles className="h-4 w-4" />
-                        <span>New contact - will be created during enrichment</span>
+                        <span>Preview only - not saved to CRM yet</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {enrichedProfile && (
+                    <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
+                      <div className="flex items-center gap-2 text-sm text-green-700">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Enrichment complete - ready to save to CRM</span>
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-center justify-end gap-3 border-t border-blue-200 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setFoundContact(null)}
-                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleEnrich}
-                    disabled={enriching}
-                    className="flex items-center gap-2 rounded-lg bg-cyan-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {enriching ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Enriching...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Confirm & Enrich
-                      </>
-                    )}
-                  </button>
+                  {!enrichedProfile ? (
+                    <>
+                      {/* Step 1: After preview, show "Enrich Contact" button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFoundContact(null);
+                          setPreviewData(null);
+                          setEnrichedProfile(null);
+                        }}
+                        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleEnrichContact}
+                        disabled={enriching}
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {enriching ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Enriching...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            Enrich Contact
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Step 2: After enrichment, show "Create Contact" and "Cancel" buttons */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEnrichedProfile(null);
+                        }}
+                        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateContact}
+                        disabled={creatingContact}
+                        className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {creatingContact ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4" />
+                            Create Contact
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
