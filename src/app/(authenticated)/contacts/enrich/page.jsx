@@ -455,10 +455,10 @@ export default function EnrichPage() {
           >
             <Search className={`mb-3 h-8 w-8 ${mode === 'search' ? 'text-blue-600' : 'text-gray-400'}`} />
             <h3 className="mb-2 text-lg font-semibold text-gray-900">
-              Search Contact
+              Lookup & Enrich
             </h3>
             <p className="text-sm text-gray-600">
-              Search for a contact by email or LinkedIn URL
+              Find contact by email or lookup LinkedIn profile
             </p>
           </button>
 
@@ -512,7 +512,7 @@ export default function EnrichPage() {
         {mode === 'search' && (
           <div className="mb-8 rounded-xl bg-white p-6 shadow-lg">
             <h2 className="mb-4 text-xl font-semibold text-gray-900">
-              Search for a Contact
+              {searchType === 'linkedin' ? 'Lookup LinkedIn Profile' : 'Search for a Contact'}
             </h2>
             
             {/* Search Type Toggle */}
@@ -582,12 +582,12 @@ export default function EnrichPage() {
                 {searching ? (
                   <>
                     <RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />
-                    Searching...
+                    {searchType === 'linkedin' ? 'Looking up...' : 'Searching...'}
                   </>
                 ) : (
                   <>
                     <Search className="mr-2 inline h-4 w-4" />
-                    Search
+                    {searchType === 'linkedin' ? 'Lookup' : 'Search'}
                   </>
                 )}
               </button>
