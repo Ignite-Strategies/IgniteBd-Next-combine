@@ -27,6 +27,7 @@ export default function EnrichPage() {
   const [searchLinkedInUrl, setSearchLinkedInUrl] = useState('');
   const [searching, setSearching] = useState(false);
   const [foundContact, setFoundContact] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
   const [csvFile, setCsvFile] = useState(null);
   const [csvContacts, setCsvContacts] = useState([]);
   const [microsoftContacts, setMicrosoftContacts] = useState([]);
@@ -58,6 +59,7 @@ export default function EnrichPage() {
     }
 
     setSearching(true);
+    setPreviewData(null);
     try {
       if (searchType === 'email') {
         const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(searchEmail)}&companyHQId=${companyHQId}`);
@@ -65,20 +67,74 @@ export default function EnrichPage() {
         if (response.data?.success && response.data.contact) {
           setFoundContact(response.data.contact);
         } else {
-          // Contact not found, create a placeholder for enrichment
-          setFoundContact({
-            email: searchEmail,
-            linkedinUrl: null,
-            id: null, // Will be created during enrichment
-          });
+          // Contact not found, try to get preview from Apollo
+          try {
+            const previewResponse = await api.post('/api/contacts/enrich/preview', {
+              email: searchEmail,
+            });
+            if (previewResponse.data?.success && previewResponse.data.enrichedData) {
+              setPreviewData(previewResponse.data.enrichedData);
+              // Use preview data to populate foundContact
+              setFoundContact({
+                email: previewResponse.data.enrichedData.email || searchEmail,
+                linkedinUrl: previewResponse.data.enrichedData.linkedinUrl || null,
+                firstName: previewResponse.data.enrichedData.firstName,
+                lastName: previewResponse.data.enrichedData.lastName,
+                title: previewResponse.data.enrichedData.title,
+                companyName: previewResponse.data.enrichedData.companyName,
+                id: null, // Will be created during enrichment
+              });
+            } else {
+              setFoundContact({
+                email: searchEmail,
+                linkedinUrl: null,
+                id: null,
+              });
+            }
+          } catch (previewError) {
+            // Preview failed, continue with placeholder
+            setFoundContact({
+              email: searchEmail,
+              linkedinUrl: null,
+              id: null,
+            });
+          }
         }
       } else {
-        // For LinkedIn URL, we'll create a placeholder since we can't search by LinkedIn URL in the database
-        setFoundContact({
-          email: null,
-          linkedinUrl: searchLinkedInUrl,
-          id: null, // Will be created during enrichment
-        });
+        // For LinkedIn URL, fetch preview from Apollo first
+        try {
+          const previewResponse = await api.post('/api/contacts/enrich/preview', {
+            linkedinUrl: searchLinkedInUrl,
+          });
+          if (previewResponse.data?.success && previewResponse.data.enrichedData) {
+            setPreviewData(previewResponse.data.enrichedData);
+            // Use enriched data to populate foundContact
+            setFoundContact({
+              email: previewResponse.data.enrichedData.email || null,
+              linkedinUrl: searchLinkedInUrl,
+              firstName: previewResponse.data.enrichedData.firstName,
+              lastName: previewResponse.data.enrichedData.lastName,
+              title: previewResponse.data.enrichedData.title,
+              companyName: previewResponse.data.enrichedData.companyName,
+              id: null, // Will be created during enrichment
+            });
+          } else {
+            // No preview data, just use placeholder
+            setFoundContact({
+              email: null,
+              linkedinUrl: searchLinkedInUrl,
+              id: null,
+            });
+          }
+        } catch (previewError) {
+          console.error('Preview fetch error:', previewError);
+          // Preview failed, continue with placeholder
+          setFoundContact({
+            email: null,
+            linkedinUrl: searchLinkedInUrl,
+            id: null,
+          });
+        }
       }
     } catch (error) {
       console.error('Error searching contact:', error);
@@ -549,15 +605,31 @@ export default function EnrichPage() {
                     </div>
                   )}
 
-                  {(foundContact.firstName || foundContact.lastName) && (
+                  {(foundContact.firstName || foundContact.lastName || foundContact.title || foundContact.companyName) && (
                     <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
-                      <div className="mb-2 flex items-center gap-2">
-                        <User className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm font-semibold text-gray-700">Name</span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {foundContact.firstName} {foundContact.lastName}
-                      </div>
+                      {(foundContact.firstName || foundContact.lastName) && (
+                        <div className="mb-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <User className="h-5 w-5 text-gray-400" />
+                            <span className="text-sm font-semibold text-gray-700">Name</span>
+                          </div>
+                          <div className="text-base font-semibold text-gray-900">
+                            {foundContact.firstName} {foundContact.lastName}
+                          </div>
+                        </div>
+                      )}
+                      {foundContact.title && (
+                        <div className="mb-2">
+                          <div className="text-sm font-semibold text-gray-700">Title</div>
+                          <div className="text-sm text-gray-600">{foundContact.title}</div>
+                        </div>
+                      )}
+                      {foundContact.companyName && (
+                        <div>
+                          <div className="text-sm font-semibold text-gray-700">Company</div>
+                          <div className="text-sm text-gray-600">{foundContact.companyName}</div>
+                        </div>
+                      )}
                     </div>
                   )}
 
