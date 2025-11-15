@@ -161,8 +161,15 @@ export async function searchPersonByEmail(email: string): Promise<ApolloPersonMa
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Apollo API error: ${response.status} - ${errorText}`);
+      let errorMessage = `Apollo API error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch {
+        const errorText = await response.text();
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
     const data: ApolloPersonMatchResponse = await response.json();
@@ -218,8 +225,15 @@ export async function searchPersonByLinkedInUrl(linkedinUrl: string): Promise<Ap
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Apollo API error: ${response.status} - ${errorText}`);
+      let errorMessage = `Apollo API error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch {
+        const errorText = await response.text();
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
     const data: ApolloPersonMatchResponse = await response.json();

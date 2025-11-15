@@ -92,12 +92,19 @@ export default function EnrichPage() {
               });
             }
           } catch (previewError) {
-            // Preview failed, continue with placeholder
+            // Preview failed, log error and continue with placeholder
+            console.error('Preview fetch error:', previewError);
             setFoundContact({
               email: searchEmail,
               linkedinUrl: null,
               id: null,
             });
+            // Show error to user
+            if (previewError.response?.data?.details) {
+              alert(`Preview failed: ${previewError.response.data.details}`);
+            } else if (previewError.message) {
+              alert(`Preview failed: ${previewError.message}`);
+            }
           }
         }
       } else {
@@ -134,6 +141,12 @@ export default function EnrichPage() {
             linkedinUrl: searchLinkedInUrl,
             id: null,
           });
+          // Show error to user
+          if (previewError.response?.data?.details) {
+            alert(`Preview failed: ${previewError.response.data.details}`);
+          } else if (previewError.message) {
+            alert(`Preview failed: ${previewError.message}`);
+          }
         }
       }
     } catch (error) {
