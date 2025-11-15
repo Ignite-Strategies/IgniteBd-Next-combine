@@ -143,22 +143,23 @@ export default function EnrichPage() {
           }
         }
       } else {
-        // For LinkedIn URL, use EXTERNAL preview endpoint (NOT DB lookup)
+        // For LinkedIn URL, use EXTERNAL preview endpoint ONLY (NO DB lookup)
+        // This person does NOT exist in CRM yet - they are external
         try {
           const previewResponse = await api.post('/api/enrich/preview', {
             linkedinUrl: searchLinkedInUrl,
           });
           if (previewResponse.data?.success && previewResponse.data.preview) {
             setPreviewData(previewResponse.data.preview);
-            // Use preview data to populate foundContact
+            // Use preview data to populate foundContact (external person, no contactId)
             setFoundContact({
-              email: previewResponse.data.preview.email || null,
+              email: previewResponse.data.preview.email || null, // May be null from MATCH endpoint
               linkedinUrl: searchLinkedInUrl,
               firstName: previewResponse.data.preview.firstName,
               lastName: previewResponse.data.preview.lastName,
               title: previewResponse.data.preview.title,
               companyName: previewResponse.data.preview.companyName,
-              id: null, // Will be created during enrichment via /api/enrich/confirm
+              id: null, // Does NOT exist in CRM - will be created during enrichment
             });
           } else {
             // No preview data, just use placeholder
@@ -367,11 +368,11 @@ export default function EnrichPage() {
             }
           } else if (linkedinUrl) {
             // For LinkedIn URL, use EXTERNAL confirm endpoint (enrich + upsert)
-            // This creates/updates contact AFTER enrichment succeeds
+            // This person does NOT exist in CRM - will be created AFTER enrichment succeeds
+            // Do NOT pass preview email (it's fake/placeholder from MATCH endpoint)
             const confirmResponse = await api.post('/api/enrich/confirm', {
               crmId: companyHQId,
-              linkedinUrl,
-              preview: previewData, // Pass preview data if available
+              linkedinUrl, // Only pass linkedinUrl - enrichment will get real data
             });
 
             if (confirmResponse.data?.success) {

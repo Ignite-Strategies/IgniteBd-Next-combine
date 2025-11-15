@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { crmId, linkedinUrl, preview } = body;
+    const { crmId, linkedinUrl } = body;
 
     // Validate inputs
     if (!crmId) {
@@ -76,9 +76,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Call Apollo ENRICHMENT using /people/enrich (deep lookup)
+    // Step 1: Call Apollo ENRICHMENT using ONLY linkedinUrl (do NOT use email)
+    // This person is NOT a CRM contact yet - they don't exist in our database
     let enrichedData: NormalizedContactData;
     try {
+      // ONLY enrich by linkedinUrl - do NOT use email from preview (it's fake/placeholder)
       const apolloResponse = await enrichPerson({ linkedinUrl });
       enrichedData = normalizeApolloResponse(apolloResponse);
     } catch (error: any) {
@@ -93,13 +95,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Use email from enriched data, or fall back to preview email
-    const enrichedEmail = enrichedData.email || preview?.email;
+    // Step 2: Use ONLY enriched data from Apollo (real data, not preview placeholders)
+    const enrichedEmail = enrichedData.email; // Use only real email from enrichment, ignore preview
     
     // Prepare upsert data from enriched fields
     const enrichedFields: any = {
       crmId,
-      linkedinUrl: enrichedData.linkedinUrl || linkedinUrl,
+      linkedinUrl: linkedinUrl, // Always use the provided linkedinUrl
       enrichmentSource: 'Apollo',
       enrichmentFetchedAt: new Date(),
       enrichmentPayload: enrichedData,
@@ -119,7 +121,7 @@ export async function POST(request: Request) {
     if (enrichedData.companyName !== undefined) enrichedFields.companyName = enrichedData.companyName;
     if (enrichedData.companyDomain !== undefined) enrichedFields.companyDomain = enrichedData.companyDomain;
 
-    // Set email if available (normalize to lowercase)
+    // Set email if available from enriched data (normalize to lowercase)
     if (enrichedEmail) {
       enrichedFields.email = enrichedEmail.toLowerCase();
       // Extract domain from email if no company domain
@@ -133,28 +135,14 @@ export async function POST(request: Request) {
       enrichedFields.domain = enrichedData.companyDomain;
     }
 
-    // UPSERT contact based on linkedinUrl OR email
-    // First, try to find existing contact by linkedinUrl or email
-    let existingContact = null;
-    
-    if (linkedinUrl) {
-      existingContact = await prisma.contact.findFirst({
-        where: {
-          crmId,
-          OR: [
-            { linkedinUrl: linkedinUrl },
-            ...(enrichedEmail ? [{ email: enrichedEmail.toLowerCase() }] : []),
-          ],
-        },
-      });
-    } else if (enrichedEmail) {
-      existingContact = await prisma.contact.findFirst({
-        where: {
-          crmId,
-          email: enrichedEmail.toLowerCase(),
-        },
-      });
-    }
+    // Step 3: UPSERT contact AFTER enrichment succeeds
+    // Use linkedinUrl + crmId to find existing contact (this person does NOT exist in CRM until now)
+    const existingContact = await prisma.contact.findFirst({
+      where: {
+        crmId,
+        linkedinUrl: linkedinUrl,
+      },
+    });
 
     let contact;
     if (existingContact) {
@@ -170,7 +158,7 @@ export async function POST(request: Request) {
       });
       console.log(`✅ Contact updated via enrichment: ${contact.id}`);
     } else {
-      // Create new contact
+      // Create new contact (this person did NOT exist in CRM before)
       contact = await prisma.contact.create({
         data: enrichedFields,
         include: {
