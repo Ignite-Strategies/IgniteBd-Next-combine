@@ -504,9 +504,9 @@ export default function EnrichPage() {
             </div>
 
             {foundContact && (
-              <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="mt-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     {foundContact.firstName || foundContact.lastName ? (
                       <div className="font-semibold text-gray-900">
                         {foundContact.firstName} {foundContact.lastName}
@@ -533,13 +533,33 @@ export default function EnrichPage() {
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setFoundContact(null)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleEnrich}
+                      disabled={enriching}
+                      className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {enriching ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Enriching...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Enrich Now
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFoundContact(null)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
