@@ -28,7 +28,7 @@ model Owner {
   managedCompanies CompanyHQ[]     @relation("ManagerOf")
   ownedCompanies   CompanyHQ[]     @relation("OwnerOf")
   emailActivities  EmailActivity[] // Outreach email tracking
-  assessments      Assessment[]    // Growth assessments
+  assessments      Assessment[] // Growth assessments
 
   @@map("owners")
 }
@@ -55,28 +55,28 @@ model EmailActivity {
 }
 
 model CompanyHQ {
-  id               String        @id @default(cuid())
-  companyName      String
-  companyStreet    String? // Street address
-  companyCity      String? // City
-  companyState     String? // State
-  companyWebsite   String? // Website URL (for LinkedIn extraction, etc.)
-  whatYouDo        String? // What the company does (description)
-  companyIndustry  String?
-  companyAnnualRev Float?
-  yearsInBusiness  Int?
-  teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  ownerId          String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
-  contactOwnerId   String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
-  managerId        String?
-  companies        Company[]
-  manager          Owner?        @relation("ManagerOf", fields: [managerId], references: [id])
-  owner            Owner?       @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
-  contactOwner     Contact?      @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id]) // Contact who owns this HQ
-  contactLists     ContactList[]
-  contacts         Contact[]
+  id                   String                  @id @default(cuid())
+  companyName          String
+  companyStreet        String? // Street address
+  companyCity          String? // City
+  companyState         String? // State
+  companyWebsite       String? // Website URL (for LinkedIn extraction, etc.)
+  whatYouDo            String? // What the company does (description)
+  companyIndustry      String?
+  companyAnnualRev     Float?
+  yearsInBusiness      Int?
+  teamSize             String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  ownerId              String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
+  contactOwnerId       String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
+  managerId            String?
+  companies            Company[]
+  manager              Owner?                  @relation("ManagerOf", fields: [managerId], references: [id])
+  owner                Owner?                  @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
+  contactOwner         Contact?                @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id]) // Contact who owns this HQ
+  contactLists         ContactList[]
+  contacts             Contact[]
   proposals            Proposal[]
   products             Product[]
   personas             Persona[]
@@ -97,7 +97,7 @@ model CompanyHQ {
 }
 
 model Company {
-  id              String     @id @default(cuid())
+  id              String        @id @default(cuid())
   companyHQId     String
   companyName     String
   address         String?
@@ -108,9 +108,9 @@ model Company {
   proposalId      String?
   contractId      String?
   invoiceId       String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  companyHQ       CompanyHQ  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  companyHQ       CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   contacts        Contact[]
   proposals       Proposal[] // Proposals linked to this company
   workPackages    WorkPackage[] // Work packages for this company
@@ -133,13 +133,13 @@ model ContactList {
 }
 
 model Contact {
-  id                  String       @id @default(cuid())
+  id                  String    @id @default(cuid())
   crmId               String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
   firstName           String?
   lastName            String?
   fullName            String? // Full name from enrichment
   goesBy              String?
-  email               String?  @unique
+  email               String?   @unique
   phone               String?
   title               String?
   seniority           String? // Seniority level from enrichment
@@ -160,28 +160,28 @@ model Contact {
   enrichmentFetchedAt DateTime? // When enrichment was fetched
   enrichmentPayload   Json? // Full enrichment payload
   createdById         String? // User who created this contact
-  
+
   // Client Portal Activation
-  firebaseUid         String?  @unique // Firebase Auth UID
-  clientPortalUrl    String?  @default("https://clientportal.ignitegrowth.biz") // Portal URL for this contact
-  isActivated        Boolean  @default(false) // Has completed activation flow
-  activatedAt        DateTime? // When activation was completed
-  
+  firebaseUid     String?   @unique // Firebase Auth UID
+  clientPortalUrl String?   @default("https://clientportal.ignitegrowth.biz") // Portal URL for this contact
+  isActivated     Boolean   @default(false) // Has completed activation flow
+  activatedAt     DateTime? // When activation was completed
+
   // Elevation to Owner
-  ownerId             String? // Contact.id (self-reference when they become owner of their own HQ)
-  role                String   @default("contact") // "contact" | "owner"
-  
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-  companyHQ           CompanyHQ    @relation(fields: [crmId], references: [id])
-  contactCompany      Company?     @relation(fields: [contactCompanyId], references: [id])
-  contactList         ContactList? @relation(fields: [contactListId], references: [id])
-  pipeline            Pipeline?
-  deliverables        ConsultantDeliverable[]
-  invites             InviteToken[] // Invite tokens for activation
-  ownedHQs            CompanyHQ[]  @relation("ContactOwnedHQs") // HQs owned by this Contact
-  proposals           Proposal[] // Proposals for this contact
-  workPackages        WorkPackage[] // Work packages for this contact
+  ownerId String? // Contact.id (self-reference when they become owner of their own HQ)
+  role    String  @default("contact") // "contact" | "owner"
+
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  companyHQ      CompanyHQ               @relation(fields: [crmId], references: [id])
+  contactCompany Company?                @relation(fields: [contactCompanyId], references: [id])
+  contactList    ContactList?            @relation(fields: [contactListId], references: [id])
+  pipeline       Pipeline?
+  deliverables   ConsultantDeliverable[]
+  invites        InviteToken[] // Invite tokens for activation
+  ownedHQs       CompanyHQ[]             @relation("ContactOwnedHQs") // HQs owned by this Contact
+  proposals      Proposal[] // Proposals for this contact
+  workPackages   WorkPackage[] // Work packages for this contact
   // Note: memberships are queried via firebaseUid, not direct relation (due to nullable firebaseUid)
 
   @@index([email])
@@ -193,15 +193,15 @@ model Contact {
 }
 
 model DomainRegistry {
-  id              String     @id @default(cuid())
-  domain          String     @unique // Normalized domain (e.g., "businesspointlaw.com")
+  id              String   @id @default(cuid())
+  domain          String   @unique // Normalized domain (e.g., "businesspointlaw.com")
   normalizedName  String? // Normalized company name (e.g., "Business Point Law")
-  companyHqId     String     @unique // CompanyHQ this domain belongs to
-  firstSeen       DateTime   @default(now())
-  lastSeen        DateTime   @updatedAt
-  confidenceScore Float?     @default(1.0) // Confidence that this domain belongs to this CompanyHQ
+  companyHqId     String   @unique // CompanyHQ this domain belongs to
+  firstSeen       DateTime @default(now())
+  lastSeen        DateTime @updatedAt
+  confidenceScore Float?   @default(1.0) // Confidence that this domain belongs to this CompanyHQ
 
-  companyHQ       CompanyHQ  @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
+  companyHQ CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
 
   @@index([domain])
   @@index([companyHqId])
@@ -209,13 +209,13 @@ model DomainRegistry {
 }
 
 model Product {
-  id                    String    @id @default(cuid())
+  id                    String       @id @default(cuid())
   companyHQId           String
   name                  String
   description           String?
   valueProp             String?
   price                 Float? // Price in base currency
-  priceCurrency         String?   @default("USD") // Currency code (USD, EUR, etc.)
+  priceCurrency         String?      @default("USD") // Currency code (USD, EUR, etc.)
   pricingModel          String? // one-time, recurring, usage-based, freemium, custom
   category              String? // Category or type of product/service
   deliveryTimeline      String? // How long it takes to deliver
@@ -224,10 +224,11 @@ model Product {
   features              String? // Key features (free text)
   competitiveAdvantages String? // Competitive advantages (free text)
   targetedTo            String? // Persona ID that this product is targeted to
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  companyHQ             CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  companyHQ             CompanyHQ    @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   personas              Persona[]
+  productFits           ProductFit[]
 
   @@map("products")
 }
@@ -245,96 +246,96 @@ model Pipeline {
 }
 
 model Proposal {
-  id             String    @id @default(cuid())
-  title          String
-  companyHQId    String // Multi-tenancy - scoped to CompanyHQ (hqId)
-  companyHQ      CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  
+  id          String    @id @default(cuid())
+  title       String
+  companyHQId String // Multi-tenancy - scoped to CompanyHQ (hqId)
+  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
   // Client information
-  contactId      String
-  contact        Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  companyId      String
-  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   // Proposal details
   estimatedStart DateTime
-  status         String    @default("draft") // "draft" | "active" | "approved" | "rejected"
+  status         String   @default("draft") // "draft" | "active" | "approved" | "rejected"
   totalPrice     Float?
-  purpose        String?   // Purpose/description of the proposal
-  
+  purpose        String? // Purpose/description of the proposal
+
   // Legacy JSON fields (for backward compatibility during migration)
-  phases           Json? // DEPRECATED: Use ProposalPhase relation instead
-  milestones       Json? // DEPRECATED
-  compensation     Json? // Compensation object (total, currency, breakdown, paymentSchedule)
-  
+  phases       Json? // DEPRECATED: Use ProposalPhase relation instead
+  milestones   Json? // DEPRECATED
+  compensation Json? // Compensation object (total, currency, breakdown, paymentSchedule)
+
   // Metadata
-  dateIssued       DateTime?
-  preparedBy       String?
-  
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  proposalPhases   ProposalPhase[]
-  deliverables     ConsultantDeliverable[]
+  dateIssued DateTime?
+  preparedBy String?
+
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  proposalPhases ProposalPhase[]
+  deliverables   ConsultantDeliverable[]
 
   @@map("proposals")
 }
 
 model PhaseTemplate {
-  id                String                    @id @default(cuid())
-  companyHQId       String
-  companyHQ         CompanyHQ                @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  name              String
-  description       String?
-  defaultDurationWeeks Int?                   @default(3)
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  phaseDeliverables PhaseDeliverableTemplate[]
-  proposalPhases    ProposalPhase[]
+  id                   String                     @id @default(cuid())
+  companyHQId          String
+  companyHQ            CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  name                 String
+  description          String?
+  defaultDurationWeeks Int?                       @default(3)
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  phaseDeliverables    PhaseDeliverableTemplate[]
+  proposalPhases       ProposalPhase[]
 
   @@map("phase_templates")
 }
 
 model DeliverableTemplate {
-  id                String                    @id @default(cuid())
-  companyHQId       String
-  companyHQ         CompanyHQ                 @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  name              String
-  description       String?
-  defaultQuantity   Int?                      @default(1)
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  phaseDeliverables PhaseDeliverableTemplate[]
+  id                   String                     @id @default(cuid())
+  companyHQId          String
+  companyHQ            CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  name                 String
+  description          String?
+  defaultQuantity      Int?                       @default(1)
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  phaseDeliverables    PhaseDeliverableTemplate[]
   proposalDeliverables ProposalDeliverable[]
 
   @@map("deliverable_templates")
 }
 
 model PhaseDeliverableTemplate {
-  id                String              @id @default(cuid())
-  phaseTemplateId   String
+  id                    String              @id @default(cuid())
+  phaseTemplateId       String
   deliverableTemplateId String
-  phaseTemplate     PhaseTemplate       @relation(fields: [phaseTemplateId], references: [id], onDelete: Cascade)
-  deliverableTemplate DeliverableTemplate @relation(fields: [deliverableTemplateId], references: [id], onDelete: Cascade)
-  defaultQuantity   Int?                @default(1)
-  order             Int?                 @default(0)
-  createdAt         DateTime             @default(now())
+  phaseTemplate         PhaseTemplate       @relation(fields: [phaseTemplateId], references: [id], onDelete: Cascade)
+  deliverableTemplate   DeliverableTemplate @relation(fields: [deliverableTemplateId], references: [id], onDelete: Cascade)
+  defaultQuantity       Int?                @default(1)
+  order                 Int?                @default(0)
+  createdAt             DateTime            @default(now())
 
   @@unique([phaseTemplateId, deliverableTemplateId])
   @@map("phase_deliverable_templates")
 }
 
 model ProposalPhase {
-  id              String              @id @default(cuid())
+  id              String                @id @default(cuid())
   proposalId      String
-  proposal        Proposal             @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  proposal        Proposal              @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   phaseTemplateId String?
-  phaseTemplate   PhaseTemplate?      @relation(fields: [phaseTemplateId], references: [id], onDelete: SetNull)
+  phaseTemplate   PhaseTemplate?        @relation(fields: [phaseTemplateId], references: [id], onDelete: SetNull)
   name            String
   description     String?
   durationWeeks   Int
   order           Int
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
   deliverables    ProposalDeliverable[]
 
   @@index([proposalId])
@@ -342,79 +343,124 @@ model ProposalPhase {
 }
 
 model ProposalDeliverable {
-  id                String            @id @default(cuid())
-  proposalPhaseId   String
-  proposalPhase     ProposalPhase     @relation(fields: [proposalPhaseId], references: [id], onDelete: Cascade)
+  id                    String               @id @default(cuid())
+  proposalPhaseId       String
+  proposalPhase         ProposalPhase        @relation(fields: [proposalPhaseId], references: [id], onDelete: Cascade)
   deliverableTemplateId String?
   deliverableTemplate   DeliverableTemplate? @relation(fields: [deliverableTemplateId], references: [id], onDelete: SetNull)
-  name              String
-  description       String?
-  quantity          Int               @default(1)
-  order             Int?              @default(0)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  name                  String
+  description           String?
+  quantity              Int                  @default(1)
+  order                 Int?                 @default(0)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
   @@index([proposalPhaseId])
   @@map("proposal_deliverables")
 }
 
 model Persona {
-  id                 String    @id @default(cuid())
-  companyHQId        String
-  name               String
-  role               String?
-  title              String?
-  industry           String?
-  goals              String?
-  painPoints         String?
-  desiredOutcome     String?
-  valuePropToPersona String?
-  alignmentScore     Int?
-  productId          String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  companyHQ          CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  product            Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  id              String      @id @default(cuid())
+  companyHQId     String
+  name            String
+  role            String?
+  title           String?
+  headline        String? // LinkedIn headline (self-identifier)
+  seniority       String?
+  industry        String?
+  subIndustries   Json? // Array of sub-industries
+  company         String? // Company name
+  companySize     String?
+  annualRevenue   String?
+  location        String?
+  description     String? // Persona description
+  whatTheyWant    String? // Single distillation of intent (replaces goals)
+  painPoints      Json? // Array of pain points
+  risks           Json? // Array of risks
+  decisionDrivers Json? // Array of decision drivers
+  workflows       Json? // Array of workflows
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  companyHQ       CompanyHQ   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  productFit      ProductFit?
+  bdIntel         BdIntel?
+  product         Product?    @relation(fields: [productId], references: [id])
+  productId       String?
 
   @@map("personas")
 }
 
+model ProductFit {
+  id                 String   @id @default(cuid())
+  personaId          String   @unique
+  productId          String
+  valuePropToThem    String
+  alignmentReasoning String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  persona            Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_fits")
+}
+
+model BdIntel {
+  id                    String   @id @default(cuid())
+  personaId             String   @unique
+  fitScore              Int // 0-100
+  painAlignmentScore    Int // 0-100
+  workflowFitScore      Int // 0-100
+  urgencyScore          Int // 0-100
+  adoptionBarrierScore  Int // 0-100
+  risks                 Json? // Array of risks
+  opportunities         Json? // Array of opportunities
+  recommendedTalkTrack  String?
+  recommendedSequence   String?
+  recommendedLeadSource String?
+  finalSummary          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  persona               Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@map("bd_intels")
+}
+
 model ConsultantDeliverable {
-  id          String   @id @default(cuid())
-  contactId   String   // Link to Contact (the client)
-  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  
+  id        String  @id @default(cuid())
+  contactId String // Link to Contact (the client)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
   // What we're delivering
   title       String
   description String?
   category    String? // "foundation", "integration", "enrichment", etc.
   type        String? // "persona", "blog", "upload", etc. - deliverable type
-  
+
   // Work content (stored as JSON for flexibility)
   workContent Json? // Actual work artifact (persona data, blog content, etc.)
-  
+
   // Status tracking
-  status      String   @default("pending") // "pending" | "in-progress" | "completed" | "blocked"
-  
+  status String @default("pending") // "pending" | "in-progress" | "completed" | "blocked"
+
   // Link to proposal/milestone (optional - can start fresh)
   proposalId  String?
   proposal    Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
   milestoneId String? // Reference to milestone in Proposal.milestones JSON (e.g., "milestone-1", "week-4")
-  
+
   // Delivery tracking
   dueDate     DateTime?
   completedAt DateTime?
   notes       String?
-  
+
   // Tenant scoping (for client delivery architecture)
-  companyHQId     String   // Always linked to owner's company (tenant boundary)
-  companyHQ       CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  companyHQId      String // Always linked to owner's company (tenant boundary)
+  companyHQ        CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   contactCompanyId String? // Link to contact's company (can derive from contact.contactCompanyId)
-  
+
   // Metadata
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([contactId])
   @@index([proposalId])
   @@index([companyHQId])
@@ -436,23 +482,23 @@ enum WorkItemType {
 }
 
 model WorkPackage {
-  id               String            @id @default(cuid())
+  id               String     @id @default(cuid())
   contactId        String
-  contact          Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact          Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
   contactCompanyId String?
-  contactCompany   Company?          @relation(fields: [contactCompanyId], references: [id], onDelete: SetNull)
+  contactCompany   Company?   @relation(fields: [contactCompanyId], references: [id], onDelete: SetNull)
   companyHQId      String?
-  companyHQ        CompanyHQ?        @relation(fields: [companyHQId], references: [id], onDelete: SetNull)
-  
-  title            String
-  description      String?
-  status           WorkPackageStatus @default(ACTIVE)
-  
-  items            WorkPackageItem[]
-  
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  
+  companyHQ        CompanyHQ? @relation(fields: [companyHQId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?
+  status      WorkPackageStatus @default(ACTIVE)
+
+  items WorkPackageItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([contactId])
   @@index([contactCompanyId])
   @@index([companyHQId])
@@ -460,26 +506,26 @@ model WorkPackage {
 }
 
 model WorkPackageItem {
-  id              String          @id @default(cuid())
-  workPackageId   String
-  workPackage     WorkPackage     @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
-  
+  id            String      @id @default(cuid())
+  workPackageId String
+  workPackage   WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+
   // Human-facing label
-  deliverableName String          // e.g. "Blog Posts", "Personas"
+  deliverableName String // e.g. "Blog Posts", "Personas"
   type            WorkItemType
-  quantity        Int             // number owed
-  
+  quantity        Int // number owed
+
   // Actual artifacts produced (arrays of artifact IDs)
-  blogIds          String[]       @default([])
-  personaIds       String[]       @default([])
-  templateIds      String[]       @default([])
-  eventPlanIds    String[]       @default([])
-  cleDeckIds       String[]       @default([])
-  landingPageIds   String[]       @default([])
-  
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  
+  blogIds        String[] @default([])
+  personaIds     String[] @default([])
+  templateIds    String[] @default([])
+  eventPlanIds   String[] @default([])
+  cleDeckIds     String[] @default([])
+  landingPageIds String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([workPackageId])
   @@index([type])
   @@map("work_package_items")
@@ -510,7 +556,7 @@ model Template {
   name        String
   subject     String?
   body        String?
-  type        String?   // "email", "sms", etc.
+  type        String? // "email", "sms", etc.
   published   Boolean   @default(false)
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -545,7 +591,7 @@ model CleDeck {
   companyHQId String
   companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   title       String
-  slides      Json?     // Array of slide objects
+  slides      Json? // Array of slide objects
   presenter   String?
   description String?
   published   Boolean   @default(false)
@@ -564,7 +610,7 @@ model LandingPage {
   companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   title       String
   url         String?
-  content     Json?     // Page content structure
+  content     Json? // Page content structure
   description String?
   published   Boolean   @default(false)
   publishedAt DateTime?
@@ -592,33 +638,33 @@ model ProspectCandidate {
 }
 
 model Assessment {
-  id                   String   @id @default(cuid())
-  ownerId              String
-  owner                Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  companyHQId          String?  // Optional: Link to CompanyHQ
-  companyHQ            CompanyHQ? @relation(fields: [companyHQId], references: [id], onDelete: SetNull)
-  
+  id          String     @id @default(cuid())
+  ownerId     String
+  owner       Owner      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  companyHQId String? // Optional: Link to CompanyHQ
+  companyHQ   CompanyHQ? @relation(fields: [companyHQId], references: [id], onDelete: SetNull)
+
   // Assessment responses
   name                 String
   company              String
   industry             String?
-  workTooMuch          String?  // "always" | "often" | "sometimes" | "rarely"
-  assignTasks          String?  // "never" | "rarely" | "sometimes" | "always"
-  wantMoreClients      String?  // "yes" | "maybe" | "no"
-  revenueGrowthPercent Float?   // Percentage (e.g., 25 for 25%)
-  totalVolume          Float?   // Total revenue/volume
-  bdSpend              Float?   // Business development spend
-  
+  workTooMuch          String? // "always" | "often" | "sometimes" | "rarely"
+  assignTasks          String? // "never" | "rarely" | "sometimes" | "always"
+  wantMoreClients      String? // "yes" | "maybe" | "no"
+  revenueGrowthPercent Float? // Percentage (e.g., 25 for 25%)
+  totalVolume          Float? // Total revenue/volume
+  bdSpend              Float? // Business development spend
+
   // Calculated results
-  score                Int?     // 0-100 score
-  scoreInterpretation  String?  // "High Growth Potential" | "Medium Growth Potential" | etc.
-  relateWithUser       String?  // First paragraph of insights
-  growthNeeds          String?  // Second paragraph of insights
-  rawGptResponse       String?  // Full GPT response
-  
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  
+  score               Int? // 0-100 score
+  scoreInterpretation String? // "High Growth Potential" | "Medium Growth Potential" | etc.
+  relateWithUser      String? // First paragraph of insights
+  growthNeeds         String? // Second paragraph of insights
+  rawGptResponse      String? // Full GPT response
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([ownerId])
   @@index([companyHQId])
   @@map("assessments")
@@ -639,15 +685,15 @@ model ClientUpload {
 }
 
 model InviteToken {
-  id          String   @id @default(cuid())
-  contactId   String
-  email       String
-  token       String   @unique
-  expiresAt   DateTime
-  used        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  contactId String
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
 
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([contactId])
@@ -656,20 +702,20 @@ model InviteToken {
 }
 
 model CompanyMembership {
-  id           String   @id @default(cuid())
-  userId       String   // Contact.firebaseUid (maps to Firebase Auth UID) - stored as string
-  companyHqId  String
-  role         String   // "client" | "owner" | "admin"
-  isPrimary    Boolean  @default(false) // Primary HQ for this user
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String // Contact.firebaseUid (maps to Firebase Auth UID) - stored as string
+  companyHqId String
+  role        String // "client" | "owner" | "admin"
+  isPrimary   Boolean  @default(false) // Primary HQ for this user
+  createdAt   DateTime @default(now())
 
   // Note: userId stores firebaseUid as string - query Contact manually via firebaseUid
   // Prisma doesn't support relations on nullable unique fields easily
-  companyHQ    CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
+  companyHQ CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, companyHqId]) // Prevent duplicate memberships
   @@index([userId])
   @@index([companyHqId])
   @@index([userId, companyHqId])
-  @@unique([userId, companyHqId]) // Prevent duplicate memberships
   @@map("company_memberships")
 }

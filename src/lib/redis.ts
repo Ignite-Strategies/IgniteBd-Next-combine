@@ -82,13 +82,16 @@ export async function storeEnrichedContact(
 /**
  * Get enriched contact data from Redis
  * 
- * @param linkedinUrl - LinkedIn URL (used as key)
+ * @param keyOrLinkedInUrl - Redis key (e.g., "apollo:enriched:...") or LinkedIn URL
  * @returns Promise<any | null> - Enriched data or null
  */
-export async function getEnrichedContact(linkedinUrl: string): Promise<any | null> {
+export async function getEnrichedContact(keyOrLinkedInUrl: string): Promise<any | null> {
   try {
     const redisClient = getRedis();
-    const key = `apollo:enriched:${linkedinUrl}`;
+    // If it's already a full Redis key, use it; otherwise construct the key
+    const key = keyOrLinkedInUrl.startsWith('apollo:enriched:') 
+      ? keyOrLinkedInUrl 
+      : `apollo:enriched:${keyOrLinkedInUrl}`;
     const data = await redisClient.get(key);
     
     if (!data) {

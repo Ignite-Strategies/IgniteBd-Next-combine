@@ -29,13 +29,21 @@ export async function GET(request, { params }) {
     const persona = await prisma.persona.findUnique({
       where: { id: personaId },
       include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            valueProp: true,
+        productFit: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                valueProp: true,
+                description: true,
+                price: true,
+                priceCurrency: true,
+              },
+            },
           },
         },
+        bdIntel: true,
         companyHQ: {
           select: {
             id: true,

@@ -83,11 +83,13 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
     const contactOrg =
       contact.contactCompany?.companyName || 'Not specified';
     
-    // Get goals and pain points from persona (founder's manual input) or contact notes
+    // Get goals, pain points, desired outcome, and value prop from persona (founder's manual input) or contact notes
     // These are stored as free text in DB - can include dashes, newlines, bullet points
     // OpenAI handles this formatted text just fine
     const contactGoals = persona?.goals || contact.notes || 'Not specified';
     const contactPainPoints = persona?.painPoints || 'Not specified';
+    const contactDesiredOutcome = persona?.desiredOutcome || 'Not specified';
+    const contactValuePropToPersona = persona?.valuePropToPersona || 'Not specified';
     
     const budgetSensitivity = inferBudgetSensitivity(
       pipeline?.stage,
@@ -103,7 +105,7 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
       : 'Not specified';
 
     // Build the user prompt - matching exact template structure
-    // Free text fields (goals, painPoints) are inserted as-is - OpenAI handles formatted text well
+    // Free text fields (goals, painPoints, desiredOutcome, valuePropToPersona) are inserted as-is - OpenAI handles formatted text well
     const userPrompt = `Offer:
 Title: ${product.name}
 Value Prop: ${product.valueProp || product.description || 'Not specified'}
@@ -115,6 +117,8 @@ Role: ${contactRole}
 Organization: ${contactOrg}
 Goals: ${contactGoals}
 Pain Points: ${contactPainPoints}
+Desired Outcome: ${contactDesiredOutcome}
+Value Prop to Persona: ${contactValuePropToPersona}
 Budget Sensitivity: ${budgetSensitivity}
 Pipeline: ${pipelineName}
 Stage: ${stageName}

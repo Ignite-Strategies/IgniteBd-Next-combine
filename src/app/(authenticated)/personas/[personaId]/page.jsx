@@ -19,8 +19,9 @@ export default function PersonaDetailPage({ params }) {
         setLoading(true);
         const response = await api.get(`/api/personas/${params.personaId}`);
         if (!isMounted) return;
-        if (response.data?.persona) {
-          setPersona(response.data.persona);
+        // API returns persona directly, not wrapped in data.persona
+        if (response.data) {
+          setPersona(response.data);
         } else {
           setError('Persona not found.');
         }
@@ -105,8 +106,44 @@ export default function PersonaDetailPage({ params }) {
             <dl className="space-y-3 text-sm text-gray-600">
               <div>
                 <dt className="font-semibold text-gray-700">Role</dt>
-                <dd>{persona.role || 'Not captured yet'}</dd>
+                <dd>{persona.role || persona.title || 'Not captured yet'}</dd>
               </div>
+              {persona.headline && (
+                <div>
+                  <dt className="font-semibold text-gray-700">Headline</dt>
+                  <dd>{persona.headline}</dd>
+                </div>
+              )}
+              {persona.seniority && (
+                <div>
+                  <dt className="font-semibold text-gray-700">Seniority</dt>
+                  <dd>{persona.seniority}</dd>
+                </div>
+              )}
+              {persona.industry && (
+                <div>
+                  <dt className="font-semibold text-gray-700">Industry</dt>
+                  <dd>{persona.industry}</dd>
+                </div>
+              )}
+              {persona.company && (
+                <div>
+                  <dt className="font-semibold text-gray-700">Company</dt>
+                  <dd>{persona.company}</dd>
+                </div>
+              )}
+              {persona.companySize && (
+                <div>
+                  <dt className="font-semibold text-gray-700">Company Size</dt>
+                  <dd>{persona.companySize}</dd>
+                </div>
+              )}
+              {persona.location && (
+                <div>
+                  <dt className="font-semibold text-gray-700">Location</dt>
+                  <dd>{persona.location}</dd>
+                </div>
+              )}
               <div>
                 <dt className="font-semibold text-gray-700">Company Context</dt>
                 <dd>{persona.companyHQ?.companyName || 'Linked to company HQ'}</dd>
@@ -120,12 +157,64 @@ export default function PersonaDetailPage({ params }) {
               Persona Narrative
             </h3>
             <div className="space-y-4 text-sm text-gray-700">
-              <FieldBlock label="Goals" value={persona.goals} />
-              <FieldBlock label="Pain Points" value={persona.painPoints} />
-              <FieldBlock
-                label="What They Expect From Ignite"
-                value={persona.valuePropToPersona}
-              />
+              {persona.description && (
+                <FieldBlock label="Description" value={persona.description} />
+              )}
+              <FieldBlock label="What They Want" value={persona.whatTheyWant} />
+              {persona.painPoints && (
+                <div>
+                  <p className="font-semibold text-gray-800">Pain Points</p>
+                  <div className="mt-1 text-sm text-gray-600">
+                    {Array.isArray(persona.painPoints) ? (
+                      <ul className="list-disc list-inside space-y-1">
+                        {persona.painPoints.map((point, idx) => (
+                          <li key={idx}>{point}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>{persona.painPoints || 'Fill this in to strengthen targeting.'}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {persona.productFit && (
+                <div>
+                  <p className="font-semibold text-gray-800">Product Fit</p>
+                  <div className="mt-1 text-sm text-gray-600">
+                    <p><strong>Product:</strong> {persona.productFit.product?.name || 'N/A'}</p>
+                    <p className="mt-2"><strong>Value Prop to Them:</strong></p>
+                    <p className="mt-1">{persona.productFit.valuePropToThem || 'N/A'}</p>
+                    {persona.productFit.alignmentReasoning && (
+                      <>
+                        <p className="mt-2"><strong>Alignment Reasoning:</strong></p>
+                        <p className="mt-1">{persona.productFit.alignmentReasoning}</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              {persona.bdIntel && (
+                <div>
+                  <p className="font-semibold text-gray-800">BD Intelligence</p>
+                  <div className="mt-1 text-sm text-gray-600 space-y-2">
+                    <p><strong>Fit Score:</strong> {persona.bdIntel.fitScore}/100</p>
+                    <p><strong>Pain Alignment:</strong> {persona.bdIntel.painAlignmentScore}/100</p>
+                    <p><strong>Workflow Fit:</strong> {persona.bdIntel.workflowFitScore}/100</p>
+                    {persona.bdIntel.recommendedTalkTrack && (
+                      <>
+                        <p className="mt-2"><strong>Recommended Talk Track:</strong></p>
+                        <p className="mt-1">{persona.bdIntel.recommendedTalkTrack}</p>
+                      </>
+                    )}
+                    {persona.bdIntel.finalSummary && (
+                      <>
+                        <p className="mt-2"><strong>Summary:</strong></p>
+                        <p className="mt-1">{persona.bdIntel.finalSummary}</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         </div>

@@ -25,16 +25,25 @@ export async function GET(request) {
     const personas = await prisma.persona.findMany({
       where: {
         companyHQId,
-        ...(productId ? { productId } : {}),
+        ...(productId ? { 
+          productFit: {
+            productId: productId
+          }
+        } : {}),
       },
       include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            valueProp: true,
+        productFit: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                valueProp: true,
+              },
+            },
           },
         },
+        bdIntel: true,
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -66,11 +75,23 @@ export async function POST(request) {
       name,
       role = null,
       title = null,
+      headline = null,
+      seniority = null,
       industry = null,
-      goals = null,
-      painPoints = null,
-      desiredOutcome = null,
-      valuePropToPersona = null,
+      subIndustries = null,
+      company = null,
+      companySize = null,
+      annualRevenue = null,
+      location = null,
+      description = null,
+      whatTheyWant = null, // New field (replaces goals)
+      goals = null, // Deprecated - map to whatTheyWant if provided
+      painPoints = null, // Can be string (old) or JSON array (new)
+      risks = null,
+      decisionDrivers = null,
+      workflows = null,
+      desiredOutcome = null, // Deprecated
+      valuePropToPersona = null, // Deprecated
       productId = null,
       alignmentScore: alignmentScoreInput,
       companyHQId,
@@ -92,67 +113,40 @@ export async function POST(request) {
       );
     }
 
-    let product = null;
-    if (productId) {
-      product = await prisma.product.findUnique({
-        where: { id: productId },
-        select: {
-          id: true,
-          companyHQId: true,
-          name: true,
-          valueProp: true,
-        },
-      });
-
-      if (!product) {
-        return NextResponse.json(
-          { error: 'Product not found' },
-          { status: 404 },
-        );
-      }
-
-      if (product.companyHQId !== tenantId) {
-        return NextResponse.json(
-          { error: 'Product does not belong to this tenant' },
-          { status: 403 },
-        );
+    // Normalize painPoints - convert string to array if needed
+    let normalizedPainPoints = painPoints;
+    if (painPoints && typeof painPoints === 'string') {
+      // Try to parse as JSON, otherwise wrap in array
+      try {
+        normalizedPainPoints = JSON.parse(painPoints);
+      } catch {
+        // If it's a plain string, convert to array
+        normalizedPainPoints = [painPoints];
       }
     }
 
-    let alignmentScore = null;
-    if (
-      alignmentScoreInput !== undefined &&
-      alignmentScoreInput !== null &&
-      alignmentScoreInput !== ''
-    ) {
-      const parsed = Number(alignmentScoreInput);
-      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
-        alignmentScore = Math.round(parsed);
-      } else {
-        return NextResponse.json(
-          { error: 'alignmentScore must be between 0 and 100 if provided' },
-          { status: 400 },
-        );
-      }
-    } else if (product?.valueProp && valuePropToPersona) {
-      alignmentScore = await getAlignmentScore(
-        product.valueProp,
-        valuePropToPersona,
-      );
-    }
-
+    // Map deprecated fields to new fields
+    const finalWhatTheyWant = whatTheyWant || goals || null;
+    
     const personaData = {
       companyHQId: tenantId,
       name,
       role,
       title,
+      headline,
+      seniority,
       industry,
-      goals,
-      painPoints,
-      desiredOutcome,
-      valuePropToPersona,
-      alignmentScore,
-      productId: product?.id ?? null,
+      subIndustries: subIndustries ? (typeof subIndustries === 'string' ? JSON.parse(subIndustries) : subIndustries) : null,
+      company,
+      companySize,
+      annualRevenue,
+      location,
+      description,
+      whatTheyWant: finalWhatTheyWant,
+      painPoints: normalizedPainPoints,
+      risks: risks ? (typeof risks === 'string' ? JSON.parse(risks) : risks) : null,
+      decisionDrivers: decisionDrivers ? (typeof decisionDrivers === 'string' ? JSON.parse(decisionDrivers) : decisionDrivers) : null,
+      workflows: workflows ? (typeof workflows === 'string' ? JSON.parse(workflows) : workflows) : null,
     };
 
     let persona;
@@ -172,26 +166,36 @@ export async function POST(request) {
         where: { id },
         data: personaData,
         include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              valueProp: true,
+          productFit: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  valueProp: true,
+                },
+              },
             },
           },
+          bdIntel: true,
         },
       });
     } else {
       persona = await prisma.persona.create({
         data: personaData,
         include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              valueProp: true,
+          productFit: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  valueProp: true,
+                },
+              },
             },
           },
+          bdIntel: true,
         },
       });
     }
@@ -199,7 +203,6 @@ export async function POST(request) {
     return NextResponse.json(
       {
         personaId: persona.id,
-        alignmentScore: persona.alignmentScore,
         persona,
       },
       { status: 201 },
