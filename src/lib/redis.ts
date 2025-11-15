@@ -12,21 +12,30 @@ function getRedis(): Redis {
     return redis;
   }
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Use Upstash Redis REST API
+  // Automatically reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from env
+  try {
+    redis = Redis.fromEnv();
+    console.log('✅ Upstash Redis client initialized');
+    return redis;
+  } catch (error: any) {
+    // Fallback to manual initialization if fromEnv() fails
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (!url || !token) {
-    throw new Error(
-      'Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.'
-    );
+    if (!url || !token) {
+      throw new Error(
+        'Upstash Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.'
+      );
+    }
+
+    redis = new Redis({
+      url,
+      token,
+    });
+    console.log('✅ Upstash Redis client initialized (manual)');
+    return redis;
   }
-
-  redis = new Redis({
-    url,
-    token,
-  });
-
-  return redis;
 }
 
 /**
@@ -47,17 +56,24 @@ export async function storeEnrichedContact(
     const redisClient = getRedis();
     const key = `apollo:enriched:${linkedinUrl}`;
     
-    // Store enriched data with TTL
-    await redisClient.setex(key, ttl, JSON.stringify({
+    // Store enriched data with TTL using Upstash Redis
+    // setex(key, seconds, value) - standard Redis command
+    const dataToStore = JSON.stringify({
       linkedinUrl,
       enrichedData,
       enrichedAt: new Date().toISOString(),
-    }));
+    });
     
-    console.log(`✅ Enriched data stored in Redis: ${key}`);
+    await redisClient.setex(key, ttl, dataToStore);
+    
+    console.log(`✅ Enriched data stored in Upstash Redis: ${key} (TTL: ${ttl}s)`);
     return key;
   } catch (error: any) {
-    console.error('❌ Redis store error:', error);
+    console.error('❌ Upstash Redis store error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+    });
     // Don't throw - just log, we don't want to break the flow
     return '';
   }
@@ -79,9 +95,10 @@ export async function getEnrichedContact(linkedinUrl: string): Promise<any | nul
       return null;
     }
     
+    // Upstash Redis returns data as-is, parse if string
     return typeof data === 'string' ? JSON.parse(data) : data;
   } catch (error: any) {
-    console.error('❌ Redis get error:', error);
+    console.error('❌ Upstash Redis get error:', error);
     return null;
   }
 }
@@ -95,9 +112,9 @@ export async function listEnrichedContacts(): Promise<string[]> {
   try {
     const redisClient = getRedis();
     const keys = await redisClient.keys('apollo:enriched:*');
-    return keys;
+    return keys as string[];
   } catch (error: any) {
-    console.error('❌ Redis list error:', error);
+    console.error('❌ Upstash Redis list error:', error);
     return [];
   }
 }
@@ -115,7 +132,7 @@ export async function deleteEnrichedContact(linkedinUrl: string): Promise<boolea
     await redisClient.del(key);
     return true;
   } catch (error: any) {
-    console.error('❌ Redis delete error:', error);
+    console.error('❌ Upstash Redis delete error:', error);
     return false;
   }
 }
