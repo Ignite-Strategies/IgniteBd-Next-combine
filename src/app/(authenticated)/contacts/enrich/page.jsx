@@ -229,6 +229,18 @@ export default function EnrichPage() {
   // Search for existing contact in CRM (ONLY for "existing" mode - NOT for LinkedIn search)
   // This DOES call /api/contacts/by-email because we're searching our internal CRM
   const handleSearchExistingContact = useCallback(async () => {
+    // NEVER call this in LinkedIn search mode
+    if (mode === 'search') {
+      console.error('❌ handleSearchExistingContact should NEVER be called in search mode');
+      return;
+    }
+
+    // ONLY allow in "existing" mode
+    if (mode !== 'existing') {
+      console.error(`❌ handleSearchExistingContact should only be called in "existing" mode, not "${mode}"`);
+      return;
+    }
+
     if (!searchEmail || !searchEmail.includes('@')) {
       alert('Please enter a valid email address');
       return;
@@ -248,24 +260,33 @@ export default function EnrichPage() {
     try {
       // Search for existing contact in CRM by email
       // This IS an internal lookup - this is the "existing" mode purpose
+      // NOTE: /api/contacts/by-email doesn't use companyHQId parameter, but we pass it for logging
+      console.log(`🔍 Searching CRM for existing contact: ${searchEmail} (mode: ${mode})`);
       const searchResponse = await api.get(
-        `/api/contacts/by-email?email=${encodeURIComponent(searchEmail)}&companyHQId=${companyHQId}`
+        `/api/contacts/by-email?email=${encodeURIComponent(searchEmail)}`
       );
 
       if (searchResponse.data?.success && searchResponse.data.contact) {
+        console.log(`✅ Found existing contact in CRM: ${searchResponse.data.contact.id}`);
         setFoundContact(searchResponse.data.contact);
       } else {
+        console.log(`⚠️ Contact not found in CRM: ${searchEmail}`);
         alert('Contact not found in CRM. Please check the email address.');
         setFoundContact(null);
       }
     } catch (error) {
-      console.error('Search existing contact error:', error);
-      alert(error.response?.data?.details || error.message || 'Failed to search for contact');
+      console.error('❌ Search existing contact error:', error);
+      // Don't show alert for 404 - that's expected if contact doesn't exist
+      if (error.response?.status === 404) {
+        alert('Contact not found in CRM. Please check the email address.');
+      } else {
+        alert(error.response?.data?.details || error.message || 'Failed to search for contact');
+      }
       setFoundContact(null);
     } finally {
       setSearching(false);
     }
-  }, [searchEmail, companyHQId]);
+  }, [searchEmail, companyHQId, mode]); // Added mode to dependencies
 
   // Step 2: Enrich contact (deep enrichment, no DB write)
   // This function is ONLY for LinkedIn search mode (mode === 'search')
@@ -345,9 +366,13 @@ export default function EnrichPage() {
   const handleEnrich = useCallback(async () => {
       // NEVER handle LinkedIn search mode here - it has its own workflow
       if (mode === 'search') {
-        console.error('LinkedIn search mode should NOT use handleEnrich');
+        console.error('❌ LinkedIn search mode should NOT use handleEnrich - use handleEnrichContact instead');
+        console.error('Current mode:', mode);
         return;
       }
+
+      // Log which mode we're in for debugging
+      console.log(`🔄 handleEnrich called for mode: ${mode}`);
 
       const contactsToEnrich = [];
       
