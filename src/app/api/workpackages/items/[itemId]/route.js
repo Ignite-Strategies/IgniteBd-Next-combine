@@ -19,10 +19,17 @@ export async function PATCH(request, { params }) {
   try {
     const { itemId } = params;
     const body = await request.json();
-    const { label, quantity, status, clientArtifactId } = body ?? {};
+    const { itemLabel, itemDescription, quantity, unitOfMeasure, duration, status } = body ?? {};
 
     const item = await prisma.workPackageItem.findUnique({
       where: { id: itemId },
+      include: {
+        workPackagePhase: {
+          include: {
+            items: true,
+          },
+        },
+      },
     });
 
     if (!item) {
@@ -33,15 +40,30 @@ export async function PATCH(request, { params }) {
     }
 
     const updateData = {};
-    if (label !== undefined) updateData.label = label;
+    if (itemLabel !== undefined) updateData.itemLabel = itemLabel;
+    if (itemDescription !== undefined) updateData.itemDescription = itemDescription;
     if (quantity !== undefined) updateData.quantity = quantity;
+    if (unitOfMeasure !== undefined) updateData.unitOfMeasure = unitOfMeasure;
+    if (duration !== undefined) updateData.duration = duration;
     if (status !== undefined) updateData.status = status;
-    if (clientArtifactId !== undefined) updateData.clientArtifactId = clientArtifactId;
 
     const updated = await prisma.workPackageItem.update({
       where: { id: itemId },
       data: updateData,
     });
+
+    // Recalculate phase total duration if quantity, unitOfMeasure, or duration changed
+    if (quantity !== undefined || unitOfMeasure !== undefined || duration !== undefined) {
+      const { calculatePhaseTotalDuration } = await import('@/lib/services/DurationNormalizationService');
+      const phase = item.workPackagePhase;
+      const allItems = phase.items.map(i => i.id === itemId ? updated : i);
+      const phaseTotalDuration = calculatePhaseTotalDuration(allItems);
+
+      await prisma.workPackagePhase.update({
+        where: { id: phase.id },
+        data: { phaseTotalDuration },
+      });
+    }
 
     return NextResponse.json({
       success: true,

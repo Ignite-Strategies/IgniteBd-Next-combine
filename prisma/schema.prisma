@@ -55,42 +55,40 @@ model EmailActivity {
 }
 
 model CompanyHQ {
-  id                   String                  @id @default(cuid())
-  companyName          String
-  companyStreet        String? // Street address
-  companyCity          String? // City
-  companyState         String? // State
-  companyWebsite       String? // Website URL (for LinkedIn extraction, etc.)
-  whatYouDo            String? // What the company does (description)
-  companyIndustry      String?
-  companyAnnualRev     Float?
-  yearsInBusiness      Int?
-  teamSize             String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  ownerId              String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
-  contactOwnerId       String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
-  managerId            String?
-  companies            Company[]
-  manager              Owner?                  @relation("ManagerOf", fields: [managerId], references: [id])
-  owner                Owner?                  @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
-  contactOwner         Contact?                @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id]) // Contact who owns this HQ
-  contactLists         ContactList[]
-  contacts             Contact[]
-  proposals            Proposal[]
-  products             Product[]
-  personas             Persona[]
-  assessments          Assessment[]
-  memberships          CompanyMembership[] // Junction table for multi-HQ access
-  domainRegistry       DomainRegistry? // Domain registry entry (one-to-one)
-  deliverables         ConsultantDeliverable[] // Client delivery deliverables
-  phaseTemplates       PhaseTemplate[]
-  deliverableTemplates DeliverableTemplate[]
-  blogs                Blog[]
-  templates            Template[]
-  eventPlans           EventPlan[]
-  cleDecks             CleDeck[]
-  landingPages         LandingPage[]
+  id               String                  @id @default(cuid())
+  companyName      String
+  companyStreet    String? // Street address
+  companyCity      String? // City
+  companyState     String? // State
+  companyWebsite   String? // Website URL (for LinkedIn extraction, etc.)
+  whatYouDo        String? // What the company does (description)
+  companyIndustry  String?
+  companyAnnualRev Float?
+  yearsInBusiness  Int?
+  teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  ownerId          String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
+  contactOwnerId   String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
+  managerId        String?
+  companies        Company[]
+  manager          Owner?                  @relation("ManagerOf", fields: [managerId], references: [id])
+  owner            Owner?                  @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
+  contactOwner     Contact?                @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id]) // Contact who owns this HQ
+  contactLists     ContactList[]
+  contacts         Contact[]
+  proposals        Proposal[]
+  products         Product[]
+  personas         Persona[]
+  assessments      Assessment[]
+  memberships      CompanyMembership[] // Junction table for multi-HQ access
+  domainRegistry   DomainRegistry? // Domain registry entry (one-to-one)
+  deliverables     ConsultantDeliverable[] // Client delivery deliverables
+  blogs            Blog[]
+  templates        Template[]
+  eventPlans       EventPlan[]
+  cleDecks         CleDeck[]
+  landingPages     LandingPage[]
 
   @@map("company_hqs")
 }
@@ -280,31 +278,25 @@ model Proposal {
 }
 
 model PhaseTemplate {
-  id                   String                     @id @default(cuid())
-  companyHQId          String
-  companyHQ            CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  name                 String
-  description          String?
-  defaultDurationWeeks Int?                       @default(3)
-  createdAt            DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
-  phaseDeliverables    PhaseDeliverableTemplate[]
-  proposalPhases       ProposalPhase[]
+  id                        String                     @id @default(cuid())
+  name                      String                     @unique
+  description               String?
+  createdAt                 DateTime                   @default(now())
+  phaseDeliverableTemplates PhaseDeliverableTemplate[]
+  proposalPhases            ProposalPhase[]
 
   @@map("phase_templates")
 }
 
 model DeliverableTemplate {
-  id                   String                     @id @default(cuid())
-  companyHQId          String
-  companyHQ            CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  name                 String
-  description          String?
-  defaultQuantity      Int?                       @default(1)
-  createdAt            DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
-  phaseDeliverables    PhaseDeliverableTemplate[]
-  proposalDeliverables ProposalDeliverable[]
+  id                        String                     @id @default(cuid())
+  deliverableType           String                     @unique
+  deliverableLabel          String
+  defaultUnitOfMeasure      String // "day" | "week" | "month"
+  defaultDuration           Int // duration in the above unit
+  createdAt                 DateTime                   @default(now())
+  phaseDeliverableTemplates PhaseDeliverableTemplate[]
+  proposalDeliverables      ProposalDeliverable[]
 
   @@map("deliverable_templates")
 }
@@ -508,14 +500,13 @@ model WorkPackagePhase {
   workPackageId String
   workPackage   WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
 
-  name     String // "Phase 1 — Foundation"
-  position Int // 1,2,3
-  timeline String? // "Weeks 1–3", optional string
+  name               String // Created from PhaseTemplate during assembly
+  position           Int // 1,2,3
+  phaseTotalDuration Int // normalized business days
 
   items WorkPackageItem[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@index([workPackageId])
   @@index([position])
@@ -523,23 +514,24 @@ model WorkPackagePhase {
 }
 
 model WorkPackageItem {
-  id                 String            @id @default(cuid())
+  id                 String           @id @default(cuid())
   workPackageId      String
-  workPackage        WorkPackage       @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
-  workPackagePhaseId String?
-  workPackagePhase   WorkPackagePhase? @relation(fields: [workPackagePhaseId], references: [id], onDelete: SetNull)
+  workPackage        WorkPackage      @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  workPackagePhaseId String
+  workPackagePhase   WorkPackagePhase @relation(fields: [workPackagePhaseId], references: [id], onDelete: Cascade)
 
-  itemType        String // persona | template | blog | deck | event_targets | page | lead_form
+  itemType        String // Created from DeliverableTemplate during assembly
   itemLabel       String // human-facing ("CLE Presentation")
   itemDescription String?
 
-  quantity Int
-  status   String @default("todo") // todo | in_progress | completed
+  quantity      Int
+  unitOfMeasure String // "day" | "week" | "month"
+  duration      Int // numeric value based on default, user may override
+  status        String @default("todo") // todo | in_progress | completed
 
   collateral Collateral[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@index([workPackageId])
   @@index([workPackagePhaseId])
