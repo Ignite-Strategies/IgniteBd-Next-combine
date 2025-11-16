@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Upload, Plus, Trash2, FileText, Package, CheckCircle, X } from 'lucide-react';
 import api from '@/lib/api';
@@ -9,7 +9,7 @@ import api from '@/lib/api';
  * Client Operations Templates Page
  * Manage Phase Templates and Deliverable Templates
  */
-export default function TemplatePantryPage() {
+function TemplatePantryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phaseTemplates, setPhaseTemplates] = useState([]);
@@ -368,6 +368,20 @@ export default function TemplatePantryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function TemplatePantryPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-6xl px-4">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <TemplatePantryContent />
+    </Suspense>
   );
 }
 
