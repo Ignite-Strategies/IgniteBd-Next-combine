@@ -27,10 +27,42 @@ export function useTemplates() {
       try {
         const parsed = JSON.parse(cachedPhaseTemplates);
         if (Array.isArray(parsed)) {
+          console.log(`📦 Loaded ${parsed.length} phase templates from localStorage`);
           setPhaseTemplates(parsed);
+        } else {
+          console.warn('⚠️ Cached phase templates is not an array:', typeof parsed);
         }
       } catch (error) {
-        console.warn('Failed to parse cached phase templates', error);
+        console.warn('⚠️ Failed to parse cached phase templates', error);
+      }
+    } else {
+      console.log('ℹ️ No cached phase templates found in localStorage');
+    }
+    
+    // Also check if templates were stored by company hydration
+    // Company hydration stores in companyHydration_{companyHQId}
+    const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
+    if (companyHQId && !cachedPhaseTemplates) {
+      const hydrationKey = `companyHydration_${companyHQId}`;
+      const hydrationData = window.localStorage.getItem(hydrationKey);
+      if (hydrationData) {
+        try {
+          const parsed = JSON.parse(hydrationData);
+          if (parsed.data?.phaseTemplates && Array.isArray(parsed.data.phaseTemplates)) {
+            console.log(`📦 Found ${parsed.data.phaseTemplates.length} phase templates in company hydration cache`);
+            setPhaseTemplates(parsed.data.phaseTemplates);
+            // Also store in the direct key for consistency
+            window.localStorage.setItem('phaseTemplates', JSON.stringify(parsed.data.phaseTemplates));
+          }
+          if (parsed.data?.deliverableTemplates && Array.isArray(parsed.data.deliverableTemplates)) {
+            console.log(`📦 Found ${parsed.data.deliverableTemplates.length} deliverable templates in company hydration cache`);
+            setDeliverableTemplates(parsed.data.deliverableTemplates);
+            // Also store in the direct key for consistency
+            window.localStorage.setItem('deliverableTemplates', JSON.stringify(parsed.data.deliverableTemplates));
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to parse company hydration data:', err);
+        }
       }
     }
 
@@ -65,17 +97,27 @@ export function useTemplates() {
         return;
       }
 
+      console.log(`🔄 Syncing templates for companyHQId: ${companyHQId}`);
+
       const [phasesRes, deliverablesRes] = await Promise.all([
         api.get(`/api/templates/phases?companyHQId=${companyHQId}`),
         api.get(`/api/templates/deliverables?companyHQId=${companyHQId}`),
       ]);
 
+      console.log('📦 Phase templates response:', {
+        success: phasesRes.data?.success,
+        count: phasesRes.data?.phaseTemplates?.length || 0,
+        sample: phasesRes.data?.phaseTemplates?.[0],
+      });
+
       if (phasesRes.data?.success) {
         const phases = phasesRes.data.phaseTemplates || [];
+        console.log(`✅ Setting ${phases.length} phase templates:`, phases.map(p => p.name));
         setPhaseTemplates(phases);
         localStorage.setItem('phaseTemplates', JSON.stringify(phases));
+        console.log('💾 Stored phase templates in localStorage');
       } else {
-        console.warn('Phase templates response not successful:', phasesRes.data);
+        console.warn('⚠️ Phase templates response not successful:', phasesRes.data);
         setError('Failed to load phase templates');
       }
 

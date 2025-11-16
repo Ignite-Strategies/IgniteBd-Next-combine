@@ -159,59 +159,42 @@ export default function GrowthDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Get companyHQId and fetch data from API (no auto-hydration)
+  // Load from localStorage first (instant), no loading spinner for cached data
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Load from localStorage immediately (no loading state for cached data)
     const storedCompanyHQId =
       window.localStorage.getItem('companyHQId') ||
       window.localStorage.getItem('companyId') ||
       '';
     setCompanyHQId(storedCompanyHQId);
 
-    if (!storedCompanyHQId) {
-      setLoading(false);
-      return;
+    // Load contacts from localStorage first
+    const cachedContacts = localStorage.getItem('contacts');
+    if (cachedContacts) {
+      try {
+        const parsed = JSON.parse(cachedContacts);
+        if (Array.isArray(parsed)) {
+          setContacts(parsed);
+        }
+      } catch (err) {
+        console.warn('Failed to parse cached contacts:', err);
+      }
     }
 
-    // Load from localStorage first, then optionally refresh from API
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        
-        // Load contacts from localStorage first
-        const cachedContacts = localStorage.getItem('contacts');
-        if (cachedContacts) {
-          try {
-            const parsed = JSON.parse(cachedContacts);
-            if (Array.isArray(parsed)) {
-              setContacts(parsed);
-            }
-          } catch (err) {
-            console.warn('Failed to parse cached contacts:', err);
-          }
-        }
-
-        // Load company from localStorage
-        try {
-          const storedCompany = localStorage.getItem('companyHQ');
-          if (storedCompany) {
-            setCompanyHQ(JSON.parse(storedCompany));
-          }
-        } catch (err) {
-          console.warn('Failed to parse stored company:', err);
-        }
-
-        setError(null);
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-        setError('Failed to load dashboard data');
-      } finally {
-        setLoading(false);
+    // Load company from localStorage
+    try {
+      const storedCompany = localStorage.getItem('companyHQ');
+      if (storedCompany) {
+        setCompanyHQ(JSON.parse(storedCompany));
       }
-    };
+    } catch (err) {
+      console.warn('Failed to parse stored company:', err);
+    }
 
-    loadData();
+    // Set loading to false immediately - we have cached data or empty state
+    setLoading(false);
   }, []);
 
   const hasCompany = !!companyHQ && !!companyHQId;
@@ -367,12 +350,14 @@ export default function GrowthDashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 transition-opacity duration-300">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {hasCompany && (
-        <SetupWizard
-          companyHQ={companyHQ}
-          hasContacts={dashboardMetrics.contactCount > 0}
-        />
+        <div className="mb-6 transition-opacity duration-300 ease-in">
+          <SetupWizard
+            companyHQ={companyHQ}
+            hasContacts={dashboardMetrics.contactCount > 0}
+          />
+        </div>
       )}
 
       <HeaderSummary

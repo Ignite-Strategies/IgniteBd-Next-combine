@@ -32,6 +32,8 @@ export async function GET(request) {
       orderBy: { createdAt: 'desc' },
     });
 
+    console.log(`✅ GET /api/templates/phases: Returning ${phaseTemplates.length} templates for ${companyHQId}`);
+
     return NextResponse.json({
       success: true,
       phaseTemplates,

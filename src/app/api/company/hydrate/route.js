@@ -132,7 +132,13 @@ export async function GET(request) {
       prisma.phaseTemplate.findMany({
         where: { companyHQId },
         orderBy: { createdAt: 'desc' },
-      }).catch(() => []), // Return empty array on error
+      }).then((templates) => {
+        console.log(`📦 Company hydrate: Found ${templates.length} phase templates for ${companyHQId}`);
+        return templates;
+      }).catch((err) => {
+        console.error('❌ Error fetching phase templates in company hydrate:', err);
+        return [];
+      }),
 
       // Deliverable Templates
       prisma.deliverableTemplate.findMany({
