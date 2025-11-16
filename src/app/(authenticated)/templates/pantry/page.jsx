@@ -1,26 +1,53 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Upload, Plus, Trash2, FileText, Package } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Upload, Plus, Trash2, FileText, Package, CheckCircle, X } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
- * Template Pantry Page
+ * Client Operations Templates Page
  * Manage Phase Templates and Deliverable Templates
  */
 export default function TemplatePantryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [phaseTemplates, setPhaseTemplates] = useState([]);
   const [deliverableTemplates, setDeliverableTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState(null);
   const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables'
 
   useEffect(() => {
+    // Read tab from query params
+    const tab = searchParams.get('tab');
+    if (tab === 'phases' || tab === 'deliverables') {
+      setActiveTab(tab);
+    }
+
+    // Check for success message from CSV import
+    if (typeof window !== 'undefined') {
+      const successData = sessionStorage.getItem('csvImportSuccess');
+      if (successData) {
+        try {
+          const data = JSON.parse(successData);
+          setSuccessMessage(data);
+          sessionStorage.removeItem('csvImportSuccess');
+          
+          // Auto-dismiss after 5 seconds
+          setTimeout(() => {
+            setSuccessMessage(null);
+          }, 5000);
+        } catch (e) {
+          console.error('Error parsing success data:', e);
+        }
+      }
+    }
+
     loadTemplates();
-  }, []);
+  }, [searchParams]);
 
   const loadTemplates = async () => {
     try {
@@ -162,12 +189,31 @@ export default function TemplatePantryPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Template Pantry</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Client Operations Templates</h1>
             <p className="mt-1 text-sm text-gray-600">
               Manage reusable phase and deliverable templates
             </p>
           </div>
         </div>
+
+        {/* Success Toast */}
+        {successMessage && (
+          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 flex items-start gap-3">
+            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-green-800">{successMessage.message}</p>
+              <p className="text-sm text-green-700 mt-1">
+                {successMessage.count} template(s) imported successfully.
+              </p>
+            </div>
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="text-green-600 hover:text-green-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4">
