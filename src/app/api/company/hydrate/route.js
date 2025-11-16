@@ -5,7 +5,7 @@ import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/fireba
 /**
  * GET /api/company/hydrate
  * Comprehensive hydration endpoint for companyHQ
- * Fetches all related data: personas, contacts, products, pipelines, etc.
+ * Fetches all related data: personas, contacts, products, pipelines, templates, etc.
  * 
  * Query params:
  * - companyHQId (required)
@@ -16,6 +16,9 @@ import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/fireba
  * - contacts: Array of contacts (or empty array)
  * - products: Array of products (or empty array)
  * - pipelines: Array of pipelines (or empty array)
+ * - proposals: Array of proposals (or empty array)
+ * - phaseTemplates: Array of phase templates (or empty array)
+ * - deliverableTemplates: Array of deliverable templates (or empty array)
  * - stats: Counts and metrics
  */
 export async function GET(request) {
@@ -36,7 +39,7 @@ export async function GET(request) {
     console.log(`🚀 COMPANY HYDRATE: Fetching all data for companyHQId: ${companyHQId}`);
 
     // Fetch all data in parallel
-    const [companyHQ, personas, contacts, products, pipelines, proposals] = await Promise.all([
+    const [companyHQ, personas, contacts, products, pipelines, proposals, phaseTemplates, deliverableTemplates] = await Promise.all([
       // CompanyHQ
       prisma.companyHQ.findUnique({
         where: { id: companyHQId },
@@ -124,6 +127,18 @@ export async function GET(request) {
         },
         orderBy: { createdAt: 'desc' },
       }).catch(() => []), // Return empty array on error
+
+      // Phase Templates
+      prisma.phaseTemplate.findMany({
+        where: { companyHQId },
+        orderBy: { createdAt: 'desc' },
+      }).catch(() => []), // Return empty array on error
+
+      // Deliverable Templates
+      prisma.deliverableTemplate.findMany({
+        where: { companyHQId },
+        orderBy: { createdAt: 'desc' },
+      }).catch(() => []), // Return empty array on error
     ]);
 
     if (!companyHQ) {
@@ -156,6 +171,8 @@ export async function GET(request) {
       products: products || [],
       pipelines: pipelines || [],
       proposals: proposals || [],
+      phaseTemplates: phaseTemplates || [],
+      deliverableTemplates: deliverableTemplates || [],
       stats,
       timestamp: new Date().toISOString(),
     };

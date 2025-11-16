@@ -20,6 +20,8 @@ export function useCompanyHydration(companyHQId) {
     products: [],
     pipelines: [],
     proposals: [],
+    phaseTemplates: [],
+    deliverableTemplates: [],
     stats: {
       personaCount: 0,
       contactCount: 0,
@@ -83,6 +85,8 @@ export function useCompanyHydration(companyHQId) {
         products: response.data.products || [],
         pipelines: response.data.pipelines || [],
         proposals: response.data.proposals || [],
+        phaseTemplates: response.data.phaseTemplates || [],
+        deliverableTemplates: response.data.deliverableTemplates || [],
         stats: response.data.stats || {
           personaCount: 0,
           contactCount: 0,
@@ -119,6 +123,8 @@ export function useCompanyHydration(companyHQId) {
       localStorage.setItem('products', JSON.stringify(hydratedData.products));
       localStorage.setItem('pipelines', JSON.stringify(hydratedData.pipelines));
       localStorage.setItem('proposals', JSON.stringify(hydratedData.proposals));
+      localStorage.setItem('phaseTemplates', JSON.stringify(hydratedData.phaseTemplates));
+      localStorage.setItem('deliverableTemplates', JSON.stringify(hydratedData.deliverableTemplates));
 
       setLoading(false);
     } catch (err) {
@@ -141,6 +147,8 @@ export function useCompanyHydration(companyHQId) {
     products: data.products,
     pipelines: data.pipelines,
     proposals: data.proposals,
+    phaseTemplates: data.phaseTemplates,
+    deliverableTemplates: data.deliverableTemplates,
     stats: data.stats,
   };
 }
