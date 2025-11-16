@@ -27,10 +27,10 @@ function CSVUploadSelectionContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Upload Templates from CSV"
-          subtitle="Choose which type of template to upload"
-          backTo="/client-operations/proposals/create"
-          backLabel="Back to Create Proposal"
+          title="Add Templates"
+          subtitle="Choose which type of template to upload from CSV"
+          backTo="/templates/library"
+          backLabel="Back to Template Library"
         />
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Upload, FileText, Copy, Plus, User, Search, RefreshCw, CheckCircle, X } from 'lucide-react';
 import api from '@/lib/api';
@@ -13,6 +13,8 @@ import { getContactsRegistry } from '@/lib/services/contactsRegistry';
  */
 function ProposalStartContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromTemplates = searchParams.get('from') === 'templates';
 
   // CompanyHQ ID for loading proposals
   const [companyHQId, setCompanyHQId] = useState('');
@@ -142,10 +144,15 @@ function ProposalStartContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {OPTIONS.map((option) => {
                 const Icon = option.icon;
+                const isHighlighted = fromTemplates && option.id === 'templates';
                 return (
                   <div
                     key={option.id}
-                    className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+                    className={`rounded-xl border-2 p-6 shadow-sm hover:shadow-md transition cursor-pointer ${
+                      isHighlighted
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-gray-200 bg-white hover:border-red-300'
+                    }`}
                     onClick={() => handleOptionSelect(option.id)}
                   >
                     <div className="flex items-start gap-4 mb-4">

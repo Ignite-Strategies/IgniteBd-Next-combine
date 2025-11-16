@@ -18,7 +18,7 @@ function TemplateLibraryContent() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState(null);
-  const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables' | 'proposals'
+  const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables' | 'proposals' | 'make-templates'
 
   // Initialize - load from localStorage via hook (no auto-fetch, sync is backup only)
   useEffect(() => {
@@ -26,7 +26,7 @@ function TemplateLibraryContent() {
 
     // Read tab from query params
     const tab = searchParams.get('tab');
-    if (tab === 'phases' || tab === 'deliverables' || tab === 'proposals') {
+    if (tab === 'phases' || tab === 'deliverables' || tab === 'proposals' || tab === 'make-templates') {
       setActiveTab(tab);
     }
 
@@ -168,14 +168,23 @@ function TemplateLibraryContent() {
               </p>
             </div>
           </div>
-          <button
-            onClick={sync}
-            disabled={syncing}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            <span>{syncing ? 'Syncing...' : 'Sync'}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/client-operations/proposals/create?from=templates')}
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add to Proposal</span>
+            </button>
+            <button
+              onClick={sync}
+              disabled={syncing}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              <span>{syncing ? 'Syncing...' : 'Sync'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Success Toast */}
@@ -234,7 +243,7 @@ function TemplateLibraryContent() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Proposal Templates (coming soon)
+              Proposal Templates
             </button>
           </nav>
         </div>
@@ -245,11 +254,11 @@ function TemplateLibraryContent() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Phase Templates</h2>
               <a
-                href="/client-operations/proposals/create/csv/phases"
+                href="/client-operations/proposals/create/csv"
                 className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
               >
-                <Upload className="h-4 w-4" />
-                <span>Upload CSV</span>
+                <Plus className="h-4 w-4" />
+                <span>Add More</span>
               </a>
             </div>
 
@@ -280,7 +289,7 @@ function TemplateLibraryContent() {
                   {phaseTemplates.length === 0 && (
                     <tr>
                       <td colSpan={3} className="px-6 py-8 text-center text-sm text-gray-500">
-                        No phase templates. <a href="/client-operations/proposals/create/csv/phases" className="text-red-600 hover:text-red-700">Upload a CSV</a> to get started.
+                        No phase templates. <a href="/client-operations/proposals/create/csv" className="text-red-600 hover:text-red-700">Add templates</a> to get started.
                       </td>
                     </tr>
                   )}
@@ -296,11 +305,11 @@ function TemplateLibraryContent() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Deliverable Templates</h2>
               <a
-                href="/client-operations/proposals/create/csv/deliverables"
+                href="/client-operations/proposals/create/csv"
                 className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
               >
-                <Upload className="h-4 w-4" />
-                <span>Upload CSV</span>
+                <Plus className="h-4 w-4" />
+                <span>Add More</span>
               </a>
             </div>
 
@@ -341,7 +350,7 @@ function TemplateLibraryContent() {
                   {deliverableTemplates.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
-                        No deliverable templates. <a href="/client-operations/proposals/create/csv/deliverables" className="text-red-600 hover:text-red-700">Upload a CSV</a> to get started.
+                        No deliverable templates. <a href="/client-operations/proposals/create/csv" className="text-red-600 hover:text-red-700">Add templates</a> to get started.
                       </td>
                     </tr>
                   )}
@@ -351,26 +360,148 @@ function TemplateLibraryContent() {
           </div>
         )}
 
-        {/* Proposal Templates (stub for future build) */}
+        {/* Proposal Templates */}
         {activeTab === 'proposals' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Proposal Templates</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Proposal Templates</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* See Templates Option */}
+                <div
+                  onClick={() => router.push('/client-operations/proposals/create?from=templates')}
+                  className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+                >
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                      <FileText className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        See Templates
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        View and use your existing phase and deliverable templates to build proposals.
+                      </p>
+                    </div>
+                  </div>
+                  <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                    View Templates
+                  </button>
+                </div>
+
+                {/* Make Templates Option */}
+                <div
+                  onClick={() => setActiveTab('make-templates')}
+                  className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+                >
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                      <Plus className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Make Templates
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Create new phase, deliverable, or proposal templates from scratch or CSV.
+                      </p>
+                    </div>
+                  </div>
+                  <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                    Create Templates
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Make Templates - Template Type Selection */}
+        {activeTab === 'make-templates' && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 mb-6">
+              <button
+                onClick={() => setActiveTab('proposals')}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <h2 className="text-xl font-semibold text-gray-900">Create Templates</h2>
             </div>
 
-            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Proposal templates are coming next
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                You&apos;ll be able to bundle phase and deliverable templates into reusable proposal
-                packages (e.g., &quot;Starter Package&quot;), then start new proposals from those
-                templates in one click.
-              </p>
-              <p className="text-xs text-gray-500">
-                For now, manage your Phase and Deliverable templates above. Proposal templates will
-                use these building blocks.
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Phase Templates */}
+              <div
+                onClick={() => router.push('/client-operations/proposals/create/csv/phases')}
+                className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Phase Templates
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Create reusable phase templates for your proposals.
+                    </p>
+                  </div>
+                </div>
+                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                  Create Phase Template
+                </button>
+              </div>
+
+              {/* Deliverable Templates */}
+              <div
+                onClick={() => router.push('/client-operations/proposals/create/csv/deliverables')}
+                className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                    <Package className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Deliverable Templates
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Create reusable deliverable templates for your proposals.
+                    </p>
+                  </div>
+                </div>
+                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                  Create Deliverable Template
+                </button>
+              </div>
+
+              {/* Proposal Templates */}
+              <div
+                onClick={() => {
+                  // TODO: Route to proposal template creation
+                  alert('Proposal template creation coming soon');
+                }}
+                className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Proposal Templates
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Bundle phases and deliverables into reusable proposal packages.
+                    </p>
+                  </div>
+                </div>
+                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                  Create Proposal Template
+                </button>
+              </div>
             </div>
           </div>
         )}
