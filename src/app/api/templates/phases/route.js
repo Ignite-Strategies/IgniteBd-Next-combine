@@ -17,7 +17,18 @@ export async function GET(request) {
   }
 
   try {
+    const { searchParams } = request.nextUrl;
+    const companyHQId = searchParams.get('companyHQId');
+
+    if (!companyHQId) {
+      return NextResponse.json(
+        { success: false, error: 'companyHQId is required' },
+        { status: 400 },
+      );
+    }
+
     const phaseTemplates = await prisma.phaseTemplate.findMany({
+      where: { companyHQId },
       orderBy: { createdAt: 'desc' },
     });
 

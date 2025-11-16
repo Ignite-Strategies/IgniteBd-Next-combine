@@ -19,10 +19,18 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
+    const companyHQId = formData.get('companyHQId');
 
     if (!file) {
       return NextResponse.json(
         { success: false, error: 'CSV file is required' },
+        { status: 400 },
+      );
+    }
+
+    if (!companyHQId) {
+      return NextResponse.json(
+        { success: false, error: 'companyHQId is required' },
         { status: 400 },
       );
     }
@@ -67,13 +75,19 @@ export async function POST(request) {
         continue; // Skip empty rows
       }
 
-      // Upsert phase template
+      // Upsert phase template (unique by companyHQId + name)
       const phaseTemplate = await prisma.phaseTemplate.upsert({
-        where: { name: phaseName },
+        where: {
+          companyHQId_name: {
+            companyHQId,
+            name: phaseName,
+          },
+        },
         update: {
           description: phaseDescription,
         },
         create: {
+          companyHQId,
           name: phaseName,
           description: phaseDescription,
         },

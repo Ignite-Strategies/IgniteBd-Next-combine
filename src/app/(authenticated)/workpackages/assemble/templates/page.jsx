@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
@@ -9,33 +9,58 @@ import api from '@/lib/api';
  * Proposal Assembler - Templates Flow
  * Choose phases and deliverables from templates
  */
-export default function ProposalAssemblerTemplatesPage() {
+function ProposalAssemblerTemplatesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contactId = searchParams.get('contactId');
 
   const [phaseTemplates, setPhaseTemplates] = useState([]);
   const [deliverableTemplates, setDeliverableTemplates] = useState([]);
-  const [selectedPhases, setSelectedPhases] = useState([]); // [{ phaseTemplateId, position, deliverables: [...] }]
+  const [selectedPhases, setSelectedPhases] = useState([]); // [{ phaseTemplateId, position, deliverables: [{ deliverableType, itemLabel, quantity, duration, unitOfMeasure }] }]
+  const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const cachedContacts = window.localStorage.getItem('contacts');
+    if (cachedContacts) {
+      try {
+        const parsed = JSON.parse(cachedContacts);
+        if (Array.isArray(parsed)) {
+          setContacts(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached contacts', error);
+      }
+    }
+
     if (!contactId) {
       router.push('/workpackages/launch');
       return;
     }
     loadTemplates();
-  }, [contactId]);
+  }, [contactId, router]);
 
   const loadTemplates = async () => {
+    if (typeof window === 'undefined') return;
+    
     try {
       setLoading(true);
       
+      // Get companyHQId from localStorage
+      const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
+      
+      if (!companyHQId) {
+        setError('CompanyHQ ID not found');
+        return;
+      }
+      
       const [phasesRes, deliverablesRes] = await Promise.all([
-        api.get('/api/templates/phases'),
-        api.get('/api/templates/deliverables'),
+        api.get(`/api/templates/phases?companyHQId=${companyHQId}`),
+        api.get(`/api/templates/deliverables?companyHQId=${companyHQId}`),
       ]);
 
       if (phasesRes.data?.success) {
@@ -89,6 +114,7 @@ export default function ProposalAssemblerTemplatesPage() {
     const updated = [...selectedPhases];
     updated[phaseIndex].deliverables.push({
       deliverableType: deliverableTemplate.deliverableType,
+      deliverableTemplateId: deliverableTemplate.id, // Store template ID for reference
       itemLabel: deliverableTemplate.deliverableLabel,
       quantity: 1,
       unitOfMeasure: deliverableTemplate.defaultUnitOfMeasure,
@@ -117,12 +143,32 @@ export default function ProposalAssemblerTemplatesPage() {
       return;
     }
 
+    if (typeof window === 'undefined') {
+      setError('Cannot save in server environment');
+      return;
+    }
+    
+    // Get companyHQId and companyId from contact
+    const contact = contacts.find(c => c.id === contactId);
+    const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
+    
+    if (!companyHQId || !contact?.contactCompanyId) {
+      setError('Company information not found');
+      return;
+    }
+
     try {
       setSaving(true);
       setError('');
 
-      const response = await api.post('/api/workpackages/assemble', {
+      const response = await api.post('/api/proposals/assemble', {
         contactId,
+        companyHQId,
+        companyId: contact.contactCompanyId,
+        title: prompt('Enter proposal title:') || 'New Proposal',
+        estimatedStart: new Date().toISOString(),
+        purpose: null,
+        totalPrice: null,
         assemblyType: 'templates',
         data: {
           phases: selectedPhases,
@@ -130,17 +176,15 @@ export default function ProposalAssemblerTemplatesPage() {
       });
 
       if (response.data?.success) {
-        const workPackage = response.data.workPackage;
+        const proposal = response.data.proposal;
         
         // Save to localStorage
-        if (typeof window !== 'undefined') {
-          const cached = window.localStorage.getItem('workPackages');
-          const existing = cached ? JSON.parse(cached) : [];
-          const updated = [...existing, workPackage];
-          window.localStorage.setItem('workPackages', JSON.stringify(updated));
-        }
+        const cached = window.localStorage.getItem('proposals');
+        const existing = cached ? JSON.parse(cached) : [];
+        const updated = [...existing, proposal];
+        window.localStorage.setItem('proposals', JSON.stringify(updated));
         
-        router.push(`/workpackages/${workPackage.id}/preview`);
+        router.push(`/client-operations/proposals/${proposal.id}`);
       } else {
         setError(response.data?.error || 'Failed to create proposal');
       }
@@ -348,6 +392,20 @@ export default function ProposalAssemblerTemplatesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProposalAssemblerTemplatesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-6xl px-4">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ProposalAssemblerTemplatesContent />
+    </Suspense>
   );
 }
 

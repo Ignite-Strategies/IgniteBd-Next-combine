@@ -26,9 +26,19 @@ export default function TemplatePantryPage() {
     try {
       setLoading(true);
       
+      // Get companyHQId from localStorage
+      const companyHQId = typeof window !== 'undefined' 
+        ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') 
+        : null;
+      
+      if (!companyHQId) {
+        setError('CompanyHQ ID not found');
+        return;
+      }
+      
       const [phasesRes, deliverablesRes] = await Promise.all([
-        api.get('/api/templates/phases'),
-        api.get('/api/templates/deliverables'),
+        api.get(`/api/templates/phases?companyHQId=${companyHQId}`),
+        api.get(`/api/templates/deliverables?companyHQId=${companyHQId}`),
       ]);
 
       if (phasesRes.data?.success) {
@@ -53,8 +63,19 @@ export default function TemplatePantryPage() {
       setUploading(true);
       setError('');
 
+      // Get companyHQId from localStorage
+      const companyHQId = typeof window !== 'undefined' 
+        ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') 
+        : null;
+      
+      if (!companyHQId) {
+        setError('CompanyHQ ID not found');
+        return;
+      }
+
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('companyHQId', companyHQId);
 
       const response = await api.post('/api/import/phases', formData, {
         headers: {
@@ -85,8 +106,19 @@ export default function TemplatePantryPage() {
       setUploading(true);
       setError('');
 
+      // Get companyHQId from localStorage
+      const companyHQId = typeof window !== 'undefined' 
+        ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') 
+        : null;
+      
+      if (!companyHQId) {
+        setError('CompanyHQ ID not found');
+        return;
+      }
+
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('companyHQId', companyHQId);
 
       const response = await api.post('/api/import/deliverables', formData, {
         headers: {
