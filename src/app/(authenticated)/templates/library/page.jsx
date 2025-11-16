@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Upload, Plus, Trash2, FileText, Package, CheckCircle, X } from 'lucide-react';
+import { ArrowLeft, Upload, Plus, Trash2, FileText, Package, CheckCircle, X, RefreshCw } from 'lucide-react';
+import { useTemplates } from '@/hooks/useTemplates';
 import api from '@/lib/api';
 
 /**
@@ -12,15 +13,14 @@ import api from '@/lib/api';
 function TemplateLibraryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [phaseTemplates, setPhaseTemplates] = useState([]);
-  const [deliverableTemplates, setDeliverableTemplates] = useState([]);
+  const { phaseTemplates, deliverableTemplates, syncing, error: syncError, sync } = useTemplates();
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState(null);
   const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables' | 'proposals'
 
-  // Load from localStorage first - no auto-fetch
+  // Initialize - load from localStorage via hook (no auto-fetch, sync is backup only)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -47,72 +47,10 @@ function TemplateLibraryContent() {
       }
     }
 
-    // Load from localStorage first
-    const cachedPhaseTemplates = localStorage.getItem('phaseTemplates');
-    if (cachedPhaseTemplates) {
-      try {
-        const parsed = JSON.parse(cachedPhaseTemplates);
-        if (Array.isArray(parsed)) {
-          setPhaseTemplates(parsed);
-        }
-      } catch (error) {
-        console.warn('Failed to parse cached phase templates', error);
-      }
-    }
-
-    const cachedDeliverableTemplates = localStorage.getItem('deliverableTemplates');
-    if (cachedDeliverableTemplates) {
-      try {
-        const parsed = JSON.parse(cachedDeliverableTemplates);
-        if (Array.isArray(parsed)) {
-          setDeliverableTemplates(parsed);
-        }
-      } catch (error) {
-        console.warn('Failed to parse cached deliverable templates', error);
-      }
-    }
-
+    // Templates are loaded from localStorage by useTemplates hook
+    // No auto-hydration - sync button is backup only
     setLoading(false);
   }, [searchParams]);
-
-  // Fetch templates from API (optional, can be called manually)
-  const loadTemplates = async () => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      setLoading(true);
-      
-      // Get companyHQId from localStorage
-      const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
-      
-      if (!companyHQId) {
-        setError('CompanyHQ ID not found');
-        setLoading(false);
-        return;
-      }
-      
-      const [phasesRes, deliverablesRes] = await Promise.all([
-        api.get(`/api/templates/phases?companyHQId=${companyHQId}`),
-        api.get(`/api/templates/deliverables?companyHQId=${companyHQId}`),
-      ]);
-
-      if (phasesRes.data?.success) {
-        const phases = phasesRes.data.phaseTemplates || [];
-        setPhaseTemplates(phases);
-        localStorage.setItem('phaseTemplates', JSON.stringify(phases));
-      }
-      if (deliverablesRes.data?.success) {
-        const deliverables = deliverablesRes.data.deliverableTemplates || [];
-        setDeliverableTemplates(deliverables);
-        localStorage.setItem('deliverableTemplates', JSON.stringify(deliverables));
-      }
-    } catch (err) {
-      console.error('Error loading templates:', err);
-      setError('Failed to load templates');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePhaseCSVUpload = async (e) => {
     const file = e.target.files[0];
@@ -143,8 +81,8 @@ function TemplateLibraryContent() {
       });
 
       if (response.data?.success) {
-        // Update localStorage with new templates
-        await loadTemplates();
+        // Sync templates from backend after CSV upload
+        await sync();
         alert(`Imported ${response.data.count} phase templates`);
       } else {
         setError(response.data?.error || 'Failed to import phases');
@@ -187,8 +125,8 @@ function TemplateLibraryContent() {
       });
 
       if (response.data?.success) {
-        // Update localStorage with new templates
-        await loadTemplates();
+        // Sync templates from backend after CSV upload
+        await sync();
         alert(`Imported ${response.data.count} deliverable templates`);
       } else {
         setError(response.data?.error || 'Failed to import deliverables');
@@ -215,19 +153,29 @@ function TemplateLibraryContent() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mb-6 flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Client Operations Templates</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Manage reusable phase and deliverable templates
-            </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Client Operations Templates</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Manage reusable phase and deliverable templates
+              </p>
+            </div>
           </div>
+          <button
+            onClick={sync}
+            disabled={syncing}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            <span>{syncing ? 'Syncing...' : 'Sync'}</span>
+          </button>
         </div>
 
         {/* Success Toast */}
@@ -249,9 +197,9 @@ function TemplateLibraryContent() {
           </div>
         )}
 
-        {error && (
+        {(error || syncError) && (
           <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4">
-            <p className="text-sm text-red-800">{error}</p>
+            <p className="text-sm text-red-800">{error || syncError}</p>
           </div>
         )}
 

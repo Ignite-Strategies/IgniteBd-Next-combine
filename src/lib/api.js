@@ -27,6 +27,12 @@ if (typeof window !== 'undefined') {
   // Request interceptor - adds Firebase token to requests
   api.interceptors.request.use(
   async (config) => {
+    // Ensure /api/* routes always use current origin (local Next.js routes)
+    // Don't send them to external backend URL
+    if (config.url && config.url.startsWith('/api/')) {
+      config.baseURL = window.location.origin;
+    }
+
     try {
       const firebaseAuth = getAuth();
       const user = firebaseAuth.currentUser;

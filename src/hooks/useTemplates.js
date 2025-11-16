@@ -1,0 +1,108 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import api from '@/lib/api';
+
+/**
+ * useTemplates Hook
+ * 
+ * Manages Phase and Deliverable Templates with localStorage caching.
+ * Loads from localStorage on mount, provides sync function for manual hydration.
+ * 
+ * @returns {Object} { phaseTemplates, deliverableTemplates, syncing, error, sync }
+ */
+export function useTemplates() {
+  const [phaseTemplates, setPhaseTemplates] = useState([]);
+  const [deliverableTemplates, setDeliverableTemplates] = useState([]);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Load from localStorage on mount - no auto-fetch
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Load phase templates from localStorage
+    const cachedPhaseTemplates = localStorage.getItem('phaseTemplates');
+    if (cachedPhaseTemplates) {
+      try {
+        const parsed = JSON.parse(cachedPhaseTemplates);
+        if (Array.isArray(parsed)) {
+          setPhaseTemplates(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached phase templates', error);
+      }
+    }
+
+    // Load deliverable templates from localStorage
+    const cachedDeliverableTemplates = localStorage.getItem('deliverableTemplates');
+    if (cachedDeliverableTemplates) {
+      try {
+        const parsed = JSON.parse(cachedDeliverableTemplates);
+        if (Array.isArray(parsed)) {
+          setDeliverableTemplates(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached deliverable templates', error);
+      }
+    }
+  }, []);
+
+  // Sync function - fetches from API and updates localStorage
+  const sync = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      setSyncing(true);
+      setError(null);
+
+      // Get companyHQId from localStorage
+      const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
+
+      if (!companyHQId) {
+        setError('CompanyHQ ID not found');
+        setSyncing(false);
+        return;
+      }
+
+      const [phasesRes, deliverablesRes] = await Promise.all([
+        api.get(`/api/templates/phases?companyHQId=${companyHQId}`),
+        api.get(`/api/templates/deliverables?companyHQId=${companyHQId}`),
+      ]);
+
+      if (phasesRes.data?.success) {
+        const phases = phasesRes.data.phaseTemplates || [];
+        setPhaseTemplates(phases);
+        localStorage.setItem('phaseTemplates', JSON.stringify(phases));
+      } else {
+        console.warn('Phase templates response not successful:', phasesRes.data);
+        setError('Failed to load phase templates');
+      }
+
+      if (deliverablesRes.data?.success) {
+        const deliverables = deliverablesRes.data.deliverableTemplates || [];
+        setDeliverableTemplates(deliverables);
+        localStorage.setItem('deliverableTemplates', JSON.stringify(deliverables));
+      } else {
+        console.warn('Deliverable templates response not successful:', deliverablesRes.data);
+        if (!error) {
+          setError('Failed to load deliverable templates');
+        }
+      }
+    } catch (err) {
+      console.error('Error syncing templates:', err);
+      setError(err.response?.data?.error || 'Failed to sync templates from server');
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  return {
+    phaseTemplates,
+    deliverableTemplates,
+    syncing,
+    error,
+    sync,
+  };
+}
+
