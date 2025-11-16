@@ -54,7 +54,7 @@ function ProposalStartContent() {
         break;
       }
       case 'templates': {
-        // Route to template pantry first to manage/upload templates
+        // Route to template library first to manage/upload templates
         router.push('/templates/library');
         break;
       }

@@ -148,7 +148,7 @@ function DeliverableCSVUploadContent() {
   };
 
   const handleCancel = () => {
-    router.push('/templates/pantry?tab=deliverables');
+    router.push('/templates/library?tab=deliverables');
   };
 
   const downloadTemplate = () => {

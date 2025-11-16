@@ -148,7 +148,7 @@ function PhaseCSVUploadContent() {
   };
 
   const handleCancel = () => {
-    router.push('/templates/pantry?tab=phases');
+    router.push('/templates/library?tab=phases');
   };
 
   const downloadTemplate = () => {
