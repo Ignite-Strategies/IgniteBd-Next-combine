@@ -23,6 +23,7 @@ import {
   GitBranch,
   Sparkles,
   Box,
+  Layers,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -74,7 +75,7 @@ const navigationGroups = [
     name: 'Client Operations',
     items: [
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
-      { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
+      { name: 'Proposal Templates', path: '/templates/library', icon: Layers },
       { name: 'Work Packages', path: '/workpackages', icon: Box },
       { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket, exact: true },
     ],
