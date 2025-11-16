@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { FileText, Plus } from 'lucide-react';
@@ -11,6 +11,11 @@ import { FileText, Plus } from 'lucide-react';
  */
 function TemplateChooserContent() {
   const router = useRouter();
+
+  // Debug: Log when component mounts
+  useEffect(() => {
+    console.log('TemplateChooserPage mounted at /templates');
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
