@@ -25,11 +25,6 @@ export const UNIVERSAL_FIELD_MAP = {
   'days': { field: '_durationDays', types: ['phase'], required: false },
   'duration_days': { field: '_durationDays', types: ['phase'], required: false },
   
-  'order': { field: '_order', types: ['phase'], required: false },
-  'position': { field: '_order', types: ['phase'], required: false },
-  'sequence': { field: '_order', types: ['phase'], required: false },
-  'sort': { field: '_order', types: ['phase'], required: false },
-  
   // === DELIVERABLE FIELDS ===
   'deliverable name': { field: 'deliverableLabel', types: ['deliverable'], required: true },
   'deliverablename': { field: 'deliverableLabel', types: ['deliverable'], required: true },
@@ -48,9 +43,11 @@ export const UNIVERSAL_FIELD_MAP = {
   'time unit': { field: 'defaultUnitOfMeasure', types: ['deliverable'], required: false },
   'unitofmeasure': { field: 'defaultUnitOfMeasure', types: ['deliverable'], required: false },
   
+  'duration (days)': { field: 'defaultDuration', types: ['deliverable'], required: false },
   'duration': { field: 'defaultDuration', types: ['deliverable'], required: false },
   'time': { field: 'defaultDuration', types: ['deliverable'], required: false },
   'weeks': { field: 'defaultDuration', types: ['deliverable'], required: false },
+  'days': { field: 'defaultDuration', types: ['deliverable'], required: false },
   'defaultduration': { field: 'defaultDuration', types: ['deliverable'], required: false },
 };
 
