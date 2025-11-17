@@ -42,7 +42,7 @@ export async function POST(request) {
 
     const createdItems = [];
     const updatedItems = [];
-    const phaseIds = new Set<string>();
+    const phaseIds = new Set();
 
     // Upsert each item
     for (const item of items) {
