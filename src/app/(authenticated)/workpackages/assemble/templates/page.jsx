@@ -184,7 +184,7 @@ function ProposalAssemblerTemplatesContent() {
         const updated = [...existing, proposal];
         window.localStorage.setItem('proposals', JSON.stringify(updated));
         
-        router.push(`/client-operations/proposals/${proposal.id}`);
+        router.push(`/proposals/${proposal.id}`);
       } else {
         setError(response.data?.error || 'Failed to create proposal');
       }

@@ -68,7 +68,7 @@ export async function POST(request) {
     // Handle different assembly types
     switch (assemblyType) {
       case 'templates': {
-        // data: { phases: [{ phaseTemplateId, position, deliverables: [...] }] }
+        // data: { phases: [{ phaseTemplateId, position, deliverables: [{ deliverableTemplateId, quantity? }] }] }
         const phaseTemplates = await prisma.phaseTemplate.findMany({
           where: {
             id: { in: data.phases.map(p => p.phaseTemplateId) },
@@ -85,43 +85,63 @@ export async function POST(request) {
           
           // Calculate phase duration from deliverables
           const phaseDeliverables = phaseData.deliverables.map((deliverableData) => {
+            // Find deliverable template by ID (new schema uses deliverableTemplateId)
             const deliverableTemplate = deliverableTemplates.find(
-              dt => dt.deliverableType === deliverableData.deliverableType || dt.id === deliverableData.deliverableTemplateId
+              dt => dt.id === deliverableData.deliverableTemplateId
             );
             
-            // Calculate durationWeeks from duration and unitOfMeasure
-            const duration = deliverableData.duration || deliverableTemplate?.defaultDuration || 1;
-            const unitOfMeasure = deliverableData.unitOfMeasure || deliverableTemplate?.defaultUnitOfMeasure || 'week';
-            let durationWeeks = duration;
-            if (unitOfMeasure === 'day') {
-              durationWeeks = Math.ceil(duration / 5); // Convert business days to weeks
-            } else if (unitOfMeasure === 'month') {
-              durationWeeks = duration * 4; // Approximate months to weeks
+            if (!deliverableTemplate) {
+              console.warn(`DeliverableTemplate not found for ID: ${deliverableData.deliverableTemplateId}`);
+              return null;
             }
+
+            // Calculate durationWeeks from durationSuggestedUnits (new schema)
+            // durationUnit is always "hour", so convert hours to weeks
+            const durationHours = deliverableTemplate.durationSuggestedUnits || 0;
+            const durationWeeks = Math.ceil(durationHours / 40); // Approximate: 40 hours per week
             
             return {
               durationWeeks,
               deliverableTemplate, // Keep for hydration
               deliverableData, // Keep for hydration
             };
-          });
+          }).filter(Boolean); // Remove null entries
 
           // Phase duration is max of deliverable durations
-          const maxDurationWeeks = Math.max(...phaseDeliverables.map(d => d.durationWeeks || 3), 3);
+          const maxDurationWeeks = phaseDeliverables.length > 0
+            ? Math.max(...phaseDeliverables.map(d => d.durationWeeks || 3), 3)
+            : 3;
 
           // Hydrate detached ProposalDeliverable copies (no template links)
+          // Use new flat schema: phaseName, deliverableName, description, unit, quantity, durationUnit, durationUnits
           phaseDeliverables.forEach(({ deliverableTemplate, deliverableData }) => {
-            const quantity = deliverableData.quantity || 1;
-            const unitPrice = deliverableData.unitPrice || null;
-            const totalPrice = unitPrice ? unitPrice * quantity : null;
+            // Get phase name from phaseTemplate
+            const phaseName = phaseTemplate?.name || 'Unnamed Phase';
+            
+            // Map to new DeliverableTemplate schema fields
+            const deliverableName = deliverableTemplate.deliverableName || deliverableTemplate.deliverableLabel || 'Untitled Deliverable';
+            const description = deliverableTemplate.description || null;
+            const unit = deliverableTemplate.unit || null;
+            const quantity = deliverableData.quantity || deliverableTemplate.suggestedQuantity || 1;
+            const durationUnit = deliverableTemplate.durationUnit || 'hour';
+            const durationUnits = deliverableTemplate.durationSuggestedUnits || null;
+            
+            // Store phaseName, unit, durationUnit, durationUnits in notes as JSON
+            // (since ProposalDeliverable doesn't have these fields directly)
+            const notesData = {
+              phaseName,
+              unit,
+              durationUnit,
+              durationUnits,
+            };
             
             proposalDeliverables.push({
-              name: deliverableData.itemLabel || deliverableTemplate?.deliverableLabel || 'Untitled Deliverable',
-              description: deliverableData.itemDescription || deliverableTemplate?.description || null,
-              quantity,
-              unitPrice,
-              totalPrice,
-              notes: deliverableData.notes || null,
+              name: deliverableName, // Store deliverableName in name field
+              description: description,
+              quantity: quantity,
+              unitPrice: null, // Can be set later
+              totalPrice: null, // Can be calculated later
+              notes: JSON.stringify(notesData), // Store phaseName and other fields in notes
             });
           });
 
