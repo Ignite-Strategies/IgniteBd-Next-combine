@@ -373,16 +373,6 @@ function WorkPackageCSVUploadContent() {
                 selectedContact={selectedContact}
               />
             </div>
-            {selectedContact && (
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="text-sm text-green-800">
-                  <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
-                  {selectedContact.contactCompany?.companyName && (
-                    <span> • {selectedContact.contactCompany.companyName}</span>
-                  )}
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Preview Table */}
@@ -488,16 +478,6 @@ function WorkPackageCSVUploadContent() {
                 selectedContact={selectedContact}
               />
             </div>
-            {selectedContact && (
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="text-sm text-green-800">
-                  <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
-                  {selectedContact.contactCompany?.companyName && (
-                    <span> • {selectedContact.contactCompany.companyName}</span>
-                  )}
-                </p>
-              </div>
-            )}
           </div>
 
           {/* File Upload */}
