@@ -143,9 +143,15 @@ export default function WorkPackagePage() {
             </h1>
             {workPackage.contact && (
               <p className="mt-1 text-gray-600">
-                Client: {workPackage.contact.firstName} {workPackage.contact.lastName}
-                {workPackage.contact.contactCompany?.companyName && (
-                  <span> • {workPackage.contact.contactCompany.companyName}</span>
+                {workPackage.company?.companyName || workPackage.contact.contactCompany?.companyName ? (
+                  <>
+                    Company: {workPackage.company?.companyName || workPackage.contact.contactCompany?.companyName}
+                    <span className="text-gray-500"> • Contact: {workPackage.contact.firstName} {workPackage.contact.lastName}</span>
+                  </>
+                ) : (
+                  <>
+                    Client: {workPackage.contact.firstName} {workPackage.contact.lastName}
+                  </>
                 )}
               </p>
             )}

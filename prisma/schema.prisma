@@ -562,6 +562,7 @@ model WorkPackageItem {
   status              String @default("not_started") // not_started | in_progress | completed
 
   collateral          Collateral[]
+  artifacts           WorkArtifact[]
 
   createdAt           DateTime @default(now())
 
@@ -572,6 +573,28 @@ model WorkPackageItem {
   @@index([itemType]) // Keep for backward compatibility
   @@index([status])
   @@map("work_package_items")
+}
+
+model WorkArtifact {
+  id                String           @id @default(cuid())
+  workPackageItemId String
+  workPackageItem   WorkPackageItem  @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
+
+  type              String // BLOG | PERSONA | CLE_DECK | TEMPLATE | LANDING_PAGE | etc.
+  title             String?
+  contentJson       Json?
+  status            String  @default("DRAFT") // DRAFT | IN_REVIEW | APPROVED | COMPLETED
+
+  reviewRequestedAt DateTime?
+  reviewCompletedAt DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([workPackageItemId])
+  @@index([status])
+  @@index([type])
+  @@map("work_artifacts")
 }
 
 model Collateral {
