@@ -152,6 +152,7 @@ export function useCompanyHydration(companyHQId) {
     proposals: data.proposals,
     phaseTemplates: data.phaseTemplates,
     deliverableTemplates: data.deliverableTemplates,
+    workPackages: data.workPackages,
     stats: data.stats,
   };
 }
