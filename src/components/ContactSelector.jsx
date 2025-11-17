@@ -142,23 +142,21 @@ export default function ContactSelector({
       )}
       
       <div className="relative">
-        {/* Search Input */}
+        {/* Search Input - Simple search bar like Manage Contacts page */}
         <div className="relative">
           <input
             type="text"
             value={contactSearch}
             onChange={(e) => setContactSearch(e.target.value)}
-            placeholder="Search contacts..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+            placeholder="Search contacts by name, email, or company..."
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-red-500 focus:ring-2 focus:ring-red-200"
           />
-          {currentSelectedContact && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              <Users className="h-5 w-5 text-gray-400" />
-            </div>
-          )}
+          <div className="absolute left-3 top-1/2 -translate-y-1/2">
+            <Users className="h-5 w-5 text-gray-400" />
+          </div>
         </div>
 
-        {/* Dropdown Results - Only shows when searching */}
+        {/* Dropdown Results - Only shows when searching (like Manage Contacts) */}
         {contactSearch && availableContacts.length > 0 && (
           <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
             {availableContacts.map((contact) => (
