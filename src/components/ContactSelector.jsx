@@ -96,6 +96,12 @@ export default function ContactSelector({
     setContactSearch('');
   }, [contactId, selectedContact, contacts]);
 
+  // Get selected contact object (computed from selectedContactId)
+  const selectedContactObj = useMemo(() => {
+    if (!selectedContactId) return null;
+    return contacts.find((c) => c.id === selectedContactId);
+  }, [contacts, selectedContactId]);
+
   // Filter contacts based on search query - exclude already selected contact
   const availableContacts = useMemo(() => {
     if (!contactSearch || !contactSearch.trim()) {
@@ -130,12 +136,6 @@ export default function ContactSelector({
       })
       .slice(0, 20);
   }, [contacts, contactSearch, selectedContactId, selectedContactObj]);
-
-  // Get selected contact object (computed from selectedContactId)
-  const selectedContactObj = useMemo(() => {
-    if (!selectedContactId) return null;
-    return contacts.find((c) => c.id === selectedContactId);
-  }, [contacts, selectedContactId]);
 
   // Handle contact selection
   const handleSelectContact = (contact) => {
