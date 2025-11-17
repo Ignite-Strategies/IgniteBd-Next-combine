@@ -68,8 +68,8 @@ function BlankWorkPackageContent() {
         <PageHeader
           title="Create Blank Work Package"
           subtitle="Start with an empty work package and add phases and items manually"
-          backTo="/workpackages/create"
-          backLabel="Back to Options"
+          backTo="/workpackages"
+          backLabel="Back to Work Packages"
         />
 
         {error && (

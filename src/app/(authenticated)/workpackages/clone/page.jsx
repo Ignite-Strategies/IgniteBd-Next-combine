@@ -68,8 +68,8 @@ function CloneWorkPackageContent() {
         <PageHeader
           title="Clone Previous Work Package"
           subtitle="Select a work package to copy as your starting point"
-          backTo="/workpackages/create"
-          backLabel="Back to Options"
+          backTo="/workpackages"
+          backLabel="Back to Work Packages"
         />
 
         {error && (

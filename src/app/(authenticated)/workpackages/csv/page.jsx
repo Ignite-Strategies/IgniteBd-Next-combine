@@ -186,8 +186,8 @@ function WorkPackageCSVUploadContent() {
         <PageHeader
           title="Upload Work Package from CSV"
           subtitle="Import a complete work package with phases and deliverables"
-          backTo="/workpackages/create"
-          backLabel="Back to Options"
+          backTo="/workpackages"
+          backLabel="Back to Work Packages"
         />
 
         {error && (
