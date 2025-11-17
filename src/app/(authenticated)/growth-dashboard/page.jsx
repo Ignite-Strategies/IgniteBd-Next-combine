@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import api from '@/lib/api';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { useCompanyHydration } from '@/hooks/useCompanyHydration';
 
 const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
   ssr: false,
@@ -153,49 +155,13 @@ function StackCard({ name, metrics, insight, icon, color, route }) {
 
 export default function GrowthDashboardPage() {
   const router = useRouter();
-  const [companyHQId, setCompanyHQId] = useState('');
-  const [companyHQ, setCompanyHQ] = useState(null);
-  const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Load from localStorage first (instant), no loading spinner for cached data
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Load from localStorage immediately (no loading state for cached data)
-    const storedCompanyHQId =
-      window.localStorage.getItem('companyHQId') ||
-      window.localStorage.getItem('companyId') ||
-      '';
-    setCompanyHQId(storedCompanyHQId);
-
-    // Load contacts from localStorage first
-    const cachedContacts = localStorage.getItem('contacts');
-    if (cachedContacts) {
-      try {
-        const parsed = JSON.parse(cachedContacts);
-        if (Array.isArray(parsed)) {
-          setContacts(parsed);
-        }
-      } catch (err) {
-        console.warn('Failed to parse cached contacts:', err);
-      }
-    }
-
-    // Load company from localStorage
-    try {
-      const storedCompany = localStorage.getItem('companyHQ');
-      if (storedCompany) {
-        setCompanyHQ(JSON.parse(storedCompany));
-      }
-    } catch (err) {
-      console.warn('Failed to parse stored company:', err);
-    }
-
-    // Set loading to false immediately - we have cached data or empty state
-    setLoading(false);
-  }, []);
+  const { companyHQId } = useCompanyHQ();
+  
+  // Use the hydration hook - loads from localStorage immediately, no auto-fetch
+  const { data, loading, hydrated, refresh } = useCompanyHydration(companyHQId);
+  
+  const companyHQ = data.companyHQ;
+  const contacts = data.contacts || [];
 
   const hasCompany = !!companyHQ && !!companyHQId;
   const companyName = companyHQ?.companyName ?? 'Your Company';
@@ -330,8 +296,8 @@ export default function GrowthDashboardPage() {
     },
   ], [hasCompany, dashboardMetrics]);
 
-  // Show loading screen while hydrating - AFTER all hooks are called
-  if (loading) {
+  // Show loading screen only if we have no cached data
+  if (loading && !hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
