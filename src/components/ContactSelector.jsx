@@ -16,7 +16,9 @@ import api from '@/lib/api';
  */
 export default function ContactSelector({ 
   contactId, 
-  onContactChange,
+  onContactSelect,
+  onContactChange, // Legacy support
+  selectedContact,
   showLabel = true,
   className = '',
 }) {
@@ -24,7 +26,7 @@ export default function ContactSelector({
   const searchParams = useSearchParams();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedContactId, setSelectedContactId] = useState(contactId || null);
+  const [selectedContactId, setSelectedContactId] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -79,36 +81,29 @@ export default function ContactSelector({
     fetchContacts();
   }, []);
 
-  // Initialize from URL param or localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Check URL param first
-    const urlContactId = searchParams.get('contactId');
-    if (urlContactId) {
-      setSelectedContactId(urlContactId);
-      // Persist to localStorage
-      localStorage.setItem('currentClientContactId', urlContactId);
-      return;
-    }
-    
-    // Fallback to localStorage
-    const storedContactId = localStorage.getItem('currentClientContactId');
-    if (storedContactId) {
-      setSelectedContactId(storedContactId);
-    }
-  }, [searchParams]);
-
-  // Update when contactId prop changes
+  // Initialize from prop or URL param only (NO localStorage auto-select)
   useEffect(() => {
     if (contactId) {
       setSelectedContactId(contactId);
+      return;
     }
-  }, [contactId]);
+    
+    if (typeof window === 'undefined') return;
+    
+    // Only use URL param if explicitly provided
+    const urlContactId = searchParams.get('contactId');
+    if (urlContactId) {
+      setSelectedContactId(urlContactId);
+      return;
+    }
+    
+    // NO auto-select from localStorage - search-first approach
+    // User must search and select manually
+  }, [contactId, searchParams]);
 
-  // Filter contacts based on search query
+  // Filter contacts based on search query - SEARCH-FIRST (require query to show results)
   const filteredContacts = useMemo(() => {
-    if (!searchQuery) return contacts;
+    if (!searchQuery.trim()) return []; // Empty if no search query - search-first!
     
     const query = searchQuery.toLowerCase();
     return contacts.filter((contact) => {
@@ -132,17 +127,12 @@ export default function ContactSelector({
     setIsOpen(false);
     setSearchQuery('');
     
-    // Persist to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('currentClientContactId', contact.id);
+    // Call callback - support both onContactSelect and onContactChange
+    if (onContactSelect) {
+      // Get company from contact if available
+      const company = contact.contactCompany || null;
+      onContactSelect(contact, company);
     }
-    
-    // Update URL param
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('contactId', contact.id);
-    router.push(`?${params.toString()}`, { scroll: false });
-    
-    // Call callback if provided
     if (onContactChange) {
       onContactChange(contact);
     }
@@ -154,17 +144,10 @@ export default function ContactSelector({
     setIsOpen(false);
     setSearchQuery('');
     
-    // Remove from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('currentClientContactId');
+    // Call callback
+    if (onContactSelect) {
+      onContactSelect(null, null);
     }
-    
-    // Remove from URL
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('contactId');
-    router.push(`?${params.toString()}`, { scroll: false });
-    
-    // Call callback if provided
     if (onContactChange) {
       onContactChange(null);
     }
@@ -225,7 +208,7 @@ export default function ContactSelector({
           </button>
         )}
 
-        {/* Dropdown */}
+        {/* Dropdown - SEARCH FIRST */}
         {isOpen && (
           <div className="absolute z-50 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
             {/* Search Input */}
@@ -234,21 +217,25 @@ export default function ContactSelector({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search contacts..."
+                placeholder="Type to search contacts..."
                 className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                 autoFocus
               />
             </div>
 
-            {/* Contact List */}
+            {/* Contact List - Only shows results when searching */}
             <div className="max-h-60 overflow-y-auto">
               {loading ? (
                 <div className="px-4 py-8 text-center text-sm text-gray-500">
                   Loading contacts...
                 </div>
+              ) : !searchQuery.trim() ? (
+                <div className="px-4 py-8 text-center text-sm text-gray-500">
+                  Type to search for contacts...
+                </div>
               ) : filteredContacts.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-gray-500">
-                  {searchQuery ? 'No contacts found' : 'No contacts available'}
+                  No contacts found
                 </div>
               ) : (
                 filteredContacts.map((contact) => (
