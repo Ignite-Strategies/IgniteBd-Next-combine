@@ -112,8 +112,8 @@ export default function ContactSelector({
     }).slice(0, 20);
   }, [contacts, contactSearch]);
 
-  // Get selected contact object
-  const currentSelectedContact = useMemo(() => {
+  // Get selected contact object (computed from selectedContactId)
+  const selectedContactObj = useMemo(() => {
     if (!selectedContactId) return null;
     return contacts.find((c) => c.id === selectedContactId);
   }, [contacts, selectedContactId]);
@@ -185,12 +185,12 @@ export default function ContactSelector({
         )}
 
         {/* Show selected contact info below input */}
-        {currentSelectedContact && (
+        {selectedContactObj && (
           <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-2">
             <p className="text-xs text-green-800">
-              <strong>Selected:</strong> {currentSelectedContact.firstName} {currentSelectedContact.lastName}
-              {currentSelectedContact.contactCompany?.companyName && (
-                <span> • {currentSelectedContact.contactCompany.companyName}</span>
+              <strong>Selected:</strong> {selectedContactObj.firstName} {selectedContactObj.lastName}
+              {selectedContactObj.contactCompany?.companyName && (
+                <span> • {selectedContactObj.contactCompany.companyName}</span>
               )}
             </p>
           </div>
