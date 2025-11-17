@@ -96,21 +96,40 @@ export default function ContactSelector({
     setContactSearch('');
   }, [contactId, selectedContact, contacts]);
 
-  // Filter contacts based on search query
+  // Filter contacts based on search query - exclude already selected contact
   const availableContacts = useMemo(() => {
     if (!contactSearch || !contactSearch.trim()) {
       return [];
     }
     
-    const searchLower = contactSearch.toLowerCase();
-    return contacts.filter((contact) => {
-      const name = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
-      const email = (contact.email || '').toLowerCase();
-      const company = (contact.contactCompany?.companyName || '').toLowerCase();
+    // If a contact is selected and search matches exactly, don't show dropdown
+    if (selectedContactObj) {
+      const selectedName = `${selectedContactObj.firstName || ''} ${selectedContactObj.lastName || ''}`.trim().toLowerCase();
+      const selectedEmail = (selectedContactObj.email || '').toLowerCase();
+      const searchLower = contactSearch.toLowerCase();
       
-      return name.includes(searchLower) || email.includes(searchLower) || company.includes(searchLower);
-    }).slice(0, 20);
-  }, [contacts, contactSearch]);
+      // If search exactly matches selected contact, return empty (hide dropdown)
+      if (searchLower === selectedName || searchLower === selectedEmail) {
+        return [];
+      }
+    }
+    
+    const searchLower = contactSearch.toLowerCase();
+    return contacts
+      .filter((contact) => {
+        // Exclude already selected contact from results
+        if (selectedContactId && contact.id === selectedContactId) {
+          return false;
+        }
+        
+        const name = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
+        const email = (contact.email || '').toLowerCase();
+        const company = (contact.contactCompany?.companyName || '').toLowerCase();
+        
+        return name.includes(searchLower) || email.includes(searchLower) || company.includes(searchLower);
+      })
+      .slice(0, 20);
+  }, [contacts, contactSearch, selectedContactId, selectedContactObj]);
 
   // Get selected contact object (computed from selectedContactId)
   const selectedContactObj = useMemo(() => {
@@ -123,11 +142,6 @@ export default function ContactSelector({
     setSelectedContactId(contact.id);
     const displayName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '';
     setContactSearch(displayName);
-    
-    // Clear search to close dropdown
-    setTimeout(() => {
-      setContactSearch(displayName);
-    }, 0);
     
     // Call callback - support both onContactSelect and onContactChange
     if (onContactSelect) {
@@ -167,8 +181,8 @@ export default function ContactSelector({
           )}
         </div>
 
-        {/* Dropdown Results - Only shows when searching AND not already selected (like Manage Contacts) */}
-        {contactSearch && availableContacts.length > 0 && !selectedContactObj && (
+        {/* Dropdown Results - Only shows when searching (like Manage Contacts) */}
+        {contactSearch && availableContacts.length > 0 && (
           <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
             {availableContacts.map((contact) => (
               <button
