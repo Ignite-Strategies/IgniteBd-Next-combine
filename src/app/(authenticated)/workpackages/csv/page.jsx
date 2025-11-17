@@ -352,43 +352,71 @@ function WorkPackageCSVUploadContent() {
           </div>
         )}
 
-        <div className="mt-8 rounded-xl border-2 border-gray-200 bg-white p-8">
-          <div className="text-center">
-            <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
-              <Upload className="h-8 w-8 text-red-600" />
+        <div className="mt-8 space-y-6">
+          {/* Contact Selection */}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Contact</h3>
+            <div className="max-w-md">
+              <ContactSelector
+                onContactSelect={(contact, company) => {
+                  setSelectedContact(contact);
+                  setContactId(contact.id);
+                  setCompanyId(company?.id || '');
+                }}
+                selectedContact={selectedContact}
+              />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Work Package from CSV</h2>
-            <p className="text-gray-600 mb-6">
-              Upload a CSV file with phases and deliverables to automatically generate your work package.
-            </p>
-
-            <div className="flex items-center justify-center gap-4 mb-8">
-              <button
-                onClick={handleDownloadTemplate}
-                className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                Download CSV Template
-              </button>
-              <label className="rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700 cursor-pointer flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Upload CSV File
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {file && (
+            {selectedContact && (
               <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
                 <p className="text-sm text-green-800">
-                  <strong>Selected:</strong> {file.name}
+                  <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
+                  {selectedContact.contactCompany?.companyName && (
+                    <span> • {selectedContact.contactCompany.companyName}</span>
+                  )}
                 </p>
               </div>
             )}
+          </div>
+
+          {/* File Upload */}
+          <div className="rounded-xl border-2 border-gray-200 bg-white p-8">
+            <div className="text-center">
+              <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <Upload className="h-8 w-8 text-red-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Work Package from CSV</h2>
+              <p className="text-gray-600 mb-6">
+                Upload a CSV file with phases and deliverables to automatically generate your work package.
+              </p>
+
+              <div className="flex items-center justify-center gap-4 mb-8">
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Download CSV Template
+                </button>
+                <label className="rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700 cursor-pointer flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload CSV File
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {file && (
+                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <p className="text-sm text-green-800">
+                    <strong>Selected:</strong> {file.name}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
