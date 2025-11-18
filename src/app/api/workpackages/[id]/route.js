@@ -121,10 +121,23 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    // WorkPackage is now just a container - no fields to update
-    // Use phases/items routes for updates
-    const workPackage = await prisma.workPackage.findUnique({
+    // Get update data from request body
+    const body = await request.json();
+    const { title, description, totalCost, effectiveStartDate } = body;
+
+    // Build update data object (only include fields that are provided)
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (totalCost !== undefined) updateData.totalCost = totalCost;
+    if (effectiveStartDate !== undefined) {
+      updateData.effectiveStartDate = effectiveStartDate ? new Date(effectiveStartDate) : null;
+    }
+
+    // Update the work package
+    const workPackage = await prisma.workPackage.update({
       where: { id },
+      data: updateData,
       include: {
         contact: {
           select: {

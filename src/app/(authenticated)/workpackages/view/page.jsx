@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Package, RefreshCw, Trash2, Eye, Plus } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
+import { useCompanyHydration } from '@/hooks/useCompanyHydration';
 
 export default function WorkPackagesViewPage() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function WorkPackagesViewPage() {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(null);
 
-  // Load from localStorage first (check company hydration cache too)
+  // Load companyHQId and contactId from localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -27,45 +28,10 @@ export default function WorkPackagesViewPage() {
 
     const storedContactId = window.localStorage.getItem('selectedContactId') || '';
     setContactId(storedContactId);
-
-    // First try direct workPackages key
-    let cached = window.localStorage.getItem('workPackages');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setWorkPackages(parsed);
-          setLoading(false);
-          return;
-        }
-      } catch (error) {
-        console.warn('Failed to parse cached work packages', error);
-      }
-    }
-
-    // Fallback to company hydration cache
-    if (storedHQId) {
-      const hydrationKey = `companyHydration_${storedHQId}`;
-      const hydrationData = window.localStorage.getItem(hydrationKey);
-      if (hydrationData) {
-        try {
-          const parsed = JSON.parse(hydrationData);
-          if (parsed.data?.workPackages && Array.isArray(parsed.data.workPackages)) {
-            console.log(`📦 Found ${parsed.data.workPackages.length} work packages in company hydration cache`);
-            setWorkPackages(parsed.data.workPackages);
-            // Also store in direct key for consistency
-            window.localStorage.setItem('workPackages', JSON.stringify(parsed.data.workPackages));
-            setLoading(false);
-            return;
-          }
-        } catch (err) {
-          console.warn('⚠️ Failed to parse company hydration data:', err);
-        }
-      }
-    }
-
-    setLoading(false);
   }, []);
+
+  // Use company hydration hook to automatically sync work packages
+  const { workPackages: hydratedWorkPackages, refresh: refreshHydration } = useCompanyHydration(companyHQId);
 
   const fetchWorkPackages = async () => {
     try {
@@ -85,6 +51,11 @@ export default function WorkPackagesViewPage() {
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('workPackages', JSON.stringify(packagesData));
       }
+
+      // Also refresh hydration cache to keep it in sync
+      if (companyHQId && refreshHydration) {
+        await refreshHydration();
+      }
     } catch (err) {
       console.error('Error fetching work packages:', err);
       setError('Unable to load work packages.');
@@ -93,6 +64,82 @@ export default function WorkPackagesViewPage() {
       setLoading(false);
     }
   };
+
+  // Sync work packages from hydration hook (this will update when CSV imports update the cache)
+  useEffect(() => {
+    if (hydratedWorkPackages && Array.isArray(hydratedWorkPackages)) {
+      console.log(`📦 Syncing ${hydratedWorkPackages.length} work packages from hydration hook`);
+      setWorkPackages(hydratedWorkPackages);
+      if (loading) {
+        setLoading(false);
+      }
+    } else if (hydratedWorkPackages && Array.isArray(hydratedWorkPackages) && hydratedWorkPackages.length === 0) {
+      // Empty array from hook - still valid, just no packages
+      setWorkPackages([]);
+      if (loading) {
+        setLoading(false);
+      }
+    }
+  }, [hydratedWorkPackages, loading]);
+
+  // Refresh hydration cache on mount if we have companyHQId (to get latest data after CSV imports)
+  useEffect(() => {
+    if (companyHQId && refreshHydration) {
+      // Refresh to get latest data from API (including any CSV imports)
+      refreshHydration().catch(err => {
+        console.warn('Failed to refresh hydration cache:', err);
+      });
+    }
+  }, [companyHQId, refreshHydration]);
+
+  // Load from localStorage on mount (fallback if hook hasn't loaded yet)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (workPackages.length > 0) return; // Already loaded from hook
+    
+    // First try direct workPackages key
+    let cached = window.localStorage.getItem('workPackages');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setWorkPackages(parsed);
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached work packages', error);
+      }
+    }
+
+    // Fallback to company hydration cache
+    if (companyHQId) {
+      const hydrationKey = `companyHydration_${companyHQId}`;
+      const hydrationData = window.localStorage.getItem(hydrationKey);
+      if (hydrationData) {
+        try {
+          const parsed = JSON.parse(hydrationData);
+          if (parsed.data?.workPackages && Array.isArray(parsed.data.workPackages)) {
+            console.log(`📦 Found ${parsed.data.workPackages.length} work packages in company hydration cache`);
+            setWorkPackages(parsed.data.workPackages);
+            // Also store in direct key for consistency
+            window.localStorage.setItem('workPackages', JSON.stringify(parsed.data.workPackages));
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to parse company hydration data:', err);
+        }
+      }
+    }
+
+    // If no cached data, fetch from API
+    if (companyHQId) {
+      fetchWorkPackages();
+    } else {
+      setLoading(false);
+    }
+  }, [companyHQId]);
 
   const handleDelete = async (workPackageId) => {
     if (!confirm('Are you sure you want to delete this work package? This action cannot be undone.')) {

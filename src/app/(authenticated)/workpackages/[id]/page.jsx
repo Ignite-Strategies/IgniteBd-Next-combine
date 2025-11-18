@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Package, Eye, EyeOff, Mail, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Package, Eye, EyeOff, Mail, Edit, Trash2, Save, X } from 'lucide-react';
 import api from '@/lib/api';
 import Link from 'next/link';
 import { getItemTypeLabel } from '@/lib/config/workPackageConfig';
@@ -21,6 +21,9 @@ export default function WorkPackagePage() {
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState('owner'); // 'owner' | 'client'
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState('');
+  const [savingTitle, setSavingTitle] = useState(false);
 
   useEffect(() => {
     if (workPackageId) {
@@ -28,12 +31,20 @@ export default function WorkPackagePage() {
     }
   }, [workPackageId]);
 
+  // Update title value when workPackage changes
+  useEffect(() => {
+    if (workPackage?.title !== undefined && !editingTitle) {
+      setTitleValue(workPackage.title || '');
+    }
+  }, [workPackage?.title, editingTitle]);
+
   const loadWorkPackage = async () => {
     try {
       setLoading(true);
       const response = await api.get(`/api/workpackages/${workPackageId}`);
       if (response.data?.success) {
         setWorkPackage(response.data.workPackage);
+        setTitleValue(response.data.workPackage.title || '');
       } else {
         setError('Failed to load work package');
       }
@@ -43,6 +54,37 @@ export default function WorkPackagePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveTitle = async () => {
+    if (!titleValue.trim()) {
+      alert('Title cannot be empty');
+      return;
+    }
+
+    try {
+      setSavingTitle(true);
+      const response = await api.patch(`/api/workpackages/${workPackageId}`, {
+        title: titleValue.trim(),
+      });
+
+      if (response.data?.success) {
+        setWorkPackage(response.data.workPackage);
+        setEditingTitle(false);
+      } else {
+        alert('Failed to update title: ' + (response.data?.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Error updating title:', err);
+      alert('Failed to update title: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSavingTitle(false);
+    }
+  };
+
+  const handleCancelEditTitle = () => {
+    setTitleValue(workPackage?.title || '');
+    setEditingTitle(false);
   };
 
   const handleSendToClient = async () => {
@@ -138,9 +180,56 @@ export default function WorkPackagePage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">
-              {workPackage.title || 'Work Package'}
-            </h1>
+            {editingTitle ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={titleValue}
+                  onChange={(e) => setTitleValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveTitle();
+                    } else if (e.key === 'Escape') {
+                      handleCancelEditTitle();
+                    }
+                  }}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-3xl font-bold text-gray-900 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                  autoFocus
+                  disabled={savingTitle}
+                />
+                <button
+                  onClick={handleSaveTitle}
+                  disabled={savingTitle}
+                  className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="h-4 w-4" />
+                  {savingTitle ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={handleCancelEditTitle}
+                  disabled={savingTitle}
+                  className="flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {workPackage.title || 'Work Package'}
+                </h1>
+                {viewMode === 'owner' && (
+                  <button
+                    onClick={() => setEditingTitle(true)}
+                    className="text-gray-400 hover:text-gray-600 transition"
+                    title="Edit title"
+                  >
+                    <Edit className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+            )}
             {workPackage.contact && (
               <p className="mt-1 text-gray-600">
                 {workPackage.company?.companyName || workPackage.contact.contactCompany?.companyName ? (
