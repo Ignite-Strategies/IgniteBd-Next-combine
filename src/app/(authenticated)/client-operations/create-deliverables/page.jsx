@@ -12,7 +12,7 @@ export default function OldCreateDeliverablesPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/execution');
+    router.replace('/client-operations/execution');
   }, [router]);
 
   return (
