@@ -52,12 +52,9 @@ export default function ExecutionPage() {
   const router = useRouter();
   const [companyHQId, setCompanyHQId] = useState('');
   
-  // Search states
-  const [companySearchTerm, setCompanySearchTerm] = useState('');
-  const [workPackageSearchTerm, setWorkPackageSearchTerm] = useState('');
-  const [companyResults, setCompanyResults] = useState([]);
-  const [workPackageResults, setWorkPackageResults] = useState([]);
-  const [selectedCompany, setSelectedCompany] = useState(null);
+  // Work package list
+  const [workPackages, setWorkPackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
   const [selectedWorkPackage, setSelectedWorkPackage] = useState(null);
   
   // WorkPackage data
@@ -85,72 +82,33 @@ export default function ExecutionPage() {
     setCompanyHQId(storedHQId);
   }, []);
 
-  // Search companies
+  // Auto-load all work packages on mount
   useEffect(() => {
-    if (!companySearchTerm || !companyHQId) {
-      setCompanyResults([]);
-      return;
-    }
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const response = await api.get(`/api/companies?companyHQId=${companyHQId}&query=${encodeURIComponent(companySearchTerm)}`);
-        if (response.data?.success) {
-          setCompanyResults(response.data.companies || []);
-        }
-      } catch (err) {
-        console.error('Error searching companies:', err);
-        setCompanyResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [companySearchTerm, companyHQId]);
-
-  // Search work packages
-  useEffect(() => {
-    if (!workPackageSearchTerm || !companyHQId) {
-      setWorkPackageResults([]);
-      return;
-    }
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const response = await api.get(`/api/workpackages?companyHQId=${companyHQId}&search=${encodeURIComponent(workPackageSearchTerm)}`);
-        if (response.data?.success) {
-          setWorkPackageResults(response.data.workPackages || []);
-        }
-      } catch (err) {
-        console.error('Error searching work packages:', err);
-        setWorkPackageResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [workPackageSearchTerm, companyHQId]);
-
-  // Load work packages for selected company
-  useEffect(() => {
-    if (!selectedCompany?.id || !companyHQId) return;
+    if (!companyHQId) return;
 
     const loadWorkPackages = async () => {
+      setLoadingPackages(true);
       try {
-        const response = await api.get(`/api/workpackages?companyHQId=${companyHQId}&contactCompanyId=${selectedCompany.id}`);
-        if (response.data?.success && response.data.workPackages?.length > 0) {
-          // Auto-select first work package if only one
-          if (response.data.workPackages.length === 1) {
-            hydrateWorkPackage(response.data.workPackages[0].id);
-          } else {
-            setWorkPackageResults(response.data.workPackages);
+        const response = await api.get(`/api/workpackages?companyHQId=${companyHQId}`);
+        if (response.data?.success) {
+          const packages = response.data.workPackages || [];
+          setWorkPackages(packages);
+          
+          // Auto-select first work package if available
+          if (packages.length > 0 && !selectedWorkPackage) {
+            hydrateWorkPackage(packages[0].id);
           }
         }
       } catch (err) {
-        console.error('Error loading work packages for company:', err);
+        console.error('Error loading work packages:', err);
+        setError('Failed to load work packages');
+      } finally {
+        setLoadingPackages(false);
       }
     };
 
     loadWorkPackages();
-  }, [selectedCompany, companyHQId]);
+  }, [companyHQId]);
 
   // Hydrate work package
   const hydrateWorkPackage = async (workPackageId) => {
@@ -169,14 +127,6 @@ export default function ExecutionPage() {
         setPrioritySummary(wp.prioritySummary || '');
         setSelectedWorkPackage({ id: wp.id, title: wp.title });
         
-        // Set company if available (check both top-level contactCompany and nested)
-        const company = wp.contactCompany || wp.contact?.contactCompany || wp.company;
-        if (company) {
-          setSelectedCompany({
-            id: company.id,
-            companyName: company.companyName,
-          });
-        }
       } else {
         setError('Failed to load work package');
       }
@@ -262,7 +212,7 @@ export default function ExecutionPage() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           title="Execution"
-          subtitle="Search for a work package and manage execution"
+          subtitle="Select a work package to manage execution"
         />
 
         {/* Error message (inline, not a banner) */}
@@ -273,99 +223,47 @@ export default function ExecutionPage() {
           </div>
         )}
 
-        {/* Search Section */}
+        {/* Work Package Selector */}
         {!workPackage && (
-          <div className="mb-8 space-y-6">
-            {/* Company Search */}
+          <div className="mb-8">
             <div className="rounded-2xl bg-white p-6 shadow">
               <label className="mb-2 block text-sm font-semibold text-gray-900">
-                Search by Company
+                Select Work Package
               </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={companySearchTerm}
-                  onChange={(e) => {
-                    setCompanySearchTerm(e.target.value);
-                    setSelectedCompany(null);
-                  }}
-                  placeholder="Type company name..."
-                  className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-              {companyResults.length > 0 && (
-                <div className="mt-2 max-h-60 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white">
-                  {companyResults.map((company) => (
-                    <button
-                      key={company.id}
-                      onClick={() => {
-                        setSelectedCompany(company);
-                        setCompanySearchTerm(company.companyName);
-                        setCompanyResults([]);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
-                    >
-                      <div className="font-medium">{company.companyName}</div>
-                      {company.contacts?.length > 0 && (
-                        <div className="text-xs text-gray-500">
-                          {company.contacts.length} contact{company.contacts.length !== 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </button>
-                  ))}
+              {loadingPackages ? (
+                <div className="flex items-center gap-2 py-4">
+                  <Loader className="h-5 w-5 animate-spin text-gray-400" />
+                  <span className="text-sm text-gray-500">Loading work packages...</span>
                 </div>
+              ) : workPackages.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                  <p className="text-lg font-semibold text-gray-800">No work packages found</p>
+                  <p className="mt-2 text-sm text-gray-500">
+                    No work packages are available for your company
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={selectedWorkPackage?.id || ''}
+                  onChange={(e) => {
+                    const wpId = e.target.value;
+                    if (wpId) {
+                      hydrateWorkPackage(wpId);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="">-- Select a work package --</option>
+                  {workPackages.map((wp) => (
+                    <option key={wp.id} value={wp.id}>
+                      {wp.title || 'Untitled Work Package'} 
+                      {wp.contact?.contactCompany?.companyName && ` - ${wp.contact.contactCompany.companyName}`}
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
-
-            {/* WorkPackage Search */}
-            <div className="rounded-2xl bg-white p-6 shadow">
-              <label className="mb-2 block text-sm font-semibold text-gray-900">
-                Search by Work Package
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={workPackageSearchTerm}
-                  onChange={(e) => {
-                    setWorkPackageSearchTerm(e.target.value);
-                    setSelectedWorkPackage(null);
-                  }}
-                  placeholder="Type work package title..."
-                  className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-              {workPackageResults.length > 0 && (
-                <div className="mt-2 max-h-60 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white">
-                  {workPackageResults.map((wp) => (
-                    <button
-                      key={wp.id}
-                      onClick={() => hydrateWorkPackage(wp.id)}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
-                    >
-                      <div className="font-medium">{wp.title || 'Untitled Work Package'}</div>
-                      {wp.contact && (
-                        <div className="text-xs text-gray-500">
-                          {wp.contact.firstName} {wp.contact.lastName}
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Empty State - Single CTA */}
-            {!companySearchTerm && !workPackageSearchTerm && !loading && (
-              <div className="rounded-2xl bg-white p-12 text-center shadow">
-                <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                <p className="text-lg font-semibold text-gray-800">Search for a Work Package</p>
-                <p className="mt-2 text-sm text-gray-500">
-                  Use the search bars above to find a work package by company or title
-                </p>
-              </div>
-            )}
           </div>
         )}
 
