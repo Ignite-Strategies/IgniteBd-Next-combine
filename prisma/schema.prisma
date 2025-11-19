@@ -495,24 +495,24 @@ enum WorkItemStatus {
 }
 
 model WorkPackage {
-  id                String   @id @default(cuid())
-  contactId         String
-  contact           Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  companyId         String?
-  company           Company? @relation(fields: [companyId], references: [id])
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
 
-  title             String   // Proposal/work package title
-  description       String?  // Proposal description
-  prioritySummary   String?  // Consultant-written summary of key focuses
-  totalCost         Float?   // Total cost from proposal
+  title              String // Proposal/work package title
+  description        String? // Proposal description
+  prioritySummary    String? // Consultant-written summary of key focuses
+  totalCost          Float? // Total cost from proposal
   effectiveStartDate DateTime? // Optional timeline start date
 
-  phases            WorkPackagePhase[]
-  items             WorkPackageItem[]
-  invoices          Invoice[] // Invoices linked to this work package
+  phases   WorkPackagePhase[]
+  items    WorkPackageItem[]
+  invoices Invoice[] // Invoices linked to this work package
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([contactId])
   @@index([companyId])
@@ -520,19 +520,31 @@ model WorkPackage {
 }
 
 model WorkPackagePhase {
-  id                  String      @id @default(cuid())
-  workPackageId       String
-  workPackage         WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  workPackageId String
+  workPackage   WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
 
   name                String
   position            Int
-  description         String?     // Phase description
-  phaseTotalDuration  Int?        // normalized business days (backward compatibility)
-  totalEstimatedHours Int?         // Computed aggregate from items (quantity * estimatedHoursEach)
+  description         String? // Phase description
+  phaseTotalDuration  Int? // normalized business days (backward compatibility)
+  totalEstimatedHours Int? // Computed aggregate from items (quantity * estimatedHoursEach)
 
-  items               WorkPackageItem[]
+  // Estimated dates (calculated from WorkPackage effectiveStartDate)
+  estimatedStartDate DateTime? // Calculated: WorkPackage start + previous phases
+  estimatedEndDate   DateTime? // Calculated: estimatedStartDate + phaseTotalDuration
 
-  createdAt           DateTime @default(now())
+  // Actual dates (set when work begins/completes, can be manually overwritten)
+  actualStartDate DateTime? // Set when phase status changes to "in_progress" (or manually)
+  actualEndDate   DateTime? // Set when phase status changes to "completed" (or manually)
+
+  // Status tracking
+  status String? // not_started | in_progress | completed
+
+  items WorkPackageItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([workPackageId, name, position]) // For idempotent upsert
   @@index([workPackageId])
@@ -557,16 +569,16 @@ model WorkPackageItem {
   itemLabel       String // Maps to deliverableLabel
   itemDescription String? // Maps to deliverableDescription
 
-  quantity            Int
-  unitOfMeasure       String // "day" | "week" | "month" | "persona" | "event" | etc.
-  estimatedHoursEach  Int    // Hours per unit (replaces duration concept)
-  duration            Int?   // Legacy field (backward compatibility)
-  status              String @default("not_started") // not_started | in_progress | completed
+  quantity           Int
+  unitOfMeasure      String // "day" | "week" | "month" | "persona" | "event" | etc.
+  estimatedHoursEach Int // Hours per unit (replaces duration concept)
+  duration           Int? // Legacy field (backward compatibility)
+  status             String @default("not_started") // not_started | in_progress | completed
 
-  collateral          Collateral[]
-  artifacts           WorkArtifact[]
+  collateral Collateral[]
+  artifacts  WorkArtifact[]
 
-  createdAt           DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([workPackageId, workPackagePhaseId, deliverableLabel]) // For idempotent upsert
   @@index([workPackageId])
@@ -578,20 +590,20 @@ model WorkPackageItem {
 }
 
 model WorkArtifact {
-  id                String           @id @default(cuid())
+  id                String          @id @default(cuid())
   workPackageItemId String
-  workPackageItem   WorkPackageItem  @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
+  workPackageItem   WorkPackageItem @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
 
-  type              String // BLOG | PERSONA | CLE_DECK | TEMPLATE | LANDING_PAGE | etc.
-  title             String?
-  contentJson       Json?
-  status            String  @default("DRAFT") // DRAFT | IN_REVIEW | APPROVED | COMPLETED
+  type        String // BLOG | PERSONA | CLE_DECK | TEMPLATE | LANDING_PAGE | etc.
+  title       String?
+  contentJson Json?
+  status      String  @default("DRAFT") // DRAFT | IN_REVIEW | APPROVED | COMPLETED
 
   reviewRequestedAt DateTime?
   reviewCompletedAt DateTime?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workPackageItemId])
   @@index([status])
@@ -810,18 +822,18 @@ model CompanyMembership {
 // ============================================
 
 model Invoice {
-  id                String   @id @default(cuid())
-  workPackageId     String
-  workPackage       WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
-  invoiceName       String
+  id                 String             @id @default(cuid())
+  workPackageId      String
+  workPackage        WorkPackage        @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  invoiceName        String
   invoiceDescription String?
-  totalExpected     Int       @default(0)
-  totalReceived     Int       @default(0)
-  status            String    @default("pending") // "pending" | "partial" | "paid"
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  milestones        InvoiceMilestone[]
-  payments          Payment[]
+  totalExpected      Int                @default(0)
+  totalReceived      Int                @default(0)
+  status             String             @default("pending") // "pending" | "partial" | "paid"
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  milestones         InvoiceMilestone[]
+  payments           Payment[]
 
   @@index([workPackageId])
   @@index([status])
@@ -829,16 +841,16 @@ model Invoice {
 }
 
 model InvoiceMilestone {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   invoiceId      String
-  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice        Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   label          String
   expectedAmount Int
   expectedDate   DateTime?
   description    String?
-  status         String   @default("pending") // "pending" | "paid"
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         String    @default("pending") // "pending" | "paid"
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   payments       Payment[] @relation("PaymentMilestone")
 
   @@index([invoiceId])
@@ -847,18 +859,18 @@ model InvoiceMilestone {
 }
 
 model Payment {
-  id                     String  @id @default(cuid())
-  invoiceId              String
-  invoice                Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  milestoneId            String?
-  milestone              InvoiceMilestone? @relation("PaymentMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
-  amountReceived         Int
-  currency               String  @default("USD")
-  paidAt                 DateTime
-  stripeSessionId        String? @unique
-  stripePaymentIntentId  String? @unique
-  paidByContactId        String?
-  createdAt              DateTime @default(now())
+  id                    String            @id @default(cuid())
+  invoiceId             String
+  invoice               Invoice           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  milestoneId           String?
+  milestone             InvoiceMilestone? @relation("PaymentMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
+  amountReceived        Int
+  currency              String            @default("USD")
+  paidAt                DateTime
+  stripeSessionId       String?           @unique
+  stripePaymentIntentId String?           @unique
+  paidByContactId       String?
+  createdAt             DateTime          @default(now())
 
   @@index([invoiceId])
   @@index([milestoneId])
@@ -868,26 +880,26 @@ model Payment {
 }
 
 model InvoiceTemplate {
-  id        String   @id @default(cuid())
-  name      String
-  notes     String?
+  id         String                     @id @default(cuid())
+  name       String
+  notes      String?
   milestones InvoiceTemplateMilestone[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime                   @default(now())
+  updatedAt  DateTime                   @updatedAt
 
   @@map("invoice_templates")
 }
 
 model InvoiceTemplateMilestone {
-  id               String   @id @default(cuid())
-  templateId       String
-  template         InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  label            String
-  expectedAmount   Float
-  expectedDate     DateTime?
-  description      String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id             String          @id @default(cuid())
+  templateId     String
+  template       InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label          String
+  expectedAmount Float
+  expectedDate   DateTime?
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([templateId])
   @@map("invoice_template_milestones")

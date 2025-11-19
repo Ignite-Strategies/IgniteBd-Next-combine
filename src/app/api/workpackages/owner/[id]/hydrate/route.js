@@ -51,7 +51,20 @@ export async function GET(request, { params }) {
           },
         },
         phases: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            position: true,
+            description: true,
+            totalEstimatedHours: true,
+            phaseTotalDuration: true, // Calculated from totalEstimatedHours / 8 (business days)
+            estimatedStartDate: true, // Calculated: WorkPackage start + previous phases
+            estimatedEndDate: true,   // Calculated: estimatedStartDate + phaseTotalDuration
+            actualStartDate: true,    // Set when phase status → "in_progress"
+            actualEndDate: true,      // Set when phase status → "completed"
+            status: true,             // not_started | in_progress | completed
+            createdAt: true,
+            updatedAt: true,
             items: {
               include: {
                 collateral: true,

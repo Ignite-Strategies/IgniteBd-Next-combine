@@ -1,35 +1,7 @@
 import { prisma } from '../prisma';
 import { computeExpectedEndDate, computePhaseTimelineStatus } from '../utils/workPackageTimeline';
-
-/**
- * Calculate effectiveDate for a phase based on WorkPackage start date and previous phases
- * @param {Date|null} workPackageStartDate - WorkPackage effectiveStartDate
- * @param {Array} allPhases - All phases sorted by position
- * @param {number} currentPhasePosition - Position of current phase
- * @returns {Date|null} - Effective date for the phase
- */
-function calculatePhaseEffectiveDate(workPackageStartDate, allPhases, currentPhasePosition) {
-  if (!workPackageStartDate) return null;
-
-  const startDate = new Date(workPackageStartDate);
-  let currentDate = new Date(startDate);
-
-  // Sort phases by position
-  const sortedPhases = [...allPhases].sort((a, b) => a.position - b.position);
-
-  // Find all phases before current phase
-  const previousPhases = sortedPhases.filter((p) => p.position < currentPhasePosition);
-
-  // Calculate cumulative days from previous phases
-  previousPhases.forEach((phase) => {
-    if (phase.totalEstimatedHours) {
-      const days = Math.ceil(phase.totalEstimatedHours / 8);
-      currentDate.setDate(currentDate.getDate() + days);
-    }
-  });
-
-  return currentDate;
-}
+import { upsertPhaseTotalDuration } from './PhaseDurationService';
+import { calculatePhaseEffectiveDate } from './PhaseDueDateService';
 
 /**
  * Hydrate WorkPackage with artifacts and calculate progress
@@ -137,6 +109,32 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
   // Hydrate phases with aggregated hours and timeline calculations
   let hydratedPhases = [];
   if (workPackage.phases && Array.isArray(workPackage.phases)) {
+    // First, upsert phaseTotalDuration for all phases based on calculated hours
+    await Promise.all(
+      workPackage.phases.map(async (phase) => {
+        const phaseItems = hydratedItems.filter((item) => item.workPackagePhaseId === phase.id);
+        const aggregatedHours = phaseItems.reduce((sum, item) => {
+          return sum + (item.estimatedHoursEach || 0) * (item.quantity || 0);
+        }, 0);
+
+        // Only update if hours have changed
+        const currentHours = phase.totalEstimatedHours || 0;
+        if (aggregatedHours !== currentHours && aggregatedHours > 0) {
+          try {
+            await upsertPhaseTotalDuration(phase.id, aggregatedHours);
+          } catch (error) {
+            console.warn(`Failed to upsert phaseTotalDuration for phase ${phase.id}:`, error);
+          }
+        }
+      })
+    );
+
+    // Then hydrate phases for response
+    // Use actual dates when available for progressive calculation
+    let progressiveStartDate = workPackage.effectiveStartDate 
+      ? new Date(workPackage.effectiveStartDate) 
+      : null;
+
     hydratedPhases = workPackage.phases.map((phase) => {
       // Calculate aggregated hours from items in this phase
       const phaseItems = hydratedItems.filter((item) => item.workPackagePhaseId === phase.id);
@@ -144,19 +142,49 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
         return sum + (item.estimatedHoursEach || 0) * (item.quantity || 0);
       }, 0);
 
-      // Calculate effectiveDate for phase (derive from WorkPackage effectiveStartDate)
-      const effectiveDate = includeTimeline
-        ? calculatePhaseEffectiveDate(
-            workPackage.effectiveStartDate,
-            workPackage.phases,
-            phase.position
-          )
-        : null;
+      // Determine effective date for this phase:
+      // 1. If phase has actualStartDate, use it (phase already started)
+      // 2. Otherwise, calculate from WorkPackage start + previous phases
+      //    (using actual dates from previous phases when available)
+      let effectiveDate = null;
+      if (includeTimeline) {
+        if (phase.actualStartDate) {
+          // Phase has actually started - use actual start date
+          effectiveDate = new Date(phase.actualStartDate);
+        } else {
+          // Calculate from progressive start date (which uses actual dates from previous phases)
+          effectiveDate = progressiveStartDate;
+        }
+      }
 
-      // Calculate expectedEndDate
-      const expectedEndDate = includeTimeline
-        ? computeExpectedEndDate(effectiveDate, aggregatedHours || phase.totalEstimatedHours || 0)
-        : null;
+      // Calculate expectedEndDate:
+      // Use actualEndDate if phase is completed, otherwise calculate from effectiveDate
+      let expectedEndDate = null;
+      if (includeTimeline) {
+        if (phase.actualEndDate) {
+          // Phase is completed - use actual end date
+          expectedEndDate = new Date(phase.actualEndDate);
+        } else if (effectiveDate) {
+          // Calculate from effective date + hours
+          expectedEndDate = computeExpectedEndDate(
+            effectiveDate, 
+            aggregatedHours || phase.totalEstimatedHours || 0
+          );
+        }
+      }
+
+      // Update progressive start date for next phase:
+      // Use actualEndDate if available, otherwise use calculated expectedEndDate
+      if (includeTimeline) {
+        const phaseEndDate = phase.actualEndDate 
+          ? new Date(phase.actualEndDate)
+          : expectedEndDate;
+        
+        if (phaseEndDate) {
+          progressiveStartDate = new Date(phaseEndDate);
+          progressiveStartDate.setDate(progressiveStartDate.getDate() + 1);
+        }
+      }
 
       // Calculate phase status from items (derive from item statuses)
       // Phase is completed if all items are completed
@@ -174,7 +202,15 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
       return {
         ...phase,
         totalEstimatedHours: aggregatedHours || phase.totalEstimatedHours || 0,
+        // Include stored dates
+        estimatedStartDate: phase.estimatedStartDate ? new Date(phase.estimatedStartDate).toISOString() : null,
+        estimatedEndDate: phase.estimatedEndDate ? new Date(phase.estimatedEndDate).toISOString() : null,
+        actualStartDate: phase.actualStartDate ? new Date(phase.actualStartDate).toISOString() : null,
+        actualEndDate: phase.actualEndDate ? new Date(phase.actualEndDate).toISOString() : null,
+        status: phase.status || null,
+        // Calculated effective date (uses actual if available)
         effectiveDate: effectiveDate ? effectiveDate.toISOString() : null,
+        // Calculated expected end date (uses actual if available)
         expectedEndDate: expectedEndDate ? expectedEndDate.toISOString() : null,
         timelineStatus,
         items: phaseItems,

@@ -165,11 +165,12 @@ export default function ExecutionPage() {
         setPrioritySummary(wp.prioritySummary || '');
         setSelectedWorkPackage({ id: wp.id, title: wp.title });
         
-        // Set company if available
-        if (wp.contact?.contactCompany) {
+        // Set company if available (check both top-level contactCompany and nested)
+        const company = wp.contactCompany || wp.contact?.contactCompany || wp.company;
+        if (company) {
           setSelectedCompany({
-            id: wp.contact.contactCompany.id,
-            companyName: wp.contact.contactCompany.companyName,
+            id: company.id,
+            companyName: company.companyName,
           });
         }
       } else {
@@ -380,10 +381,10 @@ export default function ExecutionPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h2 className="text-2xl font-bold text-gray-900">{workPackage.title || 'Untitled Work Package'}</h2>
-                  {workPackage.contact?.contactCompany && (
+                  {(workPackage.contactCompany || workPackage.contact?.contactCompany || workPackage.company) && (
                     <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                       <Building2 className="h-4 w-4" />
-                      {workPackage.contact.contactCompany.companyName}
+                      {(workPackage.contactCompany || workPackage.contact?.contactCompany || workPackage.company)?.companyName}
                     </div>
                   )}
                   {workPackage.description && (
