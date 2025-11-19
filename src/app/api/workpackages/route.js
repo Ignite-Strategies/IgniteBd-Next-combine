@@ -106,6 +106,8 @@ export async function GET(request) {
     const id = searchParams.get('id');
     const contactId = searchParams.get('contactId');
     const companyHQId = searchParams.get('companyHQId');
+    const contactCompanyId = searchParams.get('contactCompanyId');
+    const search = searchParams.get('search');
 
     if (id) {
       // Get single WorkPackage
@@ -118,9 +120,15 @@ export async function GET(request) {
               firstName: true,
               lastName: true,
               email: true,
+              contactCompany: {
+                select: {
+                  id: true,
+                  companyName: true,
+                },
+              },
             },
           },
-          contactCompany: {
+          company: {
             select: {
               id: true,
               companyName: true,
@@ -148,10 +156,21 @@ export async function GET(request) {
     if (contactId) {
       where.contactId = contactId;
     }
-    // Filter by companyHQId through contact relationship
-    if (companyHQId) {
-      where.contact = {
-        crmId: companyHQId,
+    // Filter by companyHQId and/or contactCompanyId through contact relationship
+    if (companyHQId || contactCompanyId) {
+      where.contact = {};
+      if (companyHQId) {
+        where.contact.crmId = companyHQId;
+      }
+      if (contactCompanyId) {
+        where.contact.contactCompanyId = contactCompanyId;
+      }
+    }
+    // Search by workpackage title
+    if (search) {
+      where.title = {
+        contains: search,
+        mode: 'insensitive',
       };
     }
 
@@ -173,12 +192,12 @@ export async function GET(request) {
             firstName: true,
             lastName: true,
             email: true,
-          },
-        },
-        contactCompany: {
-          select: {
-            id: true,
-            companyName: true,
+            contactCompany: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
           },
         },
         // Only include counts, not full objects
