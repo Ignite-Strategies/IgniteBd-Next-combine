@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ContactSelector from '@/components/ContactSelector';
 import { WORK_PACKAGE_ITEM_TYPES } from '@/lib/config/workPackageConfig';
@@ -67,7 +67,7 @@ const DELIVERABLE_TYPE_CONFIG = {
   },
 };
 
-export default function CreateDeliverablesPage() {
+function CreateDeliverablesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedContact, setSelectedContact] = useState(null);
@@ -360,6 +360,29 @@ export default function CreateDeliverablesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateDeliverablesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PageHeader
+            title="Create Deliverables"
+            subtitle="Select a contact and work package, then choose what to build"
+            backTo="/client-operations"
+            backLabel="Back to Client Operations"
+          />
+          <div className="mt-8 flex items-center justify-center py-12">
+            <Loader className="h-6 w-6 animate-spin text-gray-400" />
+            <span className="ml-2 text-sm text-gray-500">Loading...</span>
+          </div>
+        </div>
+      </div>
+    }>
+      <CreateDeliverablesPageContent />
+    </Suspense>
   );
 }
 
