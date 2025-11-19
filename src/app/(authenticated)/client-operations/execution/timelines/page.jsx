@@ -31,7 +31,7 @@ function ModifyTimelinesContent() {
     if (workPackageId) {
       loadWorkPackage();
     } else {
-      router.push('/client-operations/execution');
+      router.push('/execution');
     }
   }, [workPackageId]);
 
@@ -44,12 +44,12 @@ function ModifyTimelinesContent() {
         setWorkPackage(response.data.workPackage);
       } else {
         alert('Work package not found');
-        router.push('/client-operations/execution');
+        router.push('/execution');
       }
     } catch (error) {
       console.error('Error loading work package:', error);
       alert('Failed to load work package');
-      router.push('/client-operations/execution');
+      router.push('/execution');
     } finally {
       setLoading(false);
     }
@@ -107,7 +107,7 @@ function ModifyTimelinesContent() {
         <PageHeader
           title="Modify Timelines"
           subtitle={`Manage phases for: ${workPackage.title}`}
-          backTo={`/client-operations/execution?contactId=${workPackage.contactId}&workPackageId=${workPackageId}`}
+          backTo={`/execution?contactId=${workPackage.contactId}&workPackageId=${workPackageId}`}
           backLabel="Back to Execution Hub"
         />
 
