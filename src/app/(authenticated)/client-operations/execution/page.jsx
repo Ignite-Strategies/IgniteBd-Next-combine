@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
 import api from '@/lib/api';
 import { getStatusOptions } from '@/lib/config/statusConfig';
+import PhasesSection from '@/components/execution/PhasesSection';
 import {
   Search,
   Loader,
@@ -16,6 +17,8 @@ import {
   Circle,
   PlayCircle,
   AlertCircle,
+  Save,
+  X,
 } from 'lucide-react';
 
 /**
@@ -70,6 +73,12 @@ export default function ExecutionPage() {
   // Priority editor
   const [prioritySummary, setPrioritySummary] = useState('');
   const [savingPriority, setSavingPriority] = useState(false);
+  
+  // Work package title/description editing
+  const [editingWP, setEditingWP] = useState(false);
+  const [wpTitle, setWpTitle] = useState('');
+  const [wpDescription, setWpDescription] = useState('');
+  const [savingWP, setSavingWP] = useState(false);
   
   // Item status updates
   const [updatingStatus, setUpdatingStatus] = useState({});
@@ -132,6 +141,8 @@ export default function ExecutionPage() {
         const wp = response.data.workPackage;
         setWorkPackage(wp);
         setPrioritySummary(wp.prioritySummary || '');
+        setWpTitle(wp.title || '');
+        setWpDescription(wp.description || '');
         setSelectedWorkPackage({ id: wp.id, title: wp.title });
       } else {
         setError('Failed to load work package');
@@ -198,6 +209,37 @@ export default function ExecutionPage() {
     }
   };
 
+  // Save work package title/description
+  const saveWorkPackage = async () => {
+    if (!workPackage?.id) return;
+
+    setSavingWP(true);
+    try {
+      const response = await api.patch(`/api/workpackages/${workPackage.id}`, {
+        title: wpTitle,
+        description: wpDescription,
+      });
+      
+      if (response.data?.success) {
+        setWorkPackage({ ...workPackage, title: wpTitle, description: wpDescription });
+        setSelectedWorkPackage({ id: workPackage.id, title: wpTitle });
+        setEditingWP(false);
+      }
+    } catch (err) {
+      console.error('Error saving work package:', err);
+      setError('Failed to save work package');
+    } finally {
+      setSavingWP(false);
+    }
+  };
+
+  // Cancel work package editing
+  const cancelWorkPackageEdit = () => {
+    setWpTitle(workPackage?.title || '');
+    setWpDescription(workPackage?.description || '');
+    setEditingWP(false);
+  };
+
   // Update item status
   const updateItemStatus = async (itemId, newStatus) => {
     setUpdatingStatus({ ...updatingStatus, [itemId]: true });
@@ -227,28 +269,12 @@ export default function ExecutionPage() {
     router.push(route);
   };
 
-  // Get all items from phases and top-level
-  const getAllItems = () => {
-    const items = [];
-    
-    // Items from phases
-    if (workPackage?.phases) {
-      workPackage.phases.forEach((phase) => {
-        if (phase.items) {
-          items.push(...phase.items);
-        }
-      });
+  // Handle phase update (reload work package)
+  const handlePhaseUpdate = async () => {
+    if (workPackage?.id) {
+      await hydrateWorkPackage(workPackage.id);
     }
-    
-    // Top-level items
-    if (workPackage?.items) {
-      items.push(...workPackage.items);
-    }
-    
-    return items;
   };
-
-  const items = getAllItems();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -388,28 +414,87 @@ export default function ExecutionPage() {
             <div className="rounded-2xl bg-white p-6 shadow">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-900">{workPackage.title || 'Untitled Work Package'}</h2>
-                  {(workPackage.contactCompany || workPackage.contact?.contactCompany || workPackage.company) && (
-                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
-                      <Building2 className="h-4 w-4" />
-                      {(workPackage.contactCompany || workPackage.contact?.contactCompany || workPackage.company)?.companyName}
-                    </div>
-                  )}
-                  {workPackage.description && (
-                    <p className="mt-3 text-gray-600">{workPackage.description}</p>
-                  )}
-                  <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Created: {new Date(workPackage.createdAt).toLocaleDateString()}
-                    </div>
-                    {workPackage.updatedAt && (
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Updated: {new Date(workPackage.updatedAt).toLocaleDateString()}
+                  {editingWP ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-900 mb-1">
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={wpTitle}
+                          onChange={(e) => setWpTitle(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          placeholder="Work Package Title"
+                        />
                       </div>
-                    )}
-                  </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-900 mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          value={wpDescription}
+                          onChange={(e) => setWpDescription(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          rows={3}
+                          placeholder="Work Package Description"
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={cancelWorkPackageEdit}
+                          disabled={savingWP}
+                          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <X className="h-4 w-4" />
+                          Cancel
+                        </button>
+                        <button
+                          onClick={saveWorkPackage}
+                          disabled={savingWP || !wpTitle.trim()}
+                          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                          <Save className="h-4 w-4" />
+                          {savingWP ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h2 className="text-2xl font-bold text-gray-900">{workPackage.title || 'Untitled Work Package'}</h2>
+                          {(workPackage.contactCompany || workPackage.contact?.contactCompany || workPackage.company) && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                              <Building2 className="h-4 w-4" />
+                              {(workPackage.contactCompany || workPackage.contact?.contactCompany || workPackage.company)?.companyName}
+                            </div>
+                          )}
+                          {workPackage.description && (
+                            <p className="mt-3 text-gray-600">{workPackage.description}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setEditingWP(true)}
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Created: {new Date(workPackage.createdAt).toLocaleDateString()}
+                        </div>
+                        {workPackage.updatedAt && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Updated: {new Date(workPackage.updatedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -438,66 +523,13 @@ export default function ExecutionPage() {
               />
             </div>
 
-            {/* WorkPackage Items */}
-            <div className="rounded-2xl bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Work Items</h3>
-              
-              {items.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-500">
-                  No work items found in this work package
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {items.map((item) => {
-                    const itemLabel = item.deliverableLabel || item.itemLabel || 'Untitled Item';
-                    const itemStatus = item.status || 'NOT_STARTED';
-                    const deliverableType = item.deliverableType || item.itemType || 'blog';
-                    const itemDescription = item.deliverableDescription || item.itemDescription;
-                    
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between rounded-lg border border-gray-200 p-4 hover:border-gray-300"
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{itemLabel}</div>
-                          {itemDescription && (
-                            <div className="mt-1 text-sm text-gray-500">
-                              {itemDescription}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          {/* Status Dropdown */}
-                          <select
-                            value={itemStatus}
-                            onChange={(e) => updateItemStatus(item.id, e.target.value)}
-                            disabled={updatingStatus[item.id]}
-                            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-gray-50"
-                          >
-                            {statusOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-
-                          {/* Do this work item button */}
-                          <button
-                            onClick={() => handleDoWorkItem(item)}
-                            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                          >
-                            <PlayCircle className="h-4 w-4" />
-                            Do this work item
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Phases Section */}
+            <PhasesSection
+              phases={workPackage.phases || []}
+              workPackageId={workPackage.id}
+              onPhaseUpdate={handlePhaseUpdate}
+              onItemStatusUpdate={updateItemStatus}
+            />
           </div>
         )}
       </div>
