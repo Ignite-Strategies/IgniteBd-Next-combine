@@ -267,110 +267,111 @@ export default function ExecutionPage() {
         )}
 
         {/* Company Search & Work Package Selector */}
-        {!workPackage && (
-          <div className="mb-8 space-y-6">
-            {/* Company Search */}
-            <div className="rounded-2xl bg-white p-6 shadow">
-              <label className="mb-2 block text-sm font-semibold text-gray-900">
-                Search by Company
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={companySearchTerm}
-                  onChange={(e) => {
-                    setCompanySearchTerm(e.target.value);
+        <div className="mb-8 space-y-6">
+          {/* Company Search */}
+          <div className="rounded-2xl bg-white p-6 shadow">
+            <label className="mb-2 block text-sm font-semibold text-gray-900">
+              Search by Company
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={companySearchTerm}
+                onChange={(e) => {
+                  setCompanySearchTerm(e.target.value);
+                  if (e.target.value !== selectedCompany?.companyName) {
                     setSelectedCompany(null);
                     setWorkPackages([]);
                     setWorkPackage(null);
-                  }}
-                  placeholder="Type company name..."
-                  className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-              {companySearchTerm.length >= 2 && companyResults.length > 0 && (
-                <div className="mt-2 max-h-60 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white">
-                  {companyResults.map((company) => (
-                    <button
-                      key={company.id}
-                      onClick={() => {
-                        setSelectedCompany(company);
-                        setCompanySearchTerm(company.companyName);
-                        setCompanyResults([]);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
-                    >
-                      <div className="font-medium">{company.companyName}</div>
-                      {company.contacts?.length > 0 && (
-                        <div className="text-xs text-gray-500">
-                          {company.contacts.length} contact{company.contacts.length !== 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {companySearchTerm.length >= 2 && companyResults.length === 0 && !loadingPackages && (
-                <div className="mt-2 text-sm text-gray-500">
-                  No companies found matching "{companySearchTerm}"
-                </div>
-              )}
+                    setSelectedWorkPackage(null);
+                  }
+                }}
+                placeholder="Type company name..."
+                className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              />
             </div>
-
-            {/* Work Package Selector (shown after company selection) */}
-            {selectedCompany && (
-              <div className="rounded-2xl bg-white p-6 shadow">
-                <label className="mb-2 block text-sm font-semibold text-gray-900">
-                  Select Work Package {selectedCompany.companyName && `for ${selectedCompany.companyName}`}
-                </label>
-                {loadingPackages ? (
-                  <div className="flex items-center gap-2 py-4">
-                    <Loader className="h-5 w-5 animate-spin text-gray-400" />
-                    <span className="text-sm text-gray-500">Loading work packages...</span>
-                  </div>
-                ) : workPackages.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                    <p className="text-lg font-semibold text-gray-800">No work packages found</p>
-                    <p className="mt-2 text-sm text-gray-500">
-                      No work packages are available for {selectedCompany.companyName}
-                    </p>
-                  </div>
-                ) : (
-                  <select
-                    value={selectedWorkPackage?.id || ''}
-                    onChange={(e) => {
-                      const wpId = e.target.value;
-                      if (wpId) {
-                        hydrateWorkPackage(wpId);
-                      }
+            {companySearchTerm.length >= 2 && companyResults.length > 0 && (
+              <div className="mt-2 max-h-60 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white">
+                {companyResults.map((company) => (
+                  <button
+                    key={company.id}
+                    onClick={() => {
+                      setSelectedCompany(company);
+                      setCompanySearchTerm(company.companyName);
+                      setCompanyResults([]);
                     }}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
                   >
-                    <option value="">-- Select a work package --</option>
-                    {workPackages.map((wp) => (
-                      <option key={wp.id} value={wp.id}>
-                        {wp.title || 'Untitled Work Package'}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                    <div className="font-medium">{company.companyName}</div>
+                    {company.contacts?.length > 0 && (
+                      <div className="text-xs text-gray-500">
+                        {company.contacts.length} contact{company.contacts.length !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </button>
+                ))}
               </div>
             )}
-
-            {/* Empty State */}
-            {!selectedCompany && !companySearchTerm && (
-              <div className="rounded-2xl bg-white p-12 text-center shadow">
-                <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                <p className="text-lg font-semibold text-gray-800">Search for a Company</p>
-                <p className="mt-2 text-sm text-gray-500">
-                  Search for a company above to see their work packages
-                </p>
+            {companySearchTerm.length >= 2 && companyResults.length === 0 && !loadingPackages && (
+              <div className="mt-2 text-sm text-gray-500">
+                No companies found matching "{companySearchTerm}"
               </div>
             )}
           </div>
-        )}
+
+          {/* Work Package Selector (shown after company selection) */}
+          {selectedCompany && (
+            <div className="rounded-2xl bg-white p-6 shadow">
+              <label className="mb-2 block text-sm font-semibold text-gray-900">
+                Select Work Package {selectedCompany.companyName && `for ${selectedCompany.companyName}`}
+              </label>
+              {loadingPackages ? (
+                <div className="flex items-center gap-2 py-4">
+                  <Loader className="h-5 w-5 animate-spin text-gray-400" />
+                  <span className="text-sm text-gray-500">Loading work packages...</span>
+                </div>
+              ) : workPackages.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                  <p className="text-lg font-semibold text-gray-800">No work packages found</p>
+                  <p className="mt-2 text-sm text-gray-500">
+                    No work packages are available for {selectedCompany.companyName}
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={selectedWorkPackage?.id || ''}
+                  onChange={(e) => {
+                    const wpId = e.target.value;
+                    if (wpId) {
+                      hydrateWorkPackage(wpId);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="">-- Select a work package --</option>
+                  {workPackages.map((wp) => (
+                    <option key={wp.id} value={wp.id}>
+                      {wp.title || 'Untitled Work Package'}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!selectedCompany && !companySearchTerm && !workPackage && (
+            <div className="rounded-2xl bg-white p-12 text-center shadow">
+              <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+              <p className="text-lg font-semibold text-gray-800">Search for a Company</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Search for a company above to see their work packages
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Loading State */}
         {loading && (
