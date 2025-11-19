@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
 import api from '@/lib/api';
@@ -117,6 +117,7 @@ export default function ExecutionPage() {
     return () => clearTimeout(timeoutId);
   }, [companySearchTerm, companyHQId]);
 
+
   // Auto-load work packages when company is selected
   useEffect(() => {
     if (!selectedCompany?.id || !companyHQId) {
@@ -152,10 +153,7 @@ export default function ExecutionPage() {
     };
 
     loadWorkPackages();
-  }, [selectedCompany, companyHQId]);
-
-  // Hydrate work package
-  const hydrateWorkPackage = async (workPackageId) => {
+  }, [selectedCompany, companyHQId, hydrateWorkPackage]);
     if (!workPackageId) return;
 
     setLoading(true);
