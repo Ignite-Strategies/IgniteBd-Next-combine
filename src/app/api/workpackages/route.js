@@ -145,11 +145,28 @@ export async function GET(request) {
 
     // List WorkPackages
     const where = {};
-    if (contactId) where.contactId = contactId;
+    if (contactId) {
+      where.contactId = contactId;
+    }
+    // Filter by companyHQId through contact relationship
+    if (companyHQId) {
+      where.contact = {
+        crmId: companyHQId,
+      };
+    }
 
+    // For list view, return minimal data (IDs only) to reduce payload
+    // Full hydration happens on detail page
     const workPackages = await prisma.workPackage.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        totalCost: true,
+        effectiveStartDate: true,
+        createdAt: true,
+        updatedAt: true,
         contact: {
           select: {
             id: true,
@@ -158,13 +175,19 @@ export async function GET(request) {
             email: true,
           },
         },
-        phases: {
-          include: {
+        contactCompany: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        // Only include counts, not full objects
+        _count: {
+          select: {
+            phases: true,
             items: true,
           },
-          orderBy: { position: 'asc' },
         },
-        items: true,
       },
       orderBy: {
         createdAt: 'desc',

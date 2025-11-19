@@ -77,24 +77,15 @@ export default function ExecutionPage() {
     router.push(`/workpackages/${workPackageId}`);
   };
 
+  // Use count data from API (minimal payload - no nested objects)
   const getTotalItems = (workPackage) => {
-    const phaseItems = workPackage.phases?.reduce((sum, phase) => sum + (phase.items?.length || 0), 0) || 0;
-    const directItems = workPackage.items?.length || 0;
-    return phaseItems + directItems;
+    return workPackage._count?.items || 0;
   };
 
+  // Hours calculation removed - would require full hydration
+  // This is just a list view, full data loads on detail page
   const getTotalHours = (workPackage) => {
-    const phaseHours = workPackage.phases?.reduce((sum, phase) => {
-      return sum + (phase.items?.reduce((itemSum, item) => {
-        return itemSum + ((item.estimatedHoursEach || 0) * (item.quantity || 0));
-      }, 0) || 0);
-    }, 0) || 0;
-    
-    const directHours = workPackage.items?.reduce((sum, item) => {
-      return sum + ((item.estimatedHoursEach || 0) * (item.quantity || 0));
-    }, 0) || 0;
-    
-    return phaseHours + directHours;
+    return 'N/A'; // Hours require full item data - load on detail page
   };
 
   return (
@@ -159,13 +150,10 @@ export default function ExecutionPage() {
                   
                   <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-500">
                     <span>
-                      Phases: <span className="font-semibold text-gray-900">{workPackage.phases?.length || 0}</span>
+                      Phases: <span className="font-semibold text-gray-900">{workPackage._count?.phases || 0}</span>
                     </span>
                     <span>
                       Items: <span className="font-semibold text-gray-900">{getTotalItems(workPackage)}</span>
-                    </span>
-                    <span>
-                      Hours: <span className="font-semibold text-gray-900">{getTotalHours(workPackage)}</span>
                     </span>
                     {workPackage.totalCost && (
                       <span>
