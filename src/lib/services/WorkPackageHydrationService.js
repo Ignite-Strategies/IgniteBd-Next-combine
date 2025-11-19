@@ -15,6 +15,20 @@ import { calculatePhaseEffectiveDate } from './PhaseDueDateService';
 export async function hydrateWorkPackage(workPackage, options = {}) {
   const { clientView = false, includeTimeline = !clientView } = options;
 
+  // Upsert effectiveStartDate to Nov 10, 2024 if not set
+  if (!workPackage.effectiveStartDate) {
+    const nov10 = new Date('2024-11-10');
+    try {
+      await prisma.workPackage.update({
+        where: { id: workPackage.id },
+        data: { effectiveStartDate: nov10 },
+      });
+      workPackage.effectiveStartDate = nov10;
+    } catch (error) {
+      console.warn(`Failed to upsert effectiveStartDate for work package ${workPackage.id}:`, error);
+    }
+  }
+
   // Hydrate each item with its WorkCollateral
   const hydratedItems = await Promise.all(
     workPackage.items.map(async (item) => {
@@ -77,6 +91,22 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
       ? new Date(workPackage.effectiveStartDate) 
       : null;
 
+    // Ensure phase 1's estimatedStartDate matches effectiveStartDate
+    if (workPackage.phases && workPackage.phases.length > 0) {
+      const phase1 = workPackage.phases.find(p => p.position === 1);
+      if (phase1 && workPackage.effectiveStartDate && !phase1.estimatedStartDate) {
+        try {
+          await prisma.workPackagePhase.update({
+            where: { id: phase1.id },
+            data: { estimatedStartDate: new Date(workPackage.effectiveStartDate) },
+          });
+          phase1.estimatedStartDate = workPackage.effectiveStartDate;
+        } catch (error) {
+          console.warn(`Failed to set phase 1 estimatedStartDate:`, error);
+        }
+      }
+    }
+
     hydratedPhases = workPackage.phases.map((phase) => {
       // Calculate aggregated hours from items in this phase
       const phaseItems = hydratedItems.filter((item) => item.workPackagePhaseId === phase.id);
@@ -85,14 +115,20 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
       }, 0);
 
       // Determine effective date for this phase:
-      // 1. If phase has actualStartDate, use it (phase already started)
-      // 2. Otherwise, calculate from WorkPackage start + previous phases
-      //    (using actual dates from previous phases when available)
+      // Phase 1: Default to WorkPackage effectiveStartDate if no estimatedStartDate
+      // Phase 2+: Use estimatedStartDate or calculate from previous phases
+      // If phase has actualStartDate, use it (phase already started)
       let effectiveDate = null;
       if (includeTimeline) {
         if (phase.actualStartDate) {
           // Phase has actually started - use actual start date
           effectiveDate = new Date(phase.actualStartDate);
+        } else if (phase.estimatedStartDate) {
+          // Use stored estimatedStartDate
+          effectiveDate = new Date(phase.estimatedStartDate);
+        } else if (phase.position === 1 && workPackage.effectiveStartDate) {
+          // Phase 1 defaults to effectiveStartDate
+          effectiveDate = new Date(workPackage.effectiveStartDate);
         } else {
           // Calculate from progressive start date (which uses actual dates from previous phases)
           effectiveDate = progressiveStartDate;

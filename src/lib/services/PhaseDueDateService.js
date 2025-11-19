@@ -41,16 +41,16 @@ export function calculatePhaseEffectiveDate(workPackageStartDate, allPhases, cur
       currentDate.setDate(currentDate.getDate() + 1); // Next phase starts day after
     } 
     // If phase has actualStartDate (in progress), calculate from actual start
-    else if (phase.actualStartDate && phase.phaseTotalDuration) {
+    else if (phase.actualStartDate) {
       const actualStart = new Date(phase.actualStartDate);
-      const days = phase.phaseTotalDuration || Math.ceil((phase.totalEstimatedHours || 0) / 8);
+      const days = Math.ceil((phase.totalEstimatedHours || 0) / 8);
       currentDate = new Date(actualStart);
       currentDate.setDate(currentDate.getDate() + days);
       currentDate.setDate(currentDate.getDate() + 1); // Next phase starts day after
     }
     // Otherwise, use estimated duration
     else {
-      const days = phase.phaseTotalDuration || Math.ceil((phase.totalEstimatedHours || 0) / 8);
+      const days = Math.ceil((phase.totalEstimatedHours || 0) / 8);
       currentDate.setDate(currentDate.getDate() + days);
     }
   });
@@ -123,17 +123,15 @@ export async function recalculateAllPhaseDates(workPackageId, overwriteActuals =
       return sum + (item.estimatedHoursEach || 0) * (item.quantity || 0);
     }, 0);
 
-    // Calculate phaseTotalDuration (business days)
-    const phaseTotalDuration = totalEstimatedHours > 0 
-      ? Math.ceil(totalEstimatedHours / 8) 
-      : 0;
-
     // Determine start date for this phase:
-    // 1. If actualStartDate exists, use it (phase already started)
-    // 2. Otherwise, use calculated estimatedStartDate
+    // Phase 1: Use WorkPackage effectiveStartDate (or currentStartDate if set)
+    // Phase 2+: Use calculated from previous phases
+    // If actualStartDate exists, use it (phase already started)
     const phaseStartDate = phase.actualStartDate 
       ? new Date(phase.actualStartDate)
-      : currentStartDate;
+      : (phase.position === 1 && workPackage.effectiveStartDate)
+        ? new Date(workPackage.effectiveStartDate) // Phase 1 defaults to effectiveStartDate
+        : currentStartDate;
 
     // Calculate estimatedEndDate if we have a start date
     let estimatedEndDate = null;
@@ -144,8 +142,7 @@ export async function recalculateAllPhaseDates(workPackageId, overwriteActuals =
     // Build update data
     const updateData = {
       totalEstimatedHours,
-      phaseTotalDuration,
-      estimatedStartDate: currentStartDate, // Always store the calculated estimated start
+      estimatedStartDate: phaseStartDate, // Store the calculated/actual start date
       estimatedEndDate,
     };
 
@@ -168,6 +165,17 @@ export async function recalculateAllPhaseDates(workPackageId, overwriteActuals =
     });
 
     updatedPhases.push(updatedPhase);
+
+    // For phase 1, ensure estimatedStartDate matches effectiveStartDate
+    if (phase.position === 1 && workPackage.effectiveStartDate && !phase.actualStartDate) {
+      if (!updatedPhase.estimatedStartDate || 
+          new Date(updatedPhase.estimatedStartDate).getTime() !== new Date(workPackage.effectiveStartDate).getTime()) {
+        await prisma.workPackagePhase.update({
+          where: { id: phase.id },
+          data: { estimatedStartDate: new Date(workPackage.effectiveStartDate) },
+        });
+      }
+    }
 
     // Move to next phase's start date:
     // Use actualEndDate if phase is completed, otherwise use estimatedEndDate

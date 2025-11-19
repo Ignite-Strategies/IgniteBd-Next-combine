@@ -58,9 +58,8 @@ export async function GET(request, { params }) {
             position: true,
             description: true,
             totalEstimatedHours: true,
-            phaseTotalDuration: true, // Calculated from totalEstimatedHours / 8 (business days)
             estimatedStartDate: true, // Calculated: WorkPackage start + previous phases
-            estimatedEndDate: true,   // Calculated: estimatedStartDate + phaseTotalDuration
+            estimatedEndDate: true,   // Calculated: estimatedStartDate + (totalEstimatedHours / 8)
             actualStartDate: true,    // Set when phase status → "in_progress"
             actualEndDate: true,      // Set when phase status → "completed"
             status: true,             // not_started | in_progress | completed
@@ -178,9 +177,8 @@ export async function PATCH(request, { params }) {
             position: true,
             description: true,
             totalEstimatedHours: true,
-            phaseTotalDuration: true, // Calculated from totalEstimatedHours / 8 (business days)
             estimatedStartDate: true, // Calculated: WorkPackage start + previous phases
-            estimatedEndDate: true,   // Calculated: estimatedStartDate + phaseTotalDuration
+            estimatedEndDate: true,   // Calculated: estimatedStartDate + (totalEstimatedHours / 8)
             actualStartDate: true,    // Set when phase status → "in_progress"
             actualEndDate: true,      // Set when phase status → "completed"
             status: true,             // not_started | in_progress | completed
