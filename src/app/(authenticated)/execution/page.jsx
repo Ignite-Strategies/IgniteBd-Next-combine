@@ -89,7 +89,13 @@ export default function ExecutionPage() {
 
   // Search companies
   useEffect(() => {
-    if (!companySearchTerm || !companyHQId) {
+    if (!companyHQId) {
+      setCompanyResults([]);
+      return;
+    }
+
+    // Don't search if search term is too short (less than 2 characters)
+    if (companySearchTerm.length < 2) {
       setCompanyResults([]);
       return;
     }
@@ -99,6 +105,8 @@ export default function ExecutionPage() {
         const response = await api.get(`/api/companies?companyHQId=${companyHQId}&query=${encodeURIComponent(companySearchTerm)}`);
         if (response.data?.success) {
           setCompanyResults(response.data.companies || []);
+        } else {
+          setCompanyResults([]);
         }
       } catch (err) {
         console.error('Error searching companies:', err);
@@ -281,7 +289,7 @@ export default function ExecutionPage() {
                   className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
               </div>
-              {companyResults.length > 0 && (
+              {companySearchTerm.length >= 2 && companyResults.length > 0 && (
                 <div className="mt-2 max-h-60 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white">
                   {companyResults.map((company) => (
                     <button
@@ -301,6 +309,11 @@ export default function ExecutionPage() {
                       )}
                     </button>
                   ))}
+                </div>
+              )}
+              {companySearchTerm.length >= 2 && companyResults.length === 0 && !loadingPackages && (
+                <div className="mt-2 text-sm text-gray-500">
+                  No companies found matching "{companySearchTerm}"
                 </div>
               )}
             </div>
@@ -402,21 +415,26 @@ export default function ExecutionPage() {
 
             {/* Priority Editor */}
             <div className="rounded-2xl bg-white p-6 shadow">
-              <label className="mb-2 block text-sm font-semibold text-gray-900">
-                Priorities this week
-              </label>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="block text-sm font-semibold text-gray-900">
+                  Priorities this week
+                </label>
+                <button
+                  onClick={savePriority}
+                  disabled={savingPriority || !prioritySummary.trim()}
+                  className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {savingPriority ? 'Saving...' : 'Save'}
+                </button>
+              </div>
               <textarea
                 value={prioritySummary}
                 onChange={(e) => setPrioritySummary(e.target.value)}
-                onBlur={savePriority}
                 disabled={savingPriority}
                 placeholder="Enter priorities for this week..."
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-gray-50"
                 rows={4}
               />
-              {savingPriority && (
-                <div className="mt-2 text-xs text-gray-500">Saving...</div>
-              )}
             </div>
 
             {/* WorkPackage Items */}
