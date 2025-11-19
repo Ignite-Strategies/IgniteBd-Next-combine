@@ -82,6 +82,60 @@ export default function ExecutionPage() {
     setCompanyHQId(storedHQId);
   }, []);
 
+  // Hydrate work package
+  const hydrateWorkPackage = async (workPackageId) => {
+    if (!workPackageId) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Use hydrate route for full data
+      const response = await api.get(`/api/workpackages/${workPackageId}/hydrate`);
+      
+      if (response.data?.success && response.data.workPackage) {
+        const wp = response.data.workPackage;
+        setWorkPackage(wp);
+        setPrioritySummary(wp.prioritySummary || '');
+        setSelectedWorkPackage({ id: wp.id, title: wp.title });
+      } else {
+        setError('Failed to load work package');
+      }
+    } catch (err) {
+      console.error('Error hydrating work package:', err);
+      setError(err.response?.data?.error || 'Failed to load work package');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Hydrate work package
+  const hydrateWorkPackage = async (workPackageId) => {
+    if (!workPackageId) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Use hydrate route for full data
+      const response = await api.get(`/api/workpackages/${workPackageId}/hydrate`);
+      
+      if (response.data?.success && response.data.workPackage) {
+        const wp = response.data.workPackage;
+        setWorkPackage(wp);
+        setPrioritySummary(wp.prioritySummary || '');
+        setSelectedWorkPackage({ id: wp.id, title: wp.title });
+      } else {
+        setError('Failed to load work package');
+      }
+    } catch (err) {
+      console.error('Error hydrating work package:', err);
+      setError(err.response?.data?.error || 'Failed to load work package');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Auto-load all work packages on mount
   useEffect(() => {
     if (!companyHQId) return;
@@ -108,35 +162,8 @@ export default function ExecutionPage() {
     };
 
     loadWorkPackages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyHQId]);
-
-  // Hydrate work package
-  const hydrateWorkPackage = async (workPackageId) => {
-    if (!workPackageId) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Use hydrate route for full data
-      const response = await api.get(`/api/workpackages/${workPackageId}/hydrate`);
-      
-      if (response.data?.success && response.data.workPackage) {
-        const wp = response.data.workPackage;
-        setWorkPackage(wp);
-        setPrioritySummary(wp.prioritySummary || '');
-        setSelectedWorkPackage({ id: wp.id, title: wp.title });
-        
-      } else {
-        setError('Failed to load work package');
-      }
-    } catch (err) {
-      console.error('Error hydrating work package:', err);
-      setError(err.response?.data?.error || 'Failed to load work package');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Save priority summary
   const savePriority = async () => {
