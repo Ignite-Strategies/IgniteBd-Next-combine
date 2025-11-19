@@ -66,18 +66,12 @@ export async function GET(request, { params }) {
             createdAt: true,
             updatedAt: true,
             items: {
-              include: {
-                collateral: true,
-              },
               orderBy: { createdAt: 'asc' },
             },
           },
           orderBy: { position: 'asc' },
         },
         items: {
-          include: {
-            collateral: true,
-          },
           orderBy: { createdAt: 'asc' },
         },
       },

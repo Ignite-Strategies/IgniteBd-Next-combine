@@ -72,12 +72,9 @@ export async function GET(request, { params }) {
           },
           orderBy: { position: 'asc' },
         },
-        items: {
-          include: {
-            collateral: true,
-          },
-          orderBy: { createdAt: 'asc' },
-        },
+            items: {
+              orderBy: { createdAt: 'asc' },
+            },
       },
     });
 
@@ -195,12 +192,9 @@ export async function PATCH(request, { params }) {
           },
           orderBy: { position: 'asc' },
         },
-        items: {
-          include: {
-            collateral: true,
-          },
-          orderBy: { createdAt: 'asc' },
-        },
+            items: {
+              orderBy: { createdAt: 'asc' },
+            },
       },
     });
 
