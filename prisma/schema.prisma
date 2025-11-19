@@ -369,7 +369,7 @@ model ProposalDeliverable {
 model Persona {
   id              String      @id @default(cuid())
   companyHQId     String
-  personName      String
+  personName      String @default("")
   title           String
   headline        String?
   seniority       String?
@@ -555,7 +555,7 @@ model WorkPackagePhase {
   items WorkPackageItem[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([workPackageId, name, position]) // For idempotent upsert
   @@index([workPackageId])
@@ -576,8 +576,8 @@ model WorkPackageItem {
   deliverableDescription String?
 
   // Legacy fields (backward compatibility - synced with CSV fields)
-  itemType        String // Maps to deliverableType
-  itemLabel       String // Maps to deliverableLabel
+  itemType        String @default("") // Maps to deliverableType
+  itemLabel       String @default("") // Maps to deliverableLabel
   itemDescription String? // Maps to deliverableDescription
 
   quantity           Int
