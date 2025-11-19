@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
 import api from '@/lib/api';
+import { getStatusOptions } from '@/lib/config/statusConfig';
 import {
   Search,
   Loader,
@@ -70,6 +71,9 @@ export default function ExecutionPage() {
   
   // Item status updates
   const [updatingStatus, setUpdatingStatus] = useState({});
+
+  // Status options for dropdown (hydrated from config)
+  const statusOptions = getStatusOptions(false); // false = owner view
 
   // Load companyHQId from localStorage
   useEffect(() => {
@@ -437,7 +441,7 @@ export default function ExecutionPage() {
                 <div className="space-y-4">
                   {items.map((item) => {
                     const itemLabel = item.deliverableLabel || item.itemLabel || 'Untitled Item';
-                    const itemStatus = item.status || 'not_started';
+                    const itemStatus = item.status || 'NOT_STARTED';
                     const deliverableType = item.deliverableType || item.itemType || 'blog';
                     const itemDescription = item.deliverableDescription || item.itemDescription;
                     
@@ -463,9 +467,11 @@ export default function ExecutionPage() {
                             disabled={updatingStatus[item.id]}
                             className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-gray-50"
                           >
-                            <option value="not_started">Not Started</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
+                            {statusOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
                           </select>
 
                           {/* Do this work item button */}

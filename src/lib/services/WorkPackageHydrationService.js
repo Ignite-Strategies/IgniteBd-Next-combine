@@ -4,86 +4,28 @@ import { upsertPhaseTotalDuration } from './PhaseDurationService';
 import { calculatePhaseEffectiveDate } from './PhaseDueDateService';
 
 /**
- * Hydrate WorkPackage with artifacts and calculate progress
- * Uses Collateral model to link artifacts to items
- * @param {Object} workPackage - WorkPackage from Prisma (with collateral already included)
+ * Hydrate WorkPackage with WorkCollateral and calculate progress
+ * Uses WorkCollateral model as source of truth
+ * @param {Object} workPackage - WorkPackage from Prisma (with workCollateral already included)
  * @param {Object} options - Options for hydration
- * @param {boolean} options.clientView - If true, only return published artifacts
+ * @param {boolean} options.clientView - If true, only return published collateral
  * @param {boolean} options.includeTimeline - If true, include timeline calculations (default: true for owner view)
  * @returns {Promise<Object>} - Hydrated work package with progress
  */
 export async function hydrateWorkPackage(workPackage, options = {}) {
   const { clientView = false, includeTimeline = !clientView } = options;
 
-  // Hydrate each item with its artifacts from collateral
+  // Hydrate each item with its WorkCollateral
   const hydratedItems = await Promise.all(
     workPackage.items.map(async (item) => {
-      const collateral = item.collateral || [];
-      const artifacts = [];
-      let completedCount = 0;
+      // Get WorkCollateral for this item
+      const workCollateral = await prisma.workCollateral.findMany({
+        where: { workPackageItemId: item.id },
+      });
 
-      // Load artifacts based on collateral type
-      for (const coll of collateral) {
-        try {
-          let artifact = null;
-
-          switch (coll.collateralType) {
-            case 'blog':
-              artifact = await prisma.blog.findUnique({
-                where: { id: coll.collateralRefId },
-              });
-              if (artifact && (!clientView || artifact.published)) {
-                artifacts.push({ ...artifact, collateralType: 'blog' });
-                completedCount++;
-              }
-              break;
-
-            case 'persona':
-              artifact = await prisma.persona.findUnique({
-                where: { id: coll.collateralRefId },
-              });
-              if (artifact && (!clientView || artifact.published)) {
-                artifacts.push({ ...artifact, collateralType: 'persona' });
-                completedCount++;
-              }
-              break;
-
-            case 'template':
-              artifact = await prisma.template.findUnique({
-                where: { id: coll.collateralRefId },
-              });
-              if (artifact && (!clientView || artifact.published)) {
-                artifacts.push({ ...artifact, collateralType: 'template' });
-                completedCount++;
-              }
-              break;
-
-            case 'deck':
-            case 'event_targets':
-              artifact = await prisma.cleDeck.findUnique({
-                where: { id: coll.collateralRefId },
-              });
-              if (artifact && (!clientView || artifact.published)) {
-                artifacts.push({ ...artifact, collateralType: coll.collateralType });
-                completedCount++;
-              }
-              break;
-
-            case 'page':
-            case 'lead_form':
-              artifact = await prisma.landingPage.findUnique({
-                where: { id: coll.collateralRefId },
-              });
-              if (artifact && (!clientView || artifact.published)) {
-                artifacts.push({ ...artifact, collateralType: coll.collateralType });
-                completedCount++;
-              }
-              break;
-          }
-        } catch (error) {
-          console.warn(`Failed to load artifact ${coll.collateralRefId} of type ${coll.collateralType}:`, error);
-        }
-      }
+      const completedCount = workCollateral.filter(
+        (wc) => wc.status === 'APPROVED'
+      ).length;
 
       const progress = {
         completed: completedCount,
@@ -93,7 +35,7 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
 
       return {
         ...item,
-        artifacts,
+        workCollateral,
         progress,
       };
     })

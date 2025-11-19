@@ -67,9 +67,6 @@ export async function GET(request, { params }) {
             createdAt: true,
             updatedAt: true,
             items: {
-              include: {
-                collateral: true,
-              },
               orderBy: { createdAt: 'asc' },
             },
           },
@@ -153,7 +150,7 @@ export async function PATCH(request, { params }) {
     const wasEffectiveStartDateUpdated = effectiveStartDate !== undefined;
 
     // Update the work package
-    const workPackage = await prisma.workPackage.update({
+    let workPackage = await prisma.workPackage.update({
       where: { id },
       data: updateData,
       include: {
@@ -193,9 +190,6 @@ export async function PATCH(request, { params }) {
             createdAt: true,
             updatedAt: true,
             items: {
-              include: {
-                collateral: true,
-              },
               orderBy: { createdAt: 'asc' },
             },
           },
@@ -254,18 +248,12 @@ export async function PATCH(request, { params }) {
                 createdAt: true,
                 updatedAt: true,
                 items: {
-                  include: {
-                    collateral: true,
-                  },
                   orderBy: { createdAt: 'asc' },
                 },
               },
               orderBy: { position: 'asc' },
             },
             items: {
-              include: {
-                collateral: true,
-              },
               orderBy: { createdAt: 'asc' },
             },
           },

@@ -494,12 +494,23 @@ enum WorkItemStatus {
   COMPLETED
 }
 
+enum WorkPackageItemStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  IN_REVIEW
+  CHANGES_NEEDED
+  CHANGES_IN_PROGRESS
+  APPROVED
+}
+
 model WorkPackage {
   id        String   @id @default(cuid())
   contactId String
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id])
+
+  workCollateral WorkCollateral[]
 
   title              String // Proposal/work package title
   description        String? // Proposal description
@@ -573,10 +584,9 @@ model WorkPackageItem {
   unitOfMeasure      String // "day" | "week" | "month" | "persona" | "event" | etc.
   estimatedHoursEach Int // Hours per unit (replaces duration concept)
   duration           Int? // Legacy field (backward compatibility)
-  status             String @default("not_started") // not_started | in_progress | completed
+  status             WorkPackageItemStatus @default(NOT_STARTED)
 
-  collateral Collateral[]
-  artifacts  WorkArtifact[]
+  workCollateral WorkCollateral[]
 
   createdAt DateTime @default(now())
 
@@ -589,15 +599,18 @@ model WorkPackageItem {
   @@map("work_package_items")
 }
 
-model WorkArtifact {
-  id                String          @id @default(cuid())
-  workPackageItemId String
-  workPackageItem   WorkPackageItem @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
+model WorkCollateral {
+  id                String           @id @default(cuid())
+  workPackageId     String?
+  workPackage       WorkPackage?     @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  workPackageItemId String?
+  workPackageItem   WorkPackageItem? @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
 
-  type        String // BLOG | PERSONA | CLE_DECK | TEMPLATE | LANDING_PAGE | etc.
+  type        String // BLOG | PERSONA | CLE_DECK | TEMPLATE | ETC
   title       String?
   contentJson Json?
-  status      String  @default("DRAFT") // DRAFT | IN_REVIEW | APPROVED | COMPLETED
+
+  status WorkCollateralStatus @default(IN_PROGRESS)
 
   reviewRequestedAt DateTime?
   reviewCompletedAt DateTime?
@@ -605,27 +618,20 @@ model WorkArtifact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([workPackageId])
   @@index([workPackageItemId])
   @@index([status])
   @@index([type])
-  @@map("work_artifacts")
+  @@map("work_collateral")
 }
 
-model Collateral {
-  id                String          @id @default(cuid())
-  workPackageItemId String
-  workPackageItem   WorkPackageItem @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
-
-  collateralType  String // blog | persona | template | deck | event_targets | page | lead_form
-  collateralRefId String // FK to clientBlogId, clientPersonaId, etc.
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([workPackageItemId])
-  @@index([collateralType])
-  @@index([collateralRefId])
-  @@map("collateral")
+enum WorkCollateralStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  IN_REVIEW
+  CHANGES_NEEDED
+  CHANGES_IN_PROGRESS
+  APPROVED
 }
 
 // Artifact Models (standalone content models)
