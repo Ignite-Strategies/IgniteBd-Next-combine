@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { hydrateWorkPackage } from '@/lib/services/WorkPackageHydrationService';
-import { recalculateAllPhaseDates } from '@/lib/services/PhaseDueDateService';
+import { upsertWorkPackageEffectiveDate } from '@/lib/services/PhaseDueDateService';
 
 /**
  * GET /api/workpackages/:id
@@ -196,10 +196,10 @@ export async function PATCH(request, { params }) {
       },
     });
 
-    // If effectiveStartDate was updated, recalculate all phase dates
-    if (wasEffectiveStartDateUpdated) {
+    // If effectiveStartDate was updated, update Phase 1 and shift subsequent phases
+    if (wasEffectiveStartDateUpdated && effectiveStartDate) {
       try {
-        await recalculateAllPhaseDates(id, false);
+        await upsertWorkPackageEffectiveDate(id, effectiveStartDate);
         // Reload work package to get updated phase dates
         const updatedWorkPackage = await prisma.workPackage.findUnique({
           where: { id },
