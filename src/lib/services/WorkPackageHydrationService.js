@@ -114,12 +114,31 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
 
     // Sort phases by position
     hydratedPhases.sort((a, b) => a.position - b.position);
+    
+    // Determine current phase: first phase that is not_started or in_progress
+    const currentPhase = hydratedPhases.find(
+      (phase) => phase.status === 'not_started' || phase.status === 'in_progress'
+    ) || null;
+    
+    // Add currentPhase to hydrated work package
+    return {
+      ...workPackage,
+      items: hydratedItems,
+      phases: hydratedPhases,
+      currentPhase, // First phase in queue (not_started or in_progress)
+      progress: {
+        completed: completedItems,
+        total: totalItems,
+        percentage: overallProgress,
+      },
+    };
   }
 
   return {
     ...workPackage,
     items: hydratedItems,
     phases: hydratedPhases,
+    currentPhase: null, // No phases or all completed
     progress: {
       completed: completedItems,
       total: totalItems,
