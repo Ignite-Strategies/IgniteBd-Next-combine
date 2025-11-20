@@ -37,10 +37,10 @@ async function calculatePhaseDurations() {
           },
         },
       },
-      orderBy: {
-        workPackageId: 'asc',
-        position: 'asc',
-      },
+      orderBy: [
+        { workPackageId: 'asc' },
+        { position: 'asc' },
+      ],
     });
 
     console.log(`Found ${phases.length} phases to process\n`);
