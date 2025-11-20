@@ -74,10 +74,11 @@ export default function ExecutionPage() {
   const [prioritySummary, setPrioritySummary] = useState('');
   const [savingPriority, setSavingPriority] = useState(false);
   
-  // Work package title/description editing
-  const [editingWP, setEditingWP] = useState(false);
+  // Work package title/description/effective date editing
+  const [editingWPField, setEditingWPField] = useState(null);
   const [wpTitle, setWpTitle] = useState('');
   const [wpDescription, setWpDescription] = useState('');
+  const [wpEffectiveDate, setWpEffectiveDate] = useState('');
   const [savingWP, setSavingWP] = useState(false);
   
   // Item status updates
@@ -143,6 +144,7 @@ export default function ExecutionPage() {
         setPrioritySummary(wp.prioritySummary || '');
         setWpTitle(wp.title || '');
         setWpDescription(wp.description || '');
+        setWpEffectiveDate(wp.effectiveStartDate ? new Date(wp.effectiveStartDate).toISOString().split('T')[0] : '');
         setSelectedWorkPackage({ id: wp.id, title: wp.title });
       } else {
         setError('Failed to load work package');

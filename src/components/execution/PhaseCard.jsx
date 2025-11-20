@@ -181,73 +181,77 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
         <div className="grid grid-cols-2 gap-4 text-sm">
           {/* Estimated Dates */}
           <div>
-            <div className="text-xs text-gray-500 mb-1">Estimated</div>
             <div className="space-y-2">
-              {editingField === 'estimatedStartDate' ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={localValues.estimatedStartDate ? formatDateForInput(localValues.estimatedStartDate) : ''}
-                    onChange={(e) => handleValueChange('estimatedStartDate', e.target.value)}
-                    className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleFieldSave('estimatedStartDate')}
-                    disabled={saving}
-                    className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Estimated Start Date</div>
+                {editingField === 'estimatedStartDate' ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={localValues.estimatedStartDate ? formatDateForInput(localValues.estimatedStartDate) : ''}
+                      onChange={(e) => handleValueChange('estimatedStartDate', e.target.value)}
+                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleFieldSave('estimatedStartDate')}
+                      disabled={saving}
+                      className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      <Save className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={handleFieldCancel}
+                      disabled={saving}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => handleFieldEdit('estimatedStartDate')}
+                    className="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 transition font-medium text-gray-900"
                   >
-                    <Save className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={handleFieldCancel}
-                    disabled={saving}
-                    className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    {formatDate(localValues.estimatedStartDate)}
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Estimated End Date</div>
+                {editingField === 'estimatedEndDate' ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={localValues.estimatedEndDate ? formatDateForInput(localValues.estimatedEndDate) : ''}
+                      onChange={(e) => handleValueChange('estimatedEndDate', e.target.value)}
+                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleFieldSave('estimatedEndDate')}
+                      disabled={saving}
+                      className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+                    >
+                      <Save className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={handleFieldCancel}
+                      disabled={saving}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => handleFieldEdit('estimatedEndDate')}
+                    className="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 transition font-medium text-gray-900"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => handleFieldEdit('estimatedStartDate')}
-                  className="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 transition"
-                >
-                  {formatDate(localValues.estimatedStartDate)}
-                </div>
-              )}
-              <span className="text-gray-400 block text-center">→</span>
-              {editingField === 'estimatedEndDate' ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={localValues.estimatedEndDate ? formatDateForInput(localValues.estimatedEndDate) : ''}
-                    onChange={(e) => handleValueChange('estimatedEndDate', e.target.value)}
-                    className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleFieldSave('estimatedEndDate')}
-                    disabled={saving}
-                    className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50"
-                  >
-                    <Save className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={handleFieldCancel}
-                    disabled={saving}
-                    className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => handleFieldEdit('estimatedEndDate')}
-                  className="cursor-pointer rounded px-2 py-1 hover:bg-gray-100 transition"
-                >
-                  {formatDate(localValues.estimatedEndDate)}
-                </div>
-              )}
+                    {formatDate(localValues.estimatedEndDate)}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
