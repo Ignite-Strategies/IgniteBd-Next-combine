@@ -212,7 +212,7 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
               />
             ) : (
               <div className="text-sm font-medium text-gray-900">
-                {formatDuration(phase.phaseTotalDuration)}
+                {phase.phaseTotalDuration ? `${phase.phaseTotalDuration} day${phase.phaseTotalDuration !== 1 ? 's' : ''}` : '—'}
               </div>
             )}
           </div>
