@@ -130,7 +130,14 @@ export async function updatePhaseDates(phaseId, updates) {
 
   // Path 1: User edited duration
   if (updates.phaseTotalDuration !== undefined && updates.phaseTotalDuration !== null) {
-    const newDuration = updates.phaseTotalDuration;
+    const newDuration = typeof updates.phaseTotalDuration === 'string' 
+      ? parseInt(updates.phaseTotalDuration, 10) 
+      : updates.phaseTotalDuration;
+    
+    if (isNaN(newDuration) || newDuration < 0) {
+      throw new Error('phaseTotalDuration must be a valid positive number');
+    }
+    
     updateData.phaseTotalDuration = newDuration;
 
     // If we have a start date, calculate new end date

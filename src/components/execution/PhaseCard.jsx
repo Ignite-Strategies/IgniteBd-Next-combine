@@ -89,12 +89,23 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
       }
       // Handle duration
       else if (fieldName === 'phaseTotalDuration') {
-        updateData[fieldName] = newValue ? parseInt(newValue, 10) : null;
+        const durationValue = newValue === '' || newValue === null || newValue === undefined 
+          ? null 
+          : parseInt(String(newValue), 10);
+        
+        if (isNaN(durationValue)) {
+          alert('Duration must be a valid number');
+          setSaving(false);
+          return;
+        }
+        
+        updateData[fieldName] = durationValue;
+        
         // Auto-calculate end date if start date exists
-        if (newValue && localValues.estimatedStartDate) {
+        if (durationValue && durationValue > 0 && localValues.estimatedStartDate) {
           const start = new Date(localValues.estimatedStartDate);
           const end = new Date(start);
-          end.setDate(end.getDate() + parseInt(newValue, 10));
+          end.setDate(end.getDate() + durationValue);
           updateData.estimatedEndDate = end.toISOString();
           setLocalValues(prev => ({ ...prev, estimatedEndDate: end }));
         }
@@ -130,14 +141,17 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
         updateData[fieldName] = newValue;
       }
 
-      await api.patch(`/api/workpackages/phases/${phase.id}`, updateData);
+      const response = await api.patch(`/api/workpackages/phases/${phase.id}`, updateData);
       
-      // Reload phase data
-      if (onPhaseUpdate) {
-        await onPhaseUpdate();
+      if (response.data?.success) {
+        // Reload phase data to get updated values
+        if (onPhaseUpdate) {
+          await onPhaseUpdate();
+        }
+        setEditingField(null);
+      } else {
+        throw new Error(response.data?.error || 'Failed to update phase');
       }
-      
-      setEditingField(null);
     } catch (err) {
       console.error('Error updating phase:', err);
       alert('Failed to update phase');

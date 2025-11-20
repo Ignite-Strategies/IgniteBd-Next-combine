@@ -78,7 +78,16 @@ export async function PATCH(request, { params }) {
         updateData.estimatedEndDate = estimatedEndDate ? new Date(estimatedEndDate) : null;
       }
       if (phaseTotalDuration !== undefined) {
-        updateData.phaseTotalDuration = phaseTotalDuration;
+        // Ensure it's a number, not a string
+        updateData.phaseTotalDuration = phaseTotalDuration === null || phaseTotalDuration === '' 
+          ? null 
+          : parseInt(phaseTotalDuration, 10);
+        if (isNaN(updateData.phaseTotalDuration)) {
+          return NextResponse.json(
+            { success: false, error: 'phaseTotalDuration must be a valid number' },
+            { status: 400 },
+          );
+        }
       }
 
       // Handle actual dates (these do NOT trigger phase shifting)
