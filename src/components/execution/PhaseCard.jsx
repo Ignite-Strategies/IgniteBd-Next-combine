@@ -15,9 +15,8 @@ function formatDate(date) {
   });
 }
 
-function formatDuration(hours) {
-  if (!hours || hours <= 0) return '—';
-  const days = Math.ceil(hours / 8);
+function formatDuration(days) {
+  if (!days || days <= 0) return '—';
   return `${days} day${days !== 1 ? 's' : ''}`;
 }
 
@@ -34,6 +33,7 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
     status: phase.status || 'not_started',
     estimatedStartDate: phase.estimatedStartDate ? new Date(phase.estimatedStartDate).toISOString().split('T')[0] : '',
     estimatedEndDate: phase.estimatedEndDate ? new Date(phase.estimatedEndDate).toISOString().split('T')[0] : '',
+    phaseTotalDuration: phase.phaseTotalDuration || '',
     actualStartDate: phase.actualStartDate ? new Date(phase.actualStartDate).toISOString().split('T')[0] : '',
     actualEndDate: phase.actualEndDate ? new Date(phase.actualEndDate).toISOString().split('T')[0] : '',
   });
@@ -47,22 +47,34 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updateData = {
-        status: formData.status,
-      };
+      const updateData = {};
 
-      // Only include dates if they're provided
+      // Handle status change (sets actual dates if needed)
+      if (formData.status !== phase.status) {
+        updateData.status = formData.status;
+      }
+
+      // Handle estimated dates and duration (these trigger phase shifting)
       if (formData.estimatedStartDate) {
         updateData.estimatedStartDate = new Date(formData.estimatedStartDate).toISOString();
       }
       if (formData.estimatedEndDate) {
         updateData.estimatedEndDate = new Date(formData.estimatedEndDate).toISOString();
       }
+      if (formData.phaseTotalDuration !== undefined && formData.phaseTotalDuration !== '') {
+        updateData.phaseTotalDuration = parseInt(formData.phaseTotalDuration, 10);
+      }
+
+      // Handle actual dates (manual override, no phase shifting)
       if (formData.actualStartDate) {
         updateData.actualStartDate = new Date(formData.actualStartDate).toISOString();
+      } else if (formData.actualStartDate === '') {
+        updateData.actualStartDate = null;
       }
       if (formData.actualEndDate) {
         updateData.actualEndDate = new Date(formData.actualEndDate).toISOString();
+      } else if (formData.actualEndDate === '') {
+        updateData.actualEndDate = null;
       }
 
       await api.patch(`/api/workpackages/phases/${phase.id}`, updateData);
@@ -86,10 +98,35 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
       status: phase.status || 'not_started',
       estimatedStartDate: phase.estimatedStartDate ? new Date(phase.estimatedStartDate).toISOString().split('T')[0] : '',
       estimatedEndDate: phase.estimatedEndDate ? new Date(phase.estimatedEndDate).toISOString().split('T')[0] : '',
+      phaseTotalDuration: phase.phaseTotalDuration || '',
       actualStartDate: phase.actualStartDate ? new Date(phase.actualStartDate).toISOString().split('T')[0] : '',
       actualEndDate: phase.actualEndDate ? new Date(phase.actualEndDate).toISOString().split('T')[0] : '',
     });
     setIsEditing(false);
+  };
+
+  // Calculate duration from dates if editing end date
+  const handleEndDateChange = (newEndDate) => {
+    setFormData({ ...formData, estimatedEndDate: newEndDate });
+    if (newEndDate && formData.estimatedStartDate) {
+      const start = new Date(formData.estimatedStartDate);
+      const end = new Date(newEndDate);
+      const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      if (days > 0) {
+        setFormData(prev => ({ ...prev, phaseTotalDuration: days }));
+      }
+    }
+  };
+
+  // Calculate end date from duration if editing duration
+  const handleDurationChange = (newDuration) => {
+    setFormData({ ...formData, phaseTotalDuration: newDuration });
+    if (newDuration && formData.estimatedStartDate) {
+      const start = new Date(formData.estimatedStartDate);
+      const end = new Date(start);
+      end.setDate(end.getDate() + parseInt(newDuration, 10));
+      setFormData(prev => ({ ...prev, estimatedEndDate: end.toISOString().split('T')[0] }));
+    }
   };
 
   return (
@@ -136,7 +173,7 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
                 <input
                   type="date"
                   value={formData.estimatedEndDate}
-                  onChange={(e) => setFormData({ ...formData, estimatedEndDate: e.target.value })}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
                 />
               </div>
@@ -174,9 +211,20 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
         <div className="flex items-center justify-between pt-2 border-t border-gray-200">
           <div>
             <div className="text-xs text-gray-500">Duration</div>
-            <div className="text-sm font-medium text-gray-900">
-              {formatDuration(phase.totalEstimatedHours)}
-            </div>
+            {isEditing ? (
+              <input
+                type="number"
+                min="1"
+                value={formData.phaseTotalDuration}
+                onChange={(e) => handleDurationChange(e.target.value)}
+                className="w-20 rounded border border-gray-300 px-2 py-1 text-xs mt-1"
+                placeholder="days"
+              />
+            ) : (
+              <div className="text-sm font-medium text-gray-900">
+                {formatDuration(phase.phaseTotalDuration)}
+              </div>
+            )}
           </div>
           <div>
             <div className="text-xs text-gray-500">Status</div>
@@ -232,4 +280,3 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
     </div>
   );
 }
-
