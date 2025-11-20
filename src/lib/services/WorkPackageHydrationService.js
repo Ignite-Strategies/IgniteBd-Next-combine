@@ -112,24 +112,34 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
       };
     });
 
-    // Sort phases by position
-    hydratedPhases.sort((a, b) => a.position - b.position);
+    // Sort phases by position (ascending)
+    const sortedPhases = hydratedPhases.sort((a, b) => a.position - b.position);
     
-    // Determine current phase: first phase that is not_started or in_progress
-    const currentPhase = hydratedPhases.find(
-      (phase) => phase.status === 'not_started' || phase.status === 'in_progress'
+    // Current phase = first phase not completed
+    const currentPhase = sortedPhases.find(
+      (phase) => phase.status !== 'completed'
     ) || null;
     
-    // Add currentPhase to hydrated work package
+    // Calculate phase progress
+    const totalPhases = sortedPhases.length;
+    const completedPhases = sortedPhases.filter((p) => p.status === 'completed').length;
+    const phaseProgress = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+    
+    // Return hydrated object with currentPhase added
     return {
       ...workPackage,
       items: hydratedItems,
-      phases: hydratedPhases,
-      currentPhase, // First phase in queue (not_started or in_progress)
+      phases: sortedPhases,
+      currentPhase, // First phase not completed
       progress: {
         completed: completedItems,
         total: totalItems,
         percentage: overallProgress,
+      },
+      phaseProgress: {
+        completed: completedPhases,
+        total: totalPhases,
+        percentage: phaseProgress,
       },
     };
   }
@@ -143,6 +153,11 @@ export async function hydrateWorkPackage(workPackage, options = {}) {
       completed: completedItems,
       total: totalItems,
       percentage: overallProgress,
+    },
+    phaseProgress: {
+      completed: 0,
+      total: 0,
+      percentage: 0,
     },
   };
 }

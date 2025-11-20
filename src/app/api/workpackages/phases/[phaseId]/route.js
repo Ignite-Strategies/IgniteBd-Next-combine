@@ -50,9 +50,42 @@ export async function PATCH(request, { params }) {
       actualEndDate 
     } = body;
 
-    // Path 1: Status change (sets actual dates, no phase shifting)
+    // Path 1: Status change (sets actual dates, handles completion)
     if (status) {
       const updatedPhase = await updatePhaseDatesFromStatus(phaseId, status);
+      
+      // Auto-start next phase if current phase is completed
+      if (status === 'completed') {
+        try {
+          // Get current phase to find position
+          const currentPhase = await prisma.workPackagePhase.findUnique({
+            where: { id: phaseId },
+            select: {
+              position: true,
+              workPackageId: true,
+            },
+          });
+
+          if (currentPhase) {
+            // Find next phase
+            const nextPhase = await prisma.workPackagePhase.findFirst({
+              where: {
+                workPackageId: currentPhase.workPackageId,
+                position: currentPhase.position + 1,
+                status: 'not_started',
+              },
+            });
+
+            // Auto-start next phase if it exists
+            if (nextPhase) {
+              await updatePhaseDatesFromStatus(nextPhase.id, 'in_progress');
+            }
+          }
+        } catch (error) {
+          // Log error but don't fail the request
+          console.error('Error auto-starting next phase:', error);
+        }
+      }
       
       return NextResponse.json({
         success: true,
