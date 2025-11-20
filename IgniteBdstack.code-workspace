@@ -8,6 +8,12 @@
 		},
 		{
 			"path": "../workme-nextapp"
+		},
+		{
+			"path": "../../GoFast/gofastfrontend-mvp1"
+		},
+		{
+			"path": "../../GoFast/gofastbackendv2-fall2025"
 		}
 	],
 	"settings": {}

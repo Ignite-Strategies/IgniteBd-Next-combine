@@ -1,279 +1,206 @@
 import { prisma } from '@/lib/prisma';
-import { computeExpectedEndDate } from '@/lib/utils/workPackageTimeline';
 
 /**
  * Phase Due Date Service
- * Calculates and manages estimated due dates for phases based on effective dates
+ * Manages phase scheduling with pure date arithmetic (no hours conversion)
  * 
- * Logic:
- * - Phase effectiveDate = WorkPackage effectiveStartDate + cumulative days from previous phases
- * - Phase expectedEndDate = effectiveDate + (totalEstimatedHours / 8 days)
- * - Timeline status = compare today vs expectedEndDate
+ * Core Principles:
+ * - Database is source of truth (estimatedStartDate, estimatedEndDate)
+ * - When Phase N moves, shift Phase N+1, N+2, etc. by same delta
+ * - Actual dates are independent checkpoints
+ * - No hours-to-days conversion in date calculations
  */
 
 /**
- * Calculate effective date for a phase based on WorkPackage start and previous phases
- * Uses actual dates when available for progressive calculation
+ * Calculate duration in days from two dates
+ * Pure date arithmetic - no business day logic
  * 
- * @param {Date|string|null} workPackageStartDate - WorkPackage effectiveStartDate
- * @param {Array} allPhases - All phases sorted by position (should include actualStartDate/actualEndDate)
- * @param {number} currentPhasePosition - Position of current phase
- * @returns {Date|null} - Effective start date for the phase
+ * @param {Date|string} startDate - Start date
+ * @param {Date|string} endDate - End date
+ * @returns {number} - Duration in days
  */
-export function calculatePhaseEffectiveDate(workPackageStartDate, allPhases, currentPhasePosition) {
-  if (!workPackageStartDate) return null;
-
-  const startDate = new Date(workPackageStartDate);
-  let currentDate = new Date(startDate);
-
-  // Sort phases by position
-  const sortedPhases = [...allPhases].sort((a, b) => a.position - b.position);
-
-  // Find all phases before current phase
-  const previousPhases = sortedPhases.filter((p) => p.position < currentPhasePosition);
-
-  // Calculate cumulative days from previous phases
-  // Use actual dates when available for progressive calculation
-  previousPhases.forEach((phase) => {
-    // If phase has actualEndDate (completed), use it for progressive calculation
-    if (phase.actualEndDate) {
-      currentDate = new Date(phase.actualEndDate);
-      currentDate.setDate(currentDate.getDate() + 1); // Next phase starts day after
-    } 
-    // If phase has actualStartDate (in progress), calculate from actual start
-    else if (phase.actualStartDate) {
-      const actualStart = new Date(phase.actualStartDate);
-      const days = Math.ceil((phase.totalEstimatedHours || 0) / 8);
-      currentDate = new Date(actualStart);
-      currentDate.setDate(currentDate.getDate() + days);
-      currentDate.setDate(currentDate.getDate() + 1); // Next phase starts day after
-    }
-    // Otherwise, use estimated duration
-    else {
-      const days = Math.ceil((phase.totalEstimatedHours || 0) / 8);
-      currentDate.setDate(currentDate.getDate() + days);
-    }
-  });
-
-  return currentDate;
+export function calculateDurationFromDates(startDate, endDate) {
+  if (!startDate || !endDate) return 0;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffTime = end - start;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
 }
 
 /**
- * Calculate expected end date (due date) for a phase
- * @param {Date|string|null} effectiveDate - Phase effective start date
- * @param {number} totalEstimatedHours - Total estimated hours for the phase
- * @returns {Date|null} - Expected end date, or null if inputs are invalid
- */
-export function calculatePhaseDueDate(effectiveDate, totalEstimatedHours) {
-  return computeExpectedEndDate(effectiveDate, totalEstimatedHours);
-}
-
-/**
- * Recalculate and update all phase dates for a work package
- * This should be called when:
- * - WorkPackage effectiveStartDate changes
- * - Phase order/position changes
- * - Phase totalEstimatedHours changes
+ * Shift all phases after the given phase by deltaDays
+ * Pure date arithmetic - no hours conversion, no business-day logic
  * 
- * @param {string} workPackageId - WorkPackage ID
- * @param {boolean} overwriteActuals - If true, will overwrite actual dates (default: false)
- * @returns {Promise<Array>} - Array of updated phases with calculated dates
+ * @param {string} phaseId - Phase ID that was moved
+ * @param {number} deltaDays - Number of days to shift (can be negative)
+ * @returns {Promise<Array>} - Array of updated phases
  */
-export async function recalculateAllPhaseDates(workPackageId, overwriteActuals = false) {
-  if (!workPackageId) {
-    throw new Error('WorkPackage ID is required');
+export async function shiftSubsequentPhases(phaseId, deltaDays) {
+  if (!phaseId || deltaDays === 0) {
+    return [];
   }
 
-  // Get work package with effectiveStartDate
-  const workPackage = await prisma.workPackage.findUnique({
-    where: { id: workPackageId },
-    select: {
-      effectiveStartDate: true,
-    },
+  // Get current phase to find position
+  const currentPhase = await prisma.workPackagePhase.findUnique({
+    where: { id: phaseId },
+    select: { position: true, workPackageId: true },
   });
 
-  if (!workPackage) {
-    throw new Error(`WorkPackage not found: ${workPackageId}`);
+  if (!currentPhase) {
+    throw new Error(`Phase not found: ${phaseId}`);
   }
 
-  // Get all phases with their items
-  const phases = await prisma.workPackagePhase.findMany({
-    where: { workPackageId },
-    include: {
-      items: {
-        select: {
-          quantity: true,
-          estimatedHoursEach: true,
-        },
-      },
+  // Get all subsequent phases
+  const subsequentPhases = await prisma.workPackagePhase.findMany({
+    where: {
+      workPackageId: currentPhase.workPackageId,
+      position: { gt: currentPhase.position },
     },
     orderBy: { position: 'asc' },
   });
 
-  // Calculate dates for each phase sequentially
-  // Use actual dates when available for progressive calculation
-  const updatedPhases = [];
-  let currentStartDate = workPackage.effectiveStartDate 
-    ? new Date(workPackage.effectiveStartDate) 
-    : null;
+  if (subsequentPhases.length === 0) {
+    return [];
+  }
 
-  for (const phase of phases) {
-    // Calculate totalEstimatedHours from items
-    const totalEstimatedHours = phase.items.reduce((sum, item) => {
-      return sum + (item.estimatedHoursEach || 0) * (item.quantity || 0);
-    }, 0);
+  // Shift each phase by delta
+  const updatedPhases = await Promise.all(
+    subsequentPhases.map(async (phase) => {
+      const updates = {};
 
-    // Determine start date for this phase:
-    // Phase 1: Use WorkPackage effectiveStartDate (or currentStartDate if set)
-    // Phase 2+: Use calculated from previous phases
-    // If actualStartDate exists, use it (phase already started)
-    const phaseStartDate = phase.actualStartDate 
-      ? new Date(phase.actualStartDate)
-      : (phase.position === 1 && workPackage.effectiveStartDate)
-        ? new Date(workPackage.effectiveStartDate) // Phase 1 defaults to effectiveStartDate
-        : currentStartDate;
-
-    // Calculate estimatedEndDate if we have a start date
-    let estimatedEndDate = null;
-    if (phaseStartDate && totalEstimatedHours > 0) {
-      estimatedEndDate = calculatePhaseDueDate(phaseStartDate, totalEstimatedHours);
-    }
-
-    // Build update data
-    const updateData = {
-      totalEstimatedHours,
-      estimatedStartDate: phaseStartDate, // Store the calculated/actual start date
-      estimatedEndDate,
-    };
-
-    // Only overwrite actual dates if explicitly requested
-    if (overwriteActuals) {
-      // If phase is in_progress and no actualStartDate, set it
-      if (phase.status === 'in_progress' && !phase.actualStartDate) {
-        updateData.actualStartDate = new Date();
+      if (phase.estimatedStartDate) {
+        const newStart = new Date(phase.estimatedStartDate);
+        newStart.setDate(newStart.getDate() + deltaDays);
+        updates.estimatedStartDate = newStart;
       }
-      // If phase is completed and no actualEndDate, set it
-      if (phase.status === 'completed' && !phase.actualEndDate) {
-        updateData.actualEndDate = new Date();
+
+      if (phase.estimatedEndDate) {
+        const newEnd = new Date(phase.estimatedEndDate);
+        newEnd.setDate(newEnd.getDate() + deltaDays);
+        updates.estimatedEndDate = newEnd;
       }
-    }
 
-    // Update the phase
-    const updatedPhase = await prisma.workPackagePhase.update({
-      where: { id: phase.id },
-      data: updateData,
-    });
-
-    updatedPhases.push(updatedPhase);
-
-    // For phase 1, ensure estimatedStartDate matches effectiveStartDate
-    if (phase.position === 1 && workPackage.effectiveStartDate && !phase.actualStartDate) {
-      if (!updatedPhase.estimatedStartDate || 
-          new Date(updatedPhase.estimatedStartDate).getTime() !== new Date(workPackage.effectiveStartDate).getTime()) {
-        await prisma.workPackagePhase.update({
+      if (Object.keys(updates).length > 0) {
+        return await prisma.workPackagePhase.update({
           where: { id: phase.id },
-          data: { estimatedStartDate: new Date(workPackage.effectiveStartDate) },
+          data: updates,
         });
       }
-    }
 
-    // Move to next phase's start date:
-    // Use actualEndDate if phase is completed, otherwise use estimatedEndDate
-    // This ensures progressive calculation is based on actual progress
-    const phaseEndDate = phase.actualEndDate 
-      ? new Date(phase.actualEndDate)
-      : (estimatedEndDate ? new Date(estimatedEndDate) : null);
+      return phase;
+    })
+  );
 
-    if (phaseEndDate) {
-      currentStartDate = new Date(phaseEndDate);
-      currentStartDate.setDate(currentStartDate.getDate() + 1);
-    } else if (estimatedEndDate) {
-      // Fallback to estimated if no actual end date
-      currentStartDate = new Date(estimatedEndDate);
-      currentStartDate.setDate(currentStartDate.getDate() + 1);
-    }
-  }
-
-  return updatedPhases;
+  return updatedPhases.filter(Boolean);
 }
 
 /**
- * Upsert WorkPackage effectiveStartDate
- * This will trigger recalculation of all phase dates
+ * Update phase dates and/or duration
+ * Handles all editing paths and shifts subsequent phases
  * 
- * @param {string} workPackageId - WorkPackage ID
- * @param {Date|string} effectiveStartDate - New effective start date
- * @param {boolean} overwriteActuals - If true, will overwrite actual dates (default: false)
- * @returns {Promise<Object>} - Updated work package
- */
-export async function upsertWorkPackageEffectiveDate(workPackageId, effectiveStartDate, overwriteActuals = false) {
-  if (!workPackageId) {
-    throw new Error('WorkPackage ID is required');
-  }
-
-  if (!effectiveStartDate) {
-    throw new Error('Effective start date is required');
-  }
-
-  const date = new Date(effectiveStartDate);
-
-  // Update work package
-  const updatedWorkPackage = await prisma.workPackage.update({
-    where: { id: workPackageId },
-    data: {
-      effectiveStartDate: date,
-    },
-  });
-
-  // Recalculate all phase dates (estimated dates will be updated)
-  await recalculateAllPhaseDates(workPackageId, overwriteActuals);
-
-  return updatedWorkPackage;
-}
-
-/**
- * Overwrite phase dates (manual override capability)
- * Allows manual setting of estimated or actual dates
- * 
- * @param {string} phaseId - WorkPackagePhase ID
- * @param {Object} dates - Dates to overwrite
- * @param {Date|string|null} dates.estimatedStartDate - Overwrite estimated start date
- * @param {Date|string|null} dates.estimatedEndDate - Overwrite estimated end date
- * @param {Date|string|null} dates.actualStartDate - Overwrite actual start date
- * @param {Date|string|null} dates.actualEndDate - Overwrite actual end date
+ * @param {string} phaseId - Phase ID
+ * @param {Object} updates - Update data
+ * @param {Date|string|null} updates.estimatedStartDate - New start date
+ * @param {Date|string|null} updates.estimatedEndDate - New end date
+ * @param {number|null} updates.phaseTotalDuration - New duration (days)
  * @returns {Promise<Object>} - Updated phase
  */
-export async function overwritePhaseDates(phaseId, dates) {
+export async function updatePhaseDates(phaseId, updates) {
   if (!phaseId) {
     throw new Error('Phase ID is required');
   }
 
+  // Get current phase to calculate deltas
+  const currentPhase = await prisma.workPackagePhase.findUnique({
+    where: { id: phaseId },
+    select: {
+      estimatedStartDate: true,
+      estimatedEndDate: true,
+      phaseTotalDuration: true,
+    },
+  });
+
+  if (!currentPhase) {
+    throw new Error(`Phase not found: ${phaseId}`);
+  }
+
   const updateData = {};
+  let deltaDays = 0;
 
-  if (dates.estimatedStartDate !== undefined) {
-    updateData.estimatedStartDate = dates.estimatedStartDate ? new Date(dates.estimatedStartDate) : null;
+  // Path 1: User edited duration
+  if (updates.phaseTotalDuration !== undefined && updates.phaseTotalDuration !== null) {
+    const newDuration = updates.phaseTotalDuration;
+    updateData.phaseTotalDuration = newDuration;
+
+    // If we have a start date, calculate new end date
+    if (currentPhase.estimatedStartDate) {
+      const startDate = new Date(currentPhase.estimatedStartDate);
+      const newEndDate = new Date(startDate);
+      newEndDate.setDate(newEndDate.getDate() + newDuration);
+      updateData.estimatedEndDate = newEndDate;
+
+      // Calculate delta from old end date
+      if (currentPhase.estimatedEndDate) {
+        const oldEnd = new Date(currentPhase.estimatedEndDate);
+        deltaDays = Math.floor((newEndDate - oldEnd) / (1000 * 60 * 60 * 24));
+      } else {
+        // No old end date, so delta is just the duration
+        deltaDays = newDuration;
+      }
+    }
+  }
+  // Path 2: User edited end date
+  else if (updates.estimatedEndDate !== undefined) {
+    const newEndDate = updates.estimatedEndDate ? new Date(updates.estimatedEndDate) : null;
+    updateData.estimatedEndDate = newEndDate;
+
+    // Recalculate duration from dates
+    if (newEndDate && currentPhase.estimatedStartDate) {
+      const duration = calculateDurationFromDates(currentPhase.estimatedStartDate, newEndDate);
+      updateData.phaseTotalDuration = duration;
+    }
+
+    // Calculate delta from old end date
+    if (currentPhase.estimatedEndDate && newEndDate) {
+      const oldEnd = new Date(currentPhase.estimatedEndDate);
+      deltaDays = Math.floor((newEndDate - oldEnd) / (1000 * 60 * 60 * 24));
+    } else if (newEndDate && !currentPhase.estimatedEndDate) {
+      // No old end date, calculate from start
+      if (currentPhase.estimatedStartDate) {
+        const duration = calculateDurationFromDates(currentPhase.estimatedStartDate, newEndDate);
+        deltaDays = duration;
+      }
+    }
+  }
+  // Path 3: User edited start date
+  else if (updates.estimatedStartDate !== undefined) {
+    const newStartDate = updates.estimatedStartDate ? new Date(updates.estimatedStartDate) : null;
+    updateData.estimatedStartDate = newStartDate;
+
+    // Calculate delta from old start date
+    if (currentPhase.estimatedStartDate && newStartDate) {
+      const oldStart = new Date(currentPhase.estimatedStartDate);
+      deltaDays = Math.floor((newStartDate - oldStart) / (1000 * 60 * 60 * 24));
+    }
+
+    // If end date exists, recalculate duration
+    if (newStartDate && currentPhase.estimatedEndDate) {
+      const duration = calculateDurationFromDates(newStartDate, currentPhase.estimatedEndDate);
+      updateData.phaseTotalDuration = duration;
+    }
   }
 
-  if (dates.estimatedEndDate !== undefined) {
-    updateData.estimatedEndDate = dates.estimatedEndDate ? new Date(dates.estimatedEndDate) : null;
-  }
-
-  if (dates.actualStartDate !== undefined) {
-    updateData.actualStartDate = dates.actualStartDate ? new Date(dates.actualStartDate) : null;
-  }
-
-  if (dates.actualEndDate !== undefined) {
-    updateData.actualEndDate = dates.actualEndDate ? new Date(dates.actualEndDate) : null;
-  }
-
-  if (Object.keys(updateData).length === 0) {
-    throw new Error('At least one date field must be provided');
-  }
-
+  // Update the phase
   const updatedPhase = await prisma.workPackagePhase.update({
     where: { id: phaseId },
     data: updateData,
   });
+
+  // Shift subsequent phases if delta changed
+  if (deltaDays !== 0) {
+    await shiftSubsequentPhases(phaseId, deltaDays);
+  }
 
   return updatedPhase;
 }
@@ -325,3 +252,113 @@ export async function updatePhaseDatesFromStatus(phaseId, newStatus) {
   return updatedPhase;
 }
 
+/**
+ * Update WorkPackage effectiveStartDate and adjust Phase 1
+ * Only Phase 1 depends on effectiveStartDate
+ * 
+ * @param {string} workPackageId - WorkPackage ID
+ * @param {Date|string} effectiveStartDate - New effective start date
+ * @returns {Promise<Object>} - Updated work package
+ */
+export async function upsertWorkPackageEffectiveDate(workPackageId, effectiveStartDate) {
+  if (!workPackageId) {
+    throw new Error('WorkPackage ID is required');
+  }
+
+  if (!effectiveStartDate) {
+    throw new Error('Effective start date is required');
+  }
+
+  const date = new Date(effectiveStartDate);
+
+  // Update work package
+  const updatedWorkPackage = await prisma.workPackage.update({
+    where: { id: workPackageId },
+    data: {
+      effectiveStartDate: date,
+    },
+  });
+
+  // Get Phase 1
+  const phase1 = await prisma.workPackagePhase.findFirst({
+    where: {
+      workPackageId,
+      position: 1,
+    },
+    select: {
+      id: true,
+      estimatedStartDate: true,
+      estimatedEndDate: true,
+    },
+  });
+
+  if (phase1) {
+    // Calculate delta from old Phase 1 start
+    let deltaDays = 0;
+    if (phase1.estimatedStartDate) {
+      const oldStart = new Date(phase1.estimatedStartDate);
+      deltaDays = Math.floor((date - oldStart) / (1000 * 60 * 60 * 24));
+    } else {
+      // No old start date, calculate from end date if it exists
+      if (phase1.estimatedEndDate) {
+        const oldEnd = new Date(phase1.estimatedEndDate);
+        const duration = calculateDurationFromDates(date, oldEnd);
+        deltaDays = -duration; // Negative because we're moving start earlier
+      }
+    }
+
+    // Update Phase 1 start date
+    await prisma.workPackagePhase.update({
+      where: { id: phase1.id },
+      data: {
+        estimatedStartDate: date,
+      },
+    });
+
+    // Shift subsequent phases if Phase 1 moved
+    if (deltaDays !== 0) {
+      await shiftSubsequentPhases(phase1.id, deltaDays);
+    }
+  }
+
+  return updatedWorkPackage;
+}
+
+/**
+ * Initialize Phase 1 from WorkPackage effectiveStartDate
+ * Only called when Phase 1 has no estimatedStartDate
+ * 
+ * @param {string} workPackageId - WorkPackage ID
+ * @returns {Promise<Object|null>} - Updated Phase 1 or null
+ */
+export async function initializePhase1FromEffectiveDate(workPackageId) {
+  const workPackage = await prisma.workPackage.findUnique({
+    where: { id: workPackageId },
+    select: { effectiveStartDate: true },
+  });
+
+  if (!workPackage || !workPackage.effectiveStartDate) {
+    return null;
+  }
+
+  const phase1 = await prisma.workPackagePhase.findFirst({
+    where: {
+      workPackageId,
+      position: 1,
+    },
+  });
+
+  if (!phase1 || phase1.estimatedStartDate) {
+    return null;
+  }
+
+  // Set Phase 1 start date to effectiveStartDate
+  const updatedPhase1 = await prisma.workPackagePhase.update({
+    where: { id: phase1.id },
+    data: {
+      estimatedStartDate: new Date(workPackage.effectiveStartDate),
+    },
+  });
+
+  return updatedPhase1;
+}
