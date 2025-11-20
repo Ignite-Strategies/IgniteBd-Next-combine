@@ -103,8 +103,8 @@ export default function ExecutionPage() {
       return;
     }
 
-    // Don't search if search term is too short (less than 2 characters)
-    if (companySearchTerm.length < 2) {
+    // Don't search if search term is empty
+    if (companySearchTerm.length < 1) {
       setCompanyResults([]);
       return;
     }
