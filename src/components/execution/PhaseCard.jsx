@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, Edit2, Save, X } from 'lucide-react';
-import { computePhaseTimelineStatus, getTimelineStatusColor } from '@/lib/utils/workPackageTimeline';
+import { Edit2, Save, X } from 'lucide-react';
 import PhaseItems from './PhaseItems';
 import api from '@/lib/api';
 
@@ -38,11 +37,7 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
     actualEndDate: phase.actualEndDate ? new Date(phase.actualEndDate).toISOString().split('T')[0] : '',
   });
 
-  const timelineStatus = computePhaseTimelineStatus(
-    phase.status,
-    phase.estimatedEndDate || phase.actualEndDate
-  );
-  const statusColor = getTimelineStatusColor(timelineStatus);
+  // Removed timeline status - not needed for execution view
 
   const handleSave = async () => {
     setSaving(true);
@@ -140,11 +135,6 @@ export default function PhaseCard({ phase, workPackageId, onPhaseUpdate, onItemS
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColor}`}>
-            {timelineStatus === 'complete' ? 'Complete' : 
-             timelineStatus === 'overdue' ? 'Overdue' :
-             timelineStatus === 'warning' ? 'Warning' : 'On Track'}
-          </span>
           {!isEditing && (
             <button
               onClick={() => setIsEditing(true)}
