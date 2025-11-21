@@ -75,6 +75,7 @@ export default function ExecutionPage() {
   const [savingPriority, setSavingPriority] = useState(false);
   
   // Work package title/description/effective date editing
+  const [editingWP, setEditingWP] = useState(false);
   const [editingWPField, setEditingWPField] = useState(null);
   const [wpTitle, setWpTitle] = useState('');
   const [wpDescription, setWpDescription] = useState('');
