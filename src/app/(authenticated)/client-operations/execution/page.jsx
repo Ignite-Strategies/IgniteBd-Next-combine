@@ -73,6 +73,7 @@ export default function ExecutionPage() {
   // Priority editor
   const [prioritySummary, setPrioritySummary] = useState('');
   const [savingPriority, setSavingPriority] = useState(false);
+  const [prioritySaved, setPrioritySaved] = useState(false);
   
   // Work package title/description/effective date editing
   const [editingWP, setEditingWP] = useState(false);
@@ -200,10 +201,17 @@ export default function ExecutionPage() {
     if (!workPackage?.id) return;
 
     setSavingPriority(true);
+    setPrioritySaved(false);
     try {
       await api.patch(`/api/workpackages/${workPackage.id}`, {
         prioritySummary,
       });
+      // Update work package state
+      setWorkPackage({ ...workPackage, prioritySummary });
+      // Show saved indicator
+      setPrioritySaved(true);
+      // Hide indicator after 3 seconds
+      setTimeout(() => setPrioritySaved(false), 3000);
     } catch (err) {
       console.error('Error saving priority:', err);
       setError('Failed to save priority summary');
@@ -508,17 +516,28 @@ export default function ExecutionPage() {
                 <label className="block text-sm font-semibold text-gray-900">
                   Priorities this week
                 </label>
-                <button
-                  onClick={savePriority}
-                  disabled={savingPriority || !prioritySummary.trim()}
-                  className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  {savingPriority ? 'Saving...' : 'Save'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {prioritySaved && (
+                    <span className="flex items-center gap-1 text-sm text-green-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Saved
+                    </span>
+                  )}
+                  <button
+                    onClick={savePriority}
+                    disabled={savingPriority || !prioritySummary.trim()}
+                    className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {savingPriority ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
               </div>
               <textarea
                 value={prioritySummary}
-                onChange={(e) => setPrioritySummary(e.target.value)}
+                onChange={(e) => {
+                  setPrioritySummary(e.target.value);
+                  setPrioritySaved(false); // Clear saved indicator when user types
+                }}
                 disabled={savingPriority}
                 placeholder="Enter priorities for this week..."
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-gray-50"
