@@ -4,25 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp, PlayCircle } from 'lucide-react';
 import { getStatusOptions } from '@/lib/config/statusConfig';
-
-// Helper to get builder route from deliverableType
-function getBuilderRoute(deliverableType, workPackageId, itemId) {
-  const typeMap = {
-    blog: '/builder/blog',
-    persona: '/builder/persona',
-    page: '/builder/landingpage',
-    landing_page: '/builder/landingpage',
-    deck: '/builder/cledeck',
-    cledeck: '/builder/cledeck',
-    template: '/builder/template',
-    outreach_template: '/builder/template',
-    event: '/builder/event',
-    event_targets: '/builder/event',
-  };
-
-  const baseRoute = typeMap[deliverableType?.toLowerCase()] || '/builder/blog';
-  return `${baseRoute}/new?workPackageId=${workPackageId}&itemId=${itemId}`;
-}
+import { getWorkItemRoute } from '@/lib/workitem-router';
 
 export default function PhaseItems({ items, workPackageId, onItemStatusUpdate }) {
   const router = useRouter();
@@ -39,8 +21,9 @@ export default function PhaseItems({ items, workPackageId, onItemStatusUpdate })
   }
 
   const handleDoWorkItem = (item) => {
-    if (!workPackageId || !item?.id) return;
-    const route = getBuilderRoute(item.deliverableType || item.itemType, workPackageId, item.id);
+    if (!item) return;
+    const itemLabel = item.deliverableLabel || item.itemLabel || '';
+    const route = getWorkItemRoute(itemLabel, item.id);
     router.push(route);
   };
 
