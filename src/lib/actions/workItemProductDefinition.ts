@@ -96,7 +96,7 @@ export async function saveWorkItemProductDefinition(
       return {
         success: false,
         error: 'Validation failed',
-        errors: error.errors,
+        errors: error.issues,
       };
     }
 
