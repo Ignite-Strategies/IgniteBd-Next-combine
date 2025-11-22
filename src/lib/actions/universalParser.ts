@@ -2,6 +2,8 @@
 
 import { OpenAI } from 'openai';
 import { getParserConfig, type UniversalParserType } from '@/lib/parsers/typePrompts';
+import { getRedis } from '@/lib/redis';
+import { randomUUID } from 'crypto';
 
 // Initialize OpenAI client
 let openaiClient: OpenAI | null = null;
@@ -25,6 +27,7 @@ export interface UniversalParseResult {
   parsed?: any;
   explanation?: string;
   error?: string;
+  inputId?: string; // Redis key for retrieving stored result
 }
 
 /**
@@ -120,12 +123,35 @@ export async function universalParse({
     // Generate explanation
     const explanation = `Successfully extracted ${Object.keys(validationResult.data).length} fields from the raw text.`;
 
+    // Store parsed result in Redis with inputId
+    const inputId = `parser:${type}:${randomUUID()}`;
+    try {
+      const redisClient = getRedis();
+      const dataToStore = JSON.stringify({
+        type,
+        parsed: validationResult.data,
+        explanation,
+        rawText: raw,
+        context: context || null,
+        companyHqId,
+        parsedAt: new Date().toISOString(),
+      });
+      
+      // Store with 24 hour TTL
+      await redisClient.setex(inputId, 24 * 60 * 60, dataToStore);
+      console.log(`✅ Parsed result stored in Redis: ${inputId}`);
+    } catch (redisError) {
+      console.warn('⚠️ Failed to store in Redis (non-critical):', redisError);
+      // Continue even if Redis fails
+    }
+
     console.log(`✅ Universal parser completed successfully (type: ${type})`);
 
     return {
       success: true,
       parsed: validationResult.data,
       explanation,
+      inputId,
     };
   } catch (error) {
     console.error('❌ Universal parser error:', error);
@@ -133,6 +159,32 @@ export async function universalParse({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to parse data',
     };
+  }
+}
+
+/**
+ * Get stored parser result from Redis by inputId
+ */
+export async function getParserResult(inputId: string): Promise<UniversalParseResult | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(inputId);
+    
+    if (!data) {
+      return null;
+    }
+    
+    const stored = typeof data === 'string' ? JSON.parse(data) : data;
+    
+    return {
+      success: true,
+      parsed: stored.parsed,
+      explanation: stored.explanation,
+      inputId,
+    };
+  } catch (error) {
+    console.error('❌ Failed to get parser result from Redis:', error);
+    return null;
   }
 }
 

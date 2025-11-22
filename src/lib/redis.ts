@@ -7,7 +7,7 @@ import { Redis } from '@upstash/redis';
 
 let redis: Redis | null = null;
 
-function getRedis(): Redis {
+export function getRedis(): Redis {
   if (redis) {
     return redis;
   }

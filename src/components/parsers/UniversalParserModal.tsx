@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Sparkles, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Sparkles, Loader2, CheckCircle2, AlertCircle, Send } from 'lucide-react';
 import { universalParse, type UniversalParseResult } from '@/lib/actions/universalParser';
 import type { UniversalParserType } from '@/lib/parsers/typePrompts';
 
@@ -11,6 +11,7 @@ interface UniversalParserModalProps {
   onApply: (parsedResult: any) => void;
   defaultType?: UniversalParserType;
   companyHqId: string;
+  inputId?: string; // Optional: track which input/field triggered the parser
 }
 
 const PARSER_TYPES: Array<{ value: UniversalParserType; label: string; available: boolean }> = [
@@ -27,6 +28,7 @@ export default function UniversalParserModal({
   onApply,
   defaultType = 'product_definition',
   companyHqId,
+  inputId,
 }: UniversalParserModalProps) {
   const [parserType, setParserType] = useState<UniversalParserType>(defaultType);
   const [rawText, setRawText] = useState('');
@@ -69,7 +71,7 @@ export default function UniversalParserModal({
 
   const handleApply = () => {
     if (parseResult?.success && parseResult.parsed) {
-      onApply(parseResult.parsed);
+      onApply(parseResult.parsed, parseResult.inputId);
       handleClose();
     }
   };
@@ -169,7 +171,7 @@ export default function UniversalParserModal({
               </p>
             </div>
 
-            {/* Parse Button */}
+            {/* Submit Button - Send to OpenAI */}
             <div className="flex justify-end">
               <button
                 onClick={handleParse}
@@ -183,8 +185,8 @@ export default function UniversalParserModal({
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" />
-                    Parse
+                    <Send className="h-4 w-4" />
+                    Submit to OpenAI
                   </>
                 )}
               </button>
@@ -204,26 +206,24 @@ export default function UniversalParserModal({
                       <p className="text-sm text-gray-600">{parseResult.explanation}</p>
                     )}
 
+                    {parseResult.inputId && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                        <p className="text-xs text-blue-700">
+                          <strong>Input ID:</strong> <code className="bg-blue-100 px-1 py-0.5 rounded">{parseResult.inputId}</code>
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Result stored in Redis. You can retrieve it later using this ID.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="rounded-lg border border-gray-200 bg-white p-4">
                       <h4 className="mb-3 text-sm font-semibold text-gray-700">
-                        Extracted Fields:
+                        Extracted Fields (JSON Preview):
                       </h4>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {Object.entries(parseResult.parsed || {}).map(([key, value]) => (
-                          <div key={key} className="flex items-start gap-3 text-sm">
-                            <span className="font-medium text-gray-600 min-w-[140px] capitalize">
-                              {key.replace(/([A-Z])/g, ' $1').trim()}:
-                            </span>
-                            <span className="text-gray-900 flex-1">
-                              {value === null || value === ''
-                                ? <span className="text-gray-400 italic">(empty)</span>
-                                : typeof value === 'object'
-                                ? JSON.stringify(value, null, 2)
-                                : String(value)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                      <pre className="text-xs bg-gray-50 p-3 rounded border max-h-64 overflow-y-auto">
+                        {JSON.stringify(parseResult.parsed || {}, null, 2)}
+                      </pre>
                     </div>
                   </div>
                 ) : (

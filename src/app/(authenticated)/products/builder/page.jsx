@@ -222,7 +222,11 @@ export default function ProductBuilderPage({ searchParams }) {
   const isBusy = isHydrating || isSubmitting;
 
   // Handle parser result application
-  const handleParserApply = (parsedResult) => {
+  const handleParserApply = (parsedResult, inputId) => {
+    // Log inputId for tracking
+    if (inputId) {
+      console.log('Parser result applied with inputId:', inputId);
+    }
     // Map parsed result to form fields
     // The parsed result matches the product definition schema
     if (parsedResult.name) setValue('name', parsedResult.name);
