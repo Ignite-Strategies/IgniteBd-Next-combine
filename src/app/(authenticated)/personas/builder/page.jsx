@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 
 const DEFAULT_VALUES = {
@@ -208,13 +209,31 @@ export default function PersonaBuilderPage({ searchParams }) {
 
       <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {personaId ? 'Edit Persona' : 'Create Persona'}
-          </h1>
-          <p className="text-sm text-gray-600">
-            Keep the details aligned with your activation strategy and
-            messaging.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {personaId ? 'Edit Persona' : 'Create Persona'}
+              </h1>
+              <p className="text-sm text-gray-600">
+                Keep the details aligned with your activation strategy and
+                messaging.
+              </p>
+            </div>
+            {!personaId && (
+              <button
+                type="button"
+                onClick={() => {
+                  // TODO: Open enrichment modal
+                  alert('Enrichment modal coming soon!');
+                }}
+                disabled={isBusy}
+                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="h-4 w-4" />
+                Build from Enrichment
+              </button>
+            )}
+          </div>
         </div>
 
         {fetchError && (
