@@ -47,36 +47,33 @@ export type ParserConfig = {
 export const PARSER_PROMPTS: Record<UniversalParserType, ParserConfig | null> = {
   product_definition: {
     schema: productDefinitionSchema,
-    systemPrompt: `You are an extraction engine for product/service definitions.
+    systemPrompt: `You are a structured data extraction engine.
 
-Your task is to extract structured product information from raw text and return it as JSON matching the exact schema provided.
+Your job is to analyze unstructured text about a product or service and extract factual information into a strict JSON object that matches the exact Product schema defined below.
 
-Field meanings:
-- name: Product or service name (required)
-- category: Type of product/service (e.g., Software, Consulting, Training)
-- valueProp: Core value proposition - what specific outcome or benefit does this deliver?
-- description: Full description with details about features, use cases, experience
-- price: Numeric price amount (if mentioned)
-- priceCurrency: Currency code (USD, EUR, GBP, CAD) - default to USD if price mentioned
-- pricingModel: How it's priced (one-time, recurring, usage-based, freemium, custom)
-- targetedTo: Persona ID if mentioned (leave null)
-- targetMarketSize: Target company size (enterprise, mid-market, small-business, startup, individual)
-- salesCycleLength: Typical sales cycle (immediate, short, medium, long, very-long)
-- deliveryTimeline: How long to deliver (e.g., "2-4 weeks", "3 months")
-- features: Key features and capabilities (bullet points or list)
-- competitiveAdvantages: What makes this unique or better than alternatives
+Do NOT infer or hallucinate any details not explicitly stated in the text.
+If a field is not mentioned clearly, return null.
+If human context is provided, you may use it to guide interpretation but DO NOT invent new facts.
 
-Rules:
-1. Extract only facts from the raw text - do not invent information
-2. If a field is not mentioned, return null or empty string
-3. For optional fields, only include if there's clear evidence in the text
-4. Price should be a number (not a string)
-5. Features and competitiveAdvantages can be formatted as bullet points or paragraphs
-6. Follow the exact enum values for select fields
-7. If human context is provided, use it to guide interpretation but don't invent data
-8. Return strictly valid JSON matching the schema structure
+You MUST return strictly valid JSON following this exact structure:
 
-Return ONLY valid JSON matching the schema. No markdown, no explanations, just JSON.`,
+{
+  "name": string | null,
+  "category": string | null,
+  "valueProp": string | null,
+  "description": string | null,
+  "price": number | null,
+  "priceCurrency": "USD" | "EUR" | "GBP" | "CAD" | null,
+  "pricingModel": "one-time" | "recurring" | "usage-based" | "freemium" | "custom" | null,
+  "targetedTo": string | null,
+  "targetMarketSize": "enterprise" | "mid-market" | "small-business" | "startup" | "individual" | null,
+  "salesCycleLength": "immediate" | "short" | "medium" | "long" | "very-long" | null,
+  "deliveryTimeline": string | null,
+  "features": string | string[] | null,
+  "competitiveAdvantages": string | string[] | null
+}
+
+Return ONLY JSON. No markdown, no explanations, no commentary.`,
     fieldDescriptions: {
       name: 'Product/Service Name',
       category: 'Category or type',
@@ -105,7 +102,7 @@ Sales cycle: Medium (1-3 months). Delivery: 2-4 weeks setup.`,
       salesCycleLength: 'medium',
       deliveryTimeline: '2-4 weeks setup',
     },
-    temperature: 0.3,
+    temperature: 0,
     outputFormat: 'json_object',
   },
   ecosystem_map: null, // To be filled in v2

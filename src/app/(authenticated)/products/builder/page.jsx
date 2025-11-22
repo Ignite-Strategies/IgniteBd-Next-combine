@@ -222,6 +222,7 @@ export default function ProductBuilderPage({ searchParams }) {
   const isBusy = isHydrating || isSubmitting;
 
   // Handle parser result application
+  // HYDRATE ONLY - NEVER SAVE: Parser only fills form fields, user must click Save button to persist
   // Field Mapping Contract: Maps parsedResult to form fields according to strict rules
   const handleParserApply = (parsedResult, inputId) => {
     // Log inputId for tracking
@@ -229,79 +230,20 @@ export default function ProductBuilderPage({ searchParams }) {
       console.log('Parser result applied with inputId:', inputId);
     }
 
-    // Field Mapping Contract Implementation
-    // For each key in the Zod schema, apply mapping rules:
-    
-    // Rule: If parsed[key] === null → skip
-    // Rule: If typeof parsed[key] === "number" → setValue(name, value.toString())
-    // Rule: If Array.isArray(parsed[key]) → setValue(name, value)
-    // Rule: If typeof parsed[key] === "string" → setValue(name, value.trim())
-    // Rule: Unknown keys → ignore silently
-    // Rule: Mapping must never break forms even if fields are missing
-
-    if (parsedResult.name !== null && parsedResult.name !== undefined) {
-      setValue('name', typeof parsedResult.name === 'string' ? parsedResult.name.trim() : String(parsedResult.name));
-    }
-    
-    if (parsedResult.category !== null && parsedResult.category !== undefined) {
-      setValue('category', typeof parsedResult.category === 'string' ? parsedResult.category.trim() : String(parsedResult.category));
-    }
-    
-    if (parsedResult.valueProp !== null && parsedResult.valueProp !== undefined) {
-      setValue('valueProp', typeof parsedResult.valueProp === 'string' ? parsedResult.valueProp.trim() : String(parsedResult.valueProp));
-    }
-    
-    if (parsedResult.description !== null && parsedResult.description !== undefined) {
-      setValue('description', typeof parsedResult.description === 'string' ? parsedResult.description.trim() : String(parsedResult.description));
-    }
-    
-    if (parsedResult.price !== null && parsedResult.price !== undefined) {
-      if (typeof parsedResult.price === 'number') {
-        setValue('price', parsedResult.price.toString());
-      } else {
-        setValue('price', String(parsedResult.price));
-      }
-    }
-    
-    if (parsedResult.priceCurrency !== null && parsedResult.priceCurrency !== undefined) {
-      setValue('priceCurrency', typeof parsedResult.priceCurrency === 'string' ? parsedResult.priceCurrency.trim() : String(parsedResult.priceCurrency));
-    }
-    
-    if (parsedResult.pricingModel !== null && parsedResult.pricingModel !== undefined) {
-      setValue('pricingModel', typeof parsedResult.pricingModel === 'string' ? parsedResult.pricingModel.trim() : String(parsedResult.pricingModel));
-    }
-    
-    if (parsedResult.targetedTo !== null && parsedResult.targetedTo !== undefined) {
-      setValue('targetedTo', typeof parsedResult.targetedTo === 'string' ? parsedResult.targetedTo.trim() : String(parsedResult.targetedTo));
-    }
-    
-    if (parsedResult.targetMarketSize !== null && parsedResult.targetMarketSize !== undefined) {
-      setValue('targetMarketSize', typeof parsedResult.targetMarketSize === 'string' ? parsedResult.targetMarketSize.trim() : String(parsedResult.targetMarketSize));
-    }
-    
-    if (parsedResult.salesCycleLength !== null && parsedResult.salesCycleLength !== undefined) {
-      setValue('salesCycleLength', typeof parsedResult.salesCycleLength === 'string' ? parsedResult.salesCycleLength.trim() : String(parsedResult.salesCycleLength));
-    }
-    
-    if (parsedResult.deliveryTimeline !== null && parsedResult.deliveryTimeline !== undefined) {
-      setValue('deliveryTimeline', typeof parsedResult.deliveryTimeline === 'string' ? parsedResult.deliveryTimeline.trim() : String(parsedResult.deliveryTimeline));
-    }
-    
-    if (parsedResult.features !== null && parsedResult.features !== undefined) {
-      if (Array.isArray(parsedResult.features)) {
-        setValue('features', parsedResult.features);
-      } else {
-        setValue('features', typeof parsedResult.features === 'string' ? parsedResult.features.trim() : String(parsedResult.features));
-      }
-    }
-    
-    if (parsedResult.competitiveAdvantages !== null && parsedResult.competitiveAdvantages !== undefined) {
-      if (Array.isArray(parsedResult.competitiveAdvantages)) {
-        setValue('competitiveAdvantages', parsedResult.competitiveAdvantages);
-      } else {
-        setValue('competitiveAdvantages', typeof parsedResult.competitiveAdvantages === 'string' ? parsedResult.competitiveAdvantages.trim() : String(parsedResult.competitiveAdvantages));
-      }
-    }
+    // FILL THE FORM FIELDS - No database save, only UI hydration
+    setValue('name', parsedResult.name ?? '');
+    setValue('category', parsedResult.category ?? '');
+    setValue('description', parsedResult.description ?? '');
+    setValue('valueProp', parsedResult.valueProp ?? '');
+    setValue('price', parsedResult.price !== null ? parsedResult.price.toString() : '');
+    setValue('priceCurrency', parsedResult.priceCurrency ?? 'USD');
+    setValue('pricingModel', parsedResult.pricingModel ?? '');
+    setValue('targetedTo', parsedResult.targetedTo ?? '');
+    setValue('targetMarketSize', parsedResult.targetMarketSize ?? '');
+    setValue('salesCycleLength', parsedResult.salesCycleLength ?? '');
+    setValue('deliveryTimeline', parsedResult.deliveryTimeline ?? '');
+    setValue('features', Array.isArray(parsedResult.features) ? parsedResult.features.join('\n') : (parsedResult.features ?? ''));
+    setValue('competitiveAdvantages', Array.isArray(parsedResult.competitiveAdvantages) ? parsedResult.competitiveAdvantages.join('\n') : (parsedResult.competitiveAdvantages ?? ''));
 
     handleShowToast('Parsed data applied to form!');
   };

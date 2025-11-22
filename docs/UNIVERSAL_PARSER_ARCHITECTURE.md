@@ -23,13 +23,18 @@ The Universal Parser System is a scalable, extensible architecture for extractin
 2. **universalParser Server Action** (`src/lib/actions/universalParser.ts`)
    - Main entry point: `universalParse()`
    - Loads parser config based on type
-   - Builds GPT prompt with raw text + human context
-   - Calls OpenAI API
+   - Builds **production-grade GPT prompt** with raw text + human context
+   - Calls OpenAI API with:
+     - Model: `gpt-4o-mini` (default, configurable via `OPENAI_MODEL`)
+     - Temperature: `0` (deterministic, no hallucinations)
+     - Response format: `json_object` (JSON-only output, no markdown)
+   - **Extracts JSON cleanly** from OpenAI response
    - **Normalizes data** (trim strings, convert numbers, handle null/undefined)
    - Validates response with Zod schema
    - **Stores result in Redis** with `inputId` (24 hour TTL)
    - Returns parsed data + explanation + `inputId`
    - `getParserResult(inputId)`: Retrieve stored result from Redis
+   - **HYDRATE ONLY**: Never saves to database, only returns parsed data for form hydration
 
 3. **typePrompts Mapping** (`src/lib/parsers/typePrompts.ts`)
    - Extensible configuration for all parser types
@@ -53,6 +58,7 @@ The Universal Parser System is a scalable, extensible architecture for extractin
 - Opens UniversalParserModal (separate UX)
 - `handleParserApply(parsedResult, inputId)` maps parsed fields to form using `setValue()`
 - Implements Field Mapping Contract
+- **HYDRATE ONLY - NEVER SAVES**: Parser only fills form fields, user must click "Save" button to persist to database
 - Non-breaking: additive feature, doesn't modify existing form behavior
 
 ## ParserConfig Contract
@@ -77,7 +83,33 @@ Example:
 ```typescript
 product_definition: {
   schema: productDefinitionSchema,
-  systemPrompt: `You are an extraction engine...`,
+  systemPrompt: `You are a structured data extraction engine.
+
+Your job is to analyze unstructured text about a product or service and extract factual information into a strict JSON object that matches the exact Product schema defined below.
+
+Do NOT infer or hallucinate any details not explicitly stated in the text.
+If a field is not mentioned clearly, return null.
+If human context is provided, you may use it to guide interpretation but DO NOT invent new facts.
+
+You MUST return strictly valid JSON following this exact structure:
+
+{
+  "name": string | null,
+  "category": string | null,
+  "valueProp": string | null,
+  "description": string | null,
+  "price": number | null,
+  "priceCurrency": "USD" | "EUR" | "GBP" | "CAD" | null,
+  "pricingModel": "one-time" | "recurring" | "usage-based" | "freemium" | "custom" | null,
+  "targetedTo": string | null,
+  "targetMarketSize": "enterprise" | "mid-market" | "small-business" | "startup" | "individual" | null,
+  "salesCycleLength": "immediate" | "short" | "medium" | "long" | "very-long" | null,
+  "deliveryTimeline": string | null,
+  "features": string | string[] | null,
+  "competitiveAdvantages": string | string[] | null
+}
+
+Return ONLY JSON. No markdown, no explanations, no commentary.`,
   fieldDescriptions: {
     name: 'Product/Service Name',
     valueProp: 'Value Proposition',
@@ -85,8 +117,8 @@ product_definition: {
   },
   exampleInput: `Our Business Development Platform...`,
   exampleOutput: { name: 'Business Development Platform', ... },
-  temperature: 0.3,
-  outputFormat: 'json_object',
+  temperature: 0, // Deterministic, no hallucinations
+  outputFormat: 'json_object', // JSON-only output
 }
 ```
 
@@ -256,9 +288,16 @@ The parser is a **separate UX flow** that operates independently:
    - User clicks "Submit to OpenAI"
    - Loading state shown
    - `universalParse()` called with raw + context + type
+   - **Production-grade OpenAI call**:
+     - Model: `gpt-4o-mini` (default, configurable via `OPENAI_MODEL`)
+     - Temperature: `0` (deterministic, no hallucinations)
+     - Response format: `json_object` (JSON-only, no markdown)
+     - System prompt: Production-grade extraction instructions
+     - User prompt: Raw text + Human context formatted clearly
 
 4. **Server normalizes + validates + Redis stores**
-   - GPT processes and returns JSON
+   - GPT returns pure JSON (no markdown code blocks)
+   - Server extracts JSON cleanly from response
    - Server normalizes data (trim, convert types)
    - Zod validates normalized data
    - Result stored in Redis with `inputId`
@@ -270,12 +309,14 @@ The parser is a **separate UX flow** that operates independently:
    - Explanation shown
    - `inputId` displayed for tracking
 
-6. **Apply to Form**
+6. **Apply to Form (HYDRATE ONLY - NEVER SAVES)**
    - User reviews preview
    - User clicks "Apply to Form"
    - `onApply(parsedResult, inputId)` called
    - Field Mapping Contract applied
-   - Form fields populated
+   - Form fields populated using `setValue()` (React Hook Form)
+   - **NO DATABASE SAVE** - Parser only hydrates UI
+   - User must click "Save" button separately to persist to database
 
 7. **Modal closes**
    - State reset
@@ -426,12 +467,17 @@ User optionally adds "Human Context" (editor's notes)
 User clicks "Submit to OpenAI"
   ↓
 universalParse() server action:
-  - Loads parser config (schema + prompt)
-  - Builds GPT prompt (raw text + human context)
-  - Calls OpenAI API
+  - Loads parser config (schema + production-grade system prompt)
+  - Builds user prompt (Raw Text + Human Context formatted clearly)
+  - Calls OpenAI API with:
+    - Model: `gpt-4o-mini` (default)
+    - Temperature: `0` (deterministic)
+    - Response format: `json_object` (JSON-only)
+  - Extracts JSON cleanly from response
   - Normalizes response (trim, convert types)
   - Validates with Zod
   - Stores result in Redis with inputId
+  - Returns parsed data (HYDRATE ONLY - never saves to database)
   ↓
 Preview shown in modal:
   - JSON blob of extracted fields
@@ -444,9 +490,13 @@ User clicks "Apply to Form"
   ↓
 handleParserApply() applies Field Mapping Contract
   ↓
-Form fields populated with parsed data
+Form fields populated with parsed data (HYDRATE ONLY - no database save)
   ↓
 Modal closes
+  ↓
+User reviews populated form
+  ↓
+User clicks "Save" button (separate action) → Database save
 ```
 
 ## Redis Storage
@@ -491,12 +541,14 @@ const result = await getParserResult('parser:product_definition:abc123...');
    };
    ```
 
-4. **Field Mapping Contract applied**:
+4. **Field Mapping Contract applied (HYDRATE ONLY)**:
    - For each key in parsedResult:
      - If null → skip
      - If number → convert to string
-     - If array → keep as array
+     - If array → keep as array (join with newlines for text fields)
      - If string → trim
+   - All fields set using `setValue()` - **NO DATABASE SAVE**
+   - User must click "Save" button separately to persist
      - Unknown keys → ignore
 
 5. **Form fields populated** using `setValue()`:
@@ -545,6 +597,78 @@ const result = await getParserResult('parser:product_definition:abc123...');
 - **Preview Before Apply**: User sees extracted data before applying
 - **User-Friendly Errors**: Zod errors formatted for display in modal
 
+## Production-Grade OpenAI Prompt
+
+### System Prompt
+
+The production-grade system prompt for `product_definition` type:
+
+```
+You are a structured data extraction engine.
+
+Your job is to analyze unstructured text about a product or service and extract factual information into a strict JSON object that matches the exact Product schema defined below.
+
+Do NOT infer or hallucinate any details not explicitly stated in the text.
+If a field is not mentioned clearly, return null.
+If human context is provided, you may use it to guide interpretation but DO NOT invent new facts.
+
+You MUST return strictly valid JSON following this exact structure:
+
+{
+  "name": string | null,
+  "category": string | null,
+  "valueProp": string | null,
+  "description": string | null,
+  "price": number | null,
+  "priceCurrency": "USD" | "EUR" | "GBP" | "CAD" | null,
+  "pricingModel": "one-time" | "recurring" | "usage-based" | "freemium" | "custom" | null,
+  "targetedTo": string | null,
+  "targetMarketSize": "enterprise" | "mid-market" | "small-business" | "startup" | "individual" | null,
+  "salesCycleLength": "immediate" | "short" | "medium" | "long" | "very-long" | null,
+  "deliveryTimeline": string | null,
+  "features": string | string[] | null,
+  "competitiveAdvantages": string | string[] | null
+}
+
+Return ONLY JSON. No markdown, no explanations, no commentary.
+```
+
+### User Prompt Format
+
+```
+Extract the product definition fields from the following raw text.
+
+RAW TEXT:
+{raw text here}
+
+HUMAN CONTEXT (optional):
+{human context or "None"}
+
+Return ONLY the JSON object following the schema provided in the system prompt.
+```
+
+### OpenAI Call Configuration
+
+```typescript
+const completion = await openai.chat.completions.create({
+  model: "gpt-4o-mini", // Default, configurable via OPENAI_MODEL env var
+  temperature: 0, // Deterministic, no hallucinations
+  response_format: { type: "json_object" }, // JSON-only output, no markdown
+  messages: [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt }
+  ]
+});
+```
+
+### JSON Extraction
+
+With `response_format: { type: "json_object" }`, OpenAI returns pure JSON (no markdown code blocks). The server extracts it cleanly:
+
+```typescript
+const parsedData = JSON.parse(completion.choices[0].message.content);
+```
+
 ## Human Context
 
 The "Editor's Notes / Context" field allows users to:
@@ -552,7 +676,7 @@ The "Editor's Notes / Context" field allows users to:
 - Provide additional context ("This is for enterprise clients")
 - Override assumptions ("Price is in CAD, not USD")
 
-The parser uses context to guide extraction but only extracts facts present in raw text.
+The parser uses context to guide extraction but only extracts facts present in raw text. The production-grade prompt explicitly instructs GPT to use context for interpretation but NOT to invent new facts.
 
 ## Example Usage
 
@@ -597,7 +721,9 @@ Price is in USD.
 
 7. **Preview shown** with JSON blob and inputId
 
-8. **User clicks "Apply to Form"** → Field Mapping Contract applied → Fields populated → Modal closes
+8. **User clicks "Apply to Form"** → Field Mapping Contract applied → Fields populated (HYDRATE ONLY) → Modal closes
+
+9. **User reviews populated form** → User clicks "Save" button → Database save (separate action)
 
 ## Benefits
 

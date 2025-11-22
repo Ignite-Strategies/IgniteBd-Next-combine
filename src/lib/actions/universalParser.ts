@@ -101,28 +101,31 @@ export async function universalParse({
     const config = getParserConfig(type);
     const { schema, systemPrompt } = config;
 
-    // Build user prompt
-    let userPrompt = `Extract product definition information from this raw text:\n\n${raw}`;
+    // Build user prompt with Raw Text + Human Context
+    const userPrompt = `Extract the product definition fields from the following raw text.
 
-    if (context && context.trim()) {
-      userPrompt += `\n\nEditor's Notes / Context:\n${context}\n\nUse this context to guide interpretation, but only extract facts that are present in the raw text.`;
-    }
+RAW TEXT:
+${raw}
 
-    userPrompt += `\n\nReturn ONLY valid JSON matching the schema. Do not include markdown code blocks, just the raw JSON object.`;
+HUMAN CONTEXT (optional):
+${context ?? 'None'}
+
+Return ONLY the JSON object following the schema provided in the system prompt.`;
 
     // Get OpenAI client
     const openai = getOpenAIClient();
-    const model = process.env.OPENAI_MODEL || 'gpt-4o';
+    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
     console.log(`🤖 Calling OpenAI (${model}) for universal parser (type: ${type})...`);
 
     // Call OpenAI with config from parser type
-    const temperature = config.temperature ?? 0.3;
+    const temperature = config.temperature ?? 0;
     const outputFormat = config.outputFormat ?? 'json_object';
 
     const completion = await openai.chat.completions.create({
       model,
       temperature,
+      response_format: { type: outputFormat as 'json_object' },
       messages: [
         {
           role: 'system',
@@ -133,7 +136,6 @@ export async function universalParse({
           content: userPrompt,
         },
       ],
-      response_format: { type: outputFormat as 'json_object' },
     });
 
     const content = completion.choices?.[0]?.message?.content;
@@ -141,17 +143,19 @@ export async function universalParse({
       throw new Error('No GPT output received');
     }
 
-    // Parse JSON response
+    // Extract JSON cleanly - OpenAI with json_object format should return pure JSON
     let parsedData;
     try {
+      // With response_format: { type: "json_object" }, OpenAI should return pure JSON
       parsedData = JSON.parse(content);
     } catch (parseError) {
-      // Try to extract JSON from markdown code blocks
+      // Fallback: Try to extract JSON from markdown code blocks (shouldn't happen with json_object format)
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsedData = JSON.parse(jsonMatch[0]);
+        console.warn('⚠️ Extracted JSON from markdown (unexpected with json_object format)');
       } else {
-        throw new Error('Invalid JSON response from OpenAI');
+        throw new Error(`Invalid JSON response from OpenAI: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
       }
     }
 
