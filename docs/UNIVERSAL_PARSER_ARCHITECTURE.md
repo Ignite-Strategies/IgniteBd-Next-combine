@@ -422,30 +422,38 @@ export const productDefinitionSchema = z.object({
 
 To add a new parser type (e.g., `ecosystem_map`):
 
-1. **Create a Zod schema** in `typePrompts.ts`:
+1. **Create a new config file** in `src/lib/parsers/configs/ecosystem.ts`:
    ```typescript
+   import { z } from 'zod';
+   import type { ParserConfig } from '../parserConfigs';
+
    export const ecosystemMapSchema = z.object({
      // All fields optional
      field1: z.string().optional().nullable(),
      field2: z.coerce.number().optional().nullable(),
      // ...
    });
-   ```
 
-2. **Add parser config to `PARSER_PROMPTS`**:
-   ```typescript
-   ecosystem_map: {
+   export const parserConfig: ParserConfig = {
+     name: 'ecosystem_map',
      schema: ecosystemMapSchema,
      systemPrompt: `You are extracting ecosystem map data...`,
-     fieldDescriptions: {
-       field1: 'Field 1 Description',
-       field2: 'Field 2 Description',
+     buildUserPrompt: (raw: string, context: string | null) => `...`,
+     normalize: (parsed: any) => {
+       // Normalization rules
+       return normalized;
      },
-     exampleInput: `Example raw input...`,
-     exampleOutput: { field1: 'value1', field2: 123 },
-     temperature: 0.3,
-     outputFormat: 'json_object',
-   },
+   };
+   ```
+
+2. **Register the config** in `src/lib/parsers/parserConfigs.ts`:
+   ```typescript
+   import { parserConfig as ecosystemConfig } from './configs/ecosystem';
+
+   export const PARSER_CONFIGS: Record<UniversalParserType, ParserConfig> = {
+     // ... existing configs
+     ecosystem_map: ecosystemConfig,
+   };
    ```
 
 3. **Add the type to `UniversalParserType`**:
