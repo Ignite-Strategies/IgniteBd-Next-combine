@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { Package } from 'lucide-react';
+import { Package, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 import { PRODUCT_CONFIG } from '@/lib/config/productConfig';
 import { mapDatabaseToForm } from '@/lib/services/ProductServiceMapper';
 import { ProductFormFields } from '@/components/forms/ProductFormFields';
+import UniversalParserModal from '@/components/parsers/UniversalParserModal';
 
 // Default values from config
 const DEFAULT_VALUES = {
@@ -67,6 +68,7 @@ export default function ProductBuilderPage({ searchParams }) {
   const toastTimerRef = useRef(null);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [personas, setPersonas] = useState([]);
+  const [isParserModalOpen, setIsParserModalOpen] = useState(false);
 
   const derivedCompanyId = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -255,6 +257,29 @@ export default function ProductBuilderPage({ searchParams }) {
 
   const isBusy = isHydrating || isSubmitting;
 
+  // Handle parser result application
+  const handleParserApply = (parsedResult) => {
+    // Map parsed result to form fields
+    // The parsed result matches the product definition schema
+    if (parsedResult.name) setValue('name', parsedResult.name);
+    if (parsedResult.category !== undefined) setValue('category', parsedResult.category || '');
+    if (parsedResult.valueProp !== undefined) setValue('valueProp', parsedResult.valueProp || '');
+    if (parsedResult.description !== undefined) setValue('description', parsedResult.description || '');
+    if (parsedResult.price !== undefined && parsedResult.price !== null) {
+      setValue('price', parsedResult.price.toString());
+    }
+    if (parsedResult.priceCurrency !== undefined) setValue('priceCurrency', parsedResult.priceCurrency || 'USD');
+    if (parsedResult.pricingModel !== undefined) setValue('pricingModel', parsedResult.pricingModel || '');
+    if (parsedResult.targetedTo !== undefined) setValue('targetedTo', parsedResult.targetedTo || '');
+    if (parsedResult.targetMarketSize !== undefined) setValue('targetMarketSize', parsedResult.targetMarketSize || '');
+    if (parsedResult.salesCycleLength !== undefined) setValue('salesCycleLength', parsedResult.salesCycleLength || '');
+    if (parsedResult.deliveryTimeline !== undefined) setValue('deliveryTimeline', parsedResult.deliveryTimeline || '');
+    if (parsedResult.features !== undefined) setValue('features', parsedResult.features || '');
+    if (parsedResult.competitiveAdvantages !== undefined) setValue('competitiveAdvantages', parsedResult.competitiveAdvantages || '');
+
+    handleShowToast('Parsed data applied to form!');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -291,31 +316,47 @@ export default function ProductBuilderPage({ searchParams }) {
             </div>
           )}
 
-          {/* Template Helper - Only show when creating new product */}
-          {!productId && (
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="mb-2 text-sm font-medium text-blue-900">
-                ✨ Pre-filled with IgniteBD Platform Template
-              </p>
-              <p className="mb-3 text-sm text-blue-700">
-                Form is pre-filled with IgniteBD's core business development platform offering based on the Attract → Engage → Nurture methodology. Edit as needed for your specific product/service.
-              </p>
+          {/* AI Parser Button */}
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex-1">
+              {/* Template Helper - Only show when creating new product */}
+              {!productId && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <p className="mb-2 text-sm font-medium text-blue-900">
+                    ✨ Pre-filled with IgniteBD Platform Template
+                  </p>
+                  <p className="mb-3 text-sm text-blue-700">
+                    Form is pre-filled with IgniteBD's core business development platform offering based on the Attract → Engage → Nurture methodology. Edit as needed for your specific product/service.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      reset({
+                        ...BD_PLATFORM_TEMPLATE,
+                        companyId: derivedCompanyId,
+                      });
+                      handleShowToast('Template reloaded!');
+                    }}
+                    disabled={isBusy}
+                    className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                  >
+                    Reload IgniteBD Template
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="ml-4">
               <button
                 type="button"
-                onClick={() => {
-                  reset({
-                    ...BD_PLATFORM_TEMPLATE,
-                    companyId: derivedCompanyId,
-                  });
-                  handleShowToast('Template reloaded!');
-                }}
-                disabled={isBusy}
-                className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                onClick={() => setIsParserModalOpen(true)}
+                disabled={isBusy || !derivedCompanyId}
+                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Reload IgniteBD Template
+                <Sparkles className="h-4 w-4" />
+                AI Parser
               </button>
             </div>
-          )}
+          </div>
 
           <form onSubmit={onSubmit} className="space-y-6">
             <input
@@ -352,6 +393,17 @@ export default function ProductBuilderPage({ searchParams }) {
           </form>
         </div>
       </div>
+
+      {/* AI Parser Modal */}
+      {derivedCompanyId && (
+        <UniversalParserModal
+          isOpen={isParserModalOpen}
+          onClose={() => setIsParserModalOpen(false)}
+          onApply={handleParserApply}
+          defaultType="product_definition"
+          companyHqId={derivedCompanyId}
+        />
+      )}
     </div>
   );
 }
