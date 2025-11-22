@@ -21,31 +21,40 @@ The Universal Parser System is a scalable, extensible architecture for extractin
    - Displays `inputId` (Redis key) for result tracking
 
 2. **universalParser Server Action** (`src/lib/actions/universalParser.ts`)
+   - **Thin router/orchestrator** - Zero hardcoded prompts or schemas
    - Main entry point: `universalParse()`
-   - Loads parser config based on type
-   - Builds **production-grade GPT prompt** with raw text + human context
+   - Loads parser config from registry based on type
+   - Builds prompts using config's `buildUserPrompt()` function
    - Calls OpenAI API with:
      - Model: `gpt-4o-mini` (default, configurable via `OPENAI_MODEL`)
      - Temperature: `0` (deterministic, no hallucinations)
      - Response format: `json_object` (JSON-only output, no markdown)
    - **Extracts JSON cleanly** from OpenAI response
-   - **Normalizes data** (trim strings, convert numbers, handle null/undefined)
-   - Validates response with Zod schema
+   - **Normalizes data** using config's `normalize()` function
+   - Validates response with config's Zod schema
    - **Stores result in Redis** with `inputId` (24 hour TTL)
    - Returns parsed data + explanation + `inputId`
    - `getParserResult(inputId)`: Retrieve stored result from Redis
    - **HYDRATE ONLY**: Never saves to database, only returns parsed data for form hydration
 
-3. **typePrompts Mapping** (`src/lib/parsers/typePrompts.ts`)
-   - Extensible configuration for all parser types
-   - Schema definitions (Zod)
-   - System prompts for GPT
-   - Field descriptions
-   - Example input/output
-   - Temperature and output format config
-   - Easy to add new types: just fill in the mapping
+3. **Parser Configs Directory** (`src/lib/parsers/configs/`)
+   - **Config-based architecture** - Each parser type has its own config file
+   - Files: `product.ts`, `ecosystem.ts`, `events.ts`, `blog.ts`, `generic.ts`
+   - Each config exports:
+     - `schema`: Zod schema for validation
+     - `systemPrompt`: GPT system prompt
+     - `buildUserPrompt(raw, context)`: Function to build user prompt
+     - `normalize(parsed)`: Function to normalize parsed data
+   - **Zero knowledge in universalParser** - All logic in configs
 
-4. **Redis Storage** (`src/lib/redis.ts`)
+4. **Parser Configs Registry** (`src/lib/parsers/parserConfigs.ts`)
+   - Global registry mapping parser types to configs
+   - Exports `PARSER_CONFIGS` record
+   - Exports `getParserConfig(type)` function
+   - Exports `UniversalParserType` enum
+   - Exports `ParserConfig` interface
+
+5. **Redis Storage** (`src/lib/redis.ts`)
    - Stores parsed results with key pattern: `parser:{type}:{uuid}`
    - 24 hour TTL
    - Stores: parsed data, explanation, raw text, context, timestamp
@@ -61,23 +70,32 @@ The Universal Parser System is a scalable, extensible architecture for extractin
 - **HYDRATE ONLY - NEVER SAVES**: Parser only fills form fields, user must click "Save" button to persist to database
 - Non-breaking: additive feature, doesn't modify existing form behavior
 
-## ParserConfig Contract
+## ParserConfig Architecture
+
+### Config-Based Architecture
+
+The Universal Parser uses a **config-based architecture** where each parser type has its own config file in `src/lib/parsers/configs/`. This ensures:
+
+- **Zero hardcoded logic** in `universalParser.ts`
+- **Easy extensibility** - just add a new config file
+- **Type safety** - each config implements `ParserConfig` interface
+- **Separation of concerns** - prompts, schemas, and normalization rules live together
+
+### ParserConfig Interface
 
 Every parser type must provide a complete `ParserConfig`:
 
 ```typescript
-export type ParserConfig = {
-  schema: ZodSchema<any>;              // Required: Zod schema for validation
-  systemPrompt: string;                 // Required: GPT system prompt
-  fieldDescriptions: Record<string, string>; // Required: Field descriptions for GPT
-  exampleInput?: string;                // Optional: Example raw input
-  exampleOutput?: Record<string, any>;  // Optional: Example parsed output
-  temperature?: number;                  // Optional: GPT temperature (default: 0.3)
-  outputFormat?: "json_object";         // Optional: Output format (default: "json_object")
-};
+export interface ParserConfig {
+  name: string;                                    // Parser type name
+  schema: z.ZodSchema<any>;                       // Required: Zod schema for validation
+  systemPrompt: string;                            // Required: GPT system prompt
+  buildUserPrompt: (raw: string, context: string | null) => string; // Required: Function to build user prompt
+  normalize: (parsed: any) => any;                 // Required: Function to normalize parsed data
+}
 ```
 
-**All fields except `exampleInput` and `exampleOutput` are required.**
+**All fields are required.**
 
 Example:
 ```typescript
@@ -466,16 +484,17 @@ User optionally adds "Human Context" (editor's notes)
   ↓
 User clicks "Submit to OpenAI"
   ↓
-universalParse() server action:
-  - Loads parser config (schema + production-grade system prompt)
-  - Builds user prompt (Raw Text + Human Context formatted clearly)
+universalParse() server action (thin router):
+  - Loads parser config from registry (no hardcoded logic)
+  - Builds system prompt from config.systemPrompt
+  - Builds user prompt using config.buildUserPrompt(raw, context)
   - Calls OpenAI API with:
     - Model: `gpt-4o-mini` (default)
     - Temperature: `0` (deterministic)
     - Response format: `json_object` (JSON-only)
   - Extracts JSON cleanly from response
-  - Normalizes response (trim, convert types)
-  - Validates with Zod
+  - Normalizes response using config.normalize(parsed)
+  - Validates with config.schema
   - Stores result in Redis with inputId
   - Returns parsed data (HYDRATE ONLY - never saves to database)
   ↓

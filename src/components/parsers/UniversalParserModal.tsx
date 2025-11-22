@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { X, Sparkles, Loader2, CheckCircle2, AlertCircle, Send } from 'lucide-react';
 import { universalParse, type UniversalParseResult } from '@/lib/actions/universalParser';
-import type { UniversalParserType } from '@/lib/parsers/typePrompts';
+import type { UniversalParserType } from '@/lib/parsers/parserConfigs';
 
 interface UniversalParserModalProps {
   isOpen: boolean;

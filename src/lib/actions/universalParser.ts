@@ -1,7 +1,7 @@
 'use server';
 
 import { OpenAI } from 'openai';
-import { getParserConfig, type UniversalParserType } from '@/lib/parsers/typePrompts';
+import { getParserConfig, type UniversalParserType } from '@/lib/parsers/parserConfigs';
 import { getRedis } from '@/lib/redis';
 import { randomUUID } from 'crypto';
 
@@ -22,50 +22,6 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
-/**
- * Normalize parsed data according to Data Normalization Policy
- * Server responsibilities: trim strings, convert numbers, handle undefined/null, ensure arrays
- */
-function normalizeParsedData(data: any): any {
-  if (data === null || data === undefined) {
-    return {};
-  }
-
-  if (typeof data !== 'object' || Array.isArray(data)) {
-    // Primitive values: return as-is (will be handled by Zod coercion)
-    return data;
-  }
-
-  const normalized: Record<string, any> = {};
-
-  for (const [key, value] of Object.entries(data)) {
-    if (value === undefined) {
-      // Convert undefined → null
-      normalized[key] = null;
-    } else if (value === null) {
-      normalized[key] = null;
-    } else if (typeof value === 'string') {
-      // Trim strings
-      const trimmed = value.trim();
-      // Don't auto-convert numeric strings here - let Zod handle coercion
-      normalized[key] = trimmed;
-    } else if (typeof value === 'number') {
-      // Numbers stay as numbers
-      normalized[key] = value;
-    } else if (Array.isArray(value)) {
-      // Ensure arrays are always arrays
-      normalized[key] = value;
-    } else if (typeof value === 'object') {
-      // Recursively normalize nested objects
-      normalized[key] = normalizeParsedData(value);
-    } else {
-      normalized[key] = value;
-    }
-  }
-
-  return normalized;
-}
-
 export interface UniversalParseResult {
   success: boolean;
   parsed?: any;
@@ -76,7 +32,8 @@ export interface UniversalParseResult {
 
 /**
  * Universal Parser Server Action
- * Extracts structured data from raw text using GPT and validates with Zod schemas
+ * Thin router that loads config and orchestrates parsing
+ * Zero hardcoded prompts or schemas - everything comes from configs
  */
 export async function universalParse({
   raw,
@@ -97,20 +54,15 @@ export async function universalParse({
       };
     }
 
-    // Get parser config for this type
+    // Load parser config for this type
     const config = getParserConfig(type);
-    const { schema, systemPrompt } = config;
+    if (!config) {
+      throw new Error(`Parser type "${type}" is not supported`);
+    }
 
-    // Build user prompt with Raw Text + Human Context
-    const userPrompt = `Extract the product definition fields from the following raw text.
-
-RAW TEXT:
-${raw}
-
-HUMAN CONTEXT (optional):
-${context ?? 'None'}
-
-Return ONLY the JSON object following the schema provided in the system prompt.`;
+    // Build prompts from config
+    const systemPrompt = config.systemPrompt;
+    const userPrompt = config.buildUserPrompt(raw, context ?? null);
 
     // Get OpenAI client
     const openai = getOpenAIClient();
@@ -118,14 +70,11 @@ Return ONLY the JSON object following the schema provided in the system prompt.`
 
     console.log(`🤖 Calling OpenAI (${model}) for universal parser (type: ${type})...`);
 
-    // Call OpenAI with config from parser type
-    const temperature = config.temperature ?? 0;
-    const outputFormat = config.outputFormat ?? 'json_object';
-
+    // Call OpenAI with production-grade settings
     const completion = await openai.chat.completions.create({
       model,
-      temperature,
-      response_format: { type: outputFormat as 'json_object' },
+      temperature: 0, // Deterministic, no hallucinations
+      response_format: { type: 'json_object' }, // JSON-only output
       messages: [
         {
           role: 'system',
@@ -146,7 +95,6 @@ Return ONLY the JSON object following the schema provided in the system prompt.`
     // Extract JSON cleanly - OpenAI with json_object format should return pure JSON
     let parsedData;
     try {
-      // With response_format: { type: "json_object" }, OpenAI should return pure JSON
       parsedData = JSON.parse(content);
     } catch (parseError) {
       // Fallback: Try to extract JSON from markdown code blocks (shouldn't happen with json_object format)
@@ -159,11 +107,11 @@ Return ONLY the JSON object following the schema provided in the system prompt.`
       }
     }
 
-    // Normalize data before validation
-    const normalizedData = normalizeParsedData(parsedData);
+    // Normalize using config-specific normalization rules
+    const normalizedData = config.normalize(parsedData);
 
-    // Validate with Zod schema (with coercion)
-    const validationResult = schema.safeParse(normalizedData);
+    // Validate with Zod schema from config
+    const validationResult = config.schema.safeParse(normalizedData);
 
     if (!validationResult.success) {
       console.error('❌ Zod validation failed:', validationResult.error);
@@ -245,4 +193,3 @@ export async function getParserResult(inputId: string): Promise<UniversalParseRe
     return null;
   }
 }
-
