@@ -28,34 +28,6 @@ const DEFAULT_VALUES = {
   companyId: '',
 };
 
-// Prefilled template for IgniteBD Business Development Platform
-// Based on IgniteBD's core mission: Attract → Engage → Nurture
-const BD_PLATFORM_TEMPLATE = {
-  name: 'IgniteBD Business Development Platform',
-  valueProp: 'Systematic outreach, relationship building, and growth acceleration for professional services clients. Turn your network into predictable revenue through Attract → Engage → Nurture methodology.',
-  description: 'A comprehensive business development platform designed to help professional services clients with systematic outreach, relationship building, and growth acceleration. We provide the tools, systems, and expertise to turn contacts into clients through proven Attract → Engage → Nurture methodology.',
-  price: '',
-  priceCurrency: 'USD',
-  pricingModel: 'recurring',
-  category: 'Business Development Service',
-  deliveryTimeline: '2-4 weeks setup, ongoing support',
-  targetMarketSize: 'small-business',
-  salesCycleLength: 'medium',
-  features: `- Systematic outreach and relationship building
-- Contact management and pipeline tracking
-- Personalized campaign creation and management
-- BD Intelligence scoring for contact-product fit
-- Pipeline roadmap and stage tracking
-- Proposal generation and management
-- Event and meeting coordination
-- Multi-tenant company management`,
-  competitiveAdvantages: `- Contact + Company First Architecture - designed for relationship-driven growth
-- BD Intelligence scoring powered by OpenAI for optimal contact-product matching
-- Systematic methodology (Attract → Engage → Nurture) proven for professional services
-- Multi-tenant platform with CompanyHQ scoping for scalable operations
-- Integrated pipeline and stage tracking for intentional relationship management`,
-  targetedTo: '',
-};
 
 export default function ProductBuilderPage({ searchParams }) {
   const router = useRouter();
@@ -116,15 +88,7 @@ export default function ProductBuilderPage({ searchParams }) {
       }
     };
     
-    if (!productId && derivedCompanyId && !hasInitialized) {
-      // Pre-fill with template for testing upsert logic
-      reset({
-        ...BD_PLATFORM_TEMPLATE,
-        companyId: derivedCompanyId,
-      });
-      setHasInitialized(true);
-      fetchPersonas();
-    } else if (derivedCompanyId && !hasInitialized) {
+    if (derivedCompanyId && !hasInitialized) {
       setValue('companyId', derivedCompanyId);
       setHasInitialized(true);
       fetchPersonas();
@@ -317,45 +281,16 @@ export default function ProductBuilderPage({ searchParams }) {
           )}
 
           {/* AI Parser Button */}
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex-1">
-              {/* Template Helper - Only show when creating new product */}
-              {!productId && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                  <p className="mb-2 text-sm font-medium text-blue-900">
-                    ✨ Pre-filled with IgniteBD Platform Template
-                  </p>
-                  <p className="mb-3 text-sm text-blue-700">
-                    Form is pre-filled with IgniteBD's core business development platform offering based on the Attract → Engage → Nurture methodology. Edit as needed for your specific product/service.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      reset({
-                        ...BD_PLATFORM_TEMPLATE,
-                        companyId: derivedCompanyId,
-                      });
-                      handleShowToast('Template reloaded!');
-                    }}
-                    disabled={isBusy}
-                    className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
-                  >
-                    Reload IgniteBD Template
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="ml-4">
-              <button
-                type="button"
-                onClick={() => setIsParserModalOpen(true)}
-                disabled={isBusy || !derivedCompanyId}
-                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="h-4 w-4" />
-                AI Parser
-              </button>
-            </div>
+          <div className="mb-6 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsParserModalOpen(true)}
+              disabled={isBusy || !derivedCompanyId}
+              className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Sparkles className="h-4 w-4" />
+              AI Parser
+            </button>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-6">
