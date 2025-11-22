@@ -6,20 +6,23 @@ import { z } from 'zod';
  */
 
 // BD Product Definition Schema (matches BD Product model)
+// Zod Schema Rules: All fields must be optional (parser should NEVER reject data because a field is missing)
+// Zod should coerce: numbers, stringified numbers, arrays
+// Zod should define the FINAL shape of the parsed object
 export const productDefinitionSchema = z.object({
-  name: z.string().min(1, 'Product/Service Name is required').max(255),
+  name: z.string().max(255).optional().nullable(), // Optional - parser never rejects missing name
   category: z.string().max(100).optional().nullable(),
   valueProp: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
-  price: z.number().min(0).optional().nullable(),
+  price: z.coerce.number().min(0).optional().nullable(), // Coerce string numbers to numbers
   priceCurrency: z.enum(['USD', 'EUR', 'GBP', 'CAD']).optional().nullable(),
   pricingModel: z.enum(['one-time', 'recurring', 'usage-based', 'freemium', 'custom']).optional().nullable(),
   targetedTo: z.string().optional().nullable(), // Persona ID
   targetMarketSize: z.enum(['enterprise', 'mid-market', 'small-business', 'startup', 'individual']).optional().nullable(),
   salesCycleLength: z.enum(['immediate', 'short', 'medium', 'long', 'very-long']).optional().nullable(),
   deliveryTimeline: z.string().max(100).optional().nullable(),
-  features: z.string().optional().nullable(),
-  competitiveAdvantages: z.string().optional().nullable(),
+  features: z.union([z.string(), z.array(z.string())]).optional().nullable(), // Can be string or array, coerced
+  competitiveAdvantages: z.union([z.string(), z.array(z.string())]).optional().nullable(), // Can be string or array, coerced
 });
 
 export type ProductDefinitionParsed = z.infer<typeof productDefinitionSchema>;
@@ -31,11 +34,15 @@ export type UniversalParserType =
   | 'blog'
   | 'generic';
 
-export interface ParserConfig {
+export type ParserConfig = {
   schema: z.ZodSchema<any>;
   systemPrompt: string;
-  fieldDescriptions?: Record<string, string>;
-}
+  fieldDescriptions: Record<string, string>;
+  exampleInput?: string;
+  exampleOutput?: Record<string, any>;
+  temperature?: number;
+  outputFormat?: 'json_object';
+};
 
 export const PARSER_PROMPTS: Record<UniversalParserType, ParserConfig | null> = {
   product_definition: {
@@ -67,6 +74,7 @@ Rules:
 5. Features and competitiveAdvantages can be formatted as bullet points or paragraphs
 6. Follow the exact enum values for select fields
 7. If human context is provided, use it to guide interpretation but don't invent data
+8. Return strictly valid JSON matching the schema structure
 
 Return ONLY valid JSON matching the schema. No markdown, no explanations, just JSON.`,
     fieldDescriptions: {
@@ -83,6 +91,22 @@ Return ONLY valid JSON matching the schema. No markdown, no explanations, just J
       features: 'Key Features',
       competitiveAdvantages: 'Competitive Advantages',
     },
+    exampleInput: `Our Business Development Platform helps professional services firms
+systematically grow revenue through Attract → Engage → Nurture methodology.
+Pricing: $2,000/month recurring. Target: Small businesses (10-99 employees).
+Sales cycle: Medium (1-3 months). Delivery: 2-4 weeks setup.`,
+    exampleOutput: {
+      name: 'Business Development Platform',
+      valueProp: 'Systematically grow revenue through Attract → Engage → Nurture methodology',
+      pricingModel: 'recurring',
+      price: 2000,
+      priceCurrency: 'USD',
+      targetMarketSize: 'small-business',
+      salesCycleLength: 'medium',
+      deliveryTimeline: '2-4 weeks setup',
+    },
+    temperature: 0.3,
+    outputFormat: 'json_object',
   },
   ecosystem_map: null, // To be filled in v2
   event_selection: null, // To be filled in v2

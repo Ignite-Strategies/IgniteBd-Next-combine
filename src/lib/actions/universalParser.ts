@@ -22,6 +22,50 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
+/**
+ * Normalize parsed data according to Data Normalization Policy
+ * Server responsibilities: trim strings, convert numbers, handle undefined/null, ensure arrays
+ */
+function normalizeParsedData(data: any): any {
+  if (data === null || data === undefined) {
+    return {};
+  }
+
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    // Primitive values: return as-is (will be handled by Zod coercion)
+    return data;
+  }
+
+  const normalized: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      // Convert undefined → null
+      normalized[key] = null;
+    } else if (value === null) {
+      normalized[key] = null;
+    } else if (typeof value === 'string') {
+      // Trim strings
+      const trimmed = value.trim();
+      // Don't auto-convert numeric strings here - let Zod handle coercion
+      normalized[key] = trimmed;
+    } else if (typeof value === 'number') {
+      // Numbers stay as numbers
+      normalized[key] = value;
+    } else if (Array.isArray(value)) {
+      // Ensure arrays are always arrays
+      normalized[key] = value;
+    } else if (typeof value === 'object') {
+      // Recursively normalize nested objects
+      normalized[key] = normalizeParsedData(value);
+    } else {
+      normalized[key] = value;
+    }
+  }
+
+  return normalized;
+}
+
 export interface UniversalParseResult {
   success: boolean;
   parsed?: any;
@@ -72,10 +116,13 @@ export async function universalParse({
 
     console.log(`🤖 Calling OpenAI (${model}) for universal parser (type: ${type})...`);
 
-    // Call OpenAI
+    // Call OpenAI with config from parser type
+    const temperature = config.temperature ?? 0.3;
+    const outputFormat = config.outputFormat ?? 'json_object';
+
     const completion = await openai.chat.completions.create({
       model,
-      temperature: 0.3, // Lower temperature for more consistent extraction
+      temperature,
       messages: [
         {
           role: 'system',
@@ -86,7 +133,7 @@ export async function universalParse({
           content: userPrompt,
         },
       ],
-      response_format: { type: 'json_object' }, // Force JSON output
+      response_format: { type: outputFormat as 'json_object' },
     });
 
     const content = completion.choices?.[0]?.message?.content;
@@ -108,15 +155,22 @@ export async function universalParse({
       }
     }
 
-    // Validate with Zod schema
-    const validationResult = schema.safeParse(parsedData);
+    // Normalize data before validation
+    const normalizedData = normalizeParsedData(parsedData);
+
+    // Validate with Zod schema (with coercion)
+    const validationResult = schema.safeParse(normalizedData);
 
     if (!validationResult.success) {
       console.error('❌ Zod validation failed:', validationResult.error);
+      // Format Zod errors for user-friendly display
+      const errorMessages = validationResult.error.errors.map(
+        (err) => `${err.path.join('.')}: ${err.message}`
+      );
       return {
         success: false,
-        error: 'Parsed data does not match expected schema',
-        parsed: parsedData, // Return raw parsed data anyway for preview
+        error: `Validation failed: ${errorMessages.join('; ')}`,
+        parsed: normalizedData, // Return normalized data anyway for preview
       };
     }
 
