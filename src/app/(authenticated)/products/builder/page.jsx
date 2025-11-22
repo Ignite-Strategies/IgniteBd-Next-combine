@@ -223,7 +223,7 @@ export default function ProductBuilderPage({ searchParams }) {
 
   // Handle parser result application
   // Field Mapping Contract: Maps parsedResult to form fields according to strict rules
-  const handleParserApply = (parsedResult: Record<string, any>, inputId?: string) => {
+  const handleParserApply = (parsedResult, inputId) => {
     // Log inputId for tracking
     if (inputId) {
       console.log('Parser result applied with inputId:', inputId);

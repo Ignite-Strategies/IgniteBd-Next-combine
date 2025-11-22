@@ -8,7 +8,7 @@ import type { UniversalParserType } from '@/lib/parsers/typePrompts';
 interface UniversalParserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApply: (parsedResult: any) => void;
+  onApply: (parsedResult: any, inputId?: string) => void;
   defaultType?: UniversalParserType;
   companyHqId: string;
   inputId?: string; // Optional: track which input/field triggered the parser

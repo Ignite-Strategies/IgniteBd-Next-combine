@@ -14,6 +14,15 @@
 		},
 		{
 			"path": "../../GoFast/gofastbackendv2-fall2025"
+		},
+		{
+			"path": "../../GoFast/tripwell-gofastbackend"
+		},
+		{
+			"path": "../../Water4Soul/waterf4soulmvp1"
+		},
+		{
+			"path": "../../GoFast/gofast-appbuildmvp"
 		}
 	],
 	"settings": {}

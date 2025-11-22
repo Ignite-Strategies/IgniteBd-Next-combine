@@ -164,7 +164,7 @@ export async function universalParse({
     if (!validationResult.success) {
       console.error('❌ Zod validation failed:', validationResult.error);
       // Format Zod errors for user-friendly display
-      const errorMessages = validationResult.error.errors.map(
+      const errorMessages = validationResult.error.issues.map(
         (err) => `${err.path.join('.')}: ${err.message}`
       );
       return {
