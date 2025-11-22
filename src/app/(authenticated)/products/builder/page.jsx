@@ -282,15 +282,15 @@ export default function ProductBuilderPage({ searchParams }) {
 
           {/* AI Parser Button */}
           <div className="mb-6 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setIsParserModalOpen(true)}
-              disabled={isBusy || !derivedCompanyId}
-              className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Sparkles className="h-4 w-4" />
-              AI Parser
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsParserModalOpen(true)}
+                disabled={isBusy || !derivedCompanyId}
+                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="h-4 w-4" />
+                Build with AI
+              </button>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-6">
