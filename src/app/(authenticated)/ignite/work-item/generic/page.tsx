@@ -3,7 +3,8 @@ export default async function GenericPage({
 }: { 
   searchParams: Promise<{ label?: string }> | { label?: string } 
 }) {
-  const params = typeof searchParams.then === 'function' 
+  // Handle both Promise and object cases
+  const params = searchParams instanceof Promise
     ? await searchParams 
     : searchParams;
   
