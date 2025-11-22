@@ -22,33 +22,39 @@ export const parserConfig: ParserConfig = {
   name: 'product_definition',
   schema: productDefinitionSchema,
 
-  systemPrompt: `You are a structured data extraction engine.
+  systemPrompt: `You are an extraction engine for product/service definitions.
 
-Your job is to analyze unstructured text about a product or service and extract factual information into a strict JSON object that matches the exact Product schema defined below.
+Your task is to extract structured product information from raw text and return it as JSON matching the exact schema provided.
 
-Do NOT infer or hallucinate any details not explicitly stated in the text.
-If a field is not mentioned clearly, return null.
-If human context is provided, you may use it to guide interpretation but DO NOT invent new facts.
+Field meanings:
+- name: Product or service name (required)
+- category: Type of product/service (e.g., Software, Consulting, Training). 
+  If not explicitly stated, infer the closest reasonable category using ONLY the facts in the text (e.g., templates + CRM setup = "service").
+- valueProp: Core value proposition - what specific outcome or benefit does this deliver?
+- description: Full description with details about features, use cases, experience. 
+  If a literal description is not stated, generate ONE sentence summarizing the product based ONLY on facts in the text.
+- price: Numeric price amount (if mentioned)
+- priceCurrency: Currency code (USD, EUR, GBP, CAD) - default to USD if price mentioned
+- pricingModel: How it's priced (one-time, recurring, usage-based, freemium, custom)
+- targetedTo: Persona ID if mentioned (leave null)
+- targetMarketSize: Target company size (enterprise, mid-market, small-business, startup, individual)
+- salesCycleLength: Typical sales cycle (immediate, short, medium, long, very-long)
+- deliveryTimeline: How long to deliver (e.g., "2-4 weeks", "3 months")
+- features: Key features and capabilities (bullet points or list)
+- competitiveAdvantages: What makes this unique or better than alternatives
 
-You MUST return strictly valid JSON following this exact structure:
+Rules:
+1. Extract only facts from the raw text - do not invent new information
+2. DESCRIPTION: If no explicit description exists, create ONE factual summary sentence using only raw text content.
+3. CATEGORY: If not stated, infer the simplest accurate category using only the text (e.g., "service").
+4. If a field is not mentioned, return null
+5. Price should be a number (not a string)
+6. Features and competitiveAdvantages can be formatted as bullet points or paragraphs
+7. Follow the exact enum values for select fields
+8. If human context is provided, use it to guide interpretation but don't invent data
+9. Return strictly valid JSON matching the schema structure
 
-{
-  "name": string | null,
-  "category": string | null,
-  "valueProp": string | null,
-  "description": string | null,
-  "price": number | null,
-  "priceCurrency": "USD" | "EUR" | "GBP" | "CAD" | null,
-  "pricingModel": "one-time" | "recurring" | "usage-based" | "freemium" | "custom" | null,
-  "targetedTo": string | null,
-  "targetMarketSize": "enterprise" | "mid-market" | "small-business" | "startup" | "individual" | null,
-  "salesCycleLength": "immediate" | "short" | "medium" | "long" | "very-long" | null,
-  "deliveryTimeline": string | null,
-  "features": string | string[] | null,
-  "competitiveAdvantages": string | string[] | null
-}
-
-Return ONLY JSON. No markdown, no explanations, no commentary.`,
+Return ONLY valid JSON matching the schema. No markdown, no explanations, just JSON.`,
 
   buildUserPrompt: (raw: string, context: string | null) => `Extract the product definition fields from the following raw text.
 
