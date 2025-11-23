@@ -144,13 +144,11 @@ export async function calculateBDOSScore(
     let finalPersonaId = personaId;
     let finalPersona = persona;
     if (!finalPersonaId) {
-      const matchResult = await findMatchingPersona(contactId, contact.crmId, { returnDetails: true }) as 
-        | { personaId: string | null; confidence: number; matchDetails?: any }
-        | string 
-        | null;
-      // matchResult is an object when returnDetails: true
-      if (matchResult && typeof matchResult === 'object' && 'personaId' in matchResult) {
-        finalPersonaId = matchResult.personaId || null;
+      const matchResult = await findMatchingPersona(contactId, contact.crmId, { returnDetails: true });
+      // matchResult is an object when returnDetails: true, or string/null when false
+      // Type guard to handle the object case
+      if (matchResult && typeof matchResult === 'object' && !Array.isArray(matchResult) && 'personaId' in matchResult) {
+        finalPersonaId = (matchResult as { personaId: string | null }).personaId || null;
       } else {
         finalPersonaId = null;
       }
