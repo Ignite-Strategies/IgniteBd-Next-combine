@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2 } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye } from 'lucide-react';
 
 export default function PresentationsPage() {
   const router = useRouter();
@@ -26,9 +26,39 @@ export default function PresentationsPage() {
         return;
       }
 
+      // Try to load from localStorage first (hydrate)
+      const cachedKey = `presentations_${companyHQId}`;
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = localStorage.getItem(cachedKey);
+          if (cached) {
+            const cachedPresentations = JSON.parse(cached);
+            if (Array.isArray(cachedPresentations) && cachedPresentations.length > 0) {
+              console.log(`📦 Loaded ${cachedPresentations.length} presentations from localStorage`);
+              setPresentations(cachedPresentations);
+              setLoading(false);
+              // Still fetch fresh data in background
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load from localStorage:', e);
+        }
+      }
+
+      // Fetch fresh data from API
       const response = await api.get(`/api/content/presentations?companyHQId=${companyHQId}`);
       if (response.data?.success) {
-        setPresentations(response.data.presentations || []);
+        const freshPresentations = response.data.presentations || [];
+        setPresentations(freshPresentations);
+        // Update localStorage with fresh data
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(cachedKey, JSON.stringify(freshPresentations));
+            console.log('💾 Updated localStorage with fresh presentations');
+          } catch (e) {
+            console.warn('Failed to update localStorage:', e);
+          }
+        }
       }
     } catch (err) {
       console.error('Error loading presentations:', err);
@@ -78,26 +108,26 @@ export default function PresentationsPage() {
         ) : (
           <div className="space-y-4">
             {presentations.map((presentation) => {
-              const slides = presentation.slides || {};
-              const sections = slides.sections || [];
-              
               return (
                 <div
                   key={presentation.id}
-                  className="rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all cursor-pointer"
-                  onClick={() => router.push(`/builder/presentation/${presentation.id}`)}
+                  className="rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4 flex-1">
                       <div className="rounded-lg bg-red-100 p-3">
                         <FileText className="h-6 w-6 text-red-600" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900">{presentation.title || 'Untitled Presentation'}</h3>
-                        <div className="flex items-center gap-4 mt-1">
-                          <p className="text-sm text-gray-500">
-                            {sections.length} {sections.length === 1 ? 'slide' : 'slides'}
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                          {presentation.title || 'Untitled Presentation'}
+                        </h3>
+                        {presentation.description && (
+                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                            {presentation.description}
                           </p>
+                        )}
+                        <div className="flex items-center gap-3">
                           {presentation.published && (
                             <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">
                               Published
@@ -111,43 +141,23 @@ export default function PresentationsPage() {
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/builder/presentation/${presentation.id}`);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                      Edit
-                    </button>
-                  </div>
-
-                  {/* Show sections if they exist */}
-                  {sections.length > 0 && (
-                    <div className="space-y-2 mt-4">
-                      {sections.slice(0, 6).map((section, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50"
-                        >
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-gray-600">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="text-sm font-semibold text-gray-900">
-                              {section.title || `Slide ${index + 1}`}
-                            </h4>
-                          </div>
-                        </div>
-                      ))}
-                      {sections.length > 6 && (
-                        <p className="text-xs text-gray-500 text-center mt-2">
-                          +{sections.length - 6} more slides
-                        </p>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/builder/presentation/${presentation.id}`)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </button>
+                      <button
+                        onClick={() => router.push(`/builder/presentation/${presentation.id}`)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                        Edit
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

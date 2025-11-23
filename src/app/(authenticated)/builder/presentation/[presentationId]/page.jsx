@@ -89,6 +89,26 @@ export default function PresentationBuilderPage() {
         presentation = response.data.presentation;
       }
 
+      // Save to localStorage for frontend storage
+      if (typeof window !== 'undefined') {
+        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+        const cachedKey = `presentations_${companyHQId}`;
+        try {
+          const cached = localStorage.getItem(cachedKey);
+          const presentations = cached ? JSON.parse(cached) : [];
+          const existingIndex = presentations.findIndex(p => p.id === presentation.id);
+          if (existingIndex >= 0) {
+            presentations[existingIndex] = presentation;
+          } else {
+            presentations.unshift(presentation); // Add to beginning
+          }
+          localStorage.setItem(cachedKey, JSON.stringify(presentations));
+          console.log('💾 Saved presentation to localStorage');
+        } catch (e) {
+          console.warn('Failed to save to localStorage:', e);
+        }
+      }
+
       // Show success message
       setSaveSuccess(true);
       setTimeout(() => {
