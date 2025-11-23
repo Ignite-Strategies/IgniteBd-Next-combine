@@ -91,6 +91,7 @@ model CompanyHQ {
   eventPlans           EventPlan[]
   cleDecks             CleDeck[]
   landingPages         LandingPage[]
+  presentations        Presentation[]
 
   @@map("company_hqs")
 }
@@ -737,6 +738,24 @@ model LandingPage {
   @@index([companyHQId])
   @@index([published])
   @@map("landing_pages")
+}
+
+model Presentation {
+  id          String    @id @default(cuid())
+  companyHQId String
+  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  title       String
+  slides      Json? // Array of slide objects with sections
+  presenter   String?
+  description String?
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([companyHQId])
+  @@index([published])
+  @@map("presentations")
 }
 
 model ProspectCandidate {

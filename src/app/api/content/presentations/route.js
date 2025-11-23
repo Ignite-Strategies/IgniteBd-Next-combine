@@ -34,7 +34,7 @@ export async function POST(request) {
       );
     }
 
-    const presentation = await prisma.cledeck.create({
+    const presentation = await prisma.presentation.create({
       data: {
         companyHQId,
         title: title || null,
@@ -88,7 +88,7 @@ export async function GET(request) {
     if (companyHQId) where.companyHQId = companyHQId;
     if (published !== null) where.published = published === 'true';
 
-    const presentations = await prisma.cledeck.findMany({
+    const presentations = await prisma.presentation.findMany({
       where,
       orderBy: {
         createdAt: 'desc',

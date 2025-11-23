@@ -36,7 +36,7 @@ export default function PresentationsBuildPage() {
       });
 
       if (response.data?.success && response.data?.presentation) {
-        router.push(`/builder/cledeck/${response.data.presentation.id}`);
+        router.push(`/builder/presentation/${response.data.presentation.id}`);
       } else {
         throw new Error('Failed to create presentation');
       }

@@ -25,7 +25,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const presentation = await prisma.cledeck.findUnique({
+    const presentation = await prisma.presentation.findUnique({
       where: { id },
     });
 
@@ -89,7 +89,7 @@ export async function PATCH(request, { params }) {
       updateData.publishedAt = published ? new Date() : null;
     }
 
-    const presentation = await prisma.cledeck.update({
+    const presentation = await prisma.presentation.update({
       where: { id },
       data: updateData,
     });
@@ -136,7 +136,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    await prisma.cledeck.delete({
+    await prisma.presentation.delete({
       where: { id },
     });
 

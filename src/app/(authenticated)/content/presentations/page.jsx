@@ -85,7 +85,7 @@ export default function PresentationsPage() {
                 <div
                   key={presentation.id}
                   className="rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all cursor-pointer"
-                  onClick={() => router.push(`/builder/cledeck/${presentation.id}`)}
+                  onClick={() => router.push(`/builder/presentation/${presentation.id}`)}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 flex-1">
@@ -114,7 +114,7 @@ export default function PresentationsPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/builder/cledeck/${presentation.id}`);
+                        router.push(`/builder/presentation/${presentation.id}`);
                       }}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     >
