@@ -3,15 +3,14 @@
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { FileText, ArrowRight } from 'lucide-react';
-
 // Auto-hydrated placeholder sections
 const defaultSections = [
   'Introduction',
   'Problem',
   'Insights',
-  'Proof Points',
   'Case Study',
-  'CTA / Next Steps',
+  'Proof Points',
+  'CTA',
 ];
 
 export default function PresentationsPage() {
