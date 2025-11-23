@@ -55,7 +55,8 @@ export default function WorkPackageItemPage() {
       PERSONA: `/builder/persona/new?workPackageId=${workPackageId}&itemId=${itemId}`,
       OUTREACH_TEMPLATE: `/builder/template/new?workPackageId=${workPackageId}&itemId=${itemId}`,
       EVENT_CLE_PLAN: `/builder/event/new?workPackageId=${workPackageId}&itemId=${itemId}`,
-      CLE_DECK: `/builder/cledeck/new?workPackageId=${workPackageId}&itemId=${itemId}`,
+      CLE_DECK: `/builder/presentation/new?workPackageId=${workPackageId}&itemId=${itemId}`,
+      PRESENTATION: `/builder/presentation/new?workPackageId=${workPackageId}&itemId=${itemId}`,
       LANDING_PAGE: `/builder/landingpage/new?workPackageId=${workPackageId}&itemId=${itemId}`,
     };
 
@@ -92,7 +93,8 @@ export default function WorkPackageItemPage() {
       PERSONA: `/builder/persona/${artifactId}`,
       OUTREACH_TEMPLATE: `/builder/template/${artifactId}`,
       EVENT_CLE_PLAN: `/builder/event/${artifactId}`,
-      CLE_DECK: `/builder/cledeck/${artifactId}`,
+      CLE_DECK: `/builder/presentation/${artifactId}`,
+      PRESENTATION: `/builder/presentation/${artifactId}`,
       LANDING_PAGE: `/builder/landingpage/${artifactId}`,
     };
     return paths[type] || '#';

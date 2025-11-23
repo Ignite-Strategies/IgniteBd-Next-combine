@@ -23,6 +23,21 @@
 		},
 		{
 			"path": "../../GoFast/gofast-appbuildmvp"
+		},
+		{
+			"path": "../../GoFast/gofast-frontend"
+		},
+		{
+			"path": "../../GoFast/gofastfrontend-demo"
+		},
+		{
+			"path": "../Ignite-frontend-production"
+		},
+		{
+			"path": "../../WorkMe/workspace"
+		},
+		{
+			"path": "../../GoFast/trainingmvp"
 		}
 	],
 	"settings": {}

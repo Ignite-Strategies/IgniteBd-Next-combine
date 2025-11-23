@@ -6,8 +6,8 @@ Welcome to the IgniteBD documentation. All documentation has been organized into
 
 ### Core Operations
 - **[Client Operations](./client-operations/CLIENT_OPERATIONS.md)** - Complete client operations guide (onboarding, login, contact search, deliverables, execution)
-- **[Authentication](./AUTHENTICATION.md)** - Complete authentication guide (Firebase Auth, activation, normalization)
-- **[Migration](./MIGRATION.md)** - Database migrations and data cleanup procedures
+- **[Authentication](./authentication/AUTHENTICATION.md)** - Complete authentication guide (Firebase Auth, activation, normalization)
+- **[Migration](./setup/MIGRATION.md)** - Database migrations and data cleanup procedures
 
 ### Client Operations (`/client-operations/`)
 
@@ -27,7 +27,19 @@ Persona building and data parsing:
 
 #### 📇 Contacts (`/contacts/`)
 Contact model and management:
-- Contact model documentation
+- **[Contact Model](./contacts/CONTACT_MODEL.md)** - Complete contact model reference
+
+#### 🎯 BD Intelligence (`/bd-intelligence/`)
+BD Intelligence scoring and AI features:
+- **[BD Intelligence](./bd-intelligence/BD_INTELLIGENCE.md)** - Complete BD Intelligence reference
+
+#### 📝 Content (`/content/`)
+Content hub, blog posts, social content:
+- **[Content Hub UX Map](./content/ContentHub_UX_Map.md)** - Content hub UX mapping
+
+#### 🔧 Refactoring (`/refactoring/`)
+Refactoring plans and documentation:
+- **[BDOS V2 Refactor](./refactoring/BDOS_V2_REFACTOR.md)** - BDOS V2 refactoring plan
 
 #### 📄 Templates (`/templates/`)
 Template system:
@@ -117,8 +129,8 @@ Known issues, problems, and areas needing refactoring:
 
 ### Operations
 - [Client Operations](./client-operations/CLIENT_OPERATIONS.md) - Complete client operations guide
-- [Authentication](./AUTHENTICATION.md) - Complete authentication guide
-- [Migration](./MIGRATION.md) - Database migrations and data cleanup procedures
+- [Authentication](./authentication/AUTHENTICATION.md) - Complete authentication guide
+- [Migration](./setup/MIGRATION.md) - Database migrations and data cleanup procedures
 
 ### Issue Management
 - [BD Roadmap Issues](./issue-management/BD_ROADMAP.md) - BD Roadmap refactoring requirements
@@ -134,8 +146,10 @@ Known issues, problems, and areas needing refactoring:
 - **How to configure environment?** → [Environment Variables](./setup/environment-variables.md)
 - **How contacts work?** → [Contact Management](./architecture/contacts.md)
 - **How client operations work?** → [Client Operations](./client-operations/CLIENT_OPERATIONS.md)
-- **How authentication works?** → [Authentication](./AUTHENTICATION.md)
-- **How to run migrations?** → [Migration Guide](./MIGRATION.md)
+- **How authentication works?** → [Authentication](./authentication/AUTHENTICATION.md)
+- **How to run migrations?** → [Migration Guide](./setup/MIGRATION.md)
+- **BD Intelligence?** → [BD Intelligence](./bd-intelligence/BD_INTELLIGENCE.md)
+- **Content Hub?** → [Content Hub UX Map](./content/ContentHub_UX_Map.md)
 - **Work packages?** → [Work Packages Folder](./client-operations/work-packages/)
 - **Proposals?** → [Proposals Folder](./client-operations/proposals/)
 - **Products/Deliverables?** → [Products & Deliverables Folder](./client-operations/products-deliverables/)
@@ -143,14 +157,18 @@ Known issues, problems, and areas needing refactoring:
 
 ## 📝 Contributing
 
+**⚠️ IMPORTANT: Read [DOCUMENTATION_SOP.md](./DOCUMENTATION_SOP.md) before creating new docs!**
+
 When adding new documentation:
 
-1. **Feature docs** → Place in appropriate feature folder (`/work-packages/`, `/proposals/`, etc.)
-2. **Architecture docs** → Place in `/architecture/`
-3. **Setup guides** → Place in `/setup/`
-4. **Integration guides** → Place in `/integrations/`
-5. **Issues** → Place in `/issue-management/`
-6. **Update this README** → Add links to new docs
+1. **Read the SOP** → Check `DOCUMENTATION_SOP.md` for folder structure
+2. **Feature docs** → Place in appropriate feature folder
+3. **Architecture docs** → Place in `/architecture/`
+4. **Setup guides** → Place in `/setup/`
+5. **Integration guides** → Place in `/integrations/`
+6. **Issues** → Place in `/issue-management/`
+7. **Update this README** → Add links to new docs
+8. **NO loose files** → Everything must be in a folder!
 
 ## 🔗 Related Resources
 
@@ -161,7 +179,12 @@ When adding new documentation:
 ---
 
 **Last Updated**: November 2025  
-**Documentation Version**: 3.0.0 (Organized by Feature Folders)
+**Documentation Version**: 3.1.0 (Fully Organized - All Files in Folders)
+
+## 📋 Documentation SOP
+
+**Before creating any new documentation, read:**
+- **[DOCUMENTATION_SOP.md](./DOCUMENTATION_SOP.md)** - Standard Operating Procedure for where docs go
 
 ## 📦 Recently Organized
 

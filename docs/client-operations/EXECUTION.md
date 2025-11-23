@@ -1,269 +1,170 @@
-# Execution System
+# Work Package Execution System
 
 ## Overview
 
-The Execution page is a unified surface for managing work package execution. It's located at `/client-operations/execution` and provides a single UX for:
+The Execution Hub is where consultants go **after** a work package has been created. It's the operational center for viewing work packages, tracking progress, and building deliverables.
 
-- Searching by Company
-- Selecting Work Packages
-- Viewing and editing Work Packages
-- Managing Work Package Items
-- Creating deliverables
-- Tracking progress
+## Workflow
 
-## Current Implementation
+### 1. Build the Work Package
 
-### Page Location
-- **Route**: `/client-operations/execution`
-- **File**: `src/app/(authenticated)/client-operations/execution/page.jsx`
-- **Component**: `ExecutionPage`
+First, create a work package:
+- Go to **Work Packages** → **Create Work Package**
+- Import from CSV, use templates, or build from scratch
+- Define phases, items, and timelines
 
-### Workflow
+### 2. View in Execution Hub
 
-#### 1. Search by Company
-- User types company name in search box
-- System searches companies via `/api/companies?companyHQId=${id}&query=${term}`
-- Results show company name and contact count
-- User selects a company
+Once built, navigate to:
+- **Client Operations** → **Execution Hub** (sidebar)
+- See all your work packages listed
+- Each package shows:
+  - Client name
+  - Number of phases and items
+  - Total estimated hours
+  - Cost (if set)
 
-#### 2. Auto-Load Work Packages
-- After company selection, system automatically loads work packages
-- API call: `/api/workpackages?companyHQId=${id}&contactCompanyId=${companyId}`
-- If only one work package exists, it's auto-selected
-- If multiple exist, user selects from dropdown
+### 3. Open Execution Dashboard
 
-#### 3. Hydrate Work Package
-- When work package is selected, system hydrates it
-- API call: `/api/workpackages/${workPackageId}/hydrate`
-- Returns full work package with:
-  - Phases
-  - Items
-  - Artifacts
-  - Timeline calculations
-  - Company/contact relationships
+Click **"View Execution Dashboard"** on any work package to see:
 
-#### 4. View and Edit Work Package
-- **Header Section**: Shows title, description, company name
-- **Edit Mode**: Can edit title and description inline
-- **Priority Editor**: Text area for "Priorities this week"
-- **Phases Section**: Shows all phases with items
+#### **Work Package Overview**
+- Title, description, and metadata
+- Item statistics:
+  - Total Items
+  - Completed Items
+  - In Progress
+  - Needs Review
 
-#### 5. Manage Items
-- Items show status, progress, and deliverable type
-- Can update item status via dropdown
-- Can click "Do this work item" to create deliverables
-- Routes to appropriate builder based on deliverable type
+#### **Phase-Level Timeline**
+Each phase displays:
+- **Timeline Status Badge**:
+  - 🟢 **On Track** (green) - More than 3 days until expected end
+  - 🟡 **Warning** (yellow) - Within 3 days of expected end
+  - 🔴 **Overdue** (red) - Past expected end date
+  - ⚪ **Complete** (gray) - Phase is completed
+- **Expected End Date** - Calculated from phase start + estimated hours
+- **Aggregated Hours** - Sum of all item hours in the phase
+
+#### **Work Package Items**
+Each item shows:
+- Label and type
+- Status (not_started, in_progress, completed)
+- Progress (completed artifacts / total quantity)
+- Estimated hours per unit
+- **Clickable Navigation** - Items automatically route to their edit pages based on label:
+  - `blog_post` → `/owner/work/edit/blog/[id]`
+  - `research` → `/owner/work/edit/research/[id]`
+  - `deliverable` → `/owner/work/edit/artifact/[id]`
+  - `summary` → `/owner/work/edit/summary/[id]`
+  - `client_review` → `/owner/work/review/[id]`
+  - And more (see `workPackageLabelRouter.js`)
+
+### 4. Build Off the Work Package
+
+From the execution dashboard:
+
+1. **Click any item** - Automatically routes to the appropriate edit page based on the item's label
+2. **Create deliverables** - Use the item's context to build artifacts
+3. **Track progress** - See real-time updates as artifacts are created and linked
+4. **Monitor timelines** - Watch phase status change as work progresses
 
 ## Key Features
 
-### Company Search
-- Real-time search as user types (300ms debounce)
-- Filters by `companyHQId` (tenant boundary)
-- Shows company name and contact count
-- Clears work package selection when company changes
+### Timeline Calculations
 
-### Work Package Selection
-- Dropdown selector after company is chosen
-- Auto-selects if only one package exists
-- Shows "No work packages found" if none exist
-- Clears selection when company changes
+- **Expected End Date** = Phase effective date + (total estimated hours ÷ 8 hours/day)
+- **Timeline Status** computed daily:
+  - Compares today's date to expected end date
+  - Accounts for phase completion status
+  - Provides visual warnings before deadlines
 
-### Work Package Hydration
-- Uses `/api/workpackages/${id}/hydrate` endpoint
-- Loads complete work package structure
-- Includes phases, items, and calculated fields
-- Updates local state for editing
+### Label-Based Routing
 
-### Priority Editor
-- Text area for weekly priorities
-- Saves via `PATCH /api/workpackages/${id}` with `prioritySummary`
-- Shows "Saved" indicator after successful save
-- Auto-clears indicator when user types
+Items automatically route to their appropriate edit pages:
+- No need for 20 different buttons
+- Simple click-to-edit workflow
+- Routes defined in `workPackageLabelRouter.js`
+- Fallback to default view if no route mapping exists
 
-### Work Package Editing
-- Inline editing of title and description
-- Edit mode toggles on/off
-- Saves via `PATCH /api/workpackages/${id}`
-- Updates local state after save
+### Progress Tracking
 
-### Item Status Management
-- Status dropdown for each item
-- Updates via `PATCH /api/workpackages/items/${itemId}`
-- Reloads work package after status update
-- Status options from `getStatusOptions(false)` (owner view)
+- Items track completed artifacts vs. total quantity
+- Phases aggregate item progress
+- Work package shows overall completion percentage
+- Real-time updates as deliverables are created
 
-### Deliverable Creation
-- "Do this work item" button routes to builder
-- Builder route determined by `deliverableType` or `itemType`
-- Routes include `workPackageId` and `itemId` as query params
-- Builder routes:
-  - `blog` → `/builder/blog/new`
-  - `persona` → `/builder/persona/new`
-  - `page` / `landing_page` → `/builder/landingpage/new`
-  - `deck` / `cledeck` → `/builder/cledeck/new`
-  - `template` / `outreach_template` → `/builder/template/new`
-  - `event` / `event_targets` → `/builder/event/new`
+## Architecture
 
-## Phases Section
+### Server-Side
 
-The `PhasesSection` component displays:
-- All phases for the work package
-- Items within each phase
-- Item status and progress
-- Timeline information
-- Actions for each item
+- **Route**: `/api/workpackages/owner/[id]/hydrate`
+- **Service**: `WorkPackageHydrationService.js`
+  - Hydrates WorkPackage with phases, items, and artifacts
+  - Calculates timeline status for each phase
+  - Aggregates hours from items
+  - Derives phase effective dates from WorkPackage start date
 
-### Phase Display
-- Phase name and description
-- Aggregated hours per phase
-- Timeline status (on track, warning, overdue, complete)
-- Expected end date calculations
+### Client-Side
 
-### Item Display
-- Item label and type
-- Current status (not_started, in_progress, completed, etc.)
-- Progress indicator (completed artifacts / total quantity)
-- Estimated hours
-- Deliverable type
-- "Do this work item" button
+- **Hook**: `useWorkPackageHydration(workPackageId)`
+  - Fetches hydrated work package data
+  - Includes timeline calculations
+  - Same data structure as Client Portal (for consistency)
 
-## API Endpoints
+### Utilities
 
-### Company Search
-```
-GET /api/companies?companyHQId=${id}&query=${term}
-Response: { success: true, companies: [...] }
-```
+- **`workPackageTimeline.js`**:
+  - `convertHoursToDays()` - Converts hours to days (8 hours = 1 day)
+  - `computeExpectedEndDate()` - Calculates phase end date
+  - `computePhaseTimelineStatus()` - Determines timeline status
+  - `getTimelineStatusColor()` - Returns Tailwind classes for UI
 
-### Load Work Packages
-```
-GET /api/workpackages?companyHQId=${id}&contactCompanyId=${companyId}
-Response: { success: true, workPackages: [...] }
-```
-
-### Hydrate Work Package
-```
-GET /api/workpackages/${workPackageId}/hydrate
-Response: { success: true, workPackage: { ... } }
-```
-
-### Update Work Package
-```
-PATCH /api/workpackages/${workPackageId}
-Body: { title?, description?, prioritySummary?, effectiveStartDate? }
-Response: { success: true, workPackage: { ... } }
-```
-
-### Update Item Status
-```
-PATCH /api/workpackages/items/${itemId}
-Body: { status: string }
-Response: { success: true, item: { ... } }
-```
+- **`workPackageLabelRouter.js`**:
+  - `labelRouter` - Mapping of labels to routes
+  - `getRouteForItem()` - Gets route for an item
+  - `buildItemRoute()` - Builds full route with item ID
 
 ## Data Flow
 
 ```
-1. User navigates to /client-operations/execution
+1. User clicks "View Execution Dashboard"
    ↓
-2. Page loads, gets companyHQId from localStorage
+2. Page loads with useWorkPackageHydration hook
    ↓
-3. User types company name → Search companies API
+3. Hook calls /api/workpackages/owner/[id]/hydrate
    ↓
-4. User selects company → Auto-load work packages
+4. Server hydrates WorkPackage:
+   - Loads phases with items
+   - Calculates aggregated hours per phase
+   - Derives effective dates from WorkPackage start
+   - Computes expected end dates
+   - Calculates timeline status
+   - Loads artifacts for each item
    ↓
-5. User selects work package → Hydrate work package
+5. Client receives hydrated data
    ↓
-6. Work package displays with phases and items
-   ↓
-7. User can:
-   - Edit title/description
-   - Update priorities
-   - Change item status
-   - Create deliverables (routes to builder)
+6. UI renders:
+   - Phase timeline status badges
+   - Clickable items with label routing
+   - Progress indicators
+   - Item statistics
 ```
-
-## State Management
-
-### Local State
-- `companyHQId` - From localStorage
-- `companySearchTerm` - User input
-- `companyResults` - Search results
-- `selectedCompany` - Selected company
-- `workPackages` - List of packages for company
-- `selectedWorkPackage` - Selected package (id + title)
-- `workPackage` - Full hydrated work package data
-- `prioritySummary` - Priority text
-- `wpTitle`, `wpDescription` - Edit fields
-- `updatingStatus` - Map of item IDs being updated
-
-### Loading States
-- `loadingPackages` - Loading work packages list
-- `loading` - Loading/hydrating work package
-- `savingPriority` - Saving priority summary
-- `savingWP` - Saving work package edits
-- `updatingStatus` - Updating item status
-
-## Builder Route Mapping
-
-The `getBuilderRoute()` function maps deliverable types to builder routes:
-
-```javascript
-const typeMap = {
-  blog: '/builder/blog',
-  persona: '/builder/persona',
-  page: '/builder/landingpage',
-  landing_page: '/builder/landingpage',
-  deck: '/builder/cledeck',
-  cledeck: '/builder/cledeck',
-  template: '/builder/template',
-  outreach_template: '/builder/template',
-  event: '/builder/event',
-  event_targets: '/builder/event',
-};
-```
-
-Routes are built as: `${baseRoute}/new?workPackageId=${id}&itemId=${itemId}`
-
-## WorkPackage Association
-
-### Current Schema
-- WorkPackage has `contactId` (required)
-- WorkPackage has `companyId` (optional, legacy?)
-- Contact has `contactCompanyId` (optional)
-- WorkPackage can access company via `contact.contactCompany`
-
-### Filtering
-- Work packages filtered by `contactCompanyId` (direct company link)
-- Also filtered by `companyHQId` (tenant boundary)
-- API supports both filters in query params
-
-### Issues & Considerations
-- No direct `contactCompanyId` on WorkPackage (must go through contact)
-- API tries to include `contactCompany` directly but schema may not support it
-- Filtering by contactCompany requires join through contact relationship
 
 ## Best Practices
 
 1. **Always set `effectiveStartDate`** on WorkPackage for accurate timeline calculations
-2. **Use consistent deliverable types** for proper builder routing
-3. **Update item status** as work progresses
-4. **Link artifacts** to items for progress tracking
-5. **Review priorities** regularly and update weekly
+2. **Use consistent labels** for items to leverage automatic routing
+3. **Update item status** as work progresses (not_started → in_progress → completed)
+4. **Link artifacts** to items via Collateral model for progress tracking
+5. **Review timeline status** regularly to catch overdue phases early
 
 ## Future Enhancements
 
-- [ ] Work package search (not just company search)
-- [ ] Bulk item status updates
-- [ ] Drag-and-drop item reordering
-- [ ] Timeline visualization
-- [ ] Notifications for overdue items
+- [ ] Notifications for overdue phases
+- [ ] Reminders for approaching deadlines
+- [ ] Task-level scheduling (beyond phase-level)
+- [ ] Gantt chart visualization
+- [ ] Bulk operations on items
 - [ ] Export execution reports
-- [ ] Filter by phase or status
 
----
-
-**Last Updated**: November 2025  
-**Status**: Current Implementation  
-**Route**: `/client-operations/execution`  
-**Component**: `ExecutionPage`
