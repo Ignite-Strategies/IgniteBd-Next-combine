@@ -96,7 +96,7 @@ model CompanyHQ {
 }
 
 model Company {
-  id              String        @id @default(cuid())
+  id              String  @id @default(cuid())
   companyHQId     String
   companyName     String
   address         String?
@@ -107,12 +107,18 @@ model Company {
   proposalId      String?
   contractId      String?
   invoiceId       String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  companyHQ       CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts        Contact[]
-  proposals       Proposal[] // Proposals linked to this company
-  workPackages    WorkPackage[] // Work packages for this company
+
+  // Company intelligence (derived from enrichment)
+  companyHealthScore Int? // 0–100 (computed)
+  headcount          Int?
+  growthRate         Float?
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  companyHQ    CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  contacts     Contact[]
+  proposals    Proposal[] // Proposals linked to this company
+  workPackages WorkPackage[] // Work packages for this company
 
   @@map("companies")
 }
@@ -170,6 +176,11 @@ model Contact {
   ownerId String? // Contact.id (self-reference when they become owner of their own HQ)
   role    String  @default("contact") // "contact" | "owner"
 
+  // Intelligence (per-contact, derived from enrichment)
+  seniorityScore   Int? // 0–100 (computed)
+  buyingPowerScore Int? // 0–100 (computed)
+  urgencyScore     Int? // 0–100 (computed)
+
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
   companyHQ      CompanyHQ               @relation(fields: [crmId], references: [id])
@@ -181,6 +192,7 @@ model Contact {
   ownedHQs       CompanyHQ[]             @relation("ContactOwnedHQs") // HQs owned by this Contact
   proposals      Proposal[] // Proposals for this contact
   workPackages   WorkPackage[] // Work packages for this contact
+  bdosScores     BDOSScore[] // BDOS Intelligence scores
   // Note: memberships are queried via firebaseUid, not direct relation (due to nullable firebaseUid)
 
   @@index([email])
@@ -228,6 +240,7 @@ model Product {
   companyHQ             CompanyHQ    @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   personas              Persona[]
   productFits           ProductFit[]
+  bdosScores            BDOSScore[]
 
   @@map("products")
 }
@@ -369,7 +382,7 @@ model ProposalDeliverable {
 model Persona {
   id              String      @id @default(cuid())
   companyHQId     String
-  personName      String @default("")
+  personName      String      @default("")
   title           String
   headline        String?
   seniority       String?
@@ -392,6 +405,7 @@ model Persona {
   bdIntel         BdIntel?
   product         Product?    @relation(fields: [productId], references: [id])
   productId       String?
+  bdosScores      BDOSScore[]
 
   @@map("personas")
 }
@@ -576,8 +590,8 @@ model WorkPackageItem {
   deliverableDescription String?
 
   // Legacy fields (backward compatibility - synced with CSV fields)
-  itemType        String @default("") // Maps to deliverableType
-  itemLabel       String @default("") // Maps to deliverableLabel
+  itemType        String  @default("") // Maps to deliverableType
+  itemLabel       String  @default("") // Maps to deliverableLabel
   itemDescription String? // Maps to deliverableDescription
 
   quantity           Int
@@ -909,4 +923,35 @@ model InvoiceTemplateMilestone {
 
   @@index([templateId])
   @@map("invoice_template_milestones")
+}
+
+// ============================================
+// BDOS INTELLIGENCE MODELS
+// ============================================
+
+model BDOSScore {
+  id               String   @id @default(cuid())
+  contactId        String
+  productId        String
+  personaId        String?
+  totalScore       Int // 0-100 (weighted final score)
+  personaFit       Int // 0-100
+  productFit       Int // 0-100
+  companyReadiness Int // 0-100
+  buyingPower      Int // 0-100
+  seniority        Int // 0-100
+  urgency          Int // 0-100
+  rationale        String? // OpenAI explanation
+  rawResponse      Json? // Full OpenAI response
+  createdAt        DateTime @default(now())
+
+  contact Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  product Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  persona Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+
+  @@index([contactId])
+  @@index([productId])
+  @@index([personaId])
+  @@index([createdAt])
+  @@map("bdos_scores")
 }

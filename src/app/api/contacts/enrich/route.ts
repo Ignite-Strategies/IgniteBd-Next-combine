@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { enrichPerson, normalizeApolloResponse, type NormalizedContactData } from '@/lib/apollo';
+import {
+  extractSeniorityScore,
+  extractBuyingPowerScore,
+  extractUrgencyScore,
+  extractCompanyIntelligence,
+  type ApolloEnrichmentPayload,
+} from '@/lib/intelligence/EnrichmentParserService';
 
 /**
  * POST /api/contacts/enrich
@@ -72,8 +79,10 @@ export async function POST(request: Request) {
 
     // Enrich contact using Apollo ENRICHMENT (/people/enrich - deep lookup)
     let enrichedData: NormalizedContactData;
+    let rawApolloResponse: any;
     try {
       const apolloResponse = await enrichPerson({ email, linkedinUrl });
+      rawApolloResponse = apolloResponse;
       enrichedData = normalizeApolloResponse(apolloResponse);
     } catch (error: any) {
       console.error('❌ Apollo enrichment error:', error);
@@ -87,13 +96,48 @@ export async function POST(request: Request) {
       );
     }
 
+    // Extract intelligence scores from Apollo payload
+    let intelligenceScores: {
+      seniorityScore: number;
+      buyingPowerScore: number;
+      urgencyScore: number;
+    } | null = null;
+    let companyIntelligence: {
+      companyHealthScore: number;
+      headcount: number | null;
+      revenue: number | null;
+      growthRate: number | null;
+    } | null = null;
+
+    try {
+      if (rawApolloResponse) {
+        intelligenceScores = {
+          seniorityScore: extractSeniorityScore(rawApolloResponse as ApolloEnrichmentPayload),
+          buyingPowerScore: extractBuyingPowerScore(rawApolloResponse as ApolloEnrichmentPayload),
+          urgencyScore: extractUrgencyScore(rawApolloResponse as ApolloEnrichmentPayload),
+        };
+        companyIntelligence = extractCompanyIntelligence(rawApolloResponse as ApolloEnrichmentPayload);
+        console.log('✅ Intelligence scores extracted:', intelligenceScores, companyIntelligence);
+      }
+    } catch (intelError: any) {
+      console.warn('⚠️ Failed to extract intelligence scores (non-critical):', intelError);
+      // Continue without intelligence scores - enrichment still succeeds
+    }
+
     // Merge only defined Apollo fields into Contact
     // Only update fields that have values (don't overwrite with undefined)
     const updateData: any = {
       enrichmentSource: 'Apollo',
       enrichmentFetchedAt: new Date(),
-      enrichmentPayload: enrichedData,
+      enrichmentPayload: rawApolloResponse || enrichedData, // Store full Apollo response
     };
+
+    // Add intelligence scores if extracted
+    if (intelligenceScores) {
+      updateData.seniorityScore = intelligenceScores.seniorityScore;
+      updateData.buyingPowerScore = intelligenceScores.buyingPowerScore;
+      updateData.urgencyScore = intelligenceScores.urgencyScore;
+    }
 
     // Only set fields that are defined in enrichedData
     if (enrichedData.fullName !== undefined) updateData.fullName = enrichedData.fullName;
@@ -139,10 +183,31 @@ export async function POST(request: Request) {
       },
     });
 
+    // Update company intelligence if company exists and we have intelligence data
+    if (companyIntelligence && updatedContact.contactCompanyId) {
+      try {
+        await prisma.company.update({
+          where: { id: updatedContact.contactCompanyId },
+          data: {
+            companyHealthScore: companyIntelligence.companyHealthScore,
+            headcount: companyIntelligence.headcount ?? undefined,
+            revenue: companyIntelligence.revenue ?? undefined,
+            growthRate: companyIntelligence.growthRate ?? undefined,
+          },
+        });
+        console.log('✅ Company intelligence updated');
+      } catch (companyError: any) {
+        console.warn('⚠️ Failed to update company intelligence (non-critical):', companyError);
+        // Continue - contact enrichment still succeeded
+      }
+    }
+
     return NextResponse.json({
       success: true,
       contact: updatedContact,
       enrichedData,
+      intelligenceScores,
+      companyIntelligence,
     });
   } catch (error: any) {
     console.error('❌ Enrich contact error:', error);
