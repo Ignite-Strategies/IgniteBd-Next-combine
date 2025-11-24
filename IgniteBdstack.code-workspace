@@ -10,9 +10,6 @@
 			"path": "../workme-nextapp"
 		},
 		{
-			"path": "../../GoFast/gofastfrontend-mvp1"
-		},
-		{
 			"path": "../../GoFast/gofastbackendv2-fall2025"
 		},
 		{
@@ -41,6 +38,9 @@
 		},
 		{
 			"path": "../../TripWell/tripwell-tripcrew"
+		},
+		{
+			"path": "../../TripWell/TripWell-frontend"
 		}
 	],
 	"settings": {}

@@ -26,7 +26,8 @@ export async function GET(request, { params }) {
       where: { id: contactId },
       include: {
         pipeline: true,
-        contactCompany: true,
+        company: true, // Universal company relation
+        contactCompany: true, // Legacy relation for backward compatibility
       },
     });
 
@@ -92,7 +93,8 @@ export async function PUT(request, { params }) {
       email,
       phone,
       title,
-      contactCompanyId,
+      companyId,
+      contactCompanyId, // Legacy field for backward compatibility
       buyerDecision,
       howMet,
       notes,
@@ -107,7 +109,14 @@ export async function PUT(request, { params }) {
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (title !== undefined) updateData.title = title;
-    if (contactCompanyId !== undefined) updateData.contactCompanyId = contactCompanyId;
+    // Prefer companyId over contactCompanyId
+    if (companyId !== undefined) {
+      updateData.companyId = companyId;
+      updateData.contactCompanyId = companyId; // Also set legacy field for backward compatibility
+    } else if (contactCompanyId !== undefined) {
+      updateData.companyId = contactCompanyId;
+      updateData.contactCompanyId = contactCompanyId;
+    }
     if (buyerDecision !== undefined) updateData.buyerDecision = buyerDecision;
     if (howMet !== undefined) updateData.howMet = howMet;
     if (notes !== undefined) updateData.notes = notes;
@@ -117,7 +126,8 @@ export async function PUT(request, { params }) {
       data: updateData,
       include: {
         pipeline: true,
-        contactCompany: true,
+        company: true, // Universal company relation
+        contactCompany: true, // Legacy relation for backward compatibility
       },
     });
 
@@ -156,7 +166,8 @@ export async function PUT(request, { params }) {
         where: { id: contactId },
         include: {
           pipeline: true,
-          contactCompany: true,
+          company: true, // Universal company relation
+          contactCompany: true, // Legacy relation for backward compatibility
         },
       });
 

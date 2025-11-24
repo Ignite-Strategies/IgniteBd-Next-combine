@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
+import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
 
 const DEFAULT_VALUES = {
   personaName: '',

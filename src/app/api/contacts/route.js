@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { findOrCreateCompanyByDomain } from '@/lib/services/companyService';
 
 export async function GET(request) {
   try {
@@ -43,7 +44,8 @@ export async function GET(request) {
       where,
       include: {
         pipeline: true,
-        contactCompany: true,
+        company: true, // Universal company relation
+        contactCompany: true, // Legacy relation for backward compatibility
       },
       orderBy: {
         createdAt: 'desc',
@@ -114,8 +116,18 @@ export async function POST(request) {
       );
     }
 
-    let finalContactCompanyId = contactCompanyId || null;
-    if (contactCompanyName && !contactCompanyId) {
+    // Handle company association - use domain matching for universal company records
+    let finalCompanyId = null;
+    let finalContactCompanyId = null; // Legacy field for backward compatibility
+    
+    // Extract domain from email if available
+    let companyDomain = null;
+    if (email && email.includes('@')) {
+      companyDomain = email.split('@')[1].toLowerCase();
+    }
+    
+    // If contactCompanyName provided, try to find/create by name first
+    if (contactCompanyName) {
       const normalizedCompanyName = contactCompanyName.trim();
       const allCompanies = await prisma.company.findMany({
         where: { companyHQId: crmId },
@@ -127,13 +139,11 @@ export async function POST(request) {
           c.companyName.trim().toLowerCase() === normalizedCompanyName.toLowerCase(),
       );
 
-      if (company) {
-        company = await prisma.company.findUnique({
-          where: { id: company.id },
-        });
-      }
-
-      if (!company) {
+      if (!company && companyDomain) {
+        // Try to find by domain
+        company = await findOrCreateCompanyByDomain(companyDomain, crmId, normalizedCompanyName);
+      } else if (!company) {
+        // Create new company without domain
         company = await prisma.company.create({
           data: {
             companyHQId: crmId,
@@ -141,11 +151,23 @@ export async function POST(request) {
           },
         });
         console.log(`✅ Created new company: ${normalizedCompanyName} for companyHQId: ${crmId}`);
-      } else {
-        console.log(`✅ Found existing company: ${company.companyName} (id: ${company.id})`);
       }
 
-      finalContactCompanyId = company.id;
+      if (company) {
+        finalCompanyId = company.id;
+        finalContactCompanyId = company.id; // Also set legacy field
+      }
+    } else if (companyDomain) {
+      // No company name, but we have domain - find or create by domain
+      const company = await findOrCreateCompanyByDomain(companyDomain, crmId);
+      if (company) {
+        finalCompanyId = company.id;
+        finalContactCompanyId = company.id; // Also set legacy field
+      }
+    } else if (contactCompanyId) {
+      // Legacy: use provided contactCompanyId
+      finalCompanyId = contactCompanyId;
+      finalContactCompanyId = contactCompanyId;
     }
 
     let contact;
@@ -170,14 +192,16 @@ export async function POST(request) {
             goesBy: goesBy || existingContact.goesBy,
             phone: phone || existingContact.phone,
             title: title || existingContact.title,
-            contactCompanyId: finalContactCompanyId || existingContact.contactCompanyId,
+            companyId: finalCompanyId || existingContact.companyId,
+            contactCompanyId: finalContactCompanyId || existingContact.contactCompanyId, // Legacy field
             buyerDecision: buyerDecision || existingContact.buyerDecision,
             howMet: howMet || existingContact.howMet,
             notes: notes || existingContact.notes,
           },
           include: {
             pipeline: true,
-            contactCompany: true,
+            company: true, // Universal company relation
+            contactCompany: true, // Legacy relation
           },
         });
 
@@ -215,7 +239,8 @@ export async function POST(request) {
             email: email.toLowerCase().trim(),
             phone: phone || null,
             title: title || null,
-            contactCompanyId: finalContactCompanyId || null,
+            companyId: finalCompanyId || null,
+            contactCompanyId: finalContactCompanyId || null, // Legacy field
             buyerDecision: buyerDecision || null,
             howMet: howMet || null,
             notes: notes || null,
@@ -230,7 +255,8 @@ export async function POST(request) {
           },
           include: {
             pipeline: true,
-            contactCompany: true,
+            company: true, // Universal company relation
+            contactCompany: true, // Legacy relation
           },
         });
 

@@ -80,6 +80,63 @@ export async function storeEnrichedContact(
 }
 
 /**
+ * Store enriched contact data in Redis by contactId
+ * 
+ * @param contactId - Contact ID
+ * @param rawEnrichmentPayload - Raw Apollo JSON payload
+ * @param ttl - Time to live in seconds (default: 7 days)
+ * @returns Promise<string> - Redis key
+ */
+export async function storeEnrichedContactByContactId(
+  contactId: string,
+  rawEnrichmentPayload: any,
+  ttl: number = 7 * 24 * 60 * 60 // 7 days
+): Promise<string> {
+  try {
+    const redisClient = getRedis();
+    const timestamp = Date.now();
+    const key = `apollo:contact:${contactId}:${timestamp}`;
+    
+    // Store raw enrichment payload
+    const dataToStore = JSON.stringify({
+      contactId,
+      rawEnrichmentPayload,
+      enrichedAt: new Date().toISOString(),
+    });
+    
+    await redisClient.setex(key, ttl, dataToStore);
+    
+    console.log(`✅ Enriched data stored in Redis: ${key} (TTL: ${ttl}s)`);
+    return key;
+  } catch (error: any) {
+    console.error('❌ Redis store error:', error);
+    return '';
+  }
+}
+
+/**
+ * Get enriched contact data from Redis by key
+ * 
+ * @param redisKey - Full Redis key (e.g., "apollo:contact:123:timestamp")
+ * @returns Promise<any | null> - Enriched data or null
+ */
+export async function getEnrichedContactByKey(redisKey: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(redisKey);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get error:', error);
+    return null;
+  }
+}
+
+/**
  * Get enriched contact data from Redis
  * 
  * @param keyOrLinkedInUrl - Redis key (e.g., "apollo:enriched:...") or LinkedIn URL
