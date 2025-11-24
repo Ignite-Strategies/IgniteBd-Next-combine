@@ -151,7 +151,7 @@ export default function PersonasPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Build with AI */}
               <div
-                onClick={() => router.push('/personas/build?method=ai')}
+                onClick={() => router.push('/personas/builder?mode=ai')}
                 className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-blue-300"
               >
                 <div className="mb-4 flex items-center gap-3">
@@ -161,14 +161,14 @@ export default function PersonasPage() {
                   <h3 className="text-lg font-bold text-gray-900">Build with AI</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Generate a persona from your company and products using AI
+                  Describe your ideal customer and AI will generate a detailed persona
                 </p>
               </div>
 
               {/* Build from Current Clients */}
               <div
-                onClick={() => router.push('/personas/build?method=clients')}
-                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-green-300"
+                onClick={() => router.push('/personas/builder?mode=clients')}
+                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-green-300 opacity-60"
               >
                 <div className="mb-4 flex items-center gap-3">
                   <div className="rounded-lg bg-green-100 p-2">
@@ -177,7 +177,7 @@ export default function PersonasPage() {
                   <h3 className="text-lg font-bold text-gray-900">Build from Clients</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Create personas based on your existing clients and contacts
+                  Coming Soon - Analyze existing clients to generate personas
                 </p>
               </div>
 
