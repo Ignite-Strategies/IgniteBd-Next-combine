@@ -69,10 +69,12 @@ export async function POST(request: Request) {
 
     // Build OpenAI prompt
     const systemPrompt = `You are an expert presentation strategist. 
-Given a presentation idea and target slide count, generate a structured outline.
+Given a presentation idea and target slide count, generate a structured outline with a compelling title and description.
 
 Return JSON ONLY in this exact structure:
 {
+  "title": "Compelling presentation title based on the idea",
+  "description": "Brief 1-2 sentence description of what this presentation covers",
   "outline": [
     {
       "title": "Slide title",
@@ -81,10 +83,13 @@ Return JSON ONLY in this exact structure:
   ]
 }
 
-Each slide should have:
-- A clear, actionable title
-- 2-4 bullet points that support the title
-- Logical flow from introduction to conclusion`;
+Requirements:
+- Title: Should be engaging, professional, and clearly communicate the presentation topic
+- Description: 1-2 sentences summarizing the presentation's purpose and value
+- Each slide should have:
+  - A clear, actionable title
+  - 2-4 bullet points that support the title
+  - Logical flow from introduction to conclusion`;
 
     const userPrompt = `Generate a ${slideCount}-slide presentation outline for:
 
@@ -144,10 +149,16 @@ Create a compelling structure that flows logically from introduction through key
       });
     }
 
-    console.log(`✅ Generated ${outline.length} slide outline`);
+    // Extract title and description (with fallbacks)
+    const title = outlineData.title || idea.split(' ').slice(0, 5).join(' ') + ' Presentation';
+    const description = outlineData.description || `A presentation about ${idea}`;
+
+    console.log(`✅ Generated ${outline.length} slide outline with title: "${title}"`);
 
     return NextResponse.json({
       success: true,
+      title,
+      description,
       outline,
     });
   } catch (error: any) {

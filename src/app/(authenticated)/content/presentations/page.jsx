@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2, Eye, RefreshCw } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2 } from 'lucide-react';
 
 export default function PresentationsPage() {
   const router = useRouter();
@@ -82,6 +82,43 @@ export default function PresentationsPage() {
 
   const handleSync = () => {
     loadPresentations(true);
+  };
+
+  const handleDelete = async (presentationId, e) => {
+    e.stopPropagation();
+    
+    if (!confirm('Are you sure you want to delete this presentation? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await api.delete(`/api/content/presentations/${presentationId}`);
+      if (response.data?.success) {
+        // Remove from state
+        setPresentations(presentations.filter(p => p.id !== presentationId));
+        
+        // Remove from localStorage
+        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+        if (companyHQId) {
+          const cachedKey = `presentations_${companyHQId}`;
+          try {
+            const cached = localStorage.getItem(cachedKey);
+            if (cached) {
+              const cachedPresentations = JSON.parse(cached);
+              const updated = cachedPresentations.filter(p => p.id !== presentationId);
+              localStorage.setItem(cachedKey, JSON.stringify(updated));
+            }
+          } catch (e) {
+            console.warn('Failed to update localStorage:', e);
+          }
+        }
+      } else {
+        throw new Error('Failed to delete presentation');
+      }
+    } catch (err) {
+      console.error('Error deleting presentation:', err);
+      alert('Failed to delete presentation. Please try again.');
+    }
   };
 
   return (
@@ -183,6 +220,13 @@ export default function PresentationsPage() {
                       >
                         <Edit2 className="h-4 w-4" />
                         Edit
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(presentation.id, e)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:text-red-700 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
                       </button>
                     </div>
                   </div>

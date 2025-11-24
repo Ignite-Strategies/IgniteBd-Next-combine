@@ -12,6 +12,8 @@ export default function PresentationsAIPage() {
   const [slideCount, setSlideCount] = useState(6);
   const [generating, setGenerating] = useState(false);
   const [outline, setOutline] = useState(null);
+  const [aiTitle, setAiTitle] = useState('');
+  const [aiDescription, setAiDescription] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleGenerateOutline = async () => {
@@ -29,6 +31,8 @@ export default function PresentationsAIPage() {
 
       if (response.data?.success && response.data?.outline) {
         setOutline(response.data.outline);
+        setAiTitle(response.data.title || 'Untitled Presentation');
+        setAiDescription(response.data.description || '');
       } else {
         throw new Error('Failed to generate outline');
       }
@@ -83,10 +87,11 @@ export default function PresentationsAIPage() {
         return;
       }
 
-      // Create presentation with AI-generated outline
+      // Create presentation with AI-generated outline, title, and description
       const response = await api.post('/api/content/presentations', {
         companyHQId,
-        title: 'Untitled Presentation',
+        title: aiTitle || 'Untitled Presentation',
+        description: aiDescription || '',
         slides: {
           sections: outline,
         },
@@ -193,7 +198,36 @@ export default function PresentationsAIPage() {
           /* Outline Editor */
           <div className="space-y-6">
             <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-lg">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Edit Your Outline</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Edit Your Presentation</h2>
+              
+              <div className="mb-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Presentation Title
+                  </label>
+                  <input
+                    type="text"
+                    value={aiTitle}
+                    onChange={(e) => setAiTitle(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
+                    placeholder="Presentation title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={aiDescription}
+                    onChange={(e) => setAiDescription(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
+                    placeholder="Brief description of the presentation"
+                  />
+                </div>
+              </div>
+              
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Slide Outline</h3>
               
               <div className="space-y-6">
                 {outline.map((slide, slideIndex) => (

@@ -35,15 +35,40 @@ export default function PresentationBuilderPage() {
       const response = await api.get(`/api/content/presentations/${presentationId}`);
       if (response.data?.success) {
         const presentation = response.data.presentation;
+        console.log('📦 Loaded presentation:', presentation);
+        
         setTitle(presentation.title || '');
         setPresenter(presentation.presenter || '');
         setDescription(presentation.description || '');
-        // Keep slides as object for editing
-        setSlides(presentation.slides || { sections: [] });
+        
+        // Handle slides - could be object, string, or null
+        let slidesData = { sections: [] };
+        if (presentation.slides) {
+          if (typeof presentation.slides === 'string') {
+            try {
+              slidesData = JSON.parse(presentation.slides);
+            } catch (e) {
+              console.warn('Failed to parse slides JSON:', e);
+            }
+          } else if (typeof presentation.slides === 'object') {
+            slidesData = presentation.slides;
+          }
+        }
+        
+        // Ensure sections array exists
+        if (!slidesData.sections || !Array.isArray(slidesData.sections)) {
+          slidesData.sections = [];
+        }
+        
+        setSlides(slidesData);
         setPublished(presentation.published || false);
+      } else {
+        console.error('Failed to load presentation:', response.data);
+        alert('Failed to load presentation');
       }
     } catch (err) {
       console.error('Error loading presentation:', err);
+      alert('Failed to load presentation. Please try again.');
     } finally {
       setLoading(false);
     }
