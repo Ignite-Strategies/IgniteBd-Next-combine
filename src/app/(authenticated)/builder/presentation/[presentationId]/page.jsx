@@ -17,7 +17,6 @@ export default function PresentationBuilderPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [slides, setSlides] = useState(null); // Store as object, not string
-  const [published, setPublished] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -60,7 +59,6 @@ export default function PresentationBuilderPage() {
         }
         
         setSlides(slidesData);
-        setPublished(presentation.published || false);
       } else {
         console.error('Failed to load presentation:', response.data);
         alert('Failed to load presentation');
@@ -88,7 +86,7 @@ export default function PresentationBuilderPage() {
         title,
         description,
         slides: slides || { sections: [] },
-        published,
+        // published is only for work items, not standalone presentations
       };
 
       let presentation;
@@ -265,19 +263,6 @@ export default function PresentationBuilderPage() {
                   No slides yet. Use the AI builder or create slides manually.
                 </div>
               )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="published"
-                checked={published}
-                onChange={(e) => setPublished(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor="published" className="text-sm text-gray-700">
-                Published (visible to client)
-              </label>
             </div>
 
             <div className="flex items-center justify-end gap-4">
