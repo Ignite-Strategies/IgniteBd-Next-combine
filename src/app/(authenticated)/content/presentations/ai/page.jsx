@@ -140,7 +140,17 @@ export default function PresentationsAIPage() {
                 <input
                   type="number"
                   value={slideCount}
-                  onChange={(e) => setSlideCount(parseInt(e.target.value) || 6)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setSlideCount(6);
+                    } else {
+                      const num = parseInt(value, 10);
+                      if (!isNaN(num) && num >= 3 && num <= 20) {
+                        setSlideCount(num);
+                      }
+                    }
+                  }}
                   min={3}
                   max={20}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
