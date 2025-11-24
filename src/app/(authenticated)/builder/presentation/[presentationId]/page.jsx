@@ -32,10 +32,11 @@ export default function PresentationBuilderPage() {
   const loadPresentation = async () => {
     try {
       setLoading(true);
+      // Always fetch fresh from database - never use localStorage for editing
       const response = await api.get(`/api/content/presentations/${presentationId}`);
       if (response.data?.success) {
         const presentation = response.data.presentation;
-        console.log('📦 Loaded presentation:', presentation);
+        console.log('📦 Loaded presentation from database:', presentation.id);
         
         setTitle(presentation.title || '');
         setPresenter(presentation.presenter || '');
