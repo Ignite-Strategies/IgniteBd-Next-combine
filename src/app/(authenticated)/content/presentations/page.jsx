@@ -4,31 +4,39 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2, Eye } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye, RefreshCw } from 'lucide-react';
 
 export default function PresentationsPage() {
   const router = useRouter();
   const [presentations, setPresentations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadPresentations();
   }, []);
 
-  const loadPresentations = async () => {
+  const loadPresentations = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (forceRefresh) {
+        setSyncing(true);
+      } else {
+        setLoading(true);
+      }
+      
       const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
       
       if (!companyHQId) {
         console.warn('No companyHQId found');
         setLoading(false);
+        setSyncing(false);
         return;
       }
 
-      // Try to load from localStorage first (hydrate)
       const cachedKey = `presentations_${companyHQId}`;
-      if (typeof window !== 'undefined') {
+
+      // Try to load from localStorage first (only if not forcing refresh)
+      if (!forceRefresh && typeof window !== 'undefined') {
         try {
           const cached = localStorage.getItem(cachedKey);
           if (cached) {
@@ -37,7 +45,6 @@ export default function PresentationsPage() {
               console.log(`📦 Loaded ${cachedPresentations.length} presentations from localStorage`);
               setPresentations(cachedPresentations);
               setLoading(false);
-              // Still fetch fresh data in background
             }
           }
         } catch (e) {
@@ -45,11 +52,13 @@ export default function PresentationsPage() {
         }
       }
 
-      // Fetch fresh data from API
+      // Always fetch fresh data from API
       const response = await api.get(`/api/content/presentations?companyHQId=${companyHQId}`);
       if (response.data?.success) {
         const freshPresentations = response.data.presentations || [];
+        console.log(`✅ Fetched ${freshPresentations.length} presentations from API`);
         setPresentations(freshPresentations);
+        
         // Update localStorage with fresh data
         if (typeof window !== 'undefined') {
           try {
@@ -59,12 +68,20 @@ export default function PresentationsPage() {
             console.warn('Failed to update localStorage:', e);
           }
         }
+      } else {
+        console.warn('API response not successful:', response.data);
       }
     } catch (err) {
       console.error('Error loading presentations:', err);
+      alert('Failed to load presentations. Please try again.');
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
+  };
+
+  const handleSync = () => {
+    loadPresentations(true);
   };
 
   return (
@@ -77,13 +94,24 @@ export default function PresentationsPage() {
             backTo="/content"
             backLabel="Back to Content Studio"
           />
-          <button
-            onClick={() => router.push('/content/presentations/build')}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all"
-          >
-            <Plus className="h-5 w-5" />
-            Build Presentation
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSync}
+              disabled={syncing || loading}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Sync presentations from database"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              Sync
+            </button>
+            <button
+              onClick={() => router.push('/content/presentations/build')}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all"
+            >
+              <Plus className="h-5 w-5" />
+              Build Presentation
+            </button>
+          </div>
         </div>
 
         {loading ? (
