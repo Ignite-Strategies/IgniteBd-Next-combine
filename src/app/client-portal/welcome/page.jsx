@@ -46,7 +46,8 @@ export default function ClientPortalWelcomePage() {
   }, [router]);
 
   const handleContinue = () => {
-    router.push('/client-portal/dashboard');
+    // Go directly to review page instead of dashboard
+    router.push('/portal/review');
   };
 
   if (loading) {
@@ -100,7 +101,7 @@ export default function ClientPortalWelcomePage() {
           onClick={handleContinue}
           className="w-full rounded-lg bg-red-600 px-6 py-3 text-white font-semibold hover:bg-red-700 transition shadow-lg"
         >
-          Continue to Dashboard →
+          Continue to Review →
         </button>
       </div>
     </div>

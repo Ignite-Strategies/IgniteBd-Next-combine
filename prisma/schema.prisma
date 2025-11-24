@@ -89,7 +89,6 @@ model CompanyHQ {
   blogs                Blog[]
   templates            Template[]
   eventPlans           EventPlan[]
-  cleDecks             CleDeck[]
   landingPages         LandingPage[]
   presentations        Presentation[]
 
@@ -109,18 +108,32 @@ model Company {
   contractId      String?
   invoiceId       String?
 
+  // Normalized enrichment fields (company-level)
+  domain               String?   @unique // Universal domain identifier (e.g., "example.com")
+  headcount            Int?
+  revenueRange         String?   // "$1M-$10M", "$10M-$50M", etc.
+  growthRate           Float?
+  fundingStage         String?   // "seed", "series-a", "series-b", etc.
+  lastFundingDate      DateTime?
+  lastFundingAmount    Float?
+  numberOfFundingRounds Int?
+
   // Company intelligence (derived from enrichment)
   companyHealthScore Int? // 0–100 (computed)
-  headcount          Int?
-  growthRate         Float?
+  growthScore       Int? // 0–100 (computed)
+  stabilityScore    Int? // 0–100 (computed)
+  marketPositionScore Int? // 0–100 (computed)
+  readinessScore    Int? // 0–100 (computed)
 
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   companyHQ    CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts     Contact[]
+  contacts     Contact[]     @relation("ContactCompany")
+  legacyContacts Contact[]   @relation("LegacyContactCompany")
   proposals    Proposal[] // Proposals linked to this company
   workPackages WorkPackage[] // Work packages for this company
 
+  @@index([domain])
   @@map("companies")
 }
 
@@ -147,24 +160,50 @@ model Contact {
   goesBy              String?
   email               String?   @unique
   phone               String?
+  
+  // Normalized enrichment fields (contact-level)
   title               String?
   seniority           String? // Seniority level from enrichment
   department          String? // Department from enrichment
+  jobRole             String? // Specific role/function from enrichment
   linkedinUrl         String? // LinkedIn URL from enrichment
+  
   city                String? // City from enrichment
   state               String? // State from enrichment
   country             String? // Country from enrichment
-  contactCompanyId    String? // Company they work for (prospect/client company)
+  timezone            String?
+  
+  // Career signals
+  currentRoleStartDate DateTime?
+  totalYearsExperience Float?
+  numberOfJobChanges   Int?
+  averageTenureMonths  Float?
+  careerProgression    String?   // "accelerating", "stable", "declining"
+  recentJobChange      Boolean?
+  recentPromotion      Boolean?
+  
+  // Company context (normalized from enrichment)
+  companyName         String? // Company name from enrichment (convenience copy)
+  companyDomain       String? // Company domain from enrichment (e.g., "example.com")
+  companySize         String? // "1-10", "11-50", "51-200", etc.
+  companyIndustry     String? // Industry from enrichment
+  
+  // Universal company relation (refactored from contactCompanyId)
+  companyId           String? // Universal company record (domain-matched)
+  contactCompanyId    String? // DEPRECATED: Legacy field for backward compatibility
+  
   buyerDecision       String?
   howMet              String?
   notes               String? // Notes/context about the contact
   contactListId       String?
   domain              String? // Domain inferred from email (e.g., "businesspointlaw.com")
-  companyName         String? // Company name from enrichment
-  companyDomain       String? // Company domain from enrichment (e.g., "example.com")
+  
+  // Enrichment metadata
   enrichmentSource    String? // Source of enrichment (e.g., "Lusha", "Apollo")
   enrichmentFetchedAt DateTime? // When enrichment was fetched
-  enrichmentPayload   Json? // Full enrichment payload
+  enrichmentPayload   Json? // DEPRECATED: Full enrichment payload (kept for backward compatibility, use Redis instead)
+  enrichmentRedisKey  String? // Redis key where raw enrichment JSON is stored
+  
   createdById         String? // User who created this contact
 
   // Client Portal Activation
@@ -177,15 +216,31 @@ model Contact {
   ownerId String? // Contact.id (self-reference when they become owner of their own HQ)
   role    String  @default("contact") // "contact" | "owner"
 
-  // Intelligence (per-contact, derived from enrichment)
-  seniorityScore   Int? // 0–100 (computed)
-  buyingPowerScore Int? // 0–100 (computed)
-  urgencyScore     Int? // 0–100 (computed)
+  // Intelligence scores (0–100, derived from enrichment)
+  seniorityScore        Int? // 0–100 (computed)
+  buyingPowerScore      Int? // 0–100 (computed)
+  urgencyScore          Int? // 0–100 (computed)
+  rolePowerScore        Int? // 0–100 (computed)
+  buyerLikelihoodScore  Int? // 0–100 (computed)
+  readinessToBuyScore   Int? // 0–100 (computed)
+  careerMomentumScore   Int? // 0–100 (computed)
+  careerStabilityScore  Int? // 0–100 (computed)
+  
+  // Buying signals
+  budgetAuthority      Boolean?
+  decisionMaker        Boolean?
+  influencer           Boolean?
+  gatekeeper           Boolean?
+  
+  buyingTriggers       String[]  @default([])
+  painPoints           String[]  @default([])
+  goals                String[]  @default([])
 
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
   companyHQ      CompanyHQ               @relation(fields: [crmId], references: [id])
-  contactCompany Company?                @relation(fields: [contactCompanyId], references: [id])
+  company        Company?                @relation("ContactCompany", fields: [companyId], references: [id])
+  contactCompany Company?                @relation("LegacyContactCompany", fields: [contactCompanyId], references: [id])
   contactList    ContactList?            @relation(fields: [contactListId], references: [id])
   pipeline       Pipeline?
   deliverables   ConsultantDeliverable[]
@@ -201,6 +256,8 @@ model Contact {
   @@index([ownerId])
   @@index([role])
   @@index([domain])
+  @@index([companyId])
+  @@index([companyDomain])
   @@map("contacts")
 }
 
@@ -498,7 +555,6 @@ enum WorkItemType {
   PERSONA
   OUTREACH_TEMPLATE
   EVENT_CLE_PLAN
-  CLE_DECK
   PRESENTATION_DECK
   LANDING_PAGE
 }
@@ -621,7 +677,7 @@ model WorkCollateral {
   workPackageItemId String?
   workPackageItem   WorkPackageItem? @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
 
-  type        String // BLOG | PERSONA | CLE_DECK | TEMPLATE | ETC
+  type        String // BLOG | PERSONA | PRESENTATION_DECK | TEMPLATE | ETC
   title       String?
   contentJson Json?
 
@@ -704,24 +760,6 @@ model EventPlan {
   @@map("event_plans")
 }
 
-model CleDeck {
-  id          String    @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  title       String
-  slides      Json? // Array of slide objects
-  presenter   String?
-  description String?
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([companyHQId])
-  @@index([published])
-  @@map("cle_decks")
-}
-
 model LandingPage {
   id          String    @id @default(cuid())
   companyHQId String
@@ -748,6 +786,7 @@ model Presentation {
   slides      Json? // Array of slide objects with sections
   presenter   String?
   description String?
+  feedback    Json? // JSON map: { "0": "...", "5": "...", "7": "..." } - feedback keyed by sectionIndex
   published   Boolean   @default(false)
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
