@@ -15,24 +15,6 @@ const DEFAULT_VALUES = {
   companyId: '',
 };
 
-// Prefilled template for "Solo Biz Owner" persona
-const SOLO_BIZ_OWNER_TEMPLATE = {
-  personaName: 'Solo Biz Owner',
-  role: 'Sole Proprietor',
-  painPoints: `- Wears all hats (operations, sales, marketing, delivery)
-- No time for business development
-- Can't scale because they're doing everything
-- Revenue plateaus because they're maxed out on delivery
-- Knows they need help but doesn't know where to start
-- Struggles to find time for strategic planning`,
-  goals: `- Grow revenue without working more hours
-- Systematize operations to free up time
-- Build a sustainable business that doesn't depend solely on them
-- Create systems that can run without constant oversight
-- Scale to the next level (hire first employee or contractor)`,
-  whatTheyWant: `A business development system that works while they focus on delivery. They need someone to handle outreach, relationship building, and pipeline management so they can focus on what they do best - delivering value to clients. They want predictable revenue growth without having to become a sales expert themselves.`,
-};
-
 export default function PersonaBuilderPage({ searchParams }) {
   const router = useRouter();
   const personaId = searchParams?.personaId || null;
@@ -74,20 +56,13 @@ export default function PersonaBuilderPage({ searchParams }) {
     }
   }, []);
 
-  // Pre-fill form with test data when creating a new persona (not editing)
+  // Initialize companyId for new personas
   useEffect(() => {
-    if (!personaId && derivedCompanyId && !hasInitialized) {
-      // Pre-fill with test template for testing upsert logic
-      reset({
-        ...SOLO_BIZ_OWNER_TEMPLATE,
-        companyId: derivedCompanyId,
-      });
-      setHasInitialized(true);
-    } else if (derivedCompanyId && !hasInitialized) {
+    if (derivedCompanyId && !hasInitialized && !personaId) {
       setValue('companyId', derivedCompanyId);
       setHasInitialized(true);
     }
-  }, [derivedCompanyId, personaId, setValue, reset, hasInitialized]);
+  }, [derivedCompanyId, personaId, setValue, hasInitialized]);
 
   useEffect(() => {
     if (!personaId) {
@@ -222,10 +197,7 @@ export default function PersonaBuilderPage({ searchParams }) {
             {!personaId && (
               <button
                 type="button"
-                onClick={() => {
-                  // TODO: Open enrichment modal
-                  alert('Enrichment modal coming soon!');
-                }}
+                onClick={() => router.push('/contacts/enrich?returnTo=persona')}
                 disabled={isBusy}
                 className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -245,29 +217,6 @@ export default function PersonaBuilderPage({ searchParams }) {
         {submitError && (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {submitError}
-          </div>
-        )}
-
-        {/* Template Helper - Only show when creating new persona */}
-        {!personaId && (
-          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <p className="mb-3 text-sm text-gray-600">
-              Form is pre-filled with test data. Edit as needed to test upsert logic.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                reset({
-                  ...SOLO_BIZ_OWNER_TEMPLATE,
-                  companyId: derivedCompanyId,
-                });
-                handleShowToast('Template reloaded!');
-              }}
-              disabled={isBusy}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:opacity-60"
-            >
-              Reload Template
-            </button>
           </div>
         )}
 

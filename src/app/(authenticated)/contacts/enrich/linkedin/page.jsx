@@ -1,10 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
-import { Search, RefreshCw, Sparkles, Linkedin, User, X } from 'lucide-react';
+import { Search, RefreshCw, Sparkles, Linkedin, User, X, UserCircle, Target, Plus, Building2 } from 'lucide-react';
 
 export default function LinkedInEnrich() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams?.get('returnTo'); // e.g., 'persona' if coming from persona builder
+  
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -183,6 +188,118 @@ export default function LinkedInEnrich() {
             >
               Clear & Search Again
             </button>
+
+            {/* What do you want to do now? Action Menu */}
+            {enriched && redisKey && (
+              <div className="mt-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-6">
+                <h3 className="mb-4 text-lg font-bold text-gray-900">
+                  What do you want to do now?
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* Build Persona */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        // Navigate to persona builder with redisKey
+                        router.push(`/personas/builder?enrichedKey=${encodeURIComponent(redisKey)}`);
+                      } catch (err) {
+                        alert('Failed to navigate to persona builder');
+                      }
+                    }}
+                    className="flex items-center gap-3 rounded-lg border border-purple-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-purple-300 text-left"
+                  >
+                    <div className="rounded-lg bg-purple-100 p-2">
+                      <UserCircle className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">Build Persona</div>
+                      <div className="text-xs text-gray-600">Generate persona from this profile</div>
+                    </div>
+                  </button>
+
+                  {/* Target this Person */}
+                  <button
+                    onClick={() => {
+                      // Navigate to outreach with contact context
+                      if (enriched.email) {
+                        router.push(`/outreach?email=${encodeURIComponent(enriched.email)}`);
+                      } else {
+                        router.push('/outreach');
+                      }
+                    }}
+                    className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-blue-300 text-left"
+                  >
+                    <div className="rounded-lg bg-blue-100 p-2">
+                      <Target className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">Target this Person</div>
+                      <div className="text-xs text-gray-600">Start outreach campaign</div>
+                    </div>
+                  </button>
+
+                  {/* Save to CRM */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        // Create contact in CRM from enriched data
+                        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+                        if (!companyHQId) {
+                          alert('Company context required');
+                          return;
+                        }
+                        
+                        const response = await api.post('/api/contacts', {
+                          firstName: enriched.firstName,
+                          lastName: enriched.lastName,
+                          email: enriched.email,
+                          phone: enriched.phone,
+                          title: enriched.title,
+                          linkedinUrl: url,
+                          companyHQId,
+                          // Add more fields as needed
+                        });
+                        
+                        if (response.data?.contact) {
+                          alert('Contact saved to CRM!');
+                          router.push(`/contacts/${response.data.contact.id}`);
+                        }
+                      } catch (err) {
+                        console.error('Error saving contact:', err);
+                        alert('Failed to save contact. Please try again.');
+                      }
+                    }}
+                    className="flex items-center gap-3 rounded-lg border border-green-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-green-300 text-left"
+                  >
+                    <div className="rounded-lg bg-green-100 p-2">
+                      <Plus className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">Save to CRM</div>
+                      <div className="text-xs text-gray-600">Add to your contacts</div>
+                    </div>
+                  </button>
+
+                  {/* View Company (if available) */}
+                  {enriched.companyName && (
+                    <button
+                      onClick={() => {
+                        router.push(`/contacts/companies?search=${encodeURIComponent(enriched.companyName)}`);
+                      }}
+                      className="flex items-center gap-3 rounded-lg border border-orange-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-orange-300 text-left"
+                    >
+                      <div className="rounded-lg bg-orange-100 p-2">
+                        <Building2 className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900">View Company</div>
+                        <div className="text-xs text-gray-600">See company details</div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

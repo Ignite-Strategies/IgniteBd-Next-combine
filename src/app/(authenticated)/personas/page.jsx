@@ -1,16 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function PersonasPage() {
+  const router = useRouter();
   const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [showBuildOptions, setShowBuildOptions] = useState(false);
 
   // Load from localStorage only - no auto-fetch
   useEffect(() => {
@@ -95,13 +98,13 @@ export default function PersonasPage() {
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync'}
             </button>
-            <Link
-              href="/personas/builder"
+            <button
+              onClick={() => setShowBuildOptions(!showBuildOptions)}
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
             >
               <Plus className="h-4 w-4" />
-              Add Persona
-            </Link>
+              {showBuildOptions ? 'Cancel' : 'Add Persona'}
+            </button>
           </div>
         </div>
 
@@ -111,7 +114,81 @@ export default function PersonasPage() {
           </div>
         )}
 
-        {personas.length === 0 ? (
+        {/* Build Options Fork */}
+        {showBuildOptions && (
+          <div className="mb-8 rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-blue-50 p-8 shadow-lg">
+            <h2 className="mb-6 text-2xl font-bold text-gray-900">
+              Choose How to Build Your Persona
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Build with AI */}
+              <div
+                onClick={() => router.push('/personas/build?method=ai')}
+                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-blue-300"
+              >
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-lg bg-purple-100 p-2">
+                    <Sparkles className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Build with AI</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Generate a persona from your company and products using AI
+                </p>
+              </div>
+
+              {/* Build from Current Clients */}
+              <div
+                onClick={() => router.push('/personas/build?method=clients')}
+                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-green-300"
+              >
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-lg bg-green-100 p-2">
+                    <Users className="h-5 w-5 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Build from Clients</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Create personas based on your existing clients and contacts
+                </p>
+              </div>
+
+              {/* Build from Enrichment */}
+              <div
+                onClick={() => router.push('/contacts/enrich?returnTo=persona')}
+                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-orange-300"
+              >
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-lg bg-orange-100 p-2">
+                    <UserCircle className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Build from Enrichment</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Generate persona from LinkedIn profile or enriched contact data
+                </p>
+              </div>
+
+              {/* Manual Build */}
+              <div
+                onClick={() => router.push('/personas/builder')}
+                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-red-300"
+              >
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-lg bg-red-100 p-2">
+                    <FileEdit className="h-5 w-5 text-red-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Manual Build</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Create a persona from scratch with full control
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {personas.length === 0 && !showBuildOptions ? (
           <div className="rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 p-12 text-center shadow-lg">
             <div className="mb-6 flex justify-center">
               <div className="rounded-full bg-red-100 p-6">
@@ -127,12 +204,12 @@ export default function PersonasPage() {
             <p className="mb-8 text-gray-600">
               Define their goals, pain points, and how your offer aligns with their needs
             </p>
-            <Link
-              href="/personas/builder"
+            <button
+              onClick={() => setShowBuildOptions(true)}
               className="rounded-lg bg-red-600 px-8 py-3 text-lg font-semibold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg"
             >
               Get Started →
-            </Link>
+            </button>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
