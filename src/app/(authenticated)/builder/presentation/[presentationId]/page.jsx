@@ -190,7 +190,7 @@ export default function PresentationBuilderPage() {
                 Slides
               </label>
               {slides && slides.sections && slides.sections.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {slides.sections.map((section, slideIndex) => (
                     <div key={slideIndex} className="p-6 rounded-lg border border-gray-200 bg-gray-50">
                       <div className="mb-4">
@@ -205,8 +205,8 @@ export default function PresentationBuilderPage() {
                             updated.sections[slideIndex].title = e.target.value;
                             setSlides(updated);
                           }}
-                          placeholder="Slide title"
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
+                          placeholder="Slide title"
                         />
                       </div>
 
