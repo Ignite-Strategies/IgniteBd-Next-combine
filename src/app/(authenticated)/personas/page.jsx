@@ -256,12 +256,12 @@ export default function PersonasPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <Link
-                      href={`/personas/builder?personaId=${persona.id}`}
-                      className="text-sm font-semibold text-red-600 transition hover:text-red-700"
-                    >
-                      Edit
-                    </Link>
+                  <Link
+                    href={`/personas/builder?personaId=${persona.id}`}
+                    className="text-sm font-semibold text-red-600 transition hover:text-red-700"
+                  >
+                    Edit
+                  </Link>
                     <button
                       onClick={() => handleDelete(persona.id)}
                       disabled={deletingId === persona.id}

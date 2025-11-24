@@ -9,6 +9,7 @@ import api from '@/lib/api';
 const DEFAULT_VALUES = {
   personaName: '',
   role: '',
+  description: '',
   painPoints: '',
   goals: '',
   whatTheyWant: '',
@@ -115,6 +116,7 @@ function PersonaBuilderContent({ searchParams }) {
             reset({
               personaName: personaData.personName || personaData.name || '',
               role: personaData.title || personaData.role || '',
+              description: personaData.description || '',
               painPoints: Array.isArray(personaData.painPoints) 
                 ? personaData.painPoints.join('\n')
                 : (personaData.painPoints || ''),
@@ -165,10 +167,11 @@ function PersonaBuilderContent({ searchParams }) {
 
         reset({
           personaName: persona.name ?? '',
-          role: persona.role ?? '',
+          role: persona.role ?? persona.title ?? '',
+          description: persona.description ?? '',
           painPoints: persona.painPoints ?? '',
           goals: persona.goals ?? '',
-          whatTheyWant: persona.valuePropToPersona ?? '',
+          whatTheyWant: persona.valuePropToPersona ?? persona.whatTheyWant ?? '',
           companyId: persona.companyHQId ?? derivedCompanyId ?? '',
         });
         setHasInitialized(true);
@@ -225,6 +228,7 @@ function PersonaBuilderContent({ searchParams }) {
         reset({
           personaName: personaData.personName || personaData.name || '',
           role: personaData.title || personaData.role || '',
+          description: personaData.description || '',
           painPoints: Array.isArray(personaData.painPoints) 
             ? personaData.painPoints.join('\n')
             : (personaData.painPoints || ''),
@@ -259,10 +263,11 @@ function PersonaBuilderContent({ searchParams }) {
       const response = await api.post('/api/personas', {
         id: personaId,
         name: values.personaName,
-        role: values.role,
+        title: values.role,
+        description: values.description,
         painPoints: values.painPoints,
         goals: values.goals,
-        valuePropToPersona: values.whatTheyWant,
+        whatTheyWant: values.whatTheyWant,
         companyHQId: values.companyId,
       });
 
@@ -458,6 +463,19 @@ function PersonaBuilderContent({ searchParams }) {
                 {...register('role')}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Description
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Brief description of this persona (who they are, their context)"
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
+              disabled={isBusy}
+              {...register('description')}
+            />
           </div>
 
           <div>
