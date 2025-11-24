@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit } from 'lucide-react';
+import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function PersonasPage() {
@@ -14,6 +14,7 @@ export default function PersonasPage() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showBuildOptions, setShowBuildOptions] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   // Load from localStorage only - no auto-fetch
   useEffect(() => {
@@ -47,6 +48,33 @@ export default function PersonasPage() {
       setError('No personas found. Click Sync to load from server.');
     }
   }, []);
+
+  // Delete persona function
+  const handleDelete = async (personaId) => {
+    if (!confirm('Are you sure you want to delete this persona? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingId(personaId);
+    try {
+      // Try the artifacts route first (has DELETE endpoint)
+      await api.delete(`/api/artifacts/personas/${personaId}`);
+      
+      // Remove from local state
+      const updatedPersonas = personas.filter(p => p.id !== personaId);
+      setPersonas(updatedPersonas);
+      
+      // Update localStorage
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('personas', JSON.stringify(updatedPersonas));
+      }
+    } catch (err) {
+      console.error('Failed to delete persona:', err);
+      alert(err.response?.data?.error || 'Failed to delete persona. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Manual sync function
   const handleSync = async () => {
@@ -227,12 +255,27 @@ export default function PersonasPage() {
                       <p className="text-sm text-gray-500">{persona.role}</p>
                     )}
                   </div>
-                  <Link
-                    href={`/personas/builder?personaId=${persona.id}`}
-                    className="text-sm font-semibold text-red-600 transition hover:text-red-700"
-                  >
-                    Edit
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/personas/builder?personaId=${persona.id}`}
+                      className="text-sm font-semibold text-red-600 transition hover:text-red-700"
+                    >
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(persona.id)}
+                      disabled={deletingId === persona.id}
+                      className="text-sm font-semibold text-gray-600 transition hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      title="Delete persona"
+                    >
+                      {deletingId === persona.id ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      {deletingId === persona.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-3 text-sm">
