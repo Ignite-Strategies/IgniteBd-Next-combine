@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
@@ -15,7 +15,6 @@ export default function PresentationBuilderPage() {
   const isNew = presentationId === 'new';
 
   const [title, setTitle] = useState('');
-  const [presenter, setPresenter] = useState('');
   const [description, setDescription] = useState('');
   const [slides, setSlides] = useState(null); // Store as object, not string
   const [published, setPublished] = useState(false);
@@ -39,7 +38,6 @@ export default function PresentationBuilderPage() {
         console.log('📦 Loaded presentation from database:', presentation.id);
         
         setTitle(presentation.title || '');
-        setPresenter(presentation.presenter || '');
         setDescription(presentation.description || '');
         
         // Handle slides - could be object, string, or null
@@ -88,7 +86,6 @@ export default function PresentationBuilderPage() {
       const data = {
         companyHQId,
         title,
-        presenter,
         description,
         slides: slides || { sections: [] },
         published,
@@ -178,18 +175,6 @@ export default function PresentationBuilderPage() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Presenter
-              </label>
-              <input
-                type="text"
-                value={presenter}
-                onChange={(e) => setPresenter(e.target.value)}
-                placeholder=""
-                className="w-full rounded border border-gray-300 px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Description
               </label>
               <textarea
@@ -205,30 +190,73 @@ export default function PresentationBuilderPage() {
                 Slides
               </label>
               {slides && slides.sections && slides.sections.length > 0 ? (
-                <div className="space-y-3">
-                  {slides.sections.map((section, index) => (
-                    <div key={index} className="p-4 rounded-lg border border-gray-200 bg-gray-50">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-semibold text-gray-600">Slide {index + 1}:</span>
+                <div className="space-y-4">
+                  {slides.sections.map((section, slideIndex) => (
+                    <div key={slideIndex} className="p-6 rounded-lg border border-gray-200 bg-gray-50">
+                      <div className="mb-4">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Slide {slideIndex + 1} Title
+                        </label>
                         <input
                           type="text"
                           value={section.title || ''}
                           onChange={(e) => {
                             const updated = { ...slides };
-                            updated.sections[index].title = e.target.value;
+                            updated.sections[slideIndex].title = e.target.value;
                             setSlides(updated);
                           }}
                           placeholder="Slide title"
-                          className="flex-1 px-3 py-1 rounded border border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
                         />
                       </div>
-                      {section.bullets && section.bullets.length > 0 && (
-                        <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-                          {section.bullets.map((bullet, bulletIndex) => (
-                            <li key={bulletIndex}>{bullet}</li>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Bullet Points
+                        </label>
+                        <div className="space-y-2">
+                          {section.bullets && section.bullets.map((bullet, bulletIndex) => (
+                            <div key={bulletIndex} className="flex items-center gap-2">
+                              <span className="text-gray-400">•</span>
+                              <input
+                                type="text"
+                                value={bullet}
+                                onChange={(e) => {
+                                  const updated = { ...slides };
+                                  updated.sections[slideIndex].bullets[bulletIndex] = e.target.value;
+                                  setSlides(updated);
+                                }}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
+                                placeholder="Bullet point"
+                              />
+                              <button
+                                onClick={() => {
+                                  const updated = { ...slides };
+                                  updated.sections[slideIndex].bullets.splice(bulletIndex, 1);
+                                  setSlides(updated);
+                                }}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           ))}
-                        </ul>
-                      )}
+                          <button
+                            onClick={() => {
+                              const updated = { ...slides };
+                              if (!updated.sections[slideIndex].bullets) {
+                                updated.sections[slideIndex].bullets = [];
+                              }
+                              updated.sections[slideIndex].bullets.push('');
+                              setSlides(updated);
+                            }}
+                            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mt-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Bullet Point
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
