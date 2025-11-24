@@ -94,7 +94,20 @@ export default function PresentationsAIPage() {
       });
 
       if (response.data?.success && response.data?.presentation) {
-        router.push(`/builder/presentation/${response.data.presentation.id}`);
+        // Save to localStorage
+        if (typeof window !== 'undefined') {
+          const cachedKey = `presentations_${companyHQId}`;
+          try {
+            const cached = localStorage.getItem(cachedKey);
+            const presentations = cached ? JSON.parse(cached) : [];
+            presentations.unshift(response.data.presentation);
+            localStorage.setItem(cachedKey, JSON.stringify(presentations));
+          } catch (e) {
+            console.warn('Failed to save to localStorage:', e);
+          }
+        }
+        // Redirect to home page
+        router.push('/content/presentations');
       } else {
         throw new Error('Failed to create presentation');
       }

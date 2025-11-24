@@ -17,7 +17,7 @@ export default function PresentationBuilderPage() {
   const [title, setTitle] = useState('');
   const [presenter, setPresenter] = useState('');
   const [description, setDescription] = useState('');
-  const [slides, setSlides] = useState('');
+  const [slides, setSlides] = useState(null); // Store as object, not string
   const [published, setPublished] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
@@ -38,9 +38,8 @@ export default function PresentationBuilderPage() {
         setTitle(presentation.title || '');
         setPresenter(presentation.presenter || '');
         setDescription(presentation.description || '');
-        setSlides(typeof presentation.slides === 'object' 
-          ? JSON.stringify(presentation.slides, null, 2) 
-          : presentation.slides || '');
+        // Keep slides as object for editing
+        setSlides(presentation.slides || { sections: [] });
         setPublished(presentation.published || false);
       }
     } catch (err) {
@@ -60,23 +59,12 @@ export default function PresentationBuilderPage() {
       setSaving(true);
       const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
 
-      // Parse slides if it's a JSON string
-      let parsedSlides = slides;
-      if (typeof slides === 'string' && slides.trim()) {
-        try {
-          parsedSlides = JSON.parse(slides);
-        } catch (e) {
-          // If not valid JSON, keep as string or set to null
-          parsedSlides = slides.trim() || null;
-        }
-      }
-
       const data = {
         companyHQId,
         title,
         presenter,
         description,
-        slides: parsedSlides,
+        slides: slides || { sections: [] },
         published,
       };
 
@@ -109,13 +97,10 @@ export default function PresentationBuilderPage() {
         }
       }
 
-      // Show success message
+      // Show success message and redirect immediately
       setSaveSuccess(true);
-      setTimeout(() => {
-        setSaveSuccess(false);
-        // Redirect back to presentations home page
-        router.push('/content/presentations');
-      }, 1500);
+      // Redirect to presentations home page immediately
+      router.push('/content/presentations');
     } catch (err) {
       console.error('Error saving presentation:', err);
       alert('Failed to save presentation');
@@ -190,16 +175,42 @@ export default function PresentationBuilderPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Slides (JSON)
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Slides
               </label>
-              <textarea
-                value={slides}
-                onChange={(e) => setSlides(e.target.value)}
-                placeholder="JSON object with sections array"
-                rows={10}
-                className="w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm"
-              />
+              {slides && slides.sections && slides.sections.length > 0 ? (
+                <div className="space-y-3">
+                  {slides.sections.map((section, index) => (
+                    <div key={index} className="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm font-semibold text-gray-600">Slide {index + 1}:</span>
+                        <input
+                          type="text"
+                          value={section.title || ''}
+                          onChange={(e) => {
+                            const updated = { ...slides };
+                            updated.sections[index].title = e.target.value;
+                            setSlides(updated);
+                          }}
+                          placeholder="Slide title"
+                          className="flex-1 px-3 py-1 rounded border border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none"
+                        />
+                      </div>
+                      {section.bullets && section.bullets.length > 0 && (
+                        <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                          {section.bullets.map((bullet, bulletIndex) => (
+                            <li key={bulletIndex}>{bullet}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center text-sm text-gray-500">
+                  No slides yet. Use the AI builder or create slides manually.
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
