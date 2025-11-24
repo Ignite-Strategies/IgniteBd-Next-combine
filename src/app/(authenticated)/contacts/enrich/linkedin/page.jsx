@@ -18,6 +18,8 @@ function LinkedInEnrichContent() {
   const [rawApolloResponse, setRawApolloResponse] = useState(null);
   const [showRawJson, setShowRawJson] = useState(false);
   const [redisKey, setRedisKey] = useState(null);
+  const [savedContact, setSavedContact] = useState(null);
+  const [autoSave, setAutoSave] = useState(true); // Auto-save by default
 
   async function handlePreview() {
     setLoading(true);
@@ -43,12 +45,28 @@ function LinkedInEnrichContent() {
     setRawApolloResponse(null);
     setShowRawJson(false);
     setRedisKey(null);
+    setSavedContact(null);
 
     try {
-      const r = await api.post('/api/enrich/enrich', { linkedinUrl: url });
+      const companyHQId = typeof window !== 'undefined' 
+        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+        : '';
+      
+      const r = await api.post('/api/enrich/enrich', { 
+        linkedinUrl: url,
+        autoSave: autoSave && !!companyHQId && !!url, // Only auto-save if we have company context
+        companyHQId,
+      });
+      
       setEnriched(r.data.enrichedProfile || null);
       setRawApolloResponse(r.data.rawApolloResponse || null);
       setRedisKey(r.data.redisKey || null);
+      setSavedContact(r.data.contact || null);
+      
+      if (r.data.contact) {
+        // Contact was saved to DB
+        console.log('✅ Contact saved to CRM:', r.data.contact.id);
+      }
     } catch (err) {
       alert(err.response?.data?.details || err.message || 'Enrichment failed');
     } finally {
@@ -123,6 +141,20 @@ function LinkedInEnrichContent() {
               </a>
             </div>
 
+            {/* Auto-save toggle */}
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="autoSave"
+                checked={autoSave}
+                onChange={(e) => setAutoSave(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="autoSave" className="text-sm text-gray-700">
+                Automatically save to CRM after enrichment
+              </label>
+            </div>
+
             {/* Enrich Button */}
             <button
               onClick={handleEnrich}
@@ -138,11 +170,30 @@ function LinkedInEnrichContent() {
         {/* Enriched Card */}
         {enriched && (
           <div className="bg-green-50 border border-green-200 p-5 rounded-lg shadow mb-6">
-            <h2 className="font-semibold text-lg text-green-700 mb-2">✅ Enrichment Complete</h2>
+            <h2 className="font-semibold text-lg text-green-700 mb-2">
+              ✅ Enrichment Complete
+              {savedContact && (
+                <span className="ml-2 text-sm font-normal text-green-600">
+                  • Saved to CRM
+                </span>
+              )}
+            </h2>
             
+            {savedContact && (
+              <div className="mb-3 rounded-lg border border-green-300 bg-green-100 p-3">
+                <p className="text-sm font-semibold text-green-800">Contact saved to CRM</p>
+                <button
+                  onClick={() => router.push(`/contacts/${savedContact.id}`)}
+                  className="mt-1 text-xs text-green-700 underline hover:text-green-900"
+                >
+                  View contact →
+                </button>
+              </div>
+            )}
+
             {redisKey && (
-              <div className="mb-3 text-xs text-green-600">
-                Redis key: <code className="bg-green-100 px-1 py-0.5 rounded">{redisKey}</code>
+              <div className="mb-3 text-xs text-gray-600">
+                Redis key: <code className="bg-gray-100 px-1 py-0.5 rounded">{redisKey}</code>
               </div>
             )}
 

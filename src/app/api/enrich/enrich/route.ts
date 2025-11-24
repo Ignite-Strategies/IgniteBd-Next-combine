@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { enrichPerson, normalizeApolloResponse, type NormalizedContactData } from '@/lib/apollo';
 import { storeEnrichedContact } from '@/lib/redis';
+import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/enrich/enrich
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { linkedinUrl } = body;
+    const { linkedinUrl, autoSave = false, companyHQId } = body;
 
     // For LinkedIn-only flow, require linkedinUrl
     if (!linkedinUrl) {
@@ -78,8 +79,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Store enriched data in Redis - just let it chill there
-    // NO database writes, NO contact creation
+    // Store enriched data in Redis
     let redisKey = '';
     try {
       redisKey = await storeEnrichedContact(linkedinUrl, {
@@ -92,13 +92,64 @@ export async function POST(request: Request) {
       console.warn('⚠️ Redis store failed (non-critical):', redisError.message);
     }
 
-    // Return enriched data + raw Apollo response + Redis key
-    // NO database writes - just chill and return data
+    // Optionally save to database if autoSave is true
+    let savedContact = null;
+    if (autoSave && companyHQId && enrichedData.email) {
+      try {
+        // Get companyHQ for tenant context
+        const companyHQ = await prisma.companyHQ.findUnique({
+          where: { id: companyHQId },
+        });
+
+        if (!companyHQ) {
+          console.warn('⚠️ CompanyHQ not found, skipping DB save');
+        } else {
+          // Upsert contact by email
+          savedContact = await prisma.contact.upsert({
+            where: {
+              email: enrichedData.email.toLowerCase().trim(),
+            },
+            update: {
+              firstName: enrichedData.firstName || undefined,
+              lastName: enrichedData.lastName || undefined,
+              title: enrichedData.title || undefined,
+              phone: enrichedData.phone || undefined,
+              linkedinUrl: linkedinUrl || undefined,
+              enrichmentSource: 'Apollo',
+              enrichmentFetchedAt: new Date(),
+              enrichmentPayload: rawApolloResponse || undefined,
+            },
+            create: {
+              crmId: companyHQId,
+              email: enrichedData.email.toLowerCase().trim(),
+              firstName: enrichedData.firstName || null,
+              lastName: enrichedData.lastName || null,
+              title: enrichedData.title || null,
+              phone: enrichedData.phone || null,
+              linkedinUrl: linkedinUrl || null,
+              enrichmentSource: 'Apollo',
+              enrichmentFetchedAt: new Date(),
+              enrichmentPayload: rawApolloResponse || null,
+            },
+            include: {
+              contactCompany: true,
+            },
+          });
+          console.log('✅ Contact saved to database:', savedContact.id);
+        }
+      } catch (dbError: any) {
+        console.error('❌ Failed to save contact to database:', dbError);
+        // Don't fail the enrichment request - just log the error
+      }
+    }
+
+    // Return enriched data + raw Apollo response + Redis key + saved contact (if any)
     return NextResponse.json({
       success: true,
       enrichedProfile: enrichedData,
       rawApolloResponse: rawApolloResponse, // Include full raw response
       redisKey: redisKey || null, // Redis key where data is stored
+      contact: savedContact, // Contact saved to DB (if autoSave was true)
     });
   } catch (error: any) {
     console.error('❌ Enrich route error:', error);
