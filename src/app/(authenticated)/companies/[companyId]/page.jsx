@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Users, TrendingUp, ArrowLeft, DollarSign, Calendar, MapPin } from 'lucide-react';
+import { Building2, Users, TrendingUp, ArrowLeft, DollarSign } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
-import ScoreCard from '@/components/enrichment/ScoreCard';
+
+// Dynamically import ScoreCard to avoid SSR issues
+const ScoreCard = dynamic(() => import('@/components/enrichment/ScoreCard'), {
+  ssr: false,
+});
 
 export default function CompanyDetailPage({ params }) {
   const router = useRouter();
@@ -44,10 +49,10 @@ export default function CompanyDetailPage({ params }) {
         } else {
           setError(response.data?.error || 'Company not found');
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error loading company:', err);
         if (!isMounted) return;
-        setError(err.response?.data?.error || 'Failed to load company');
+        setError(err?.response?.data?.error || 'Failed to load company');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -283,7 +288,7 @@ export default function CompanyDetailPage({ params }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {company.contacts.map((contact: any) => (
+                    {company.contacts.map((contact) => (
                       <tr
                         key={contact.id}
                         className="cursor-pointer hover:bg-gray-50"

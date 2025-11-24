@@ -31,7 +31,7 @@ export default function ContactsViewPage() {
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [enrichmentModalContactId, setEnrichmentModalContactId] = useState<string | null>(null);
+  const [enrichmentModalContactId, setEnrichmentModalContactId] = useState(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

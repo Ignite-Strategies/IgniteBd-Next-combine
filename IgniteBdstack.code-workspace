@@ -22,12 +22,6 @@
 			"path": "../../GoFast/gofast-appbuildmvp"
 		},
 		{
-			"path": "../../GoFast/gofast-frontend"
-		},
-		{
-			"path": "../../GoFast/gofastfrontend-demo"
-		},
-		{
 			"path": "../Ignite-frontend-production"
 		},
 		{
@@ -41,6 +35,9 @@
 		},
 		{
 			"path": "../../TripWell/TripWell-frontend"
+		},
+		{
+			"path": "../../GoFast/gofastfrontend-mvp1"
 		}
 	],
 	"settings": {}
