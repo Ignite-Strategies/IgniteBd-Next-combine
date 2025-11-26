@@ -15,7 +15,6 @@ import {
   extractBuyerLikelihoodScore,
   extractReadinessToBuyScore,
   extractCompanyIntelligenceScores,
-  type ApolloEnrichmentPayload,
 } from '@/lib/intelligence/EnrichmentParserService';
 
 function LinkedInEnrichContent() {
@@ -79,7 +78,7 @@ function LinkedInEnrichContent() {
       
       // Compute intelligence scores and create enriched contact object for ContactOutlook
       if (r.data.rawApolloResponse) {
-        const apolloPayload = r.data.rawApolloResponse as ApolloEnrichmentPayload;
+        const apolloPayload = r.data.rawApolloResponse;
         const enrichedProfile = r.data.enrichedProfile || {};
         
         // Compute all intelligence scores
@@ -323,9 +322,9 @@ function LinkedInEnrichContent() {
                             // Refresh to show updated contact
                             window.location.href = `/contacts/${response.data.contact.id}`;
                           }
-                        } catch (err: any) {
+                        } catch (err) {
                           console.error('Error saving contact:', err);
-                          alert(err.response?.data?.error || 'Failed to save contact. Please try again.');
+                          alert(err?.response?.data?.error || 'Failed to save contact. Please try again.');
                         }
                       }}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold text-sm shadow-lg transition flex items-center gap-2"
