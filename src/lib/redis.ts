@@ -15,17 +15,34 @@ export function getRedis(): Redis {
   // Use Upstash Redis REST API
   // Automatically reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from env
   try {
+    // Try fromEnv first - it handles quote stripping internally
     redis = Redis.fromEnv();
     console.log('✅ Upstash Redis client initialized');
     return redis;
   } catch (error: any) {
     // Fallback to manual initialization if fromEnv() fails
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    let url = process.env.UPSTASH_REDIS_REST_URL;
+    let token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
     if (!url || !token) {
       throw new Error(
-        'Upstash Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.'
+        'Upstash Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.\n\n' +
+        'Note: These should be REST API credentials, not Redis CLI connection strings.\n' +
+        'Get them from: https://console.upstash.com/redis -> Your Database -> REST API'
+      );
+    }
+
+    // Strip quotes from URL and token (common issue when env vars are set with quotes in .env files)
+    // Handles: "https://..." or 'https://...' or ""https://..."" or ''https://...''
+    url = url.trim().replace(/^["']+|["']+$/g, '');
+    token = token.trim().replace(/^["']+|["']+$/g, '');
+
+    // Validate URL format
+    if (!url.startsWith('https://')) {
+      throw new Error(
+        `Invalid UPSTASH_REDIS_REST_URL format. Expected https:// URL, got: ${url}\n\n` +
+        'Note: UPSTASH_REDIS_REST_URL should be the REST API URL (https://...), not a Redis CLI connection string (redis://...).\n' +
+        'Get the correct URL from: https://console.upstash.com/redis -> Your Database -> REST API'
       );
     }
 
