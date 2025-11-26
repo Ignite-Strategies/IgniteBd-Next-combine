@@ -197,3 +197,25 @@ export async function deleteEnrichedContact(linkedinUrl: string): Promise<boolea
   }
 }
 
+/**
+ * Get preview intelligence data from Redis by previewId
+ * 
+ * @param previewId - Preview ID (e.g., "preview:123:abc")
+ * @returns Promise<any | null> - Preview data or null
+ */
+export async function getPreviewIntelligence(previewId: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(previewId);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get preview error:', error);
+    return null;
+  }
+}
+
