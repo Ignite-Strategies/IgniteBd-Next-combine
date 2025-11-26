@@ -3,6 +3,11 @@
 import { Building2, TrendingUp, Briefcase, Clock, Target, Zap, Shield, User, Mail, Phone, MapPin, Linkedin } from 'lucide-react';
 import ScoreCard from './ScoreCard';
 
+// Safe formatter for numeric values
+const fmt = (s: number | null | undefined): string => {
+  return typeof s === 'number' ? s.toFixed(1) : '—';
+};
+
 interface IntelligencePreviewProps {
   normalizedContact: any;
   normalizedCompany: any;
@@ -35,6 +40,11 @@ export default function IntelligencePreview({
   linkedinUrl,
   onViewRawJSON,
 }: IntelligencePreviewProps) {
+  // Null check - don't render if data is not loaded
+  if (!normalizedContact || !intelligenceScores || !companyIntelligence) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       {/* Contact Summary Section */}
@@ -206,11 +216,11 @@ export default function IntelligencePreview({
                 </dd>
               </div>
             )}
-            {normalizedCompany.revenue && (
+            {normalizedCompany.revenue !== null && normalizedCompany.revenue !== undefined && (
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Revenue</dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  ${(normalizedCompany.revenue / 1000000).toFixed(1)}M
+                  ${fmt(normalizedCompany.revenue / 1000000)}M
                 </dd>
               </div>
             )}
@@ -263,11 +273,11 @@ export default function IntelligencePreview({
             <h3 className="text-lg font-semibold text-gray-900">Career Snapshot</h3>
           </div>
           <div className="space-y-3">
-            {normalizedContact.totalYearsExperience !== null && (
+            {normalizedContact.totalYearsExperience !== null && normalizedContact.totalYearsExperience !== undefined && (
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                 <span className="text-sm text-gray-600">Total Experience</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {normalizedContact.totalYearsExperience.toFixed(1)} years
+                  {fmt(normalizedContact.totalYearsExperience)} years
                 </span>
               </div>
             )}
@@ -279,11 +289,11 @@ export default function IntelligencePreview({
                 </span>
               </div>
             )}
-            {normalizedContact.averageTenureMonths !== null && (
+            {normalizedContact.averageTenureMonths !== null && normalizedContact.averageTenureMonths !== undefined && (
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                 <span className="text-sm text-gray-600">Avg Tenure</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {(normalizedContact.averageTenureMonths / 12).toFixed(1)} years
+                  {fmt(normalizedContact.averageTenureMonths / 12)} years
                 </span>
               </div>
             )}

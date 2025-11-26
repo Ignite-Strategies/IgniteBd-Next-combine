@@ -239,7 +239,7 @@ function LinkedInEnrichContent() {
         )}
 
         {/* Intelligence Preview - Step 2: Inline Intelligence */}
-        {intelligenceData && (
+        {intelligenceData && intelligenceData.normalizedContact && intelligenceData.intelligenceScores && (
           <div className="space-y-6 mb-6">
             {/* Intelligence Preview Component */}
             <IntelligencePreview

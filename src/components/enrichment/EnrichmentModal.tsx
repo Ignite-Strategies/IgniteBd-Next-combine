@@ -17,6 +17,11 @@ import {
   type ApolloEnrichmentPayload,
 } from '@/lib/intelligence/EnrichmentParserService';
 
+// Safe formatter for numeric values
+const fmt = (s: number | null | undefined): string => {
+  return typeof s === 'number' ? s.toFixed(1) : '—';
+};
+
 interface EnrichmentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -319,8 +324,8 @@ export default function EnrichmentModal({
                     <div>
                       <dt className="text-xs font-semibold text-gray-500 uppercase">Revenue</dt>
                       <dd className="mt-1 text-sm text-gray-900">
-                        {company.annual_revenue
-                          ? `$${(company.annual_revenue / 1000000).toFixed(1)}M`
+                        {company.annual_revenue !== null && company.annual_revenue !== undefined
+                          ? `$${fmt(company.annual_revenue / 1000000)}M`
                           : company.revenue_range || '—'}
                       </dd>
                     </div>

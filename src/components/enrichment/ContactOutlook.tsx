@@ -2,6 +2,12 @@
 
 import { Building2, TrendingUp, Clock, Target, Zap, Briefcase, Shield } from 'lucide-react';
 import ScoreCard from './ScoreCard';
+
+// Safe formatter for numeric values
+const fmt = (s: number | null | undefined): string => {
+  return typeof s === 'number' ? s.toFixed(1) : '—';
+};
+
 interface ContactOutlookProps {
   contact: any;
   onViewRawJSON?: (json: any) => void;
@@ -227,11 +233,11 @@ export default function ContactOutlook({ contact, onViewRawJSON }: ContactOutloo
             <h3 className="text-lg font-semibold text-gray-900">Career Snapshot</h3>
           </div>
           <div className="space-y-3">
-            {contact.totalYearsExperience && (
+            {contact.totalYearsExperience !== null && contact.totalYearsExperience !== undefined && (
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                 <span className="text-sm text-gray-600">Total Experience</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {contact.totalYearsExperience.toFixed(1)} years
+                  {fmt(contact.totalYearsExperience)} years
                 </span>
               </div>
             )}
@@ -243,11 +249,13 @@ export default function ContactOutlook({ contact, onViewRawJSON }: ContactOutloo
                 </span>
               </div>
             )}
-            {contact.averageTenureMonths && (
+            {contact.averageTenureMonths !== null && contact.averageTenureMonths !== undefined && (
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                 <span className="text-sm text-gray-600">Avg Tenure</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {(contact.averageTenureMonths / 12).toFixed(1)} years
+                  {contact.averageTenureMonths !== null && contact.averageTenureMonths !== undefined
+                    ? fmt(contact.averageTenureMonths / 12)
+                    : '—'} years
                 </span>
               </div>
             )}
