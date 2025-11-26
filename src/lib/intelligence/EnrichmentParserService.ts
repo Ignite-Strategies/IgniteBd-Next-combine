@@ -3,7 +3,27 @@
  * 
  * Extracts intelligence scores from Apollo enrichment payload
  * Converts raw enrichment data into structured intelligence scores (0-100)
+ * Also provides inference layer for profile summaries and company positioning
  */
+
+import { OpenAI } from 'openai';
+
+// Initialize OpenAI client
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (openaiClient) {
+    return openaiClient;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+
+  openaiClient = new OpenAI({ apiKey });
+  return openaiClient;
+}
 
 export interface ApolloEnrichmentPayload {
   person?: {
@@ -663,5 +683,224 @@ export function extractCompanyIntelligenceScores(apollo: ApolloEnrichmentPayload
     marketPositionScore: Math.min(100, Math.max(0, marketPositionScore)),
     readinessScore: Math.min(100, Math.max(0, readinessScore)),
   };
+}
+
+/**
+ * INFERENCE LAYER - Non-Score Inferences
+ * These functions generate textual/categorical inferences, not numerical scores
+ */
+
+/**
+ * Generate contact profile summary using GPT
+ * 
+ * @param contactData - Normalized contact data with employment history and scores
+ * @param companyData - Normalized company data
+ * @returns Promise<string> - 2-3 sentence profile summary
+ */
+export async function generateContactProfileSummary(
+  contactData: {
+    firstName?: string;
+    lastName?: string;
+    title?: string;
+    normalizedEmploymentHistory?: Array<{
+      started_at?: string;
+      ended_at?: string | null;
+      title?: string;
+    }>;
+    seniorityScore?: number;
+    buyingPowerScore?: number;
+    tenureYears?: number;
+  },
+  companyData: {
+    companyName?: string;
+    companyReadinessScore?: number;
+    headcount?: number;
+    revenue?: number;
+  }
+): Promise<string> {
+  try {
+    const client = getOpenAIClient();
+    
+    const firstName = contactData.firstName || 'This professional';
+    const title = contactData.title || 'their role';
+    const companyName = companyData.companyName || 'their company';
+    const tenureYears = contactData.tenureYears || 0;
+    const seniorityScore = contactData.seniorityScore || 0;
+    const buyingPowerScore = contactData.buyingPowerScore || 0;
+    const readinessScore = companyData.companyReadinessScore || 0;
+    
+    const prompt = `Write a 2-3 sentence professional profile summary for ${firstName}, a ${title} at ${companyName}.
+
+Context:
+- Seniority level: ${seniorityScore}/100 (high = executive level)
+- Buying power: ${buyingPowerScore}/100 (high = significant budget authority)
+- Tenure: ${tenureYears} years at current company
+- Company readiness: ${readinessScore}/100 (high = strong financial health)
+
+Focus on:
+1. Their authority level and buying power
+2. Their tenure and stability at the company
+3. Their company's financial position and how it relates to their decision-making ability
+
+Keep it professional, concise, and focused on business context. Return only the summary text, no additional commentary.`;
+
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a business intelligence analyst writing professional profile summaries. Be concise and factual.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 200,
+    });
+
+    return response.choices[0]?.message?.content?.trim() || '';
+  } catch (error) {
+    console.error('Error generating contact profile summary:', error);
+    return '';
+  }
+}
+
+/**
+ * Calculate tenure years from employment history
+ * 
+ * @param employmentHistory - Array of employment records
+ * @returns number - Years of tenure at current company
+ */
+export function calculateTenureYears(
+  employmentHistory?: Array<{
+    started_at?: string;
+    ended_at?: string | null;
+  }>
+): number {
+  if (!employmentHistory || employmentHistory.length === 0) {
+    return 0;
+  }
+
+  // Find current role (no end date)
+  const currentRole = employmentHistory.find(job => !job.ended_at && job.started_at);
+  if (!currentRole?.started_at) {
+    return 0;
+  }
+
+  const startDate = new Date(currentRole.started_at);
+  const now = new Date();
+  const years = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  
+  return Math.max(0, Math.round(years * 10) / 10); // Round to 1 decimal
+}
+
+/**
+ * Enrich company positioning, category, and normalization
+ * 
+ * @param companyData - Normalized company data
+ * @returns Promise<object> - Positioning, category, tiers, normalized industry, competitors
+ */
+export async function enrichCompanyPositioning(companyData: {
+  companyName?: string;
+  industry?: string;
+  revenue?: number;
+  headcount?: number;
+}): Promise<{
+  positioningLabel: string;
+  category: string;
+  revenueTier: string;
+  headcountTier: string;
+  normalizedIndustry: string;
+  competitors: string[];
+}> {
+  // 1. Revenue Tier (deterministic)
+  let revenueTier = 'Micro';
+  if (companyData.revenue) {
+    if (companyData.revenue > 5000000000) revenueTier = 'Mega';
+    else if (companyData.revenue > 500000000) revenueTier = 'Enterprise';
+    else if (companyData.revenue > 50000000) revenueTier = 'Mid';
+    else if (companyData.revenue > 5000000) revenueTier = 'Small';
+  }
+
+  // 2. Headcount Tier (deterministic)
+  let headcountTier = 'Very Small';
+  if (companyData.headcount) {
+    if (companyData.headcount > 10000) headcountTier = 'Global Enterprise';
+    else if (companyData.headcount > 1000) headcountTier = 'Large';
+    else if (companyData.headcount > 200) headcountTier = 'Mid-size';
+    else if (companyData.headcount > 50) headcountTier = 'Small';
+  }
+
+  // 3-6. GPT-based inferences
+  try {
+    const client = getOpenAIClient();
+    const companyName = companyData.companyName || 'this company';
+    const industry = companyData.industry || 'unknown';
+    const revenue = companyData.revenue || 0;
+    const headcount = companyData.headcount || 0;
+
+    const prompt = `Analyze this company and provide structured information:
+
+Company: ${companyName}
+Industry: ${industry}
+Revenue: $${(revenue / 1000000).toFixed(1)}M
+Headcount: ${headcount} employees
+
+Provide the following in JSON format:
+1. normalizedIndustry: One word from ["Finance", "Healthcare", "Technology", "Consulting", "Retail", "Manufacturing", "Government", "Education", "Energy"]
+2. positioningLabel: A short strategic label (2-5 words), e.g. "mid-size capital allocator", "enterprise SaaS provider"
+3. category: One from ["Asset Manager", "Capital Allocator", "Bank", "SaaS Vendor", "Consultancy", "Healthcare System", "PE Firm", "Manufacturer", "Government Contractor"]
+4. competitors: Array of 3 competitor company names as strings
+
+Return ONLY valid JSON in this format:
+{
+  "normalizedIndustry": "Finance",
+  "positioningLabel": "mid-size capital allocator",
+  "category": "Capital Allocator",
+  "competitors": ["Blackstone", "BlackRock", "KKR"]
+}`;
+
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a business intelligence analyst. Return only valid JSON, no additional text.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 300,
+      response_format: { type: 'json_object' },
+    });
+
+    const jsonStr = response.choices[0]?.message?.content?.trim() || '{}';
+    const parsed = JSON.parse(jsonStr);
+
+    return {
+      positioningLabel: parsed.positioningLabel || `${headcountTier.toLowerCase()} ${parsed.normalizedIndustry || industry} company`,
+      category: parsed.category || 'Unknown',
+      revenueTier,
+      headcountTier,
+      normalizedIndustry: parsed.normalizedIndustry || industry || 'Unknown',
+      competitors: Array.isArray(parsed.competitors) ? parsed.competitors.slice(0, 3) : [],
+    };
+  } catch (error) {
+    console.error('Error enriching company positioning:', error);
+    // Fallback values
+    return {
+      positioningLabel: `${headcountTier.toLowerCase()} ${companyData.industry || 'company'}`,
+      category: 'Unknown',
+      revenueTier,
+      headcountTier,
+      normalizedIndustry: companyData.industry || 'Unknown',
+      competitors: [],
+    };
+  }
 }
 

@@ -30,6 +30,17 @@ interface IntelligencePreviewProps {
   };
   linkedinUrl?: string;
   onViewRawJSON?: (json: any) => void;
+  // Inference layer fields
+  profileSummary?: string;
+  tenureYears?: number;
+  companyPositioning?: {
+    positioningLabel?: string;
+    category?: string;
+    revenueTier?: string;
+    headcountTier?: string;
+    normalizedIndustry?: string;
+    competitors?: string[];
+  };
 }
 
 export default function IntelligencePreview({
@@ -39,6 +50,9 @@ export default function IntelligencePreview({
   companyIntelligence,
   linkedinUrl,
   onViewRawJSON,
+  profileSummary,
+  tenureYears,
+  companyPositioning,
 }: IntelligencePreviewProps) {
   // Null check - don't render if data is not loaded
   if (!normalizedContact || !intelligenceScores || !companyIntelligence) {
@@ -132,6 +146,24 @@ export default function IntelligencePreview({
         </div>
       </section>
 
+      {/* Profile Summary Section */}
+      {(profileSummary || tenureYears !== null) && (
+        <section className="rounded-2xl bg-white p-6 shadow">
+          <div className="flex items-center gap-3 mb-4">
+            <User className="h-5 w-5 text-purple-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Profile Summary</h3>
+          </div>
+          {profileSummary && (
+            <p className="text-sm text-gray-700 mb-3 leading-relaxed">{profileSummary}</p>
+          )}
+          {tenureYears !== null && tenureYears !== undefined && (
+            <div className="text-xs text-gray-500">
+              <span className="font-semibold">TENURE:</span> {tenureYears} {tenureYears === 1 ? 'year' : 'years'}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Intelligence Scores Section */}
       <section className="rounded-2xl bg-white p-6 shadow">
         <div className="flex items-center gap-3 mb-6">
@@ -181,6 +213,58 @@ export default function IntelligencePreview({
           />
         </div>
       </section>
+
+      {/* Company Positioning / Identity Section */}
+      {companyPositioning && (
+        <section className="rounded-2xl bg-white p-6 shadow">
+          <div className="flex items-center gap-3 mb-6">
+            <Building2 className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Company Identity</h3>
+          </div>
+          <div className="space-y-3 text-sm">
+            {companyPositioning.positioningLabel && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Positioning</dt>
+                <dd className="mt-1 text-gray-900">{companyPositioning.positioningLabel}</dd>
+              </div>
+            )}
+            {companyPositioning.category && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Category</dt>
+                <dd className="mt-1 text-gray-900">{companyPositioning.category}</dd>
+              </div>
+            )}
+            {companyPositioning.normalizedIndustry && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Normalized Industry</dt>
+                <dd className="mt-1 text-gray-900">{companyPositioning.normalizedIndustry}</dd>
+              </div>
+            )}
+            {companyPositioning.revenueTier && normalizedCompany.revenue && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Revenue Tier</dt>
+                <dd className="mt-1 text-gray-900">
+                  {companyPositioning.revenueTier} (${fmt(normalizedCompany.revenue / 1000000)}M)
+                </dd>
+              </div>
+            )}
+            {companyPositioning.headcountTier && normalizedCompany.headcount && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Headcount Tier</dt>
+                <dd className="mt-1 text-gray-900">
+                  {companyPositioning.headcountTier} ({normalizedCompany.headcount.toLocaleString()} employees)
+                </dd>
+              </div>
+            )}
+            {companyPositioning.competitors && companyPositioning.competitors.length > 0 && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Competitors</dt>
+                <dd className="mt-1 text-gray-900">{companyPositioning.competitors.join(', ')}</dd>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Company Intelligence Section */}
       {normalizedCompany && (

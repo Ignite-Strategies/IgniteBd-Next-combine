@@ -15,6 +15,9 @@ import {
   extractBuyerLikelihoodScore,
   extractReadinessToBuyScore,
   extractCompanyIntelligenceScores,
+  generateContactProfileSummary,
+  calculateTenureYears,
+  enrichCompanyPositioning,
   type ApolloEnrichmentPayload,
 } from '@/lib/intelligence/EnrichmentParserService';
 
@@ -113,6 +116,55 @@ export async function POST(request: Request) {
 
     const companyIntelligence = extractCompanyIntelligenceScores(apolloPayload);
 
+    // INFERENCE LAYER - Compute non-score inferences
+    // 1. Calculate tenure years
+    const employmentHistory = apolloPayload.person?.employment_history || [];
+    const tenureYears = calculateTenureYears(employmentHistory);
+
+    // 2. Generate contact profile summary (GPT)
+    let profileSummary = '';
+    try {
+      profileSummary = await generateContactProfileSummary(
+        {
+          firstName: normalizedContact.firstName,
+          lastName: normalizedContact.lastName,
+          title: normalizedContact.title,
+          normalizedEmploymentHistory: employmentHistory,
+          seniorityScore: intelligenceScores.seniorityScore,
+          buyingPowerScore: intelligenceScores.buyingPowerScore,
+          tenureYears,
+        },
+        {
+          companyName: normalizedCompany.companyName,
+          companyReadinessScore: companyIntelligence.readinessScore,
+          headcount: normalizedCompany.headcount,
+          revenue: normalizedCompany.revenue,
+        }
+      );
+    } catch (error: any) {
+      console.warn('⚠️ Profile summary generation failed (non-critical):', error.message);
+    }
+
+    // 3. Enrich company positioning (GPT + deterministic tiers)
+    let companyPositioning = {
+      positioningLabel: '',
+      category: '',
+      revenueTier: '',
+      headcountTier: '',
+      normalizedIndustry: '',
+      competitors: [] as string[],
+    };
+    try {
+      companyPositioning = await enrichCompanyPositioning({
+        companyName: normalizedCompany.companyName,
+        industry: normalizedCompany.industry,
+        revenue: normalizedCompany.revenue,
+        headcount: normalizedCompany.headcount,
+      });
+    } catch (error: any) {
+      console.warn('⚠️ Company positioning enrichment failed (non-critical):', error.message);
+    }
+
     // Generate preview ID
     const previewId = `preview:${Date.now()}:${Math.random().toString(36).substring(7)}`;
     const redisKey = `apollo:${previewId}`;
@@ -132,7 +184,7 @@ export async function POST(request: Request) {
         })
       );
 
-      // Store normalized data + intelligence scores under previewId
+      // Store normalized data + intelligence scores + inferences under previewId
       await redisClient.setex(
         previewId,
         ttl,
@@ -146,6 +198,10 @@ export async function POST(request: Request) {
           normalizedCompany,
           intelligenceScores,
           companyIntelligence,
+          // Inference layer fields
+          profileSummary,
+          tenureYears,
+          companyPositioning,
           createdAt: new Date().toISOString(),
         })
       );
@@ -156,7 +212,7 @@ export async function POST(request: Request) {
       // Continue - we can still return preview data
     }
 
-    // Return preview data with intelligence scores
+    // Return preview data with intelligence scores + inferences
     return NextResponse.json({
       success: true,
       previewId,
@@ -165,6 +221,10 @@ export async function POST(request: Request) {
       normalizedCompany,
       intelligenceScores,
       companyIntelligence,
+      // Inference layer fields
+      profileSummary,
+      tenureYears,
+      companyPositioning,
       message: 'Intelligence generated successfully. Use previewId to retrieve data.',
     });
   } catch (error: any) {

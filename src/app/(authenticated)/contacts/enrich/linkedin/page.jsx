@@ -56,6 +56,10 @@ function LinkedInEnrichContent() {
           intelligenceScores: response.data.intelligenceScores,
           companyIntelligence: response.data.companyIntelligence,
           redisKey: response.data.redisKey,
+          previewId: response.data.previewId,
+          profileSummary: response.data.profileSummary,
+          tenureYears: response.data.tenureYears,
+          companyPositioning: response.data.companyPositioning,
           linkedinUrl: url,
         });
       } else {
@@ -103,10 +107,11 @@ function LinkedInEnrichContent() {
 
       const contactId = contactResponse.data.contact.id;
 
-      // Step 2: Save enrichment data with intelligence scores
+      // Step 2: Save enrichment data with intelligence scores + inferences
       await api.post('/api/contacts/enrich/save', {
         contactId,
         redisKey: intelligenceData.redisKey,
+        previewId: intelligenceData.previewId, // Pass previewId to get inference fields
       });
 
       // Step 3: Redirect to contact detail page
@@ -249,6 +254,9 @@ function LinkedInEnrichContent() {
               companyIntelligence={intelligenceData.companyIntelligence}
               linkedinUrl={intelligenceData.linkedinUrl}
               onViewRawJSON={handleViewRawJSON}
+              profileSummary={intelligenceData.profileSummary}
+              tenureYears={intelligenceData.tenureYears}
+              companyPositioning={intelligenceData.companyPositioning}
             />
 
             {/* Action Buttons */}

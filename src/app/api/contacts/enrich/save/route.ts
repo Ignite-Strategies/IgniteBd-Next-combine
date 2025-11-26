@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { getEnrichedContactByKey } from '@/lib/redis';
+import { getEnrichedContactByKey, getPreviewIntelligence } from '@/lib/redis';
 import { normalizeContactApollo } from '@/lib/enrichment/normalizeContactApollo';
 import { normalizeCompanyApollo } from '@/lib/enrichment/normalizeCompanyApollo';
 import {
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { contactId, redisKey, companyId } = body;
+    const { contactId, redisKey, companyId, previewId } = body;
 
     // Validate inputs
     if (!contactId) {
@@ -81,6 +81,31 @@ export async function POST(request: Request) {
     }
 
     const rawApolloResponse = redisData.rawEnrichmentPayload;
+
+    // Get inference fields from preview data (if previewId provided)
+    let profileSummary: string | null = null;
+    let tenureYears: number | null = null;
+    let companyPositioning: {
+      positioningLabel?: string;
+      category?: string;
+      revenueTier?: string;
+      headcountTier?: string;
+      normalizedIndustry?: string;
+      competitors?: string[];
+    } = {};
+
+    if (previewId) {
+      try {
+        const previewData = await getPreviewIntelligence(previewId);
+        if (previewData) {
+          profileSummary = previewData.profileSummary || null;
+          tenureYears = previewData.tenureYears || null;
+          companyPositioning = previewData.companyPositioning || {};
+        }
+      } catch (error: any) {
+        console.warn('⚠️ Could not fetch preview data for inferences (non-critical):', error.message);
+      }
+    }
 
     // Normalize contact fields
     const normalizedContact = normalizeContactApollo(rawApolloResponse);
@@ -139,6 +164,13 @@ export async function POST(request: Request) {
             stabilityScore: companyIntelligence.stabilityScore,
             marketPositionScore: companyIntelligence.marketPositionScore,
             readinessScore: companyIntelligence.readinessScore,
+            // Inference layer fields
+            positioningLabel: companyPositioning.positioningLabel || existingCompany.positioningLabel,
+            category: companyPositioning.category || existingCompany.category,
+            revenueTier: companyPositioning.revenueTier || existingCompany.revenueTier,
+            headcountTier: companyPositioning.headcountTier || existingCompany.headcountTier,
+            normalizedIndustry: companyPositioning.normalizedIndustry || existingCompany.normalizedIndustry,
+            competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : existingCompany.competitors,
           },
         });
       } else {
@@ -163,6 +195,13 @@ export async function POST(request: Request) {
             stabilityScore: companyIntelligence.stabilityScore,
             marketPositionScore: companyIntelligence.marketPositionScore,
             readinessScore: companyIntelligence.readinessScore,
+            // Inference layer fields
+            positioningLabel: companyPositioning.positioningLabel,
+            category: companyPositioning.category,
+            revenueTier: companyPositioning.revenueTier,
+            headcountTier: companyPositioning.headcountTier,
+            normalizedIndustry: companyPositioning.normalizedIndustry,
+            competitors: companyPositioning.competitors || [],
           },
         });
         finalCompanyId = newCompany.id;
@@ -178,6 +217,10 @@ export async function POST(request: Request) {
       
       // Intelligence scores
       ...intelligenceScores,
+      
+      // Inference layer fields
+      profileSummary: profileSummary || undefined,
+      tenureYears: tenureYears || undefined,
       
       // Normalized contact fields
       title: normalizedContact.title,

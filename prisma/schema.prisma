@@ -125,6 +125,14 @@ model Company {
   marketPositionScore Int? // 0–100 (computed)
   readinessScore    Int? // 0–100 (computed)
 
+  // Inference layer (non-score inferences)
+  positioningLabel   String?   // e.g. "mid-size capital allocator"
+  category           String?   // e.g. "Capital Allocator", "Asset Manager"
+  revenueTier        String?   // e.g. "Mega", "Enterprise", "Mid"
+  headcountTier      String?   // e.g. "Large", "Mid-size"
+  normalizedIndustry String?   // e.g. "Finance", "Healthcare"
+  competitors        String[] @default([]) // Inferred competitor list
+
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   companyHQ    CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
@@ -225,6 +233,10 @@ model Contact {
   readinessToBuyScore   Int? // 0–100 (computed)
   careerMomentumScore   Int? // 0–100 (computed)
   careerStabilityScore  Int? // 0–100 (computed)
+  
+  // Inference layer (non-score inferences)
+  profileSummary        String? // GPT-generated summary for the individual
+  tenureYears           Int?    // Based on employment history
   
   // Buying signals
   budgetAuthority      Boolean?
