@@ -1,9 +1,12 @@
 # Contact Enrichment - Apollo Integration
 
-**Last Updated**: December 2024  
+**Last Updated**: January 2025  
 **Status**: ✅ Active  
 **Provider**: Apollo.io  
 **Purpose**: Contact enrichment service to find and populate contact information using email or LinkedIn URL
+
+> 📖 **For the complete vision and mental model**, see [ENRICHMENT_VISION.md](./ENRICHMENT_VISION.md)  
+> This document covers the technical integration details. The vision doc explains how enrichment intelligence scores differ from BD Intelligence fit scores and persona alignment.
 
 ---
 
@@ -538,7 +541,9 @@ Error: Apollo API error: 429 - Rate limit exceeded
 
 ## Related Documentation
 
+- **[Enrichment Vision](./ENRICHMENT_VISION.md)** - Complete mental model: enrichment intelligence vs BD Intelligence fit scores vs persona alignment
 - [Contact Management Architecture](../architecture/contacts.md)
+- [BD Intelligence](../bd-intelligence/BD_INTELLIGENCE.md) - Product-contact fit scoring (separate system)
 - [Apollo API Helper](../../src/lib/apollo.ts)
 - [Enrichment API Route](../../src/app/api/contacts/enrich/route.ts)
 - [Environment Variables](../setup/environment-variables.md)

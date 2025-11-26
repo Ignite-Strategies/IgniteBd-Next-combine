@@ -4,6 +4,19 @@ import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Search, RefreshCw, Sparkles, Linkedin, User, X, UserCircle, Target, Plus, Building2 } from 'lucide-react';
+import ContactOutlook from '@/components/enrichment/ContactOutlook';
+import {
+  extractSeniorityScore,
+  extractBuyingPowerScore,
+  extractUrgencyScore,
+  extractRolePowerScore,
+  extractCareerMomentumScore,
+  extractCareerStabilityScore,
+  extractBuyerLikelihoodScore,
+  extractReadinessToBuyScore,
+  extractCompanyIntelligenceScores,
+  type ApolloEnrichmentPayload,
+} from '@/lib/intelligence/EnrichmentParserService';
 
 function LinkedInEnrichContent() {
   const router = useRouter();
@@ -20,6 +33,7 @@ function LinkedInEnrichContent() {
   const [redisKey, setRedisKey] = useState(null);
   const [savedContact, setSavedContact] = useState(null);
   const [autoSave, setAutoSave] = useState(true); // Auto-save by default
+  const [enrichedContactWithScores, setEnrichedContactWithScores] = useState(null);
 
   async function handlePreview() {
     setLoading(true);
@@ -62,6 +76,40 @@ function LinkedInEnrichContent() {
       setRawApolloResponse(r.data.rawApolloResponse || null);
       setRedisKey(r.data.redisKey || null);
       setSavedContact(r.data.contact || null);
+      
+      // Compute intelligence scores and create enriched contact object for ContactOutlook
+      if (r.data.rawApolloResponse) {
+        const apolloPayload = r.data.rawApolloResponse as ApolloEnrichmentPayload;
+        const enrichedProfile = r.data.enrichedProfile || {};
+        
+        // Compute all intelligence scores
+        const intelligenceScores = {
+          seniorityScore: extractSeniorityScore(apolloPayload),
+          buyingPowerScore: extractBuyingPowerScore(apolloPayload),
+          urgencyScore: extractUrgencyScore(apolloPayload),
+          rolePowerScore: extractRolePowerScore(apolloPayload),
+          buyerLikelihoodScore: extractBuyerLikelihoodScore(apolloPayload),
+          readinessToBuyScore: extractReadinessToBuyScore(apolloPayload),
+          careerMomentumScore: extractCareerMomentumScore(apolloPayload),
+          careerStabilityScore: extractCareerStabilityScore(apolloPayload),
+        };
+        
+        const companyIntelligence = extractCompanyIntelligenceScores(apolloPayload);
+        
+        // Create enriched contact object with all scores for ContactOutlook component
+        setEnrichedContactWithScores({
+          ...enrichedProfile,
+          ...intelligenceScores,
+          enrichmentSource: 'Apollo',
+          enrichmentRedisKey: r.data.redisKey,
+          enrichmentFetchedAt: new Date().toISOString(),
+          company: enrichedProfile.companyName ? {
+            companyName: enrichedProfile.companyName,
+            domain: enrichedProfile.companyDomain,
+            companyHealthScore: companyIntelligence.companyHealthScore,
+          } : null,
+        });
+      }
       
       if (r.data.contact) {
         // Contact was saved to DB
@@ -167,65 +215,147 @@ function LinkedInEnrichContent() {
           </div>
         )}
 
-        {/* Enriched Card */}
-        {enriched && (
-          <div className="bg-green-50 border border-green-200 p-5 rounded-lg shadow mb-6">
-            <h2 className="font-semibold text-lg text-green-700 mb-2">
-              ✅ Enrichment Complete
-              {savedContact && (
-                <span className="ml-2 text-sm font-normal text-green-600">
-                  • Saved to CRM
-                </span>
-              )}
-            </h2>
-            
-            {savedContact && (
-              <div className="mb-3 rounded-lg border border-green-300 bg-green-100 p-3">
-                <p className="text-sm font-semibold text-green-800">Contact saved to CRM</p>
-                <button
-                  onClick={() => router.push(`/contacts/${savedContact.id}`)}
-                  className="mt-1 text-xs text-green-700 underline hover:text-green-900"
-                >
-                  View contact →
-                </button>
+        {/* Enriched Card - Full Contact Outlook */}
+        {enriched && enrichedContactWithScores && (
+          <div className="space-y-6 mb-6">
+            {/* Success Banner */}
+            <div className="bg-green-50 border-2 border-green-200 p-5 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-semibold text-lg text-green-700 mb-1">
+                    ✅ Enrichment Complete
+                    {savedContact && (
+                      <span className="ml-2 text-sm font-normal text-green-600">
+                        • Saved to CRM
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-sm text-green-600">
+                    {enriched.firstName || enriched.lastName 
+                      ? `${enriched.firstName || ''} ${enriched.lastName || ''}`.trim()
+                      : enriched.email || 'Contact'}
+                    {' '}has been enriched with full intelligence data
+                  </p>
+                </div>
+                {savedContact && (
+                  <button
+                    onClick={() => router.push(`/contacts/${savedContact.id}`)}
+                    className="bg-green-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-green-700 transition"
+                  >
+                    View Contact →
+                  </button>
+                )}
               </div>
-            )}
-
-            {redisKey && (
-              <div className="mb-3 text-xs text-gray-600">
-                Redis key: <code className="bg-gray-100 px-1 py-0.5 rounded">{redisKey}</code>
-              </div>
-            )}
-
-            <div className="mb-3">
-              {enriched.firstName || enriched.lastName ? (
-                <p className="font-semibold text-gray-900">
-                  {enriched.firstName} {enriched.lastName}
-                </p>
-              ) : null}
-              {enriched.email && <p className="text-sm text-gray-700">Email: {enriched.email}</p>}
-              {enriched.title && <p className="text-sm text-gray-700">Title: {enriched.title}</p>}
-              {enriched.companyName && <p className="text-sm text-gray-700">Company: {enriched.companyName}</p>}
-              {enriched.phone && <p className="text-sm text-gray-700">Phone: {enriched.phone}</p>}
             </div>
 
-            {/* Raw Apollo JSON */}
+            {/* Full Contact Outlook Component - The "Whole Enchilada" */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <ContactOutlook 
+                contact={enrichedContactWithScores}
+                onViewRawJSON={(json) => {
+                  setRawApolloResponse(json);
+                  setShowRawJson(true);
+                }}
+              />
+            </div>
+
+            {/* Save to CRM CTA - Prominent when not saved */}
+            {!savedContact && redisKey && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">
+                      🎯 This Contact Looks Valuable!
+                    </h3>
+                    <p className="text-sm text-gray-700 mb-4">
+                      Save this enriched contact to your CRM to access all intelligence data, 
+                      track interactions, and build your pipeline.
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                      {enrichedContactWithScores.seniorityScore && (
+                        <span className="bg-white px-2 py-1 rounded">
+                          Seniority: {enrichedContactWithScores.seniorityScore}/100
+                        </span>
+                      )}
+                      {enrichedContactWithScores.buyingPowerScore && (
+                        <span className="bg-white px-2 py-1 rounded">
+                          Buying Power: {enrichedContactWithScores.buyingPowerScore}/100
+                        </span>
+                      )}
+                      {enrichedContactWithScores.readinessToBuyScore && (
+                        <span className="bg-white px-2 py-1 rounded">
+                          Readiness: {enrichedContactWithScores.readinessToBuyScore}/100
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="ml-6">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+                          if (!companyHQId) {
+                            alert('Company context required. Please set your company first.');
+                            return;
+                          }
+                          
+                          // Create contact in CRM from enriched data
+                          const response = await api.post('/api/contacts', {
+                            crmId: companyHQId, // Use crmId field name
+                            firstName: enriched.firstName,
+                            lastName: enriched.lastName,
+                            email: enriched.email,
+                            phone: enriched.phone,
+                            title: enriched.title,
+                            // Note: linkedinUrl will be saved via enrichment save endpoint
+                          });
+                          
+                          if (response.data?.contact) {
+                            // Now save the enrichment data with intelligence scores
+                            // This will also save linkedinUrl and all intelligence scores
+                            await api.post('/api/contacts/enrich/save', {
+                              contactId: response.data.contact.id,
+                              redisKey: redisKey,
+                            });
+                            
+                            setSavedContact(response.data.contact);
+                            alert('✅ Contact saved to CRM with full intelligence data!');
+                            // Refresh to show updated contact
+                            window.location.href = `/contacts/${response.data.contact.id}`;
+                          }
+                        } catch (err: any) {
+                          console.error('Error saving contact:', err);
+                          alert(err.response?.data?.error || 'Failed to save contact. Please try again.');
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold text-sm shadow-lg transition flex items-center gap-2"
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      Save to CRM
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Raw Apollo JSON Toggle */}
             {rawApolloResponse && (
-              <div className="mt-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <button
                   onClick={() => setShowRawJson(!showRawJson)}
-                  className="text-xs text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2 font-medium"
                 >
                   {showRawJson ? '▼ Hide' : '▶ Show'} Full Apollo JSON
                 </button>
                 {showRawJson && (
-                  <pre className="mt-2 text-xs bg-gray-900 text-green-300 p-4 rounded max-h-[400px] overflow-y-auto">
+                  <pre className="mt-3 text-xs bg-gray-900 text-green-300 p-4 rounded max-h-[400px] overflow-y-auto">
                     {JSON.stringify(rawApolloResponse, null, 2)}
                   </pre>
                 )}
               </div>
             )}
 
+            {/* Clear Button */}
             <button
               onClick={() => {
                 setEnriched(null);
@@ -233,15 +363,16 @@ function LinkedInEnrichContent() {
                 setRawApolloResponse(null);
                 setShowRawJson(false);
                 setRedisKey(null);
+                setEnrichedContactWithScores(null);
                 setUrl('');
               }}
-              className="mt-4 bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm"
+              className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 transition"
             >
               Clear & Search Again
             </button>
 
             {/* What do you want to do now? Action Menu */}
-            {enriched && redisKey && (
+            {enriched && redisKey && !savedContact && (
               <div className="mt-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-6">
                 <h3 className="mb-4 text-lg font-bold text-gray-900">
                   What do you want to do now?
