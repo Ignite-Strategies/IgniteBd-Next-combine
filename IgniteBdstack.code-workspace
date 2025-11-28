@@ -19,9 +19,6 @@
 			"path": "../../Water4Soul/waterf4soulmvp1"
 		},
 		{
-			"path": "../../GoFast/gofast-appbuildmvp"
-		},
-		{
 			"path": "../Ignite-frontend-production"
 		},
 		{
@@ -38,6 +35,15 @@
 		},
 		{
 			"path": "../../GoFast/gofastfrontend-mvp1"
+		},
+		{
+			"path": "../../repooverview"
+		},
+		{
+			"path": "../../GoFast/f3invigorate"
+		},
+		{
+			"path": "../../GoFast/gofastapp-mvp"
 		}
 	],
 	"settings": {}

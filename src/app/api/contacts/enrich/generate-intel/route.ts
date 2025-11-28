@@ -17,6 +17,8 @@ import {
   extractCompanyIntelligenceScores,
   generateContactProfileSummary,
   calculateTenureYears,
+  calculateCareerStats,
+  generateCareerTimeline,
   enrichCompanyPositioning,
   type ApolloEnrichmentPayload,
 } from '@/lib/intelligence/EnrichmentParserService';
@@ -117,9 +119,11 @@ export async function POST(request: Request) {
     const companyIntelligence = extractCompanyIntelligenceScores(apolloPayload);
 
     // INFERENCE LAYER - Compute non-score inferences
-    // 1. Calculate tenure years
+    // 1. Calculate career statistics
     const employmentHistory = apolloPayload.person?.employment_history || [];
-    const tenureYears = calculateTenureYears(employmentHistory);
+    const tenureYears = calculateTenureYears(employmentHistory); // Keep for backward compatibility
+    const careerStats = calculateCareerStats(employmentHistory);
+    const careerTimeline = generateCareerTimeline(employmentHistory);
 
     // 2. Generate contact profile summary (GPT)
     let profileSummary = '';
@@ -200,7 +204,11 @@ export async function POST(request: Request) {
           companyIntelligence,
           // Inference layer fields
           profileSummary,
-          tenureYears,
+          tenureYears, // Keep for backward compatibility
+          currentTenureYears: careerStats.currentTenureYears,
+          totalExperienceYears: careerStats.totalExperienceYears,
+          avgTenureYears: careerStats.avgTenureYears,
+          careerTimeline,
           companyPositioning,
           createdAt: new Date().toISOString(),
         })
@@ -223,7 +231,11 @@ export async function POST(request: Request) {
       companyIntelligence,
       // Inference layer fields
       profileSummary,
-      tenureYears,
+      tenureYears, // Keep for backward compatibility
+      currentTenureYears: careerStats.currentTenureYears,
+      totalExperienceYears: careerStats.totalExperienceYears,
+      avgTenureYears: careerStats.avgTenureYears,
+      careerTimeline,
       companyPositioning,
       message: 'Intelligence generated successfully. Use previewId to retrieve data.',
     });

@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
-import { Search, RefreshCw, Linkedin, X, Sparkles, Save } from 'lucide-react';
+import { Search, RefreshCw, Linkedin, X, Sparkles, Save, CheckCircle, User, ArrowRight } from 'lucide-react';
 import IntelligencePreview from '@/components/enrichment/IntelligencePreview';
 
 function LinkedInEnrichContent() {
@@ -19,6 +19,8 @@ function LinkedInEnrichContent() {
   const [saving, setSaving] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
   const [rawJson, setRawJson] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [savedContactId, setSavedContactId] = useState(null);
 
   async function handlePreview() {
     setLoading(true);
@@ -59,6 +61,10 @@ function LinkedInEnrichContent() {
           previewId: response.data.previewId,
           profileSummary: response.data.profileSummary,
           tenureYears: response.data.tenureYears,
+          currentTenureYears: response.data.currentTenureYears,
+          totalExperienceYears: response.data.totalExperienceYears,
+          avgTenureYears: response.data.avgTenureYears,
+          careerTimeline: response.data.careerTimeline,
           companyPositioning: response.data.companyPositioning,
           linkedinUrl: url,
         });
@@ -114,8 +120,10 @@ function LinkedInEnrichContent() {
         previewId: intelligenceData.previewId, // Pass previewId to get inference fields
       });
 
-      // Step 3: Redirect to contact detail page
-      router.push(`/contacts/${contactId}`);
+      // Step 3: Show success modal with next steps
+      setSaving(false);
+      setShowSuccessModal(true);
+      setSavedContactId(contactId);
     } catch (err) {
       console.error('Error saving contact:', err);
       alert(err.response?.data?.error || err.message || 'Failed to save contact');
@@ -256,6 +264,10 @@ function LinkedInEnrichContent() {
               onViewRawJSON={handleViewRawJSON}
               profileSummary={intelligenceData.profileSummary}
               tenureYears={intelligenceData.tenureYears}
+              currentTenureYears={intelligenceData.currentTenureYears}
+              totalExperienceYears={intelligenceData.totalExperienceYears}
+              avgTenureYears={intelligenceData.avgTenureYears}
+              careerTimeline={intelligenceData.careerTimeline}
               companyPositioning={intelligenceData.companyPositioning}
             />
 
@@ -322,6 +334,83 @@ function LinkedInEnrichContent() {
                 <pre className="text-xs bg-gray-50 p-4 rounded-lg overflow-x-auto">
                   {JSON.stringify(rawJson, null, 2)}
                 </pre>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success Modal */}
+        {showSuccessModal && savedContactId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-xl">
+              <div className="p-6">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="rounded-full bg-green-100 p-3">
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+                  Contact Enriched Successfully!
+                </h2>
+                <p className="text-gray-600 text-center mb-6">
+                  All intelligence scores and profile data have been saved. What would you like to do next?
+                </p>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      router.push(`/contacts/${savedContactId}`);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">View Contact</div>
+                        <div className="text-sm text-gray-600">See full contact details and intelligence</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-blue-600" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      router.push(`/personas/builder?contactId=${savedContactId}`);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Sparkles className="h-5 w-5 text-purple-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">Start Persona Flow</div>
+                        <div className="text-sm text-gray-600">Create a persona from this enriched contact</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-purple-600" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      setPreview(null);
+                      setIntelligenceData(null);
+                      setUrl('');
+                      setSavedContactId(null);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border border-gray-300 bg-white px-6 py-4 text-left transition hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Search className="h-5 w-5 text-gray-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">Enrich Another Contact</div>
+                        <div className="text-sm text-gray-600">Start a new enrichment</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-600" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

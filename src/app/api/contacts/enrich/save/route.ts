@@ -85,6 +85,10 @@ export async function POST(request: Request) {
     // Get inference fields from preview data (if previewId provided)
     let profileSummary: string | null = null;
     let tenureYears: number | null = null;
+    let currentTenureYears: number | null = null;
+    let totalExperienceYears: number | null = null;
+    let avgTenureYears: number | null = null;
+    let careerTimeline: any = null;
     let companyPositioning: {
       positioningLabel?: string;
       category?: string;
@@ -100,6 +104,10 @@ export async function POST(request: Request) {
         if (previewData) {
           profileSummary = previewData.profileSummary || null;
           tenureYears = previewData.tenureYears || null;
+          currentTenureYears = previewData.currentTenureYears || null;
+          totalExperienceYears = previewData.totalExperienceYears || null;
+          avgTenureYears = previewData.avgTenureYears || null;
+          careerTimeline = previewData.careerTimeline || null;
           companyPositioning = previewData.companyPositioning || {};
         }
       } catch (error: any) {
@@ -220,7 +228,11 @@ export async function POST(request: Request) {
       
       // Inference layer fields
       profileSummary: profileSummary || undefined,
-      tenureYears: tenureYears || undefined,
+      tenureYears: tenureYears || undefined, // Keep for backward compatibility
+      currentTenureYears: currentTenureYears || undefined,
+      totalExperienceYears: totalExperienceYears || undefined,
+      avgTenureYears: avgTenureYears || undefined,
+      careerTimeline: careerTimeline || undefined,
       
       // Normalized contact fields
       title: normalizedContact.title,

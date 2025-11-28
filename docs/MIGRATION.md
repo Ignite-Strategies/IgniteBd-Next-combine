@@ -232,3 +232,4 @@ All new invites will:
 **Status**: ✅ Auth Normalization Complete  
 **Next Steps**: Monitor for any edge cases, update client portal if needed
 
+

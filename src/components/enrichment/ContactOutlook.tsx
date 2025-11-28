@@ -225,8 +225,73 @@ export default function ContactOutlook({ contact, onViewRawJSON }: ContactOutloo
         </section>
       )}
 
+      {/* Profile Summary */}
+      {contact.profileSummary && (
+        <section className="rounded-2xl bg-white p-6 shadow">
+          <div className="flex items-center gap-3 mb-4">
+            <Briefcase className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Profile Summary</h3>
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed mb-4">{contact.profileSummary}</p>
+          {(contact.currentTenureYears !== null || contact.totalExperienceYears !== null || contact.avgTenureYears !== null) && (
+            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 text-sm">
+              {contact.currentTenureYears !== null && contact.currentTenureYears !== undefined && (
+                <div>
+                  <dt className="text-xs font-semibold text-gray-500 uppercase">Current Tenure</dt>
+                  <dd className="mt-1 text-gray-900 font-semibold">{fmt(contact.currentTenureYears)} {contact.currentTenureYears === 1 ? 'year' : 'years'}</dd>
+                </div>
+              )}
+              {contact.totalExperienceYears !== null && contact.totalExperienceYears !== undefined && (
+                <div>
+                  <dt className="text-xs font-semibold text-gray-500 uppercase">Total Experience</dt>
+                  <dd className="mt-1 text-gray-900 font-semibold">{fmt(contact.totalExperienceYears)} {contact.totalExperienceYears === 1 ? 'year' : 'years'}</dd>
+                </div>
+              )}
+              {contact.avgTenureYears !== null && contact.avgTenureYears !== undefined && (
+                <div>
+                  <dt className="text-xs font-semibold text-gray-500 uppercase">Avg Tenure</dt>
+                  <dd className="mt-1 text-gray-900 font-semibold">{fmt(contact.avgTenureYears)} {contact.avgTenureYears === 1 ? 'year' : 'years'}</dd>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Career Timeline */}
-      {contact.numberOfJobChanges !== null && contact.numberOfJobChanges > 0 && (
+      {contact.careerTimeline && Array.isArray(contact.careerTimeline) && contact.careerTimeline.length > 0 && (
+        <section className="rounded-2xl bg-white p-6 shadow">
+          <div className="flex items-center gap-3 mb-4">
+            <Briefcase className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Career Timeline</h3>
+          </div>
+          <div className="space-y-3">
+            {contact.careerTimeline.map((role: any, index: number) => (
+              <div key={index} className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
+                <div className="flex-shrink-0 w-2 h-2 rounded-full bg-indigo-600 mt-2"></div>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-1">
+                    <div>
+                      <p className="font-semibold text-gray-900">{role.title}</p>
+                      <p className="text-sm text-gray-600">{role.company}</p>
+                    </div>
+                    <div className="text-right text-xs text-gray-500">
+                      <p>{new Date(role.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+                      <p>{role.endDate ? new Date(role.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present'}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {role.durationYears > 0 ? `${fmt(role.durationYears)} ${role.durationYears === 1 ? 'year' : 'years'}` : `${role.durationMonths} ${role.durationMonths === 1 ? 'month' : 'months'}`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Career Snapshot (fallback if no timeline) */}
+      {(!contact.careerTimeline || !Array.isArray(contact.careerTimeline) || contact.careerTimeline.length === 0) && contact.numberOfJobChanges !== null && contact.numberOfJobChanges > 0 && (
         <section className="rounded-2xl bg-white p-6 shadow">
           <div className="flex items-center gap-3 mb-4">
             <Briefcase className="h-5 w-5 text-purple-600" />

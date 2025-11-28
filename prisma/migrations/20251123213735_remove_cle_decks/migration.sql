@@ -4,3 +4,4 @@
 -- Drop the table (CASCADE will automatically drop any foreign key constraints)
 DROP TABLE IF EXISTS "cle_decks" CASCADE;
 
+

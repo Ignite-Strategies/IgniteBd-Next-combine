@@ -23,6 +23,7 @@ function PersonaBuilderContent({ searchParams }) {
   const personaId = searchParams?.personaId || urlSearchParams?.get('personaId') || null;
   const mode = searchParams?.mode || urlSearchParams?.get('mode') || null;
   const enrichedKey = searchParams?.enrichedKey || urlSearchParams?.get('enrichedKey') || null;
+  const contactId = searchParams?.contactId || urlSearchParams?.get('contactId') || null;
 
   const [isHydrating, setIsHydrating] = useState(Boolean(personaId));
   const [fetchError, setFetchError] = useState(null);
@@ -67,9 +68,50 @@ function PersonaBuilderContent({ searchParams }) {
     }
   }, []);
 
-  // Initialize companyId and handle prefill/enrichedKey
+  // Initialize companyId and handle prefill/enrichedKey/contactId
   useEffect(() => {
     if (!hasInitialized && !personaId) {
+      // Handle contactId from enrichment flow
+      if (contactId && derivedCompanyId) {
+        setIsHydrating(true);
+        (async () => {
+          try {
+            const contactResponse = await api.get(`/api/contacts/${contactId}`);
+            if (contactResponse.data?.success && contactResponse.data?.contact) {
+              const contact = contactResponse.data.contact;
+              
+              // Build description with profile summary and LinkedIn URL if available
+              let description = contact.profileSummary || '';
+              if (contact.linkedinUrl) {
+                if (description) {
+                  description += `\n\nLinkedIn: ${contact.linkedinUrl}`;
+                } else {
+                  description = `LinkedIn: ${contact.linkedinUrl}`;
+                }
+              }
+              
+              reset({
+                personaName: contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'New Persona',
+                role: contact.title || '',
+                description: description,
+                painPoints: Array.isArray(contact.painPoints) ? contact.painPoints.join('\n') : (contact.painPoints || ''),
+                goals: Array.isArray(contact.goals) ? contact.goals.join('\n') : (contact.goals || ''),
+                whatTheyWant: contact.notes || '',
+                companyId: derivedCompanyId,
+              });
+              handleShowToast('Persona pre-filled from enriched contact!');
+            }
+          } catch (err) {
+            console.error('Failed to load contact for persona:', err);
+            setFetchError('Failed to load contact data');
+          } finally {
+            setIsHydrating(false);
+            setHasInitialized(true);
+          }
+        })();
+        return;
+      }
+
       // Handle enrichedKey from enrichment flow
       if (enrichedKey && derivedCompanyId) {
         setIsHydrating(true);

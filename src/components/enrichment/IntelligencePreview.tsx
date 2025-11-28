@@ -8,6 +8,22 @@ const fmt = (s: number | null | undefined): string => {
   return typeof s === 'number' ? s.toFixed(1) : '—';
 };
 
+// Format revenue to billions/millions
+const formatRevenue = (revenue: number | null | undefined): string => {
+  if (!revenue || revenue === 0) {
+    return '—';
+  }
+  if (revenue >= 1000000000) {
+    return `$${(revenue / 1000000000).toFixed(1)}B`;
+  } else if (revenue >= 1000000) {
+    return `$${(revenue / 1000000).toFixed(1)}M`;
+  } else if (revenue >= 1000) {
+    return `$${(revenue / 1000).toFixed(1)}K`;
+  } else {
+    return `$${revenue.toFixed(0)}`;
+  }
+};
+
 interface IntelligencePreviewProps {
   normalizedContact: any;
   normalizedCompany: any;
@@ -33,6 +49,17 @@ interface IntelligencePreviewProps {
   // Inference layer fields
   profileSummary?: string;
   tenureYears?: number;
+  currentTenureYears?: number;
+  totalExperienceYears?: number;
+  avgTenureYears?: number;
+  careerTimeline?: Array<{
+    startDate: string;
+    endDate: string | null;
+    title: string;
+    company: string;
+    durationMonths: number;
+    durationYears: number;
+  }>;
   companyPositioning?: {
     positioningLabel?: string;
     category?: string;
@@ -52,6 +79,10 @@ export default function IntelligencePreview({
   onViewRawJSON,
   profileSummary,
   tenureYears,
+  currentTenureYears,
+  totalExperienceYears,
+  avgTenureYears,
+  careerTimeline,
   companyPositioning,
 }: IntelligencePreviewProps) {
   // Null check - don't render if data is not loaded
@@ -147,7 +178,7 @@ export default function IntelligencePreview({
       </section>
 
       {/* Profile Summary Section */}
-      {(profileSummary || tenureYears !== null) && (
+      {(profileSummary || currentTenureYears !== null || totalExperienceYears !== null) && (
         <section className="rounded-2xl bg-white p-6 shadow">
           <div className="flex items-center gap-3 mb-4">
             <User className="h-5 w-5 text-purple-600" />
@@ -156,11 +187,26 @@ export default function IntelligencePreview({
           {profileSummary && (
             <p className="text-sm text-gray-700 mb-3 leading-relaxed">{profileSummary}</p>
           )}
-          {tenureYears !== null && tenureYears !== undefined && (
-            <div className="text-xs text-gray-500">
-              <span className="font-semibold">TENURE:</span> {tenureYears} {tenureYears === 1 ? 'year' : 'years'}
-            </div>
-          )}
+          <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+            {currentTenureYears !== null && currentTenureYears !== undefined && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Current Tenure</dt>
+                <dd className="mt-1 text-gray-900 font-semibold">{fmt(currentTenureYears)} {currentTenureYears === 1 ? 'year' : 'years'}</dd>
+              </div>
+            )}
+            {totalExperienceYears !== null && totalExperienceYears !== undefined && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Total Experience</dt>
+                <dd className="mt-1 text-gray-900 font-semibold">{fmt(totalExperienceYears)} {totalExperienceYears === 1 ? 'year' : 'years'}</dd>
+              </div>
+            )}
+            {avgTenureYears !== null && avgTenureYears !== undefined && (
+              <div>
+                <dt className="text-xs font-semibold text-gray-500 uppercase">Avg Tenure</dt>
+                <dd className="mt-1 text-gray-900 font-semibold">{fmt(avgTenureYears)} {avgTenureYears === 1 ? 'year' : 'years'}</dd>
+              </div>
+            )}
+          </div>
         </section>
       )}
 
@@ -244,7 +290,7 @@ export default function IntelligencePreview({
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Revenue Tier</dt>
                 <dd className="mt-1 text-gray-900">
-                  {companyPositioning.revenueTier} (${fmt(normalizedCompany.revenue / 1000000)}M)
+                  {companyPositioning.revenueTier} ({formatRevenue(normalizedCompany.revenue)})
                 </dd>
               </div>
             )}
@@ -304,7 +350,7 @@ export default function IntelligencePreview({
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Revenue</dt>
                 <dd className="mt-1 text-sm text-gray-900">
-                  ${fmt(normalizedCompany.revenue / 1000000)}M
+                  {formatRevenue(normalizedCompany.revenue)}
                 </dd>
               </div>
             )}
@@ -343,6 +389,38 @@ export default function IntelligencePreview({
               score={companyIntelligence.readinessScore}
               description="Readiness to buy/partner"
             />
+          </div>
+        </section>
+      )}
+
+      {/* Career Timeline */}
+      {careerTimeline && careerTimeline.length > 0 && (
+        <section className="rounded-2xl bg-white p-6 shadow">
+          <div className="flex items-center gap-3 mb-4">
+            <Briefcase className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Career Timeline</h3>
+          </div>
+          <div className="space-y-3">
+            {careerTimeline.map((role, index) => (
+              <div key={index} className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
+                <div className="flex-shrink-0 w-2 h-2 rounded-full bg-indigo-600 mt-2"></div>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-1">
+                    <div>
+                      <p className="font-semibold text-gray-900">{role.title}</p>
+                      <p className="text-sm text-gray-600">{role.company}</p>
+                    </div>
+                    <div className="text-right text-xs text-gray-500">
+                      <p>{new Date(role.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+                      <p>{role.endDate ? new Date(role.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present'}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {role.durationYears > 0 ? `${fmt(role.durationYears)} ${role.durationYears === 1 ? 'year' : 'years'}` : `${role.durationMonths} ${role.durationMonths === 1 ? 'month' : 'months'}`}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}

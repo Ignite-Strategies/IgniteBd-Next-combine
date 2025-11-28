@@ -768,7 +768,7 @@ Keep it professional, concise, and focused on business context. Return only the 
 }
 
 /**
- * Calculate tenure years from employment history
+ * Calculate tenure years from employment history (DEPRECATED - use calculateCareerStats)
  * 
  * @param employmentHistory - Array of employment records
  * @returns number - Years of tenure at current company
@@ -794,6 +794,144 @@ export function calculateTenureYears(
   const years = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
   
   return Math.max(0, Math.round(years * 10) / 10); // Round to 1 decimal
+}
+
+/**
+ * Calculate comprehensive career statistics from employment history
+ * 
+ * @param employmentHistory - Array of employment records
+ * @returns Object with currentTenureYears, totalExperienceYears, avgTenureYears
+ */
+export function calculateCareerStats(
+  employmentHistory?: Array<{
+    started_at?: string;
+    ended_at?: string | null;
+    title?: string;
+    organization?: { name?: string };
+  }>
+): {
+  currentTenureYears: number;
+  totalExperienceYears: number;
+  avgTenureYears: number;
+} {
+  if (!employmentHistory || employmentHistory.length === 0) {
+    return {
+      currentTenureYears: 0,
+      totalExperienceYears: 0,
+      avgTenureYears: 0,
+    };
+  }
+
+  const now = new Date();
+  let currentTenureYears = 0;
+  let totalMonths = 0;
+  let validJobs = 0;
+
+  // Find current role (no end date) and calculate current tenure
+  const currentRole = employmentHistory.find(job => !job.ended_at && job.started_at);
+  if (currentRole?.started_at) {
+    const startDate = new Date(currentRole.started_at);
+    const months = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+    currentTenureYears = Math.max(0, months / 12);
+  }
+
+  // Calculate total experience and average tenure
+  for (const job of employmentHistory) {
+    if (job.started_at) {
+      const startDate = new Date(job.started_at);
+      const endDate = job.ended_at ? new Date(job.ended_at) : now;
+      const months = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+      if (months > 0) {
+        totalMonths += months;
+        validJobs++;
+      }
+    }
+  }
+
+  const totalExperienceYears = totalMonths / 12;
+  const avgTenureYears = validJobs > 0 ? totalMonths / validJobs / 12 : 0;
+
+  return {
+    currentTenureYears: Math.round(currentTenureYears * 10) / 10,
+    totalExperienceYears: Math.round(totalExperienceYears * 10) / 10,
+    avgTenureYears: Math.round(avgTenureYears * 10) / 10,
+  };
+}
+
+/**
+ * Generate full career timeline from employment history
+ * 
+ * @param employmentHistory - Array of employment records
+ * @returns Array of timeline entries with formatted dates and details
+ */
+export function generateCareerTimeline(
+  employmentHistory?: Array<{
+    started_at?: string;
+    ended_at?: string | null;
+    title?: string;
+    organization?: { name?: string };
+  }>
+): Array<{
+  startDate: string;
+  endDate: string | null;
+  title: string;
+  company: string;
+  durationMonths: number;
+  durationYears: number;
+}> {
+  if (!employmentHistory || employmentHistory.length === 0) {
+    return [];
+  }
+
+  const now = new Date();
+  const timeline = employmentHistory
+    .filter(job => job.started_at) // Only include jobs with start dates
+    .map(job => {
+      const startDate = new Date(job.started_at!);
+      const endDate = job.ended_at ? new Date(job.ended_at) : now;
+      const months = Math.max(0, (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+      const years = months / 12;
+
+      return {
+        startDate: startDate.toISOString().split('T')[0], // YYYY-MM-DD
+        endDate: job.ended_at ? endDate.toISOString().split('T')[0] : null,
+        title: job.title || 'Unknown Title',
+        company: job.organization?.name || 'Unknown Company',
+        durationMonths: Math.round(months),
+        durationYears: Math.round(years * 10) / 10,
+      };
+    })
+    .sort((a, b) => {
+      // Sort by start date, most recent first
+      return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+    });
+
+  return timeline;
+}
+
+/**
+ * Format revenue to billions/millions string
+ * 
+ * @param revenue - Revenue in dollars
+ * @returns Formatted string like "$26.1B" or "$125.5M"
+ */
+export function formatRevenue(revenue: number | null | undefined): string {
+  if (!revenue || revenue === 0) {
+    return '—';
+  }
+
+  if (revenue >= 1000000000) {
+    // Billions
+    return `$${(revenue / 1000000000).toFixed(1)}B`;
+  } else if (revenue >= 1000000) {
+    // Millions
+    return `$${(revenue / 1000000).toFixed(1)}M`;
+  } else if (revenue >= 1000) {
+    // Thousands
+    return `$${(revenue / 1000).toFixed(1)}K`;
+  } else {
+    return `$${revenue.toFixed(0)}`;
+  }
 }
 
 /**
@@ -841,18 +979,24 @@ export async function enrichCompanyPositioning(companyData: {
     const revenue = companyData.revenue || 0;
     const headcount = companyData.headcount || 0;
 
-    const prompt = `Analyze this company and provide structured information:
+    // Format revenue properly
+    const revenueFormatted = formatRevenue(revenue);
+
+    const prompt = `Analyze this company and classify it into standard business categories:
 
 Company: ${companyName}
 Industry: ${industry}
-Revenue: $${(revenue / 1000000).toFixed(1)}M
+Revenue: ${revenueFormatted}
 Headcount: ${headcount} employees
 
 Provide the following in JSON format:
-1. normalizedIndustry: One word from ["Finance", "Healthcare", "Technology", "Consulting", "Retail", "Manufacturing", "Government", "Education", "Energy"]
-2. positioningLabel: A short strategic label (2-5 words), e.g. "mid-size capital allocator", "enterprise SaaS provider"
-3. category: One from ["Asset Manager", "Capital Allocator", "Bank", "SaaS Vendor", "Consultancy", "Healthcare System", "PE Firm", "Manufacturer", "Government Contractor"]
-4. competitors: Array of 3 competitor company names as strings
+1. normalizedIndustry: Classify the PRIMARY industry category. Choose ONE word from this exact list: ["Finance", "Healthcare", "Technology", "Consulting", "Retail", "Manufacturing", "Government", "Education", "Energy", "Real Estate", "Media", "Transportation", "Hospitality", "Legal", "Construction"]. This should be the core industry, not a job title or role.
+
+2. positioningLabel: Create a short strategic positioning label (2-5 words) that describes what this company does. Examples: "mid-size capital allocator", "enterprise SaaS provider", "regional healthcare network", "boutique consulting firm". Be specific and descriptive.
+
+3. category: Classify the company type. Choose ONE from this exact list: ["Asset Manager", "Capital Allocator", "Bank", "SaaS Vendor", "Consultancy", "Healthcare System", "PE Firm", "Manufacturer", "Government Contractor", "Retailer", "Media Company", "Energy Company", "Real Estate Firm", "Law Firm", "Construction Company", "Education Institution", "Technology Company"]. This should match the company's primary business model.
+
+4. competitors: List exactly 3 well-known competitor company names as an array of strings. These should be real companies in the same industry/category.
 
 Return ONLY valid JSON in this format:
 {

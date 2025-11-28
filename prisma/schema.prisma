@@ -236,7 +236,11 @@ model Contact {
   
   // Inference layer (non-score inferences)
   profileSummary        String? // GPT-generated summary for the individual
-  tenureYears           Int?    // Based on employment history
+  tenureYears           Int?    // Based on employment history (DEPRECATED - use currentTenureYears)
+  currentTenureYears    Float?  // Years at current company
+  totalExperienceYears  Float?  // Total years across all positions
+  avgTenureYears        Float?  // Average tenure per position
+  careerTimeline        Json?   // Full career timeline from employment history
   
   // Buying signals
   budgetAuthority      Boolean?

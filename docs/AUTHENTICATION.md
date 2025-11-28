@@ -977,3 +977,4 @@ WHERE email = 'user@example.com';
 **Architecture:** Firebase UID as Universal Identifier  
 **Pattern:** Admin SDK (server) + Client SDK (portal)
 
+
