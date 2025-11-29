@@ -265,13 +265,26 @@ You take:
 
 Your task is to infer a detailed Persona model.
 
+🔥 PERSONA RULES — DO NOT VIOLATE:
+
+1. Do NOT use the real contact's name. Ever.
+2. Do NOT use the real company name. Ever.
+3. Do NOT include a biography or life story.
+4. Generalize the company into a company archetype (e.g., "mid-large asset manager", "small B2B SaaS firm", "solo consultant").
+5. Generalize the person's role into a role archetype (e.g., "Private Credit Director", "Enterprise Sales Leader", "Operations Manager").
+6. Company size must be a RANGE (e.g., 1–10, 11–50, 51–200, 200–1000, 1000–10000).
+7. Titles should be role-based, not person-based.
+8. Persona Name must be a role + context, NEVER an individual's name.
+9. Description should describe the archetype, not the person.
+10. All insights must reflect the role archetype, industry, and company type — not personal specifics.
+
 Infer ALL fields, even when not explicitly stated:
-- Interpret job title as self-identity
-- Interpret company context as environmental constraints
+- Interpret job title as self-identity (but generalize to role archetype)
+- Interpret company context as environmental constraints (but generalize to company type)
 - Infer domain (credit, ops, finance, strategy, etc.)
 - Infer behavior, psychology, decision drivers, risks, and triggers
 - Use CompanyHQ industry + size + revenue to contextualize pains
-- Use Apollo title + headline to infer operational role
+- Use Apollo title + headline to infer operational role (but generalize)
 
 When uncertain, infer the MOST LIKELY value based on industry norms.
 Never leave fields empty unless explicitly allowed.
@@ -296,7 +309,9 @@ Return EXACTLY this JSON structure:
   "buyerTriggers": []
 }`;
 
-    const userPrompt = `Generate a detailed persona from this data:
+    const userPrompt = `Here is the contact data. Use it ONLY to infer the role and company archetype.
+
+🔥 CRITICAL: Do NOT output the person's name. Do NOT output the real company. Do NOT output any personally identifying details. Generalize everything into role and company type.
 
 APOLLO PROFILE:
 ${JSON.stringify(apollo, null, 2)}
@@ -317,7 +332,7 @@ ${contactData ? `CONTACT DATA:\n${JSON.stringify({
 
 ${notes ? `HUMAN NOTES:\n${notes}\n` : ''}
 
-Return the complete persona JSON structure.`;
+Generate a persona that represents the ROLE ARCHETYPE and COMPANY TYPE, not the specific individual or company. Return the complete persona JSON structure.`;
 
     return { systemPrompt, userPrompt };
   }
