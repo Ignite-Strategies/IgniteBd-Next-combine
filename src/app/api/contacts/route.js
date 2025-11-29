@@ -42,12 +42,57 @@ export async function GET(request) {
       }
     }
 
+    // Use select to avoid querying fields that may not exist in DB yet
+    // This prevents errors if migrations haven't been run for new fields
     const contacts = await prisma.contact.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        crmId: true,
+        firstName: true,
+        lastName: true,
+        fullName: true,
+        goesBy: true,
+        email: true,
+        phone: true,
+        title: true,
+        seniority: true,
+        department: true,
+        jobRole: true,
+        linkedinUrl: true,
+        city: true,
+        state: true,
+        country: true,
+        timezone: true,
+        currentRoleStartDate: true,
+        totalYearsExperience: true,
+        numberOfJobChanges: true,
+        averageTenureMonths: true,
+        careerProgression: true,
+        recentJobChange: true,
+        recentPromotion: true,
+        companyName: true,
+        companyDomain: true,
+        companySize: true,
+        companyIndustry: true,
+        companyId: true,
+        contactCompanyId: true,
+        buyerDecision: true,
+        howMet: true,
+        notes: true,
+        enrichmentRedisKey: true,
+        createdAt: true,
+        updatedAt: true,
+        // New career fields - only include if they exist in DB
+        // currentTenureYears: true,
+        // totalExperienceYears: true,
+        // avgTenureYears: true,
+        // careerTimeline: true,
+        // profileSummary: true,
+        // tenureYears: true,
         pipeline: true,
-        company: true, // Universal company relation
-        contactCompany: true, // Legacy relation for backward compatibility
+        company: true,
+        contactCompany: true,
       },
       orderBy: {
         createdAt: 'desc',

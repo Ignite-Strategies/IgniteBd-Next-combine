@@ -226,13 +226,14 @@ export async function POST(request: Request) {
       // Intelligence scores
       ...intelligenceScores,
       
-      // Inference layer fields
+      // Inference layer fields (only include if they exist in DB)
       profileSummary: profileSummary || undefined,
       tenureYears: tenureYears || undefined, // Keep for backward compatibility
-      currentTenureYears: currentTenureYears || undefined,
-      totalExperienceYears: totalExperienceYears || undefined,
-      avgTenureYears: avgTenureYears || undefined,
-      careerTimeline: careerTimeline || undefined,
+      // Note: These fields may not exist in DB yet - only include if migration has been run
+      // currentTenureYears: currentTenureYears || undefined,
+      // totalExperienceYears: totalExperienceYears || undefined,
+      // avgTenureYears: avgTenureYears || undefined,
+      // careerTimeline: careerTimeline || undefined,
       
       // Normalized contact fields
       title: normalizedContact.title,
