@@ -32,29 +32,32 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { presentationId, sectionIndex, comment } = body;
+    const { workCollateralId, sectionIndex, comment } = body;
 
-    if (!presentationId || typeof sectionIndex !== 'number' || typeof comment !== 'string') {
+    if (!workCollateralId || typeof sectionIndex !== 'number' || typeof comment !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'presentationId, sectionIndex, and comment are required' },
+        { success: false, error: 'workCollateralId, sectionIndex, and comment are required' },
         { status: 400 },
       );
     }
 
-    // Fetch existing presentation
-    const presentation = await prisma.presentation.findUnique({
-      where: { id: presentationId },
+    // Fetch WorkCollateral (contains the presentation snapshot)
+    const workCollateral = await prisma.workCollateral.findUnique({
+      where: { id: workCollateralId },
     });
 
-    if (!presentation) {
+    if (!workCollateral) {
       return NextResponse.json(
-        { success: false, error: 'Presentation not found' },
+        { success: false, error: 'WorkCollateral not found' },
         { status: 404 },
       );
     }
 
+    // Get existing content snapshot
+    const contentJson = (workCollateral.contentJson as any) || {};
+    
     // Get existing feedback or initialize empty object
-    const existingFeedback = (presentation.feedback as Record<string, string> | null) || {};
+    const existingFeedback = contentJson.feedback || {};
 
     // Update feedback for this section
     const updatedFeedback = {
@@ -62,11 +65,15 @@ export async function POST(request: Request) {
       [sectionIndex.toString()]: comment,
     };
 
-    // Update presentation with new feedback
-    await prisma.presentation.update({
-      where: { id: presentationId },
+    // Update WorkCollateral.contentJson with new feedback
+    // This updates the snapshot, not a Content Hub artifact
+    await prisma.workCollateral.update({
+      where: { id: workCollateralId },
       data: {
-        feedback: updatedFeedback,
+        contentJson: {
+          ...contentJson,
+          feedback: updatedFeedback,
+        },
       },
     });
 

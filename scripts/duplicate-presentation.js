@@ -75,53 +75,42 @@ async function duplicatePresentation() {
 
     console.log(`   CompanyHQ ID: ${companyHQId}`);
 
-    // Create the duplicated presentation
-    console.log('\n3️⃣ Creating duplicated presentation...');
-    const joelClePresentation = await prisma.presentation.create({
-      data: {
-        companyHQId,
-        title: originalPresentation.title,
-        slides: originalPresentation.slides,
-        presenter: originalPresentation.presenter,
-        description: originalPresentation.description,
-        feedback: null, // Start with empty feedback
-        published: false,
-        publishedAt: null,
-      },
-    });
+    // Copy presentation content into WorkCollateral as a snapshot
+    // DO NOT create a new Presentation - WorkCollateral contains the full snapshot
+    console.log('\n3️⃣ Copying presentation content to WorkCollateral snapshot...');
+    const presentationSnapshot = {
+      title: originalPresentation.title,
+      slides: originalPresentation.slides,
+      presenter: originalPresentation.presenter,
+      description: originalPresentation.description,
+      feedback: {}, // Start with empty feedback object
+    };
 
-    console.log(`✅ Created duplicated presentation!`);
-    console.log(`   New Presentation ID: ${joelClePresentation.id}`);
-    console.log(`   Title: "${joelClePresentation.title}"`);
-    console.log(`   Created at: ${joelClePresentation.createdAt}`);
-
-    // Create WorkCollateral entry to link presentation to WorkItem
-    console.log('\n4️⃣ Creating WorkCollateral link...');
+    // Create WorkCollateral entry with full content snapshot
+    console.log('\n4️⃣ Creating WorkCollateral with presentation snapshot...');
     const workCollateral = await prisma.workCollateral.create({
       data: {
         workPackageItemId: workItemId,
         workPackageId: workItem.workPackageId,
-        type: 'CLE_DECK',
-        title: joelClePresentation.title,
-        contentJson: {
-          presentationId: joelClePresentation.id,
-          type: 'presentation',
-        },
-        status: 'IN_REVIEW',
+        type: 'PRESENTATION_DECK',
+        title: originalPresentation.title,
+        contentJson: presentationSnapshot, // Full snapshot copy, not a reference
+        status: 'IN_PROGRESS',
       },
     });
 
-    console.log(`✅ Created WorkCollateral!`);
+    console.log(`✅ Created WorkCollateral with presentation snapshot!`);
     console.log(`   WorkCollateral ID: ${workCollateral.id}`);
     console.log(`   Type: ${workCollateral.type}`);
     console.log(`   Status: ${workCollateral.status}`);
+    console.log(`   Title: "${workCollateral.title}"`);
 
     console.log('\n✨ Duplication complete!');
     console.log('\n📊 Summary:');
-    console.log(`   Original Presentation: ${originalPresentationId}`);
-    console.log(`   New Presentation (joelClePresentation): ${joelClePresentation.id}`);
+    console.log(`   Original Presentation (Content Hub): ${originalPresentationId}`);
     console.log(`   WorkItem: ${workItemId}`);
-    console.log(`   WorkCollateral: ${workCollateral.id}`);
+    console.log(`   WorkCollateral (Client Deliverable): ${workCollateral.id}`);
+    console.log(`   Content: Full snapshot copied to WorkCollateral.contentJson`);
     console.log(`\n🔗 Joel can now access the presentation at: /portal/review/cle`);
 
   } catch (error) {

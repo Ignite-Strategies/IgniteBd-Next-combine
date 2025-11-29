@@ -11,6 +11,7 @@ import {
   findCompanyHQByEmail,
   registerDomain,
 } from '@/lib/services/domainRegistryService';
+import { ensureContactPipeline } from './pipelineService';
 
 interface UpsertContactData {
   email: string;
@@ -156,7 +157,39 @@ export async function upsertContactWithDomain(
     },
   });
 
-  return contact;
+  // Ensure pipeline exists (default to prospect/interest)
+  await ensureContactPipeline(contact.id, {
+    pipeline: 'prospect',
+    stage: 'interest',
+  });
+
+  // Re-fetch contact with pipeline to ensure it's included
+  const contactWithPipeline = await prisma.contact.findUnique({
+    where: { id: contact.id },
+    include: {
+      contactCompany: {
+        select: {
+          id: true,
+          companyName: true,
+        },
+      },
+      companyHQ: {
+        select: {
+          id: true,
+          companyName: true,
+          companyWebsite: true,
+        },
+      },
+      pipeline: {
+        select: {
+          pipeline: true,
+          stage: true,
+        },
+      },
+    },
+  });
+
+  return contactWithPipeline;
 }
 
 /**

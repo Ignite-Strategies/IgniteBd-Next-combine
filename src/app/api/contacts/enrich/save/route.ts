@@ -308,9 +308,26 @@ export async function POST(request: Request) {
       },
     });
 
+    // Ensure pipeline exists (default to prospect/interest if not provided)
+    const { ensureContactPipeline } = await import('@/lib/services/pipelineService');
+    await ensureContactPipeline(updatedContact.id, {
+      // Use defaults: prospect/interest
+    });
+
+    // Re-fetch contact with pipeline to ensure it's included
+    const contactWithPipeline = await prisma.contact.findUnique({
+      where: { id: updatedContact.id },
+      include: {
+        company: true,
+        contactCompany: true,
+        contactList: true,
+        pipeline: true,
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      contact: updatedContact,
+      contact: contactWithPipeline,
       intelligenceScores,
       companyIntelligence,
     });

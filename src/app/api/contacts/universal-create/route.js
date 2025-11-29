@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { inferWebsiteFromEmail } from '@/lib/services/CompanyEnrichmentService.js';
+import { ensureContactPipeline, validatePipeline } from '@/lib/services/pipelineService';
 
 export async function POST(request) {
   try {
@@ -39,6 +40,17 @@ export async function POST(request) {
         { success: false, error: 'CompanyHQ not found' },
         { status: 404 },
       );
+    }
+
+    // Validate pipeline and stage if provided
+    if (pipelineData?.pipeline) {
+      const validation = validatePipeline(pipelineData.pipeline, pipelineData.stage);
+      if (!validation.isValid) {
+        return NextResponse.json(
+          { success: false, error: validation.error },
+          { status: 400 },
+        );
+      }
     }
 
     let contactCompanyId = contactData.contactCompanyId || null;
@@ -137,28 +149,20 @@ export async function POST(request) {
           },
         });
 
-        if (pipelineData && pipelineData.pipeline) {
-          await prisma.pipeline.upsert({
-            where: { contactId: contact.id },
-            update: {
-              pipeline: pipelineData.pipeline,
-              stage: pipelineData.stage || null,
-            },
-            create: {
-              contactId: contact.id,
-              pipeline: pipelineData.pipeline,
-              stage: pipelineData.stage || null,
-            },
-          });
+        // Ensure pipeline exists (use provided values or defaults)
+        await ensureContactPipeline(contact.id, {
+          pipeline: pipelineData?.pipeline || 'prospect',
+          stage: pipelineData?.stage || 'interest',
+        });
 
-          contact = await prisma.contact.findUnique({
-            where: { id: contact.id },
-            include: {
-              pipeline: true,
-              contactCompany: true,
-            },
-          });
-        }
+        // Re-fetch contact with pipeline
+        contact = await prisma.contact.findUnique({
+          where: { id: contact.id },
+          include: {
+            pipeline: true,
+            contactCompany: true,
+          },
+        });
 
         console.log('✅ Contact updated (universal):', contact.id);
       } else {
@@ -175,15 +179,22 @@ export async function POST(request) {
             buyerDecision: contactData.buyerDecision || null,
             howMet: contactData.howMet || null,
             notes: contactData.notes || null,
-            ...(pipelineData && pipelineData.pipeline && {
-              pipeline: {
-                create: {
-                  pipeline: pipelineData.pipeline,
-                  stage: pipelineData.stage || null,
-                },
-              },
-            }),
           },
+          include: {
+            pipeline: true,
+            contactCompany: true,
+          },
+        });
+
+        // Ensure pipeline exists (use provided values or defaults)
+        await ensureContactPipeline(contact.id, {
+          pipeline: pipelineData?.pipeline || 'prospect',
+          stage: pipelineData?.stage || 'interest',
+        });
+
+        // Re-fetch contact with pipeline
+        contact = await prisma.contact.findUnique({
+          where: { id: contact.id },
           include: {
             pipeline: true,
             contactCompany: true,
@@ -206,15 +217,22 @@ export async function POST(request) {
           buyerDecision: contactData.buyerDecision || null,
           howMet: contactData.howMet || null,
           notes: contactData.notes || null,
-          ...(pipelineData && pipelineData.pipeline && {
-            pipeline: {
-              create: {
-                pipeline: pipelineData.pipeline,
-                stage: pipelineData.stage || null,
-              },
-            },
-          }),
         },
+        include: {
+          pipeline: true,
+          contactCompany: true,
+        },
+      });
+
+      // Ensure pipeline exists (use provided values or defaults)
+      await ensureContactPipeline(contact.id, {
+        pipeline: pipelineData?.pipeline || 'prospect',
+        stage: pipelineData?.stage || 'interest',
+      });
+
+      // Re-fetch contact with pipeline
+      contact = await prisma.contact.findUnique({
+        where: { id: contact.id },
         include: {
           pipeline: true,
           contactCompany: true,

@@ -68,56 +68,38 @@ export async function POST(request) {
       );
     }
 
-    // Get companyHQId from the workItem's workPackage contact
-    const companyHQId = workItem.workPackage.contact.companyHQ?.id;
-    if (!companyHQId) {
-      return NextResponse.json(
-        { success: false, error: 'Could not determine companyHQId from workItem' },
-        { status: 400 },
-      );
-    }
+    // Copy the presentation content into WorkCollateral as a snapshot
+    // DO NOT create a new Presentation - WorkCollateral contains the full snapshot
+    const presentationSnapshot = {
+      title: originalPresentation.title,
+      slides: originalPresentation.slides,
+      presenter: originalPresentation.presenter,
+      description: originalPresentation.description,
+      feedback: {}, // Start with empty feedback object
+    };
 
-    // Create the duplicated presentation
-    const joelClePresentation = await prisma.presentation.create({
-      data: {
-        companyHQId,
-        title: originalPresentation.title,
-        slides: originalPresentation.slides,
-        presenter: originalPresentation.presenter,
-        description: originalPresentation.description,
-        feedback: null, // Start with empty feedback
-        published: false,
-        publishedAt: null,
-      },
-    });
+    console.log('📋 Copying presentation content to WorkCollateral snapshot');
+    console.log('🔗 Linking to WorkItem:', workItemId);
 
-    console.log('✅ Duplicated presentation created:', joelClePresentation.id);
-    console.log('📋 Presentation title:', joelClePresentation.title);
-    console.log('🔗 Linked to WorkItem:', workItemId);
-
-    // Create WorkCollateral entry to link presentation to WorkItem
+    // Create WorkCollateral entry with full content snapshot
     const workCollateral = await prisma.workCollateral.create({
       data: {
         workPackageItemId: workItemId,
         workPackageId: workItem.workPackageId,
-        type: 'CLE_DECK',
-        title: joelClePresentation.title,
-        contentJson: {
-          presentationId: joelClePresentation.id,
-          type: 'presentation',
-        },
-        status: 'IN_REVIEW',
+        type: 'PRESENTATION_DECK',
+        title: originalPresentation.title,
+        contentJson: presentationSnapshot, // Full snapshot copy, not a reference
+        status: 'IN_PROGRESS',
       },
     });
 
-    console.log('✅ WorkCollateral created:', workCollateral.id);
+    console.log('✅ WorkCollateral created with presentation snapshot:', workCollateral.id);
 
     return NextResponse.json({
       success: true,
-      presentation: joelClePresentation,
-      presentationId: joelClePresentation.id,
+      workCollateral,
       workCollateralId: workCollateral.id,
-      message: `Presentation duplicated successfully. New presentation ID: ${joelClePresentation.id}`,
+      message: `Presentation content copied to work package deliverable successfully.`,
     });
   } catch (error) {
     console.error('❌ DuplicatePresentation error:', error);

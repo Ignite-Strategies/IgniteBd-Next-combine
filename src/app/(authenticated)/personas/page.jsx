@@ -105,6 +105,7 @@ export default function PersonasPage() {
     }
   };
 
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -165,19 +166,19 @@ export default function PersonasPage() {
                 </p>
               </div>
 
-              {/* Build from Current Clients */}
+              {/* Build from Contacts */}
               <div
-                onClick={() => router.push('/personas/builder?mode=clients')}
-                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-green-300 opacity-60"
+                onClick={() => router.push('/personas/contact-select')}
+                className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-green-300"
               >
                 <div className="mb-4 flex items-center gap-3">
                   <div className="rounded-lg bg-green-100 p-2">
                     <Users className="h-5 w-5 text-green-600" />
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900">Build from Clients</h3>
+                  <h3 className="text-lg font-bold text-gray-900">Build from Contacts</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Coming Soon - Analyze existing clients to generate personas
+                  Select any contact (prospects or clients) to build a persona
                 </p>
               </div>
 

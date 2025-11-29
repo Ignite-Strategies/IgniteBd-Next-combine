@@ -1,15 +1,18 @@
 /**
  * EnrichmentToPersonaService
  * 
- * Unified service that generates Persona, ProductFit, and BdIntel in a single OpenAI call.
+ * Generates a Persona from enriched Apollo contact data.
  * 
- * This replaces the previous 3-step pipeline:
- * - Old: generate persona → product-fit → bd-intel (3 separate API calls)
- * - New: single unified generation (1 API call)
+ * This is the natural next step after contact enrichment:
+ * 1. User enriches contact (Apollo) → saves to contact
+ * 2. Success modal → "Start Persona Flow" button
+ * 3. Persona builder → calls this service to generate persona from enriched contact
+ * 
+ * ProductFit and BdIntel are generated separately later (when viewing/editing persona).
  * 
  * Usage:
  *   const result = await EnrichmentToPersonaService.run({
- *     redisKey: "preview:123:abc", // or "apollo:enriched:https://linkedin.com/..."
+ *     redisKey: "preview:123:abc", // or "apollo:enriched:https://linkedin.com/..." or contactId
  *     companyHQId: "company_hq_123",
  *     mode: "save" | "hydrate"
  *   });
@@ -37,7 +40,8 @@ function getOpenAIClient(): OpenAI {
 }
 
 export interface EnrichmentToPersonaOptions {
-  redisKey: string; // Preview ID or Redis key with Apollo data
+  redisKey?: string; // Preview ID or Redis key with Apollo data
+  contactId?: string; // Contact ID (alternative to redisKey)
   companyHQId: string;
   mode: 'hydrate' | 'save'; // 'hydrate' = return data only, 'save' = persist to DB
   notes?: string; // Optional freeform human notes
@@ -46,8 +50,6 @@ export interface EnrichmentToPersonaOptions {
 export interface EnrichmentToPersonaResult {
   success: boolean;
   persona?: any;
-  productFit?: any;
-  bdIntel?: any;
   error?: string;
   details?: string;
 }
@@ -58,15 +60,65 @@ export class EnrichmentToPersonaService {
    */
   static async run(options: EnrichmentToPersonaOptions): Promise<EnrichmentToPersonaResult> {
     try {
-      const { redisKey, companyHQId, mode, notes } = options;
+      const { redisKey, contactId, companyHQId, mode, notes } = options;
 
-      // Step 1: Fetch Apollo data from Redis
-      console.log('🔍 Fetching Apollo data from Redis:', redisKey);
-      const apolloData = await this.fetchApolloData(redisKey);
+      // Step 1: Fetch Apollo data from Redis or Contact
+      let apolloData: any = null;
+      let contactData: any = null;
+
+      if (contactId) {
+        console.log('🔍 Fetching contact:', contactId);
+        contactData = await prisma.contact.findUnique({
+          where: { id: contactId },
+          include: {
+            company: true,
+            contactCompany: true,
+          },
+        });
+
+        if (!contactData) {
+          return {
+            success: false,
+            error: 'Contact not found',
+          };
+        }
+
+        // Try to get Apollo data from Redis if available
+        // Check if contact has enrichment data stored
+        if (contactData.enrichmentRedisKey) {
+          apolloData = await this.fetchApolloData(contactData.enrichmentRedisKey);
+        }
+      } else if (redisKey) {
+        console.log('🔍 Fetching Apollo data from Redis:', redisKey);
+        apolloData = await this.fetchApolloData(redisKey);
+      } else {
+        return {
+          success: false,
+          error: 'Either redisKey or contactId is required',
+        };
+      }
+
+      // If no Apollo data but we have contact, use contact data as fallback
+      if (!apolloData && contactData) {
+        apolloData = {
+          person: {
+            first_name: contactData.firstName,
+            last_name: contactData.lastName,
+            title: contactData.title,
+            headline: contactData.title,
+            employment_history: contactData.careerTimeline || [],
+          },
+          organization: contactData.company || contactData.contactCompany || {
+            name: contactData.companyName,
+            industry: contactData.companyIndustry,
+          },
+        };
+      }
+
       if (!apolloData) {
         return {
           success: false,
-          error: 'Apollo data not found in Redis',
+          error: 'Unable to generate persona: contact data is insufficient. Please ensure the contact has at least a name or title.',
         };
       }
 
@@ -91,41 +143,17 @@ export class EnrichmentToPersonaService {
         };
       }
 
-      // Step 3: Fetch product list
-      console.log('🔍 Fetching products for tenant:', companyHQId);
-      const products = await prisma.product.findMany({
-        where: { companyHQId },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          valueProp: true,
-          price: true,
-          priceCurrency: true,
-          targetMarketSize: true,
-          features: true,
-          competitiveAdvantages: true,
-        },
-      });
-
-      if (products.length === 0) {
-        return {
-          success: false,
-          error: 'No products found for this tenant',
-        };
-      }
-
-      // Step 4: Build unified prompt
-      console.log('🤖 Building unified prompt...');
-      const { systemPrompt, userPrompt } = this.buildUnifiedPrompt(
+      // Step 3: Build persona prompt
+      console.log('🤖 Building persona prompt...');
+      const { systemPrompt, userPrompt } = this.buildPersonaPrompt(
         apolloData,
         companyHQ,
-        products,
+        contactData,
         notes
       );
 
-      // Step 5: Call OpenAI
-      console.log('🤖 Calling OpenAI for unified generation...');
+      // Step 4: Call OpenAI
+      console.log('🤖 Calling OpenAI for persona generation...');
       const openai = getOpenAIClient();
       const model = process.env.OPENAI_MODEL || 'gpt-4o';
 
@@ -147,34 +175,30 @@ export class EnrichmentToPersonaService {
         };
       }
 
-      // Step 6: Parse and normalize response
+      // Step 5: Parse and normalize response
       console.log('📦 Parsing GPT response...');
-      const parsed = this.parseAndNormalizeResponse(content);
+      const persona = this.parseAndNormalizePersona(content);
 
-      // Step 7: Save to database if mode is "save"
+      // Step 6: Save to database if mode is "save"
       if (mode === 'save') {
-        console.log('💾 Saving to database...');
-        const saved = await this.saveToDatabase(parsed, companyHQId);
+        console.log('💾 Saving persona to database...');
+        const saved = await this.savePersonaToDatabase(persona, companyHQId);
         return {
           success: true,
-          persona: saved.persona,
-          productFit: saved.productFit,
-          bdIntel: saved.bdIntel,
+          persona: saved,
         };
       } else {
         // Mode: hydrate - return data only
         return {
           success: true,
-          persona: parsed.persona,
-          productFit: parsed.productFit,
-          bdIntel: parsed.bdIntel,
+          persona,
         };
       }
     } catch (error: any) {
       console.error('❌ EnrichmentToPersonaService error:', error);
       return {
         success: false,
-        error: 'Failed to generate persona pipeline',
+        error: 'Failed to generate persona',
         details: error.message,
       };
     }
@@ -223,83 +247,56 @@ export class EnrichmentToPersonaService {
   }
 
   /**
-   * Build unified prompt that generates all three models
+   * Build persona prompt
    */
-  private static buildUnifiedPrompt(
+  private static buildPersonaPrompt(
     apollo: any,
     companyHQ: any,
-    products: any[],
+    contactData?: any,
     notes?: string
   ): { systemPrompt: string; userPrompt: string } {
-    const systemPrompt = `You are an enterprise-grade business intelligence engine.
+    const systemPrompt = `You are an expert in executive psychology and business persona modeling.
 
 You take:
 1. A deeply enriched Apollo person profile (raw JSON)
 2. A CompanyHQ record (company context)
-3. Optional freeform human notes
+3. Optional contact data from database
+4. Optional freeform human notes
 
-Your task is to infer 3 separate but connected models:
+Your task is to infer a detailed Persona model.
 
-A. Persona
-B. ProductFit
-C. BdIntel
-
-Each output MUST match the exact schema definitions (below).
-Infer ALL fields, even when not explicitly stated.
-
-Your job is:
+Infer ALL fields, even when not explicitly stated:
 - Interpret job title as self-identity
 - Interpret company context as environmental constraints
 - Infer domain (credit, ops, finance, strategy, etc.)
 - Infer behavior, psychology, decision drivers, risks, and triggers
 - Use CompanyHQ industry + size + revenue to contextualize pains
 - Use Apollo title + headline to infer operational role
-- Use cross-signals to assign accurate BD intel scores
 
 When uncertain, infer the MOST LIKELY value based on industry norms.
 Never leave fields empty unless explicitly allowed.
 
 Return EXACTLY this JSON structure:
 {
-  "persona": {
-    "personName": "",
-    "title": "",
-    "headline": "",
-    "seniority": "",
-    "industry": "",
-    "subIndustries": [],
-    "company": "",
-    "companySize": "",
-    "annualRevenue": "",
-    "location": "",
-    "description": "",
-    "whatTheyWant": "",
-    "painPoints": [],
-    "risks": [],
-    "decisionDrivers": [],
-    "buyerTriggers": []
-  },
-  "productFit": {
-    "targetProductId": "",
-    "valuePropToThem": "",
-    "alignmentReasoning": ""
-  },
-  "bdIntel": {
-    "fitScore": 0,
-    "painAlignmentScore": 0,
-    "workflowFitScore": 0,
-    "urgencyScore": 0,
-    "adoptionBarrierScore": 0,
-    "risks": [],
-    "opportunities": [],
-    "recommendedTalkTrack": "",
-    "recommendedSequence": "",
-    "recommendedLeadSource": "",
-    "finalSummary": ""
-  }
+  "personName": "",
+  "title": "",
+  "headline": "",
+  "seniority": "",
+  "industry": "",
+  "subIndustries": [],
+  "company": "",
+  "companySize": "",
+  "annualRevenue": "",
+  "location": "",
+  "description": "",
+  "whatTheyWant": "",
+  "painPoints": [],
+  "risks": [],
+  "decisionDrivers": [],
+  "buyerTriggers": []
 }`;
 
-    const userPrompt = `Generate all three models (Persona, ProductFit, BdIntel) from this data:
+    const userPrompt = `Generate a detailed persona from this data:
 
 APOLLO PROFILE:
 ${JSON.stringify(apollo, null, 2)}
@@ -307,24 +304,28 @@ ${JSON.stringify(apollo, null, 2)}
 COMPANY HQ CONTEXT:
 ${JSON.stringify(companyHQ, null, 2)}
 
-AVAILABLE PRODUCTS:
-${JSON.stringify(products, null, 2)}
+${contactData ? `CONTACT DATA:\n${JSON.stringify({
+  firstName: contactData.firstName,
+  lastName: contactData.lastName,
+  title: contactData.title,
+  email: contactData.email,
+  companyName: contactData.companyName,
+  companyIndustry: contactData.companyIndustry,
+  profileSummary: contactData.profileSummary,
+  notes: contactData.notes,
+}, null, 2)}\n` : ''}
 
 ${notes ? `HUMAN NOTES:\n${notes}\n` : ''}
 
-Return the complete JSON structure with all three models.`;
+Return the complete persona JSON structure.`;
 
     return { systemPrompt, userPrompt };
   }
 
   /**
-   * Parse and normalize GPT response
+   * Parse and normalize persona response
    */
-  private static parseAndNormalizeResponse(content: string): {
-    persona: any;
-    productFit: any;
-    bdIntel: any;
-  } {
+  private static parseAndNormalizePersona(content: string): any {
     let parsed;
     try {
       parsed = JSON.parse(content);
@@ -353,159 +354,71 @@ Return the complete JSON structure with all three models.`;
       return [];
     };
 
-    // Normalize persona
-    const persona = {
-      personName: parsed.persona?.personName || '',
-      title: parsed.persona?.title || '',
-      headline: parsed.persona?.headline || null,
-      seniority: parsed.persona?.seniority || null,
-      industry: parsed.persona?.industry || null,
-      subIndustries: normalizeArray(parsed.persona?.subIndustries),
-      company: parsed.persona?.company || null,
-      companySize: parsed.persona?.companySize || null,
-      annualRevenue: parsed.persona?.annualRevenue || null,
-      location: parsed.persona?.location || null,
-      description: parsed.persona?.description || null,
-      whatTheyWant: parsed.persona?.whatTheyWant || null,
-      painPoints: normalizeArray(parsed.persona?.painPoints),
-      risks: normalizeArray(parsed.persona?.risks),
-      decisionDrivers: normalizeArray(parsed.persona?.decisionDrivers),
-      buyerTriggers: normalizeArray(parsed.persona?.buyerTriggers),
+    // Normalize persona (handle both direct persona object and nested structure)
+    const personaData = parsed.persona || parsed;
+    
+    return {
+      personName: personaData.personName || '',
+      title: personaData.title || '',
+      headline: personaData.headline || null,
+      seniority: personaData.seniority || null,
+      industry: personaData.industry || null,
+      subIndustries: normalizeArray(personaData.subIndustries),
+      company: personaData.company || null,
+      companySize: personaData.companySize || null,
+      annualRevenue: personaData.annualRevenue || null,
+      location: personaData.location || null,
+      description: personaData.description || null,
+      whatTheyWant: personaData.whatTheyWant || null,
+      painPoints: normalizeArray(personaData.painPoints),
+      risks: normalizeArray(personaData.risks),
+      decisionDrivers: normalizeArray(personaData.decisionDrivers),
+      buyerTriggers: normalizeArray(personaData.buyerTriggers),
     };
-
-    // Normalize productFit
-    const productFit = {
-      targetProductId: parsed.productFit?.targetProductId || parsed.productFit?.productId || '',
-      valuePropToThem: parsed.productFit?.valuePropToThem || '',
-      alignmentReasoning: parsed.productFit?.alignmentReasoning || '',
-    };
-
-    // Normalize bdIntel (ensure scores are 0-100)
-    const clampScore = (score: any): number => {
-      const num = typeof score === 'number' ? score : parseInt(score) || 0;
-      return Math.max(0, Math.min(100, num));
-    };
-
-    const bdIntel = {
-      fitScore: clampScore(parsed.bdIntel?.fitScore),
-      painAlignmentScore: clampScore(parsed.bdIntel?.painAlignmentScore),
-      workflowFitScore: clampScore(parsed.bdIntel?.workflowFitScore),
-      urgencyScore: clampScore(parsed.bdIntel?.urgencyScore),
-      adoptionBarrierScore: clampScore(parsed.bdIntel?.adoptionBarrierScore),
-      risks: normalizeArray(parsed.bdIntel?.risks),
-      opportunities: normalizeArray(parsed.bdIntel?.opportunities),
-      recommendedTalkTrack: parsed.bdIntel?.recommendedTalkTrack || null,
-      recommendedSequence: parsed.bdIntel?.recommendedSequence || null,
-      recommendedLeadSource: parsed.bdIntel?.recommendedLeadSource || null,
-      finalSummary: parsed.bdIntel?.finalSummary || null,
-    };
-
-    return { persona, productFit, bdIntel };
   }
 
   /**
-   * Save all three models to database
+   * Save persona to database
    */
-  private static async saveToDatabase(
-    parsed: { persona: any; productFit: any; bdIntel: any },
+  private static async savePersonaToDatabase(
+    persona: any,
     companyHQId: string
-  ): Promise<{ persona: any; productFit: any; bdIntel: any }> {
+  ): Promise<any> {
     // Validate required fields
-    if (!parsed.persona.personName || !parsed.persona.title) {
+    if (!persona.personName || !persona.title) {
       throw new Error('Persona personName and title are required');
     }
 
-    if (!parsed.productFit.targetProductId) {
-      throw new Error('ProductFit targetProductId is required');
-    }
-
-    // Validate product exists
-    const product = await prisma.product.findUnique({
-      where: { id: parsed.productFit.targetProductId },
-    });
-
-    if (!product) {
-      throw new Error(`Product not found: ${parsed.productFit.targetProductId}`);
-    }
-
     // Create Persona
-    const persona = await prisma.persona.create({
+    const saved = await prisma.persona.create({
       data: {
         companyHQId,
-        personName: parsed.persona.personName,
-        title: parsed.persona.title,
-        headline: parsed.persona.headline,
-        seniority: parsed.persona.seniority,
-        industry: parsed.persona.industry,
-        subIndustries: parsed.persona.subIndustries,
-        company: parsed.persona.company,
-        companySize: parsed.persona.companySize,
-        annualRevenue: parsed.persona.annualRevenue,
-        location: parsed.persona.location,
-        description: parsed.persona.description,
-        whatTheyWant: parsed.persona.whatTheyWant,
-        painPoints: parsed.persona.painPoints,
-        risks: parsed.persona.risks,
-        decisionDrivers: parsed.persona.decisionDrivers,
-        buyerTriggers: parsed.persona.buyerTriggers,
+        personName: persona.personName,
+        title: persona.title,
+        headline: persona.headline,
+        seniority: persona.seniority,
+        industry: persona.industry,
+        subIndustries: persona.subIndustries,
+        company: persona.company,
+        companySize: persona.companySize,
+        annualRevenue: persona.annualRevenue,
+        location: persona.location,
+        description: persona.description,
+        whatTheyWant: persona.whatTheyWant,
+        painPoints: persona.painPoints,
+        risks: persona.risks,
+        decisionDrivers: persona.decisionDrivers,
+        buyerTriggers: persona.buyerTriggers,
+      },
+      include: {
+        productFit: true,
+        bdIntel: true,
       },
     });
 
-    console.log(`✅ Persona created: ${persona.id}`);
+    console.log(`✅ Persona created: ${saved.id}`);
 
-    // Create ProductFit
-    const productFit = await prisma.productFit.upsert({
-      where: { personaId: persona.id },
-      create: {
-        personaId: persona.id,
-        productId: parsed.productFit.targetProductId,
-        valuePropToThem: parsed.productFit.valuePropToThem,
-        alignmentReasoning: parsed.productFit.alignmentReasoning,
-      },
-      update: {
-        productId: parsed.productFit.targetProductId,
-        valuePropToThem: parsed.productFit.valuePropToThem,
-        alignmentReasoning: parsed.productFit.alignmentReasoning,
-      },
-    });
-
-    console.log(`✅ ProductFit created/updated: ${productFit.id}`);
-
-    // Create BdIntel
-    const bdIntel = await prisma.bdIntel.upsert({
-      where: { personaId: persona.id },
-      create: {
-        personaId: persona.id,
-        fitScore: parsed.bdIntel.fitScore,
-        painAlignmentScore: parsed.bdIntel.painAlignmentScore,
-        workflowFitScore: parsed.bdIntel.workflowFitScore,
-        urgencyScore: parsed.bdIntel.urgencyScore,
-        adoptionBarrierScore: parsed.bdIntel.adoptionBarrierScore,
-        risks: parsed.bdIntel.risks.length > 0 ? parsed.bdIntel.risks : null,
-        opportunities: parsed.bdIntel.opportunities.length > 0 ? parsed.bdIntel.opportunities : null,
-        recommendedTalkTrack: parsed.bdIntel.recommendedTalkTrack,
-        recommendedSequence: parsed.bdIntel.recommendedSequence,
-        recommendedLeadSource: parsed.bdIntel.recommendedLeadSource,
-        finalSummary: parsed.bdIntel.finalSummary,
-      },
-      update: {
-        fitScore: parsed.bdIntel.fitScore,
-        painAlignmentScore: parsed.bdIntel.painAlignmentScore,
-        workflowFitScore: parsed.bdIntel.workflowFitScore,
-        urgencyScore: parsed.bdIntel.urgencyScore,
-        adoptionBarrierScore: parsed.bdIntel.adoptionBarrierScore,
-        risks: parsed.bdIntel.risks.length > 0 ? parsed.bdIntel.risks : null,
-        opportunities: parsed.bdIntel.opportunities.length > 0 ? parsed.bdIntel.opportunities : null,
-        recommendedTalkTrack: parsed.bdIntel.recommendedTalkTrack,
-        recommendedSequence: parsed.bdIntel.recommendedSequence,
-        recommendedLeadSource: parsed.bdIntel.recommendedLeadSource,
-        finalSummary: parsed.bdIntel.finalSummary,
-      },
-    });
-
-    console.log(`✅ BdIntel created/updated: ${bdIntel.id}`);
-
-    return { persona, productFit, bdIntel };
+    return saved;
   }
 }
 

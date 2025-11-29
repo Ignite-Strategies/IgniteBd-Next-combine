@@ -45,30 +45,34 @@ export async function GET(request: Request) {
       );
     }
 
-    // Find the presentation via WorkCollateral
-    let presentation = null;
+    // Load presentation content from WorkCollateral.contentJson (snapshot)
+    // WorkCollateral contains the full content, not a reference
+    let presentationContent = null;
+    let workCollateralId = null;
+    
     for (const collateral of workItem.workCollateral) {
-      if (collateral.contentJson && typeof collateral.contentJson === 'object') {
-        const content = collateral.contentJson as any;
-        if (content.presentationId) {
-          presentation = await prisma.presentation.findUnique({
-            where: { id: content.presentationId },
-          });
-          if (presentation) break;
+      if (collateral.type === 'PRESENTATION_DECK' || collateral.type === 'CLE_DECK') {
+        if (collateral.contentJson && typeof collateral.contentJson === 'object') {
+          presentationContent = collateral.contentJson as any;
+          workCollateralId = collateral.id;
+          break;
         }
       }
     }
 
-    if (!presentation) {
+    if (!presentationContent) {
       return NextResponse.json(
-        { success: false, error: 'Presentation not found for this WorkItem' },
+        { success: false, error: 'Presentation content not found for this WorkItem' },
         { status: 404 },
       );
     }
 
+    // Return the snapshot content from WorkCollateral
+    // This IS the presentation - no FK lookup needed
     return NextResponse.json({
       success: true,
-      presentation,
+      presentation: presentationContent,
+      workCollateralId,
     });
   } catch (error: any) {
     console.error('❌ GetPresentationForReview error:', error);
