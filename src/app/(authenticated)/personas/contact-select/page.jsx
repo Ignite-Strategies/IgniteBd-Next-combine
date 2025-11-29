@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, User, Building2, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 export default function ContactSelectPage() {
   const router = useRouter();
@@ -12,18 +13,20 @@ export default function ContactSelectPage() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(null);
-  const [companyHQId, setCompanyHQId] = useState('');
+  
+  // Use hook to get companyHQId (fetches from API if not in localStorage)
+  const { companyHQId, loading: companyLoading, refresh } = useCompanyHQ();
 
-  // Load companyHQId from localStorage
+  // Fetch companyHQId from API if not in localStorage
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') || '';
-    setCompanyHQId(stored);
-  }, []);
+    if (!companyHQId && !companyLoading) {
+      refresh();
+    }
+  }, [companyHQId, companyLoading, refresh]);
 
   // Fetch contacts
   useEffect(() => {
-    if (!companyHQId) return;
+    if (!companyHQId || companyLoading) return;
 
     const fetchContacts = async () => {
       setLoading(true);
@@ -44,7 +47,7 @@ export default function ContactSelectPage() {
     };
 
     fetchContacts();
-  }, [companyHQId]);
+  }, [companyHQId, companyLoading]);
 
   // Filter contacts by search query
   const filteredContacts = useMemo(() => {
@@ -69,12 +72,27 @@ export default function ContactSelectPage() {
     router.push(`/personas/from-contact?contactId=${selectedContactId}`);
   };
 
+  // Show loading while fetching companyHQId
+  if (companyLoading || (!companyHQId && !error)) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-red-600 border-r-transparent"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if companyHQId still not available after loading
   if (!companyHQId) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            Company context is required. Please set companyHQId in localStorage.
+            Unable to load company context. Please ensure you are logged in and try refreshing the page.
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 function FromContactContent() {
   const router = useRouter();
@@ -16,18 +17,20 @@ function FromContactContent() {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [companyHQId, setCompanyHQId] = useState('');
+  
+  // Use hook to get companyHQId (fetches from API if not in localStorage)
+  const { companyHQId, loading: companyLoading, refresh } = useCompanyHQ();
 
-  // Load companyHQId from localStorage
+  // Fetch companyHQId from API if not in localStorage
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') || '';
-    setCompanyHQId(stored);
-  }, []);
+    if (!companyHQId && !companyLoading) {
+      refresh();
+    }
+  }, [companyHQId, companyLoading, refresh]);
 
   // Fetch contact and generate persona
   useEffect(() => {
-    if (!contactId || !companyHQId) return;
+    if (!contactId || !companyHQId || companyLoading) return;
 
     const fetchAndGenerate = async () => {
       setLoading(true);
@@ -64,7 +67,7 @@ function FromContactContent() {
     };
 
     fetchAndGenerate();
-  }, [contactId, companyHQId]);
+  }, [contactId, companyHQId, companyLoading]);
 
   const handleFieldChange = (field, value) => {
     setPersonaData((prev) => ({
