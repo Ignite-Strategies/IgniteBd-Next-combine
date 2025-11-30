@@ -727,15 +727,12 @@ model Blog {
   companyHQId String
   companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   title       String
-  content     String?
-  author      String?
-  published   Boolean   @default(false)
-  publishedAt DateTime?
+  subtitle    String?
+  content     Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([companyHQId])
-  @@index([published])
   @@map("blogs")
 }
 
@@ -1028,4 +1025,28 @@ model BDOSScore {
   @@index([personaId])
   @@index([createdAt])
   @@map("bdos_scores")
+}
+
+// ============================================
+// EVENT PLANNER MODELS
+// ============================================
+
+model SavedEvent {
+  id              String   @id @default(cuid())
+  userId          String
+  personaId       String?
+  name            String
+  organization    String?
+  producerType    String?
+  dateRange       String?
+  location        String?
+  relevanceReason String
+  totalScore      Int
+  rawJson         Json
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([personaId])
+  @@index([createdAt])
+  @@map("saved_events")
 }

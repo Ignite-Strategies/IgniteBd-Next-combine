@@ -51,6 +51,7 @@ const navigationGroups = [
     items: [
       { name: 'Ads & SEO', path: '/ads', icon: BarChart },
       { name: 'Content', path: '/content', icon: FileText },
+      { name: 'Events', path: '/events', icon: Calendar },
     ],
   },
   {
