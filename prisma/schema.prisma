@@ -1034,19 +1034,72 @@ model BDOSScore {
 model SavedEvent {
   id              String   @id @default(cuid())
   userId          String
-  personaId       String?
-  name            String
-  organization    String?
-  producerType    String?
-  dateRange       String?
-  location        String?
-  relevanceReason String
-  totalScore      Int
+
+  eventName       String
+  eventSeriesName String?
+  organizerName   String
+  producerType    String
+
+  city            String
+  stateOrRegion   String?
+
+  startDate       String?
+  endDate         String?
+
+  costMin         Int?
+  costMax         Int?
+  currency        String
+
+  personaAlignment Int
+
+  url             String?
+
   rawJson         Json
   createdAt       DateTime @default(now())
 
   @@index([userId])
-  @@index([personaId])
   @@index([createdAt])
   @@map("saved_events")
+}
+
+// ============================================
+// ECOSYSTEM INTELLIGENCE MODELS
+// ============================================
+
+enum EcosystemEntityType {
+  ASSOCIATION
+  VENDOR
+  PARTNER
+  MEDIA
+  GOVERNMENT
+  NONPROFIT
+}
+
+model AssociationIngest {
+  id               String   @id @default(cuid())
+
+  // Raw spreadsheet fields
+  rawName          String
+  rawWebsite       String?
+  rawLocation      String?
+
+  // Inferred by AI
+  normalizedName   String
+  description      String?
+  industryTags     String[]
+  memberTypes      String[]
+  memberSeniority  String?
+  missionSummary   String?
+  authorityLevel   Int?
+  valueProposition String?
+
+  // BD Intelligence
+  personaAlignment Json?
+  bdRelevanceScore Int?
+
+  ecosystemType    EcosystemEntityType @default(ASSOCIATION)
+
+  createdAt        DateTime @default(now())
+
+  @@map("association_ingests")
 }

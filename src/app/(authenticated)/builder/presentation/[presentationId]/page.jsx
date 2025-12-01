@@ -1,18 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
  * Presentation Builder Page
+ * 
+ * CONTEXT DETECTION:
+ * - If workPackageId & itemId query params exist → WorkPackage context (save to WorkCollateral)
+ * - Otherwise → Content Hub context (save to Presentation table)
  */
 export default function PresentationBuilderPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const presentationId = params.presentationId;
   const isNew = presentationId === 'new';
+  
+  // Detect WorkPackage context
+  const workPackageId = searchParams.get('workPackageId');
+  const itemId = searchParams.get('itemId');
+  const collateralId = searchParams.get('collateralId');
+  const isWorkPackageContext = !!(workPackageId && itemId);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -30,38 +41,80 @@ export default function PresentationBuilderPage() {
   const loadPresentation = async () => {
     try {
       setLoading(true);
-      // Always fetch fresh from database - never use localStorage for editing
-      const response = await api.get(`/api/content/presentations/${presentationId}`);
-      if (response.data?.success) {
-        const presentation = response.data.presentation;
-        console.log('📦 Loaded presentation from database:', presentation.id);
-        
-        setTitle(presentation.title || '');
-        setDescription(presentation.description || '');
-        
-        // Handle slides - could be object, string, or null
-        let slidesData = { sections: [] };
-        if (presentation.slides) {
-          if (typeof presentation.slides === 'string') {
-            try {
-              slidesData = JSON.parse(presentation.slides);
-            } catch (e) {
-              console.warn('Failed to parse slides JSON:', e);
+      
+      if (isWorkPackageContext) {
+        // Load from WorkCollateral
+        if (!collateralId) {
+          alert('Collateral ID is required for WorkPackage context');
+          return;
+        }
+        const response = await api.get(`/api/workpackages/items/${itemId}/workcollateral/${collateralId}`);
+        if (response.data?.success) {
+          const workCollateral = response.data.workCollateral;
+          const content = workCollateral.contentJson || {};
+          console.log('📦 Loaded WorkCollateral from database:', workCollateral.id);
+          
+          setTitle(content.title || workCollateral.title || '');
+          setDescription(content.description || '');
+          
+          // Handle slides - could be object, string, or null
+          let slidesData = { sections: [] };
+          if (content.slides) {
+            if (typeof content.slides === 'string') {
+              try {
+                slidesData = JSON.parse(content.slides);
+              } catch (e) {
+                console.warn('Failed to parse slides JSON:', e);
+              }
+            } else if (typeof content.slides === 'object') {
+              slidesData = content.slides;
             }
-          } else if (typeof presentation.slides === 'object') {
-            slidesData = presentation.slides;
           }
+          
+          // Ensure sections array exists
+          if (!slidesData.sections || !Array.isArray(slidesData.sections)) {
+            slidesData.sections = [];
+          }
+          
+          setSlides(slidesData);
+        } else {
+          console.error('Failed to load WorkCollateral:', response.data);
+          alert('Failed to load presentation');
         }
-        
-        // Ensure sections array exists
-        if (!slidesData.sections || !Array.isArray(slidesData.sections)) {
-          slidesData.sections = [];
-        }
-        
-        setSlides(slidesData);
       } else {
-        console.error('Failed to load presentation:', response.data);
-        alert('Failed to load presentation');
+        // Load from Content Hub (Presentation table)
+        const response = await api.get(`/api/content/presentations/${presentationId}`);
+        if (response.data?.success) {
+          const presentation = response.data.presentation;
+          console.log('📦 Loaded presentation from Content Hub:', presentation.id);
+          
+          setTitle(presentation.title || '');
+          setDescription(presentation.description || '');
+          
+          // Handle slides - could be object, string, or null
+          let slidesData = { sections: [] };
+          if (presentation.slides) {
+            if (typeof presentation.slides === 'string') {
+              try {
+                slidesData = JSON.parse(presentation.slides);
+              } catch (e) {
+                console.warn('Failed to parse slides JSON:', e);
+              }
+            } else if (typeof presentation.slides === 'object') {
+              slidesData = presentation.slides;
+            }
+          }
+          
+          // Ensure sections array exists
+          if (!slidesData.sections || !Array.isArray(slidesData.sections)) {
+            slidesData.sections = [];
+          }
+          
+          setSlides(slidesData);
+        } else {
+          console.error('Failed to load presentation:', response.data);
+          alert('Failed to load presentation');
+        }
       }
     } catch (err) {
       console.error('Error loading presentation:', err);
@@ -79,49 +132,92 @@ export default function PresentationBuilderPage() {
 
     try {
       setSaving(true);
-      const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
 
-      const data = {
-        companyHQId,
-        title,
-        description,
-        slides: slides || { sections: [] },
-        // published is only for work items, not standalone presentations
-      };
+      if (isWorkPackageContext) {
+        // Save to WorkCollateral (WorkPackage context)
+        const contentJson = {
+          title,
+          description,
+          slides: slides || { sections: [] },
+          feedback: {}, // Initialize empty feedback
+        };
 
-      let presentation;
-      if (isNew) {
-        const response = await api.post('/api/content/presentations', data);
-        presentation = response.data.presentation;
-      } else {
-        const response = await api.patch(`/api/content/presentations/${presentationId}`, data);
-        presentation = response.data.presentation;
-      }
-
-      // Save to localStorage for frontend storage
-      if (typeof window !== 'undefined') {
-        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-        const cachedKey = `presentations_${companyHQId}`;
-        try {
-          const cached = localStorage.getItem(cachedKey);
-          const presentations = cached ? JSON.parse(cached) : [];
-          const existingIndex = presentations.findIndex(p => p.id === presentation.id);
-          if (existingIndex >= 0) {
-            presentations[existingIndex] = presentation;
+        if (isNew || !collateralId) {
+          // Create new WorkCollateral
+          const response = await api.post(`/api/workpackages/items/${itemId}/workcollateral`, {
+            type: 'PRESENTATION_DECK',
+            title,
+            contentJson,
+            status: 'IN_PROGRESS',
+          });
+          
+          if (response.data?.success) {
+            console.log('✅ Created WorkCollateral:', response.data.workCollateral.id);
+            setSaveSuccess(true);
+            router.push(`/workpackages/${workPackageId}/items/${itemId}`);
           } else {
-            presentations.unshift(presentation); // Add to beginning
+            throw new Error('Failed to create WorkCollateral');
           }
-          localStorage.setItem(cachedKey, JSON.stringify(presentations));
-          console.log('💾 Saved presentation to localStorage');
-        } catch (e) {
-          console.warn('Failed to save to localStorage:', e);
+        } else {
+          // Update existing WorkCollateral
+          const response = await api.patch(`/api/workpackages/items/${itemId}/workcollateral/${collateralId}`, {
+            title,
+            contentJson,
+          });
+          
+          if (response.data?.success) {
+            console.log('✅ Updated WorkCollateral:', response.data.workCollateral.id);
+            setSaveSuccess(true);
+            router.push(`/workpackages/${workPackageId}/items/${itemId}`);
+          } else {
+            throw new Error('Failed to update WorkCollateral');
+          }
         }
-      }
+      } else {
+        // Save to Content Hub (Presentation table)
+        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
 
-      // Show success message and redirect immediately
-      setSaveSuccess(true);
-      // Redirect to presentations home page immediately
-      router.push('/content/presentations');
+        const data = {
+          companyHQId,
+          title,
+          description,
+          slides: slides || { sections: [] },
+        };
+
+        let presentation;
+        if (isNew) {
+          const response = await api.post('/api/content/presentations', data);
+          presentation = response.data.presentation;
+        } else {
+          const response = await api.patch(`/api/content/presentations/${presentationId}`, data);
+          presentation = response.data.presentation;
+        }
+
+        // Save to localStorage for frontend storage
+        if (typeof window !== 'undefined') {
+          const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+          const cachedKey = `presentations_${companyHQId}`;
+          try {
+            const cached = localStorage.getItem(cachedKey);
+            const presentations = cached ? JSON.parse(cached) : [];
+            const existingIndex = presentations.findIndex(p => p.id === presentation.id);
+            if (existingIndex >= 0) {
+              presentations[existingIndex] = presentation;
+            } else {
+              presentations.unshift(presentation); // Add to beginning
+            }
+            localStorage.setItem(cachedKey, JSON.stringify(presentations));
+            console.log('💾 Saved presentation to localStorage');
+          } catch (e) {
+            console.warn('Failed to save to localStorage:', e);
+          }
+        }
+
+        // Show success message and redirect immediately
+        setSaveSuccess(true);
+        // Redirect to presentations home page immediately
+        router.push('/content/presentations');
+      }
     } catch (err) {
       console.error('Error saving presentation:', err);
       alert('Failed to save presentation');

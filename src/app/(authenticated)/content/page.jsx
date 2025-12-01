@@ -39,18 +39,24 @@ export default function ContentHubPage() {
             </div>
           </div>
 
-          {/* Blog Posts - Coming Soon */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-lg opacity-60">
+          {/* Blog Posts */}
+          <div
+            onClick={() => router.push('/content/blog')}
+            className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all hover:border-blue-300"
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="rounded-lg bg-gray-100 p-3">
-                <FileText className="h-6 w-6 text-gray-400" />
+              <div className="rounded-lg bg-blue-100 p-3">
+                <FileText className="h-6 w-6 text-blue-600" />
               </div>
               <h3 className="text-xl font-bold text-gray-900">Blog Posts</h3>
             </div>
             <p className="text-sm text-gray-600 mb-4">
               Create and manage blog content for your website.
             </p>
-            <div className="text-xs text-gray-500 font-medium">Coming Soon</div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-blue-600">
+              <span>Get Started</span>
+              <ArrowRight className="h-4 w-4" />
+            </div>
           </div>
         </div>
       </div>

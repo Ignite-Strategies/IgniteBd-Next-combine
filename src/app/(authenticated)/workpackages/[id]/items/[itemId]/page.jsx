@@ -87,15 +87,24 @@ export default function WorkPackageItemPage() {
     );
   }
 
-  const getBuilderPath = (type, artifactId) => {
+  const getBuilderPath = (type, collateral) => {
+    // For WorkPackage context, use collateralId and pass workPackageId/itemId
+    const collateralId = collateral.id;
+    const queryParams = new URLSearchParams({
+      workPackageId: workPackageId,
+      itemId: itemId,
+      collateralId: collateralId,
+    });
+    
     const paths = {
-      BLOG: `/builder/blog/${artifactId}`,
-      PERSONA: `/builder/persona/${artifactId}`,
-      OUTREACH_TEMPLATE: `/builder/template/${artifactId}`,
-      EVENT_CLE_PLAN: `/builder/event/${artifactId}`,
-      CLE_DECK: `/builder/presentation/${artifactId}`,
-      PRESENTATION: `/builder/presentation/${artifactId}`,
-      LANDING_PAGE: `/builder/landingpage/${artifactId}`,
+      BLOG: `/builder/blog/${collateralId}?${queryParams}`,
+      PERSONA: `/builder/persona/${collateralId}?${queryParams}`,
+      OUTREACH_TEMPLATE: `/builder/template/${collateralId}?${queryParams}`,
+      EVENT_CLE_PLAN: `/builder/event/${collateralId}?${queryParams}`,
+      CLE_DECK: `/builder/presentation/${collateralId}?${queryParams}`,
+      PRESENTATION_DECK: `/builder/presentation/${collateralId}?${queryParams}`,
+      PRESENTATION: `/builder/presentation/${collateralId}?${queryParams}`,
+      LANDING_PAGE: `/builder/landingpage/${collateralId}?${queryParams}`,
     };
     return paths[type] || '#';
   };
@@ -147,27 +156,30 @@ export default function WorkPackageItemPage() {
         {/* Artifacts List */}
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow">
           <h2 className="mb-4 text-xl font-bold text-gray-900">Artifacts</h2>
-          {item.artifacts && item.artifacts.length > 0 ? (
+          {item.workCollateral && item.workCollateral.length > 0 ? (
             <div className="space-y-3">
-              {item.artifacts.map((artifact) => (
-                <Link
-                  key={artifact.id}
-                  href={getBuilderPath(item.type, artifact.id)}
-                  className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100"
-                >
-                  <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {artifact.title || artifact.name || artifact.eventName || 'Untitled'}
-                    </h3>
-                    {artifact.description && (
-                      <p className="mt-1 text-sm text-gray-600">{artifact.description}</p>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {artifact.published ? 'Published' : 'Draft'}
-                  </div>
-                </Link>
-              ))}
+              {item.workCollateral.map((collateral) => {
+                const content = collateral.contentJson || {};
+                return (
+                  <Link
+                    key={collateral.id}
+                    href={getBuilderPath(item.deliverableType || item.type, collateral)}
+                    className="flex items-center justify-between rounded border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100"
+                  >
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        {collateral.title || content.title || 'Untitled'}
+                      </h3>
+                      {content.description && (
+                        <p className="mt-1 text-sm text-gray-600">{content.description}</p>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {collateral.status}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
