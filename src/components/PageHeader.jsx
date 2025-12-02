@@ -16,10 +16,9 @@ import { ArrowLeft } from 'lucide-react';
  */
 export default function PageHeader({ 
   title, 
-  subtitle, 
-  backTo, 
+  subtitle, backTo, 
   backLabel = 'Back',
-  actions
+  actions = null
 }) {
   return (
     <div className="mb-8">
