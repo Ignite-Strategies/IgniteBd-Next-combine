@@ -4,118 +4,76 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, CheckCircle2, ArrowRight, Home } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 export default function SuperAdminInitialize() {
   const router = useRouter();
-  const { owner, ownerId, refresh: refreshOwner } = useOwner();
-  const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
+  const [owner, setOwner] = useState(null);
+  const [ownerId, setOwnerId] = useState(null);
   const [initializing, setInitializing] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
+  // Step 1: Just load from localStorage (ownerId already set from welcome)
   useEffect(() => {
-    const checkAuthorization = async () => {
-      if (!ownerId) {
-        setLoading(false);
-        return;
-      }
+    if (typeof window === 'undefined') return;
 
+    const storedOwnerId = localStorage.getItem('ownerId');
+    const storedOwner = localStorage.getItem('owner');
+
+    if (storedOwnerId) {
+      setOwnerId(storedOwnerId);
+    }
+
+    if (storedOwner) {
       try {
-        // Check if owner has CompanyHQs (indicates primary owner with tenant access)
-        const response = await api.get('/api/owner/hydrate');
-        if (response.data?.success) {
-          const ownerData = response.data.owner;
-          const hasCompanyHQs = ownerData.ownedCompanies?.length > 0 || ownerData.managedCompanies?.length > 0;
-          
-          // Also check if already SuperAdmin
-          const isAlreadySuperAdmin = response.data.isSuperAdmin === true;
-
-          // Authorize if owner has CompanyHQs (primary owner) or is already SuperAdmin
-          if (hasCompanyHQs || isAlreadySuperAdmin) {
-            setAuthorized(true);
-            if (isAlreadySuperAdmin) {
-              setSuccess(true); // Already initialized
-            }
-          } else {
-            // Not authorized - show error instead of redirecting
-            setError('Access denied: This page is only available to primary owners with tenant access.');
-            setAuthorized(false);
-          }
-        }
+        const ownerData = JSON.parse(storedOwner);
+        setOwner(ownerData);
       } catch (err) {
-        console.error('Error checking authorization:', err);
-        setError('Failed to verify authorization. Please try again.');
-        setAuthorized(false);
-      } finally {
-        setLoading(false);
+        console.warn('Failed to parse stored owner:', err);
       }
-    };
+    }
 
-    checkAuthorization();
-  }, [ownerId]);
+    // If no ownerId in localStorage, redirect to login
+    if (!storedOwnerId) {
+      router.replace('/signup');
+    }
+  }, [router]);
 
+  // Step 3: Only upsert when button is clicked
   const handleInitialize = async () => {
+    if (!ownerId) {
+      setError('No owner ID found. Please sign in again.');
+      return;
+    }
+
     try {
       setInitializing(true);
       setError(null);
 
+      console.log('🚀 SuperAdmin Initialize: Calling upsert API for ownerId:', ownerId);
       const response = await api.post('/api/admin/superadmin/upsert');
 
       if (response.data?.success) {
         setSuccess(true);
-        // Refresh owner data to get updated isSuperAdmin status
-        await refreshOwner();
+        console.log('✅ SuperAdmin Initialize: Success!');
       } else {
         setError(response.data?.error || 'Failed to initialize SuperAdmin');
       }
     } catch (err) {
-      console.error('Error initializing SuperAdmin:', err);
+      console.error('❌ SuperAdmin Initialize: Error:', err);
       setError(err.response?.data?.error || err.message || 'Failed to initialize SuperAdmin');
     } finally {
       setInitializing(false);
     }
   };
 
-  if (loading) {
+  // Step 2: Show welcome message (proof we have the user)
+  if (!ownerId || !owner) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
           <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!authorized && !loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-        <div className="max-w-md w-full">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
-                <Shield className="h-8 w-8 text-red-600" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Access Denied
-              </h1>
-              <p className="text-sm text-gray-600 mb-4">
-                {error || 'This page is only available to primary owners with tenant access.'}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => router.push('/growth-dashboard')}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-white font-medium hover:bg-blue-700 transition-colors"
-              >
-                <Home className="h-5 w-5" />
-                Return to Dashboard
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -130,10 +88,13 @@ export default function SuperAdminInitialize() {
               <Shield className="h-8 w-8 text-yellow-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              SuperAdmin Initialization
+              Welcome{owner?.name ? `, ${owner.name.split(' ')[0]}` : ''}!
             </h1>
+            <p className="text-sm text-gray-600 mb-4">
+              {owner?.email && `Logged in as: ${owner.email}`}
+            </p>
             <p className="text-sm text-gray-600">
-              This is an internal configuration page.
+              Would you like to become a SuperAdmin?
             </p>
           </div>
 
@@ -143,7 +104,7 @@ export default function SuperAdminInitialize() {
                 <div className="flex items-center">
                   <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
                   <p className="text-sm font-medium text-green-900">
-                    SuperAdmin role initialized.
+                    SuperAdmin role initialized successfully!
                   </p>
                 </div>
               </div>
@@ -186,9 +147,17 @@ export default function SuperAdminInitialize() {
                 ) : (
                   <>
                     <Shield className="h-5 w-5" />
-                    Initialize SuperAdmin
+                    Yes, Make Me SuperAdmin
                   </>
                 )}
+              </button>
+
+              <button
+                onClick={() => router.push('/growth-dashboard')}
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              >
+                <Home className="h-5 w-5" />
+                No, Return to Dashboard
               </button>
             </div>
           )}
