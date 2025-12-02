@@ -6,6 +6,12 @@ import { ArrowLeft } from 'lucide-react';
 /**
  * Standardized Page Header Component
  * 
+ * @param {string} title - Page title (required)
+ * @param {string} [subtitle] - Optional subtitle text
+ * @param {string} [backTo] - Optional back link URL
+ * @param {string} [backLabel] - Optional back link label (default: "Back")
+ * @param {React.ReactNode} [actions] - Optional action buttons
+ * 
  * Usage:
  * <PageHeader
  *   title="Page Title"
@@ -16,7 +22,8 @@ import { ArrowLeft } from 'lucide-react';
  */
 export default function PageHeader({ 
   title, 
-  subtitle, backTo, 
+  subtitle = null, 
+  backTo, 
   backLabel = 'Back',
   actions = null
 }) {
