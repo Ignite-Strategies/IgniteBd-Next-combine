@@ -739,7 +739,8 @@ model Blog {
   companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   title       String
   subtitle    String?
-  content     Json?
+  blogText    String?
+  sections    Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

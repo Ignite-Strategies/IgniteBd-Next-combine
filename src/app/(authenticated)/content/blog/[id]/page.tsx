@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, ArrowLeft, Trash2, Plus } from 'lucide-react';
+import { Save, ArrowLeft, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
-import type { BlogDraft } from '@/lib/blog-engine/types';
 
 export default function BlogEditorPage() {
   const params = useParams();
@@ -13,9 +12,8 @@ export default function BlogEditorPage() {
 
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
-  const [blogDraft, setBlogDraft] = useState<BlogDraft | null>(null);
-  const [summary, setSummary] = useState('');
-  const [cta, setCta] = useState('');
+  const [blogText, setBlogText] = useState('');
+  const [sections, setSections] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -36,22 +34,8 @@ export default function BlogEditorPage() {
         
         setTitle(blog.title || '');
         setSubtitle(blog.subtitle || '');
-        
-        // Handle content as BlogDraft structure
-        if (blog.content && typeof blog.content === 'object') {
-          const draft = blog.content as BlogDraft;
-          setBlogDraft(draft);
-          setSummary(draft.summary || '');
-          setCta(draft.cta || '');
-        } else {
-          // Initialize empty BlogDraft if no content
-          setBlogDraft({
-            title: blog.title || '',
-            subtitle: blog.subtitle,
-            outline: { sections: [] },
-            body: { sections: [] },
-          });
-        }
+        setBlogText(blog.blogText || '');
+        setSections(blog.sections || null);
       } else {
         console.error('Failed to load blog:', response.data);
         alert('Failed to load blog');
@@ -70,27 +54,14 @@ export default function BlogEditorPage() {
       return;
     }
 
-    if (!blogDraft) {
-      alert('Blog content is required');
-      return;
-    }
-
     try {
       setSaving(true);
-      
-      // Update BlogDraft with current values
-      const updatedDraft: BlogDraft = {
-        ...blogDraft,
-        title,
-        subtitle: subtitle || undefined,
-        summary: summary || undefined,
-        cta: cta || undefined,
-      };
 
       const response = await api.patch(`/api/content/blog/${blogId}`, {
         title,
         subtitle,
-        content: updatedDraft, // Store full BlogDraft structure
+        blogText,
+        sections, // Preserve sections for future editing
       });
 
       if (response.data?.success) {
@@ -131,36 +102,6 @@ export default function BlogEditorPage() {
     }
   };
 
-  const updateSectionHeading = (sectionIndex: number, newHeading: string) => {
-    if (!blogDraft) return;
-    const updated = { ...blogDraft };
-    if (updated.body.sections[sectionIndex]) {
-      updated.body.sections[sectionIndex].heading = newHeading;
-      // Also update outline if it exists
-      if (updated.outline.sections[sectionIndex]) {
-        updated.outline.sections[sectionIndex].heading = newHeading;
-      }
-    }
-    setBlogDraft(updated);
-  };
-
-  const updateSectionContent = (sectionIndex: number, newContent: string) => {
-    if (!blogDraft) return;
-    const updated = { ...blogDraft };
-    if (updated.body.sections[sectionIndex]) {
-      updated.body.sections[sectionIndex].content = newContent;
-    }
-    setBlogDraft(updated);
-  };
-
-  const updateOutlineBullets = (sectionIndex: number, bullets: string[]) => {
-    if (!blogDraft) return;
-    const updated = { ...blogDraft };
-    if (updated.outline.sections[sectionIndex]) {
-      updated.outline.sections[sectionIndex].bullets = bullets;
-    }
-    setBlogDraft(updated);
-  };
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this blog? This action cannot be undone.')) {
@@ -248,87 +189,20 @@ export default function BlogEditorPage() {
               />
             </div>
 
-            {/* Blog Sections */}
-            {blogDraft && blogDraft.body.sections && blogDraft.body.sections.length > 0 && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900">Sections</h3>
-                {blogDraft.body.sections.map((section, index) => (
-                  <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                    <div className="mb-3">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Section {index + 1} Heading
-                      </label>
-                      <input
-                        type="text"
-                        value={section.heading}
-                        onChange={(e) => updateSectionHeading(index, e.target.value)}
-                        className="w-full rounded border border-gray-300 px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Content
-                      </label>
-                      <textarea
-                        value={section.content}
-                        onChange={(e) => updateSectionContent(index, e.target.value)}
-                        rows={6}
-                        className="w-full rounded border border-gray-300 px-3 py-2"
-                        placeholder="2-3 rich paragraphs for this section..."
-                      />
-                    </div>
-                    {blogDraft.outline.sections[index] && (
-                      <div className="mt-3">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Outline Bullets
-                        </label>
-                        <div className="space-y-2">
-                          {blogDraft.outline.sections[index].bullets.map((bullet, bulletIndex) => (
-                            <input
-                              key={bulletIndex}
-                              type="text"
-                              value={bullet}
-                              onChange={(e) => {
-                                const newBullets = [...blogDraft.outline.sections[index].bullets];
-                                newBullets[bulletIndex] = e.target.value;
-                                updateOutlineBullets(index, newBullets);
-                              }}
-                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                              placeholder="Bullet point"
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Summary
+                Blog Text *
               </label>
               <textarea
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                placeholder="Blog summary"
-                rows={3}
-                className="w-full rounded border border-gray-300 px-3 py-2"
+                value={blogText}
+                onChange={(e) => setBlogText(e.target.value)}
+                placeholder="Blog content..."
+                rows={20}
+                className="w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Call to Action (CTA)
-              </label>
-              <textarea
-                value={cta}
-                onChange={(e) => setCta(e.target.value)}
-                placeholder="Call to action relating to BusinessPoint Law"
-                rows={2}
-                className="w-full rounded border border-gray-300 px-3 py-2"
-              />
+              <p className="text-xs text-gray-500 mt-1">
+                Structured sections are stored separately for future editing
+              </p>
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t">

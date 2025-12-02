@@ -87,11 +87,12 @@ export default function BlogBuildPersonaPage() {
         const blogDraft = aiResponse.data.blogDraft;
         
         // Create blog with generated BlogDraft
+        // The API will merge sections into blogText and store sections separately
         const createResponse = await api.post('/api/content/blog', {
           companyHQId,
           title: blogDraft.title,
           subtitle: blogDraft.subtitle,
-          content: blogDraft, // Store full BlogDraft structure
+          blogDraft: blogDraft, // Pass BlogDraft for processing
         });
 
         if (createResponse.data?.success) {
@@ -116,8 +117,8 @@ export default function BlogBuildPersonaPage() {
         <PageHeader
           title="Build from Persona"
           subtitle="Select a persona to generate a targeted blog post"
-          backTo="/content/blog/build"
-          backLabel="Back to Create Blog"
+          backTo="/content/blog"
+          backLabel="Back to Blogs"
         />
 
         {loading ? (
@@ -155,12 +156,22 @@ export default function BlogBuildPersonaPage() {
                         className="mt-1"
                       />
                       <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">{persona.name}</h4>
-                        {persona.role && (
-                          <p className="text-sm text-gray-600">{persona.role}</p>
+                        <h4 className="font-semibold text-gray-900">{persona.name || persona.personName}</h4>
+                        {persona.title && (
+                          <p className="text-sm text-gray-600">{persona.title}</p>
                         )}
-                        {persona.painPoints && (
-                          <p className="text-sm text-gray-500 mt-2">{persona.painPoints}</p>
+                        {persona.painPoints && Array.isArray(persona.painPoints) && persona.painPoints.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs font-semibold text-gray-700 mb-1">Top Problems:</p>
+                            <ul className="text-sm text-gray-600 space-y-1">
+                              {persona.painPoints.slice(0, 3).map((point, idx) => (
+                                <li key={idx} className="flex items-start">
+                                  <span className="mr-2">•</span>
+                                  <span>{point}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -174,10 +185,21 @@ export default function BlogBuildPersonaPage() {
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Persona Summary</h3>
                   <div className="space-y-2 text-sm text-gray-600">
-                    <p><strong>Name:</strong> {selectedPersona.name}</p>
-                    {selectedPersona.role && <p><strong>Role:</strong> {selectedPersona.role}</p>}
-                    {selectedPersona.goals && <p><strong>Goals:</strong> {selectedPersona.goals}</p>}
-                    {selectedPersona.painPoints && <p><strong>Pain Points:</strong> {selectedPersona.painPoints}</p>}
+                    <p><strong>Name:</strong> {selectedPersona.name || selectedPersona.personName}</p>
+                    {selectedPersona.title && <p><strong>Title:</strong> {selectedPersona.title}</p>}
+                    {selectedPersona.painPoints && Array.isArray(selectedPersona.painPoints) && selectedPersona.painPoints.length > 0 && (
+                      <div>
+                        <p className="font-semibold mb-1">Top Problems:</p>
+                        <ul className="space-y-1 ml-4">
+                          {selectedPersona.painPoints.slice(0, 3).map((point, idx) => (
+                            <li key={idx} className="flex items-start">
+                              <span className="mr-2">•</span>
+                              <span>{point}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
 

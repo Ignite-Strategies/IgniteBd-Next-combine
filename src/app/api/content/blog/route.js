@@ -22,7 +22,9 @@ export async function POST(request) {
       companyHQId,
       title,
       subtitle,
-      content,
+      blogText,
+      sections,
+      blogDraft, // Accept BlogDraft from AI generation
     } = body ?? {};
 
     if (!companyHQId || !title) {
@@ -32,12 +34,32 @@ export async function POST(request) {
       );
     }
 
+    // If blogDraft is provided, merge sections into blogText
+    let finalBlogText = blogText;
+    let finalSections = sections;
+
+    if (blogDraft) {
+      // Merge body sections into blogText
+      if (blogDraft.body && blogDraft.body.sections && Array.isArray(blogDraft.body.sections)) {
+        finalBlogText = blogDraft.body.sections
+          .map((section) => {
+            const heading = section.heading ? `## ${section.heading}\n\n` : '';
+            return heading + (section.content || '');
+          })
+          .join('\n\n');
+      }
+      
+      // Store sections structure
+      finalSections = blogDraft;
+    }
+
     const blog = await prisma.blog.create({
       data: {
         companyHQId,
         title: title || null,
         subtitle: subtitle || null,
-        content: content || null,
+        blogText: finalBlogText || null,
+        sections: finalSections || null,
       },
     });
 

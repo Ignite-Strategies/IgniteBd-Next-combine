@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2 } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool } from 'lucide-react';
 
 export default function BlogPage() {
   const router = useRouter();
@@ -127,6 +127,37 @@ export default function BlogPage() {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const buildOptions = [
+    {
+      title: 'Build from Persona',
+      description: 'Generate a blog post targeted to a specific persona',
+      icon: UserCircle,
+      route: '/content/blog/build/persona',
+      color: 'from-blue-500 to-blue-600',
+    },
+    {
+      title: 'Build from Idea',
+      description: 'Start with a core theme or idea',
+      icon: Lightbulb,
+      route: '/content/blog/build/idea',
+      color: 'from-yellow-500 to-yellow-600',
+    },
+    {
+      title: 'Build from Previous Blog',
+      description: 'Use an existing blog as a starting point',
+      icon: FileStack,
+      route: '/content/blog/build/previous',
+      color: 'from-purple-500 to-purple-600',
+    },
+    {
+      title: 'Start Empty',
+      description: 'Write a blog from scratch',
+      icon: PenTool,
+      route: '/content/blog/build/write',
+      color: 'from-green-500 to-green-600',
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -147,14 +178,37 @@ export default function BlogPage() {
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
               Sync
             </button>
-            <button
-              onClick={() => router.push('/content/blog/build/persona')}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all"
-            >
-              <Plus className="h-5 w-5" />
-              Create Blog
-            </button>
           </div>
+        </div>
+
+        {/* Build Options Cards */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Create New Blog</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {buildOptions.map((option) => {
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.route}
+                  onClick={() => router.push(option.route)}
+                  className="rounded-xl border border-gray-200 bg-white p-6 shadow hover:shadow-lg transition-all text-left group"
+                >
+                  <div className={`inline-flex p-3 rounded-lg bg-gradient-to-r ${option.color} mb-4`}>
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-red-600 transition-colors">
+                    {option.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">{option.description}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Existing Blogs List */}
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Existing Blogs</h2>
         </div>
 
         {loading ? (
@@ -165,16 +219,9 @@ export default function BlogPage() {
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-lg font-semibold text-gray-800 mb-2">No blogs yet</p>
-            <p className="text-sm text-gray-500 mb-6">
-              Create your first blog to get started
+            <p className="text-sm text-gray-500">
+              Create your first blog using one of the options above
             </p>
-            <button
-              onClick={() => router.push('/content/blog/build/persona')}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all mx-auto"
-            >
-              <Plus className="h-5 w-5" />
-              Create Blog
-            </button>
           </div>
         ) : (
           <div className="space-y-4">

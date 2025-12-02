@@ -77,12 +77,13 @@ export async function PATCH(request, { params }) {
     }
 
     const body = await request.json();
-    const { title, subtitle, content } = body ?? {};
+    const { title, subtitle, blogText, sections } = body ?? {};
 
     const updateData = {};
     if (title !== undefined) updateData.title = title;
     if (subtitle !== undefined) updateData.subtitle = subtitle;
-    if (content !== undefined) updateData.content = content;
+    if (blogText !== undefined) updateData.blogText = blogText;
+    if (sections !== undefined) updateData.sections = sections;
 
     const blog = await prisma.blog.update({
       where: { id },
