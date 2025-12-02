@@ -75,7 +75,7 @@ model CompanyHQ {
   companyWebsite   String? // Website URL (for LinkedIn extraction, etc.)
   whatYouDo        String? // What the company does (description)
   companyIndustry  String?
-  companyAnnualRev Float?
+  companyAnnualRev String? // Revenue range as string (e.g., "500k-1m", "1m-5m")
   yearsInBusiness  Int?
   teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
   createdAt        DateTime @default(now())
