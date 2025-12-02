@@ -57,13 +57,8 @@ export async function POST(request) {
       );
     }
 
-    // Validate that at least one of ownerId, contactOwnerId, or managerId is provided
-    if (!ownerId && !contactOwnerId && !managerId) {
-      return NextResponse.json(
-        { success: false, error: 'At least one of ownerId, contactOwnerId, or managerId must be provided' },
-        { status: 400 },
-      );
-    }
+    // Note: ownerId, contactOwnerId, and managerId are all optional
+    // CompanyHQ can be created without any owner and ownerId can be added later
 
     // Validate ownerId if provided
     if (ownerId) {
