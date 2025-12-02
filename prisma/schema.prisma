@@ -67,28 +67,28 @@ model EmailActivity {
 }
 
 model CompanyHQ {
-  id                   String                  @id @default(cuid())
-  companyName          String
-  companyStreet        String? // Street address
-  companyCity          String? // City
-  companyState         String? // State
-  companyWebsite       String? // Website URL (for LinkedIn extraction, etc.)
-  whatYouDo            String? // What the company does (description)
-  companyIndustry      String?
-  companyAnnualRev     Float?
-  yearsInBusiness      Int?
-  teamSize             String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  ownerId              String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
-  contactOwnerId       String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
-  managerId            String?
-  
+  id               String   @id @default(cuid())
+  companyName      String
+  companyStreet    String? // Street address
+  companyCity      String? // City
+  companyState     String? // State
+  companyWebsite   String? // Website URL (for LinkedIn extraction, etc.)
+  whatYouDo        String? // What the company does (description)
+  companyIndustry  String?
+  companyAnnualRev Float?
+  yearsInBusiness  Int?
+  teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  ownerId          String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
+  contactOwnerId   String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
+  managerId        String?
+
   // Ultra Tenant Parent-Child Relationship
-  ultraTenantId        String? // Parent tenant (Ignite Strategies is root with null)
-  ultraTenant          CompanyHQ?              @relation("UltraTenantChildren", fields: [ultraTenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  subTenants           CompanyHQ[]             @relation("UltraTenantChildren")
-  
+  ultraTenantId String? // Parent tenant (Ignite Strategies is root with null)
+  ultraTenant   CompanyHQ?  @relation("UltraTenantChildren", fields: [ultraTenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  subTenants    CompanyHQ[] @relation("UltraTenantChildren")
+
   companies            Company[]
   manager              Owner?                  @relation("ManagerOf", fields: [managerId], references: [id])
   owner                Owner?                  @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
