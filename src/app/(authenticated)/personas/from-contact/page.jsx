@@ -119,8 +119,8 @@ function FromContactContent() {
       const response = await api.post('/api/personas', payload);
 
       if (response.data?.personaId || response.data?.persona) {
-        // Redirect to personas list
-        router.push('/personas');
+        // Redirect to personas list with success indicator
+        router.push('/personas?saved=true');
       } else {
         throw new Error('Failed to save persona');
       }

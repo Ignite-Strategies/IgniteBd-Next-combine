@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit, Trash2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit, Trash2, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/api';
 
-export default function PersonasPage() {
+function PersonasPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
@@ -15,8 +16,9 @@ export default function PersonasPage() {
   const [syncing, setSyncing] = useState(false);
   const [showBuildOptions, setShowBuildOptions] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  // Load from localStorage only - no auto-fetch
+  // Auto-fetch personas on mount and when companyHQId changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -31,7 +33,7 @@ export default function PersonasPage() {
       return;
     }
 
-    // Only load from localStorage
+    // Load from localStorage first for instant display
     const cached = window.localStorage.getItem('personas');
     if (cached) {
       try {
@@ -42,12 +44,50 @@ export default function PersonasPage() {
         }
       } catch (error) {
         console.warn('Failed to parse cached personas', error);
-        setError('Failed to load personas from cache');
       }
-    } else {
-      setError('No personas found. Click Sync to load from server.');
     }
+
+    // Then fetch fresh data from API
+    const fetchPersonas = async () => {
+      setLoading(true);
+      try {
+        const response = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
+        const personasData = Array.isArray(response.data) ? response.data : [];
+        setPersonas(personasData);
+        setError(null);
+        
+        // Update localStorage
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('personas', JSON.stringify(personasData));
+        }
+      } catch (err) {
+        console.error('Failed to fetch personas:', err);
+        // Don't set error if we have cached data
+        if (!cached) {
+          setError('Failed to load personas. Click Sync to retry.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPersonas();
   }, []);
+
+  // Check for success message in URL params
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = searchParams?.get('saved');
+    if (saved === 'true') {
+      setShowSuccess(true);
+      setError(null);
+      // Clean up URL
+      window.history.replaceState({}, '', '/personas');
+      // Hide success message after 5 seconds
+      const timer = setTimeout(() => setShowSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   // Delete persona function
   const handleDelete = async (personaId) => {
@@ -136,6 +176,13 @@ export default function PersonasPage() {
             </button>
           </div>
         </div>
+
+        {showSuccess && (
+          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5" />
+            <span>Persona saved successfully!</span>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -250,10 +297,10 @@ export default function PersonasPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {persona.name || 'Persona'}
+                      {persona.personName || persona.name || 'Persona'}
                     </h3>
-                    {persona.role && (
-                      <p className="text-sm text-gray-500">{persona.role}</p>
+                    {persona.title && (
+                      <p className="text-sm text-gray-500">{persona.title}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
@@ -286,28 +333,46 @@ export default function PersonasPage() {
                       <p className="text-gray-600">{persona.industry}</p>
                     </div>
                   )}
-                  {persona.goals && (
+                  {persona.description && (
                     <div>
-                      <p className="font-semibold text-gray-800 mb-1">Goals:</p>
-                      <p className="text-gray-600 whitespace-pre-wrap">{persona.goals}</p>
+                      <p className="font-semibold text-gray-800 mb-1">Description:</p>
+                      <p className="text-gray-600 whitespace-pre-wrap">{persona.description}</p>
                     </div>
                   )}
-                  {persona.painPoints && (
+                  {persona.painPoints && Array.isArray(persona.painPoints) && persona.painPoints.length > 0 && (
                     <div>
                       <p className="font-semibold text-gray-800 mb-1">Pain Points:</p>
-                      <p className="text-gray-600 whitespace-pre-wrap">{persona.painPoints}</p>
+                      <ul className="list-disc list-inside text-gray-600 space-y-1">
+                        {persona.painPoints.map((point, idx) => (
+                          <li key={idx}>{point}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
-                  {persona.valuePropToPersona && (
+                  {persona.whatTheyWant && (
                     <div>
                       <p className="font-semibold text-gray-800 mb-1">What They Want:</p>
-                      <p className="text-gray-600 whitespace-pre-wrap">{persona.valuePropToPersona}</p>
+                      <p className="text-gray-600 whitespace-pre-wrap">{persona.whatTheyWant}</p>
                     </div>
                   )}
-                  {persona.desiredOutcome && (
+                  {persona.decisionDrivers && Array.isArray(persona.decisionDrivers) && persona.decisionDrivers.length > 0 && (
                     <div>
-                      <p className="font-semibold text-gray-800 mb-1">Desired Outcome:</p>
-                      <p className="text-gray-600">{persona.desiredOutcome}</p>
+                      <p className="font-semibold text-gray-800 mb-1">Decision Drivers:</p>
+                      <ul className="list-disc list-inside text-gray-600 space-y-1">
+                        {persona.decisionDrivers.map((driver, idx) => (
+                          <li key={idx}>{driver}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {persona.buyerTriggers && Array.isArray(persona.buyerTriggers) && persona.buyerTriggers.length > 0 && (
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-1">Buyer Triggers:</p>
+                      <ul className="list-disc list-inside text-gray-600 space-y-1">
+                        {persona.buyerTriggers.map((trigger, idx) => (
+                          <li key={idx}>{trigger}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {persona.alignmentScore !== null &&
@@ -328,6 +393,23 @@ export default function PersonasPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PersonasPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+            <RefreshCw className="mx-auto h-8 w-8 animate-spin text-gray-500" />
+            <p className="mt-4 text-gray-600">Loading personas...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <PersonasPageContent />
+    </Suspense>
   );
 }
 

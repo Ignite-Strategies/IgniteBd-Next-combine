@@ -978,3 +978,4 @@ WHERE email = 'user@example.com';
 **Pattern:** Admin SDK (server) + Client SDK (portal)
 
 
+

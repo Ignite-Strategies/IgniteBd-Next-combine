@@ -7,9 +7,6 @@
 			"path": "../ignitebd-clientportal"
 		},
 		{
-			"path": "../workme-nextapp"
-		},
-		{
 			"path": "../../GoFast/gofastbackendv2-fall2025"
 		},
 		{
@@ -22,28 +19,25 @@
 			"path": "../Ignite-frontend-production"
 		},
 		{
-			"path": "../../WorkMe/workspace"
-		},
-		{
 			"path": "../../GoFast/trainingmvp"
 		},
 		{
-			"path": "../../TripWell/tripwell-tripcrew"
-		},
-		{
-			"path": "../../TripWell/TripWell-frontend"
-		},
-		{
 			"path": "../../GoFast/gofastfrontend-mvp1"
-		},
-		{
-			"path": "../../repooverview"
 		},
 		{
 			"path": "../../GoFast/f3invigorate"
 		},
 		{
 			"path": "../../GoFast/gofastapp-mvp"
+		},
+		{
+			"path": "../../TruNorth/TruNorth"
+		},
+		{
+			"path": "../../WorkMe/workme-manageconsole"
+		},
+		{
+			"path": "../workme-nextapp"
 		}
 	],
 	"settings": {}
