@@ -56,6 +56,13 @@ export async function GET(request) {
       );
     }
 
+    // Check if Owner is SuperAdmin
+    const superAdmin = await prisma.superAdmin.findUnique({
+      where: { ownerId: owner.id },
+    });
+
+    const isSuperAdmin = superAdmin?.active === true;
+
     const primaryCompanyHQ = owner.ownedCompanies?.[0] || null;
 
     const hydratedOwner = {
@@ -76,6 +83,7 @@ export async function GET(request) {
       success: true,
       message: 'Owner hydrated successfully',
       owner: hydratedOwner,
+      isSuperAdmin: isSuperAdmin,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

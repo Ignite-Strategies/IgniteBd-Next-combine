@@ -11,9 +11,10 @@ Complete architecture guide for IgniteBD Next.js stack.
 5. [API Architecture](#api-architecture)
 6. [Authentication Flow](#authentication-flow)
 7. [Database & Prisma](#database--prisma)
-8. [Development Workflow](#development-workflow)
-9. [Deployment](#deployment)
-10. [Key Differences from Original Stack](#key-differences-from-original-stack)
+8. [Core Data Model Relationships](#core-data-model-relationships)
+9. [Development Workflow](#development-workflow)
+10. [Deployment](#deployment)
+11. [Key Differences from Original Stack](#key-differences-from-original-stack)
 
 ---
 
@@ -288,6 +289,126 @@ export const prisma = globalThis.prisma || new PrismaClient();
 
 ---
 
+## Core Data Model Relationships
+
+### Owner → CompanyHQ Relationship
+
+The `CompanyHQ` model represents the tenant boundary (multi-tenancy root). It can be owned or managed through multiple relationships:
+
+**Schema:**
+```prisma
+model CompanyHQ {
+  id            String   @id @default(cuid())
+  ownerId       String?  // Owner.id (legacy Owner model) - optional
+  contactOwnerId String? // Contact.id (for Contact-owned HQs)
+  managerId     String?  // Owner.id (for managers)
+  
+  owner         Owner?   @relation("OwnerOf", fields: [ownerId], references: [id])
+  contactOwner   Contact? @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id])
+  manager       Owner?   @relation("ManagerOf", fields: [managerId], references: [id])
+}
+```
+
+**Relationship Types:**
+
+1. **Owner Ownership** (`ownerId` → `Owner.id`)
+   - Legacy pattern: Owner directly owns CompanyHQ
+   - Used for traditional owner-tenant relationships
+   - Optional field (allows Contact-owned HQs)
+
+2. **Contact Ownership** (`contactOwnerId` → `Contact.id`)
+   - Modern pattern: Contact can own CompanyHQ
+   - Enables Contact to become a tenant owner
+   - Supports universal personhood model
+
+3. **Manager Relationship** (`managerId` → `Owner.id`)
+   - Allows Owner to manage CompanyHQ without owning it
+   - Supports multi-HQ management scenarios
+
+**Key Points:**
+- `ownerId` is **optional** - CompanyHQ can exist without an Owner (Contact-owned)
+- Both `ownerId` and `contactOwnerId` can coexist (hybrid ownership)
+- `CompanyHQ` is the **tenant boundary** - all data is scoped by `companyHQId`
+
+### CompanyHQ → Company Relationship
+
+The `Company` model represents prospect/client companies within a tenant's scope:
+
+**Schema:**
+```prisma
+model Company {
+  id          String    @id @default(cuid())
+  companyHQId String    // Required - links to tenant
+  companyName String
+  
+  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  workPackages WorkPackage[]
+}
+```
+
+**Relationship:**
+- `Company.companyHQId` → `CompanyHQ.id` (required, cascade delete)
+- **Tenant Boundary**: All Companies belong to a CompanyHQ (tenant)
+- **Prospect/Client Companies**: These are the companies you're doing business with, not your own tenant
+
+### WorkPackage → Client Portal Connection
+
+WorkPackages bridge the owner-side operations with the client portal through `workPackageId`:
+
+**Schema:**
+```prisma
+model WorkPackage {
+  id        String   @id @default(cuid())
+  contactId String   // Contact who is the client
+  companyId String?  // Company the work package is for
+  
+  contact   Contact  @relation(fields: [contactId], references: [id])
+  company   Company? @relation(fields: [companyId], references: [id])
+}
+```
+
+**Connection Flow:**
+
+1. **Owner Side** (IgniteBD Main App):
+   - WorkPackages are created and managed by Owners
+   - Scoped by `CompanyHQ` (tenant boundary)
+   - Linked to `Contact` and `Company` (prospect/client)
+
+2. **Client Portal** (Separate Next.js App):
+   - Clients access via `workPackageId` stored in localStorage
+   - Authentication: `Contact.firebaseUid` → Firebase Auth
+   - Authorization: Validates `WorkPackage.companyId` matches `Contact.contactCompanyId`
+   - Access Pattern: `Contact` → `Contact.contactCompanyId` → `WorkPackage.companyId` → validates access
+
+**Client Portal Access Pattern:**
+```
+Firebase UID → Contact (via firebaseUid)
+  → Contact.contactCompanyId
+  → WorkPackage.companyId (must match)
+  → Full WorkPackage with phases, items, deliverables
+```
+
+**Key Points:**
+- `workPackageId` is the **bridge identifier** between owner and client systems
+- Client portal validates ownership via `companyId` matching
+- WorkPackages are tenant-scoped through `Company.companyHQId`
+- Client portal is a separate Next.js app (`ignitebd-clientportal`) sharing the same database
+
+**Data Flow Diagram:**
+```
+Owner (firebaseId)
+  ↓
+CompanyHQ (ownerId/contactOwnerId)
+  ↓
+Company (companyHQId) ← Tenant boundary
+  ↓
+WorkPackage (companyId)
+  ↓
+Client Portal (workPackageId) ← Access via localStorage
+```
+
+---
+
 ## Development Workflow
 
 ### Local Development
@@ -465,9 +586,4 @@ import Link from 'next/link';
 **Multi-Tenancy**: CompanyHQ-scoped  
 **Authentication**: Firebase Auth  
 **Deployment**: Vercel (Full-Stack)
-
-
-
-
-
 

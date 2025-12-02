@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight, Shield } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
@@ -13,6 +13,8 @@ export default function SettingsPage() {
   const [microsoftAuth, setMicrosoftAuth] = useState(null);
   const [sendGridConfig, setSendGridConfig] = useState(null);
   const [error, setError] = useState(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [becomingSuperAdmin, setBecomingSuperAdmin] = useState(false);
   const [activeSection, setActiveSection] = useState(null); // 'profile' | 'company' | 'integrations' | null
   
   // Profile form state
@@ -93,6 +95,22 @@ export default function SettingsPage() {
     if (ownerId) {
       fetchConnectionStatus();
       fetchSendGridConfig();
+    }
+
+    // Check SuperAdmin status
+    const checkSuperAdmin = async () => {
+      try {
+        const response = await api.get('/api/owner/hydrate');
+        if (response.data?.success) {
+          setIsSuperAdmin(response.data.isSuperAdmin === true);
+        }
+      } catch (err) {
+        console.error('Error checking SuperAdmin status:', err);
+      }
+    };
+
+    if (ownerId) {
+      checkSuperAdmin();
     }
   }, [owner, companyHQ, ownerId, fetchConnectionStatus, fetchSendGridConfig]);
 
@@ -182,6 +200,35 @@ export default function SettingsPage() {
     : false;
 
   const isConnected = microsoftAuth && !isTokenExpired;
+
+  // Check if user can become SuperAdmin
+  const canBecomeSuperAdmin = owner?.email === process.env.NEXT_PUBLIC_PLATFORM_ADMIN_EMAIL || isSuperAdmin;
+  const showAdminTools = canBecomeSuperAdmin && !isSuperAdmin;
+
+  // Handle becoming SuperAdmin
+  const handleBecomeSuperAdmin = async () => {
+    try {
+      setBecomingSuperAdmin(true);
+      setError(null);
+      
+      const response = await api.post('/api/admin/superadmin/upsert');
+      
+      if (response.data?.success) {
+        setIsSuperAdmin(true);
+        await refreshOwner();
+        router.refresh();
+        // Optional: redirect to switchboard
+        // router.push('/admin/switchboard');
+      } else {
+        setError(response.data?.error || 'Failed to become SuperAdmin');
+      }
+    } catch (err) {
+      console.error('Error becoming SuperAdmin:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to become SuperAdmin');
+    } finally {
+      setBecomingSuperAdmin(false);
+    }
+  };
 
   // If a section is active, show the form
   if (activeSection) {
@@ -679,6 +726,70 @@ export default function SettingsPage() {
               <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
             </div>
           </button>
+
+          {/* Platform Admin Tools - Only show if can become SuperAdmin or is SuperAdmin */}
+          {canBecomeSuperAdmin && (
+            <div className="group relative rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:border-yellow-300 hover:shadow-md transition-all text-left md:col-span-2">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-50 group-hover:bg-yellow-100 transition-colors mb-4">
+                    <Shield className="h-6 w-6 text-yellow-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    IgniteBD Platform Admin Tools
+                  </h3>
+                  {isSuperAdmin ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-500">
+                        You are a Platform SuperAdmin. Manage all tenants and access the Tenant Switchboard.
+                      </p>
+                      <div className="flex items-center mt-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-500 mr-1" />
+                        <p className="text-xs text-gray-400">
+                          SuperAdmin active
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => router.push('/admin/switchboard')}
+                        className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                      >
+                        Open Tenant Switchboard
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-500">
+                        Become a Platform SuperAdmin to manage all CompanyHQs and access the Tenant Switchboard.
+                      </p>
+                      {error && (
+                        <div className="rounded-md bg-red-50 border border-red-200 p-3">
+                          <p className="text-sm text-red-800">{error}</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={handleBecomeSuperAdmin}
+                        disabled={becomingSuperAdmin}
+                        className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {becomingSuperAdmin ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Activating...
+                          </>
+                        ) : (
+                          <>
+                            Become Platform SuperAdmin
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,0 +1,170 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Shield, CheckCircle2, ArrowRight, Home } from 'lucide-react';
+import api from '@/lib/api';
+import { useOwner } from '@/hooks/useOwner';
+
+export default function SuperAdminInitialize() {
+  const router = useRouter();
+  const { owner, ownerId, refresh: refreshOwner } = useOwner();
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const [initializing, setInitializing] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const checkAuthorization = async () => {
+      if (!ownerId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Check if owner has CompanyHQs (indicates primary owner with tenant access)
+        const response = await api.get('/api/owner/hydrate');
+        if (response.data?.success) {
+          const ownerData = response.data.owner;
+          const hasCompanyHQs = ownerData.ownedCompanies?.length > 0 || ownerData.managedCompanies?.length > 0;
+          
+          // Also check if already SuperAdmin
+          const isAlreadySuperAdmin = response.data.isSuperAdmin === true;
+
+          // Authorize if owner has CompanyHQs (primary owner) or is already SuperAdmin
+          if (hasCompanyHQs || isAlreadySuperAdmin) {
+            setAuthorized(true);
+            if (isAlreadySuperAdmin) {
+              setSuccess(true); // Already initialized
+            }
+          } else {
+            // Not authorized, redirect
+            router.push('/growth-dashboard');
+          }
+        }
+      } catch (err) {
+        console.error('Error checking authorization:', err);
+        router.push('/growth-dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthorization();
+  }, [ownerId, router]);
+
+  const handleInitialize = async () => {
+    try {
+      setInitializing(true);
+      setError(null);
+
+      const response = await api.post('/api/admin/superadmin/upsert');
+
+      if (response.data?.success) {
+        setSuccess(true);
+        // Refresh owner data to get updated isSuperAdmin status
+        await refreshOwner();
+      } else {
+        setError(response.data?.error || 'Failed to initialize SuperAdmin');
+      }
+    } catch (err) {
+      console.error('Error initializing SuperAdmin:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to initialize SuperAdmin');
+    } finally {
+      setInitializing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authorized) {
+    return null; // Will redirect
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mb-4">
+              <Shield className="h-8 w-8 text-yellow-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              SuperAdmin Initialization
+            </h1>
+            <p className="text-sm text-gray-600">
+              This is an internal configuration page.
+            </p>
+          </div>
+
+          {success ? (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                <div className="flex items-center">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 mr-2" />
+                  <p className="text-sm font-medium text-green-900">
+                    SuperAdmin role initialized.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => router.push('/admin/switchboard')}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-white font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Go to Tenant Switchboard
+                  <ArrowRight className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => router.push('/growth-dashboard')}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Return to Dashboard
+                  <Home className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleInitialize}
+                disabled={initializing}
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-yellow-600 px-4 py-3 text-white font-medium hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {initializing ? (
+                  <>
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Initializing...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="h-5 w-5" />
+                    Initialize SuperAdmin
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+

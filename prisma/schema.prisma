@@ -29,8 +29,20 @@ model Owner {
   ownedCompanies   CompanyHQ[]     @relation("OwnerOf")
   emailActivities  EmailActivity[] // Outreach email tracking
   assessments      Assessment[] // Growth assessments
+  superAdmin        SuperAdmin? // SuperAdmin relationship
 
   @@map("owners")
+}
+
+model SuperAdmin {
+  id        String   @id @default(cuid())
+  ownerId   String   @unique
+  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("super_admins")
 }
 
 model EmailActivity {
