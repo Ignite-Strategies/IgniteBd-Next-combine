@@ -17,13 +17,19 @@ export default function EventRecommendationsList({ events, personaId }: EventRec
     try {
       setSaving(event.name);
       
-      // Get userId from Firebase token or localStorage
-      const userId = localStorage.getItem('userId') || localStorage.getItem('firebaseUid') || '';
+      // Get companyHQId and ownerId from localStorage
+      const companyHQId = localStorage.getItem('companyHQId') || '';
+      const ownerId = localStorage.getItem('ownerId') || '';
 
-      const response = await api.post('/api/events/save', {
-        eventSuggestion: event,
-        userId,
-        personaId: personaId || null,
+      if (!companyHQId || !ownerId) {
+        alert('Please ensure you are logged in and have a company selected.');
+        return;
+      }
+
+      const response = await api.post('/api/bd-events/save', {
+        aiEvent: event,
+        companyHQId,
+        ownerId,
       });
 
       if (response.data?.success) {
