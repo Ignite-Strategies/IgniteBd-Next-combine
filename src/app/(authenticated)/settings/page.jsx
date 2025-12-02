@@ -247,19 +247,18 @@ export default function SettingsPage() {
   // Temporary test function for debugging
   const handleTestSuperAdminUpsert = async () => {
     try {
-      console.log('🧪 TEST: Calling SuperAdmin upsert directly...');
-      const res = await fetch('/api/admin/superadmin/upsert', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      const data = await res.json();
-      console.log('🧪 TEST: SuperAdmin result:', data);
-      alert(`Result: ${JSON.stringify(data, null, 2)}`);
+      console.log('🧪 TEST: Calling SuperAdmin upsert via api client...');
+      const response = await api.post('/api/admin/superadmin/upsert');
+      console.log('🧪 TEST: SuperAdmin result:', response.data);
+      alert(`Success! Result: ${JSON.stringify(response.data, null, 2)}`);
     } catch (err) {
       console.error('🧪 TEST: Error:', err);
-      alert(`Error: ${err.message}`);
+      console.error('🧪 TEST: Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      alert(`Error: ${err.response?.data?.error || err.message}\nStatus: ${err.response?.status || 'N/A'}`);
     }
   };
 
