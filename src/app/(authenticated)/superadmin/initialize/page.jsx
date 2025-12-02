@@ -39,20 +39,22 @@ export default function SuperAdminInitialize() {
               setSuccess(true); // Already initialized
             }
           } else {
-            // Not authorized, redirect
-            router.push('/growth-dashboard');
+            // Not authorized - show error instead of redirecting
+            setError('Access denied: This page is only available to primary owners with tenant access.');
+            setAuthorized(false);
           }
         }
       } catch (err) {
         console.error('Error checking authorization:', err);
-        router.push('/growth-dashboard');
+        setError('Failed to verify authorization. Please try again.');
+        setAuthorized(false);
       } finally {
         setLoading(false);
       }
     };
 
     checkAuthorization();
-  }, [ownerId, router]);
+  }, [ownerId]);
 
   const handleInitialize = async () => {
     try {
@@ -87,8 +89,36 @@ export default function SuperAdminInitialize() {
     );
   }
 
-  if (!authorized) {
-    return null; // Will redirect
+  if (!authorized && !loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+                <Shield className="h-8 w-8 text-red-600" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Access Denied
+              </h1>
+              <p className="text-sm text-gray-600 mb-4">
+                {error || 'This page is only available to primary owners with tenant access.'}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => router.push('/growth-dashboard')}
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-white font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Home className="h-5 w-5" />
+                Return to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
