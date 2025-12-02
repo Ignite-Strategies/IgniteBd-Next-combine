@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getAuth } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import api from '@/lib/api';
 
 /**
@@ -20,6 +21,22 @@ export function useOwner() {
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
+
+  // Wait for Firebase auth to initialize
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('✅ useOwner: Firebase auth initialized, user:', firebaseUser.uid);
+        setAuthInitialized(true);
+      } else {
+        console.log('⚠️ useOwner: No Firebase user');
+        setAuthInitialized(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -64,13 +81,21 @@ export function useOwner() {
       setLoading(true);
       setError(null);
 
-      const firebaseUser = getAuth().currentUser;
+      // Wait for auth to be initialized
+      if (!authInitialized) {
+        console.log('⏳ useOwner: Waiting for auth initialization...');
+        setLoading(false);
+        return;
+      }
+
+      const firebaseUser = auth.currentUser;
       if (!firebaseUser) {
         setError('No Firebase user found');
         setLoading(false);
         return;
       }
 
+      console.log('🚀 useOwner: Calling /api/owner/hydrate');
       const response = await api.get('/api/owner/hydrate');
       if (!response.data?.success) {
         setError(response.data?.error || 'Failed to hydrate owner');
@@ -107,7 +132,7 @@ export function useOwner() {
       setError(err.message || 'Failed to refresh owner data');
       setLoading(false);
     }
-  }, []);
+  }, [authInitialized]);
 
   return {
     ownerId,

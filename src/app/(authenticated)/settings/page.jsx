@@ -6,6 +6,8 @@ import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -16,6 +18,7 @@ export default function SettingsPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [becomingSuperAdmin, setBecomingSuperAdmin] = useState(false);
   const [activeSection, setActiveSection] = useState(null); // 'profile' | 'company' | 'integrations' | null
+  const [authInitialized, setAuthInitialized] = useState(false);
   
   // Profile form state
   const [profileLoading, setProfileLoading] = useState(false);
@@ -65,6 +68,21 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // Wait for Firebase auth to initialize
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('✅ Settings: Firebase auth initialized, user:', firebaseUser.uid);
+        setAuthInitialized(true);
+      } else {
+        console.log('⚠️ Settings: No Firebase user');
+        setAuthInitialized(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Load data from owner hook (uses localStorage + hydration)
   useEffect(() => {
     // Load profile data from owner
@@ -91,6 +109,9 @@ export default function SettingsPage() {
       });
     }
     
+    // Only make API calls after auth is initialized
+    if (!authInitialized) return;
+    
     // Fetch Microsoft integration status (checks by ownerId via API)
     if (ownerId) {
       fetchConnectionStatus();
@@ -100,20 +121,20 @@ export default function SettingsPage() {
     // Check SuperAdmin status
     const checkSuperAdmin = async () => {
       try {
-        console.log('🚀 Calling /api/owner/hydrate');
+        console.log('🚀 Settings: Calling /api/owner/hydrate');
         const response = await api.get('/api/owner/hydrate');
         if (response.data?.success) {
           setIsSuperAdmin(response.data.isSuperAdmin === true);
         }
       } catch (err) {
-        console.error('Error checking SuperAdmin status:', err);
+        console.error('❌ Settings: Error checking SuperAdmin status:', err);
       }
     };
 
     if (ownerId) {
       checkSuperAdmin();
     }
-  }, [owner, companyHQ, ownerId, fetchConnectionStatus, fetchSendGridConfig]);
+  }, [owner, companyHQ, ownerId, authInitialized, fetchConnectionStatus, fetchSendGridConfig]);
 
   // Handle Microsoft connection
   const handleConnectMicrosoft = async () => {
@@ -211,6 +232,11 @@ export default function SettingsPage() {
 
   // Handle becoming SuperAdmin
   const handleBecomeSuperAdmin = async () => {
+    if (!authInitialized) {
+      console.log('⏳ Settings: Waiting for auth initialization...');
+      return;
+    }
+
     try {
       setBecomingSuperAdmin(true);
       setError(null);
@@ -247,6 +273,12 @@ export default function SettingsPage() {
 
   // Temporary test function for debugging
   const handleTestSuperAdminUpsert = async () => {
+    if (!authInitialized) {
+      console.log('⏳ Settings: Waiting for auth initialization...');
+      alert('Waiting for authentication to initialize. Please try again in a moment.');
+      return;
+    }
+
     try {
       console.log('🧪 TEST: Calling SuperAdmin upsert via api client...');
       const response = await api.post('/api/admin/superadmin/upsert');
