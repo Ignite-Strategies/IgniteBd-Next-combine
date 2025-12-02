@@ -6,14 +6,23 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * POST /api/admin/companyhq/create
  * 
  * Create a new CompanyHQ (SuperAdmin only)
+ * Mirrors /api/company/upsert fields but sets ownerId to SuperAdmin's owner ID
  * 
  * Payload:
  * {
  *   companyName: string (required),
- *   ownerId?: string,
- *   contactOwnerId?: string,
- *   managerId?: string
+ *   whatYouDo?: string,
+ *   companyStreet?: string,
+ *   companyCity?: string,
+ *   companyState?: string,
+ *   companyWebsite?: string,
+ *   companyIndustry?: string,
+ *   companyAnnualRev?: string,
+ *   yearsInBusiness?: string,
+ *   teamSize?: string
  * }
+ * 
+ * Note: ownerId is automatically set to the SuperAdmin's owner ID
  */
 export async function POST(request) {
   try {
@@ -46,69 +55,45 @@ export async function POST(request) {
       );
     }
 
-    // Parse request body
+    // Parse request body (matching /api/company/upsert structure)
     const body = await request.json();
-    const { companyName, ownerId, contactOwnerId, managerId } = body;
+    const {
+      companyName,
+      whatYouDo,
+      companyStreet,
+      companyCity,
+      companyState,
+      companyWebsite,
+      companyIndustry,
+      companyAnnualRev,
+      yearsInBusiness,
+      teamSize,
+    } = body ?? {};
 
     if (!companyName || companyName.trim() === '') {
       return NextResponse.json(
-        { success: false, error: 'companyName is required' },
+        { success: false, error: 'Company name is required' },
         { status: 400 },
       );
-    }
-
-    // Note: ownerId, contactOwnerId, and managerId are all optional
-    // CompanyHQ can be created without any owner and ownerId can be added later
-
-    // Validate ownerId if provided
-    if (ownerId) {
-      const ownerExists = await prisma.owner.findUnique({
-        where: { id: ownerId },
-      });
-      if (!ownerExists) {
-        return NextResponse.json(
-          { success: false, error: 'Owner not found' },
-          { status: 404 },
-        );
-      }
-    }
-
-    // Validate contactOwnerId if provided
-    if (contactOwnerId) {
-      const contactExists = await prisma.contact.findUnique({
-        where: { id: contactOwnerId },
-      });
-      if (!contactExists) {
-        return NextResponse.json(
-          { success: false, error: 'Contact not found' },
-          { status: 404 },
-        );
-      }
-    }
-
-    // Validate managerId if provided
-    if (managerId) {
-      const managerExists = await prisma.owner.findUnique({
-        where: { id: managerId },
-      });
-      if (!managerExists) {
-        return NextResponse.json(
-          { success: false, error: 'Manager not found' },
-          { status: 404 },
-        );
-      }
     }
 
     // Auto-assign Ultra Tenant (Ignite Strategies)
     const ULTRA_TENANT_ID = 'cmhmdw78k0001mb1vioxdw2g8';
 
-    // Create CompanyHQ
+    // Create CompanyHQ with SuperAdmin as owner
     const companyHQ = await prisma.companyHQ.create({
       data: {
         companyName: companyName.trim(),
-        ownerId: ownerId || null,
-        contactOwnerId: contactOwnerId || null,
-        managerId: managerId || null,
+        whatYouDo: whatYouDo || null,
+        companyStreet: companyStreet || null,
+        companyCity: companyCity || null,
+        companyState: companyState || null,
+        companyWebsite: companyWebsite || null,
+        companyIndustry: companyIndustry || null,
+        companyAnnualRev: companyAnnualRev || null,
+        yearsInBusiness: yearsInBusiness || null,
+        teamSize: teamSize || null,
+        ownerId: owner.id, // Set to SuperAdmin's owner ID
         ultraTenantId: ULTRA_TENANT_ID, // Auto-assign to Ignite Strategies
       },
       include: {

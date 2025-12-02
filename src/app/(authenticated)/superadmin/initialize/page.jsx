@@ -111,7 +111,7 @@ export default function SuperAdminInitialize() {
 
               <div className="flex flex-col gap-3">
                 <button
-                  onClick={() => router.push('/admin/switchboard')}
+                  onClick={() => router.push('/superadmin/switchboard')}
                   className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-white font-medium hover:bg-blue-700 transition-colors"
                 >
                   Go to Tenant Switchboard

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Users, FileText, ArrowRight, Plus, Shield } from 'lucide-react';
+import { Building2, Users, FileText, ArrowRight, Plus, Shield, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { switchTenant } from '@/lib/tenant';
 import { auth } from '@/lib/firebase';
@@ -93,21 +93,30 @@ export default function TenantSwitchboard() {
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Shield className="h-8 w-8 text-blue-600" />
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Tenant Switchboard</h1>
-              <p className="text-gray-600">SuperAdmin - Manage all CompanyHQs</p>
-            </div>
-          </div>
+        <div className="mb-8">
           <button
-            onClick={() => router.push('/admin/companyhq/create')}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            onClick={() => router.push('/growth-dashboard')}
+            className="mb-4 flex items-center gap-2 text-gray-600 hover:text-gray-900"
           >
-            <Plus className="h-5 w-5" />
-            Create CompanyHQ
+            <ArrowLeft className="h-5 w-5" />
+            Back to Dashboard
           </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Shield className="h-8 w-8 text-blue-600" />
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Tenant Switchboard</h1>
+                <p className="text-gray-600">SuperAdmin - Manage all CompanyHQs</p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/superadmin/companyhq/create')}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            >
+              <Plus className="h-5 w-5" />
+              Create CompanyHQ
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -156,7 +165,7 @@ export default function TenantSwitchboard() {
                 <Building2 className="mx-auto mb-4 h-12 w-12 text-gray-400" />
                 <p>No CompanyHQs found</p>
                 <button
-                  onClick={() => router.push('/admin/companyhq/create')}
+                  onClick={() => router.push('/superadmin/companyhq/create')}
                   className="mt-4 text-blue-600 hover:text-blue-700"
                 >
                   Create your first CompanyHQ
