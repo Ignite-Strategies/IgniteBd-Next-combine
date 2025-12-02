@@ -420,7 +420,5 @@ src/
 
 ## 📚 Related Documentation
 
-- [SuperAdmin Implementation](./SUPERADMIN_IMPLEMENTATION.md)
-- [SuperAdmin Current State](./SUPERADMIN_CURRENT_STATE.md)
-- [Architecture Overview](./architecture/ignitebd-architectureoverview.md)
+- [Architecture Overview](../architecture/ignitebd-architectureoverview.md)
 
