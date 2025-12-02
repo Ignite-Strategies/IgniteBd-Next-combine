@@ -88,7 +88,6 @@ model CompanyHQ {
   deliverableTemplates DeliverableTemplate[]
   blogs                Blog[]
   templates            Template[]
-  eventPlans           EventPlan[]
   landingPages         LandingPage[]
   presentations        Presentation[]
 
@@ -754,24 +753,8 @@ model Template {
   @@map("templates")
 }
 
-model EventPlan {
-  id          String    @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  eventName   String
-  date        DateTime?
-  location    String?
-  agenda      String?
-  description String?
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([companyHQId])
-  @@index([published])
-  @@map("event_plans")
-}
+// Old EventPlan model removed - replaced with BD EventPlan architecture
+// If needed, rename this to EventAgenda or similar for event planning use cases
 
 model LandingPage {
   id          String    @id @default(cuid())
@@ -1062,44 +1045,214 @@ model SavedEvent {
   @@map("saved_events")
 }
 
+
 // ============================================
 // ECOSYSTEM INTELLIGENCE MODELS
 // ============================================
 
-enum EcosystemEntityType {
-  ASSOCIATION
-  VENDOR
-  PARTNER
-  MEDIA
-  GOVERNMENT
-  NONPROFIT
+enum EcosystemOrgSourceType {
+  MANUAL
+  CSV
+  EVENT
+  AI
 }
 
-model AssociationIngest {
+enum OrganizationType {
+  ASSOCIATION
+  COMMERCIAL
+  MEDIA
+  NONPROFIT
+  GOVERNMENT
+}
+
+model EcosystemOrg {
   id               String   @id @default(cuid())
 
-  // Raw spreadsheet fields
+  // Raw ingest
+  sourceType       EcosystemOrgSourceType @default(MANUAL)
   rawName          String
   rawWebsite       String?
   rawLocation      String?
 
-  // Inferred by AI
+  // Identity
   normalizedName   String
+  organizationType OrganizationType
+
+  // AI Enrichment (OpenAI or Apollo in future)
   description      String?
+  whatTheyDo       String?
+  howTheyMatter    String?
   industryTags     String[]
-  memberTypes      String[]
-  memberSeniority  String?
-  missionSummary   String?
   authorityLevel   Int?
-  valueProposition String?
+  sizeEstimate     String?
+  memberTypes      String[]
 
   // BD Intelligence
   personaAlignment Json?
   bdRelevanceScore Int?
 
-  ecosystemType    EcosystemEntityType @default(ASSOCIATION)
-
   createdAt        DateTime @default(now())
 
-  @@map("association_ingests")
+  // Relations
+  eventMetas       EventMeta[]
+
+  @@index([normalizedName])
+  @@index([organizationType])
+  @@map("ecosystem_orgs")
+}
+
+// ============================================
+// EVENT CATALOG MODELS
+// ============================================
+
+enum EventType {
+  ASSOCIATION
+  COMMERCIAL
+  MEDIA
+  INDUSTRY
+  PRIVATE
+  CORPORATE
+}
+
+enum EventSourceType {
+  AI
+  CSV
+  MANUAL
+  WEB
+}
+
+model EventMeta {
+  id         String @id @default(cuid())
+
+  // Identity
+  name       String
+  seriesName String?
+  eventType  EventType
+
+  // Organizer Link
+  organizerId String?
+  organizer   EcosystemOrg? @relation(fields: [organizerId], references: [id], onDelete: SetNull)
+
+  // Location
+  city        String?
+  state       String?
+  country     String?
+
+  // Dates
+  startDate   DateTime?
+  endDate     DateTime?
+  dateRange   String?
+
+  // Cost (if available)
+  costMin     Int?
+  costMax     Int?
+  currency    String?
+
+  // Source tracking
+  sourceType  EventSourceType @default(AI)
+  rawJson     Json?
+
+  createdAt   DateTime @default(now())
+
+  // Relations
+  bdEventOpps BDEventOpp[]
+
+  @@index([organizerId])
+  @@index([eventType])
+  @@index([name])
+  @@map("event_metas")
+}
+
+// ============================================
+// BD EVENT OPPORTUNITY MODELS
+// ============================================
+
+enum EventOppStatus {
+  CONSIDERING
+  SHORTLIST
+  GOING
+  PASSED
+}
+
+model BDEventOpp {
+  id            String @id @default(cuid())
+
+  companyHQId   String
+  ownerId       String
+
+  // Link to global event
+  eventMetaId   String
+  eventMeta     EventMeta @relation(fields: [eventMetaId], references: [id], onDelete: Cascade)
+
+  // Link to persona used for analysis
+  personaId     String?
+
+  // BD scoring
+  personaAlignment Int?
+  travelBurden     Int?
+  costFit          Int?
+  ecosystemFit     Int?
+  bdOpportunity    Int?
+  notes            String?
+
+  // Status
+  status         EventOppStatus @default(CONSIDERING)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  eventPlans     EventPlanOpp[]
+
+  @@index([companyHQId])
+  @@index([ownerId])
+  @@index([eventMetaId])
+  @@index([personaId])
+  @@index([status])
+  @@map("bd_event_opps")
+}
+
+// ============================================
+// EVENT PLAN MODELS
+// ============================================
+
+model EventPlan {
+  id            String @id @default(cuid())
+  companyHQId   String
+  ownerId       String
+
+  name          String
+  description   String?
+  year          Int?
+
+  // Analytics
+  totalCost     Int?
+  totalTrips    Int?
+  spacingScore  Int?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations (via junction table)
+  opps          EventPlanOpp[]
+
+  @@index([companyHQId])
+  @@index([ownerId])
+  @@map("event_plans")
+}
+
+model EventPlanOpp {
+  id          String @id @default(cuid())
+  eventPlanId String
+  eventPlan   EventPlan @relation(fields: [eventPlanId], references: [id], onDelete: Cascade)
+  bdEventOppId String
+  bdEventOpp  BDEventOpp @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
+  order       Int?
+
+  createdAt   DateTime @default(now())
+
+  @@unique([eventPlanId, bdEventOppId])
+  @@index([eventPlanId])
+  @@index([bdEventOppId])
+  @@map("event_plan_opps")
 }
