@@ -211,7 +211,10 @@ export default function SettingsPage() {
       setBecomingSuperAdmin(true);
       setError(null);
       
+      console.log('🚀 Settings: Calling SuperAdmin upsert API...');
       const response = await api.post('/api/admin/superadmin/upsert');
+      
+      console.log('📥 Settings: API response:', response.data);
       
       if (response.data?.success) {
         setIsSuperAdmin(true);
@@ -220,11 +223,22 @@ export default function SettingsPage() {
         // Optional: redirect to switchboard
         // router.push('/admin/switchboard');
       } else {
-        setError(response.data?.error || 'Failed to become SuperAdmin');
+        const errorMsg = response.data?.error || response.data?.details || 'Failed to become SuperAdmin';
+        console.error('❌ Settings: API returned error:', errorMsg);
+        setError(errorMsg);
       }
     } catch (err) {
-      console.error('Error becoming SuperAdmin:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to become SuperAdmin');
+      console.error('❌ Settings: Error becoming SuperAdmin:', err);
+      console.error('❌ Settings: Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      const errorMsg = err.response?.data?.error || 
+                      err.response?.data?.details || 
+                      err.message || 
+                      'Failed to become SuperAdmin';
+      setError(errorMsg);
     } finally {
       setBecomingSuperAdmin(false);
     }
