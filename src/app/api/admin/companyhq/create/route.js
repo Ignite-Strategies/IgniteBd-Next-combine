@@ -80,6 +80,19 @@ export async function POST(request) {
     // Auto-assign Ultra Tenant (Ignite Strategies)
     const ULTRA_TENANT_ID = 'cmhmdw78k0001mb1vioxdw2g8';
 
+    // Convert companyAnnualRev: if it's a string (like "500k-1m"), set to null since schema expects Float
+    // If it's already a number, use it; otherwise null
+    let annualRevValue = null;
+    if (companyAnnualRev) {
+      if (typeof companyAnnualRev === 'number') {
+        annualRevValue = companyAnnualRev;
+      } else if (typeof companyAnnualRev === 'string') {
+        // String ranges like "500k-1m" can't be converted to a single Float
+        // Set to null - the schema expects Float, not String
+        annualRevValue = null;
+      }
+    }
+
     // Create CompanyHQ with SuperAdmin as owner
     const companyHQ = await prisma.companyHQ.create({
       data: {
@@ -90,7 +103,7 @@ export async function POST(request) {
         companyState: companyState || null,
         companyWebsite: companyWebsite || null,
         companyIndustry: companyIndustry || null,
-        companyAnnualRev: companyAnnualRev || null,
+        companyAnnualRev: annualRevValue,
         yearsInBusiness: yearsInBusiness || null,
         teamSize: teamSize || null,
         ownerId: owner.id, // Set to SuperAdmin's owner ID
