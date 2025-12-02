@@ -29,7 +29,7 @@ model Owner {
   ownedCompanies   CompanyHQ[]     @relation("OwnerOf")
   emailActivities  EmailActivity[] // Outreach email tracking
   assessments      Assessment[] // Growth assessments
-  superAdmin        SuperAdmin? // SuperAdmin relationship
+  superAdmin       SuperAdmin? // SuperAdmin relationship
 
   @@map("owners")
 }
@@ -39,8 +39,8 @@ model SuperAdmin {
   ownerId   String   @unique
   owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   active    Boolean  @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("super_admins")
 }
@@ -120,37 +120,37 @@ model Company {
   invoiceId       String?
 
   // Normalized enrichment fields (company-level)
-  domain               String?   @unique // Universal domain identifier (e.g., "example.com")
-  headcount            Int?
-  revenueRange         String?   // "$1M-$10M", "$10M-$50M", etc.
-  growthRate           Float?
-  fundingStage         String?   // "seed", "series-a", "series-b", etc.
-  lastFundingDate      DateTime?
-  lastFundingAmount    Float?
+  domain                String?   @unique // Universal domain identifier (e.g., "example.com")
+  headcount             Int?
+  revenueRange          String? // "$1M-$10M", "$10M-$50M", etc.
+  growthRate            Float?
+  fundingStage          String? // "seed", "series-a", "series-b", etc.
+  lastFundingDate       DateTime?
+  lastFundingAmount     Float?
   numberOfFundingRounds Int?
 
   // Company intelligence (derived from enrichment)
-  companyHealthScore Int? // 0–100 (computed)
-  growthScore       Int? // 0–100 (computed)
-  stabilityScore    Int? // 0–100 (computed)
+  companyHealthScore  Int? // 0–100 (computed)
+  growthScore         Int? // 0–100 (computed)
+  stabilityScore      Int? // 0–100 (computed)
   marketPositionScore Int? // 0–100 (computed)
-  readinessScore    Int? // 0–100 (computed)
+  readinessScore      Int? // 0–100 (computed)
 
   // Inference layer (non-score inferences)
-  positioningLabel   String?   // e.g. "mid-size capital allocator"
-  category           String?   // e.g. "Capital Allocator", "Asset Manager"
-  revenueTier        String?   // e.g. "Mega", "Enterprise", "Mid"
-  headcountTier      String?   // e.g. "Large", "Mid-size"
-  normalizedIndustry String?   // e.g. "Finance", "Healthcare"
+  positioningLabel   String? // e.g. "mid-size capital allocator"
+  category           String? // e.g. "Capital Allocator", "Asset Manager"
+  revenueTier        String? // e.g. "Mega", "Enterprise", "Mid"
+  headcountTier      String? // e.g. "Large", "Mid-size"
+  normalizedIndustry String? // e.g. "Finance", "Healthcare"
   competitors        String[] @default([]) // Inferred competitor list
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  companyHQ    CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts     Contact[]     @relation("ContactCompany")
-  legacyContacts Contact[]   @relation("LegacyContactCompany")
-  proposals    Proposal[] // Proposals linked to this company
-  workPackages WorkPackage[] // Work packages for this company
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  companyHQ      CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  contacts       Contact[]     @relation("ContactCompany")
+  legacyContacts Contact[]     @relation("LegacyContactCompany")
+  proposals      Proposal[] // Proposals linked to this company
+  workPackages   WorkPackage[] // Work packages for this company
 
   @@index([domain])
   @@map("companies")
@@ -171,59 +171,59 @@ model ContactList {
 }
 
 model Contact {
-  id                  String    @id @default(cuid())
-  crmId               String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
-  firstName           String?
-  lastName            String?
-  fullName            String? // Full name from enrichment
-  goesBy              String?
-  email               String?   @unique
-  phone               String?
-  
+  id        String  @id @default(cuid())
+  crmId     String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
+  firstName String?
+  lastName  String?
+  fullName  String? // Full name from enrichment
+  goesBy    String?
+  email     String? @unique
+  phone     String?
+
   // Normalized enrichment fields (contact-level)
-  title               String?
-  seniority           String? // Seniority level from enrichment
-  department          String? // Department from enrichment
-  jobRole             String? // Specific role/function from enrichment
-  linkedinUrl         String? // LinkedIn URL from enrichment
-  
-  city                String? // City from enrichment
-  state               String? // State from enrichment
-  country             String? // Country from enrichment
-  timezone            String?
-  
+  title       String?
+  seniority   String? // Seniority level from enrichment
+  department  String? // Department from enrichment
+  jobRole     String? // Specific role/function from enrichment
+  linkedinUrl String? // LinkedIn URL from enrichment
+
+  city     String? // City from enrichment
+  state    String? // State from enrichment
+  country  String? // Country from enrichment
+  timezone String?
+
   // Career signals
   currentRoleStartDate DateTime?
   totalYearsExperience Float?
   numberOfJobChanges   Int?
   averageTenureMonths  Float?
-  careerProgression    String?   // "accelerating", "stable", "declining"
+  careerProgression    String? // "accelerating", "stable", "declining"
   recentJobChange      Boolean?
   recentPromotion      Boolean?
-  
+
   // Company context (normalized from enrichment)
-  companyName         String? // Company name from enrichment (convenience copy)
-  companyDomain       String? // Company domain from enrichment (e.g., "example.com")
-  companySize         String? // "1-10", "11-50", "51-200", etc.
-  companyIndustry     String? // Industry from enrichment
-  
+  companyName     String? // Company name from enrichment (convenience copy)
+  companyDomain   String? // Company domain from enrichment (e.g., "example.com")
+  companySize     String? // "1-10", "11-50", "51-200", etc.
+  companyIndustry String? // Industry from enrichment
+
   // Universal company relation (refactored from contactCompanyId)
-  companyId           String? // Universal company record (domain-matched)
-  contactCompanyId    String? // DEPRECATED: Legacy field for backward compatibility
-  
-  buyerDecision       String?
-  howMet              String?
-  notes               String? // Notes/context about the contact
-  contactListId       String?
-  domain              String? // Domain inferred from email (e.g., "businesspointlaw.com")
-  
+  companyId        String? // Universal company record (domain-matched)
+  contactCompanyId String? // DEPRECATED: Legacy field for backward compatibility
+
+  buyerDecision String?
+  howMet        String?
+  notes         String? // Notes/context about the contact
+  contactListId String?
+  domain        String? // Domain inferred from email (e.g., "businesspointlaw.com")
+
   // Enrichment metadata
   enrichmentSource    String? // Source of enrichment (e.g., "Lusha", "Apollo")
   enrichmentFetchedAt DateTime? // When enrichment was fetched
   enrichmentPayload   Json? // DEPRECATED: Full enrichment payload (kept for backward compatibility, use Redis instead)
   enrichmentRedisKey  String? // Redis key where raw enrichment JSON is stored
-  
-  createdById         String? // User who created this contact
+
+  createdById String? // User who created this contact
 
   // Client Portal Activation
   firebaseUid     String?   @unique // Firebase Auth UID
@@ -236,32 +236,32 @@ model Contact {
   role    String  @default("contact") // "contact" | "owner"
 
   // Intelligence scores (0–100, derived from enrichment)
-  seniorityScore        Int? // 0–100 (computed)
-  buyingPowerScore      Int? // 0–100 (computed)
-  urgencyScore          Int? // 0–100 (computed)
-  rolePowerScore        Int? // 0–100 (computed)
-  buyerLikelihoodScore  Int? // 0–100 (computed)
-  readinessToBuyScore   Int? // 0–100 (computed)
-  careerMomentumScore   Int? // 0–100 (computed)
-  careerStabilityScore  Int? // 0–100 (computed)
-  
+  seniorityScore       Int? // 0–100 (computed)
+  buyingPowerScore     Int? // 0–100 (computed)
+  urgencyScore         Int? // 0–100 (computed)
+  rolePowerScore       Int? // 0–100 (computed)
+  buyerLikelihoodScore Int? // 0–100 (computed)
+  readinessToBuyScore  Int? // 0–100 (computed)
+  careerMomentumScore  Int? // 0–100 (computed)
+  careerStabilityScore Int? // 0–100 (computed)
+
   // Inference layer (non-score inferences)
-  profileSummary        String? // GPT-generated summary for the individual
-  tenureYears           Int?    // Based on employment history (DEPRECATED - use currentTenureYears)
-  currentTenureYears    Float?  // Years at current company
-  totalExperienceYears  Float?  // Total years across all positions
-  avgTenureYears        Float?  // Average tenure per position
-  careerTimeline        Json?   // Full career timeline from employment history
-  
+  profileSummary       String? // GPT-generated summary for the individual
+  tenureYears          Int? // Based on employment history (DEPRECATED - use currentTenureYears)
+  currentTenureYears   Float? // Years at current company
+  totalExperienceYears Float? // Total years across all positions
+  avgTenureYears       Float? // Average tenure per position
+  careerTimeline       Json? // Full career timeline from employment history
+
   // Buying signals
-  budgetAuthority      Boolean?
-  decisionMaker        Boolean?
-  influencer           Boolean?
-  gatekeeper           Boolean?
-  
-  buyingTriggers       String[]  @default([])
-  painPoints           String[]  @default([])
-  goals                String[]  @default([])
+  budgetAuthority Boolean?
+  decisionMaker   Boolean?
+  influencer      Boolean?
+  gatekeeper      Boolean?
+
+  buyingTriggers String[] @default([])
+  painPoints     String[] @default([])
+  goals          String[] @default([])
 
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
@@ -1028,89 +1028,86 @@ model BDOSScore {
 // ============================================
 
 model SavedEvent {
-  id              String   @id @default(cuid())
-  userId          String
+  id     String @id @default(cuid())
+  userId String
 
   eventName       String
   eventSeriesName String?
   organizerName   String
   producerType    String
 
-  city            String
-  stateOrRegion   String?
+  city          String
+  stateOrRegion String?
 
-  startDate       String?
-  endDate         String?
+  startDate String?
+  endDate   String?
 
-  costMin         Int?
-  costMax         Int?
-  currency        String
+  costMin  Int?
+  costMax  Int?
+  currency String
 
   personaAlignment Int
 
-  url             String?
+  url String?
 
-  rawJson         Json
-  createdAt       DateTime @default(now())
+  rawJson   Json
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
   @@map("saved_events")
 }
 
-
 // ============================================
 // ECOSYSTEM INTELLIGENCE MODELS
 // ============================================
 
-enum EcosystemOrgSourceType {
-  MANUAL
-  CSV
-  EVENT
-  AI
-}
-
-enum OrganizationType {
+enum OrganizationArchetype {
   ASSOCIATION
-  COMMERCIAL
-  MEDIA
+  TRADE_GROUP
+  GUILD
   NONPROFIT
   GOVERNMENT
+  OTHER
 }
 
 model EcosystemOrg {
-  id               String   @id @default(cuid())
-
-  // Raw ingest
-  sourceType       EcosystemOrgSourceType @default(MANUAL)
-  rawName          String
-  rawWebsite       String?
-  rawLocation      String?
+  id String @id @default(cuid())
 
   // Identity
-  normalizedName   String
-  organizationType OrganizationType
+  name      String
+  website   String?
+  city      String?
+  state     String?
+  archetype OrganizationArchetype
 
-  // AI Enrichment (OpenAI or Apollo in future)
-  description      String?
-  whatTheyDo       String?
-  howTheyMatter    String?
-  industryTags     String[]
-  authorityLevel   Int?
-  sizeEstimate     String?
-  memberTypes      String[]
+  // Org-level meta
+  whatTheyDo    String?
+  annualRevenue Int?
+  duesInfo      String?
+  memberCount   Int?
 
-  // BD Intelligence
-  personaAlignment Json?
-  bdRelevanceScore Int?
+  // Member meta
+  memberDescription          String?
+  memberSeniority            String?
+  memberIndustries           String[]
+  memberReasonForAffiliation String?
+  memberAffiliationStrength  String?
 
-  createdAt        DateTime @default(now())
+  // Why I Care (CompanyHQ context)
+  orgRelevanceToCompanyHQ     String?
+  bdCompanyHQAffiliationScore Int?
 
-  // Relations
-  eventMetas       EventMeta[]
+  // BD-Intel (target persona)
+  targetPersonaAlignment Int?
 
-  @@index([normalizedName])
-  @@index([organizationType])
+  createdAt DateTime @default(now())
+
+  // Relations for future event linkage
+  eventMetas EventMeta[]
+
+  @@index([name])
+  @@index([archetype])
   @@map("ecosystem_orgs")
 }
 
@@ -1135,7 +1132,7 @@ enum EventSourceType {
 }
 
 model EventMeta {
-  id         String @id @default(cuid())
+  id String @id @default(cuid())
 
   // Identity
   name       String
@@ -1147,25 +1144,25 @@ model EventMeta {
   organizer   EcosystemOrg? @relation(fields: [organizerId], references: [id], onDelete: SetNull)
 
   // Location
-  city        String?
-  state       String?
-  country     String?
+  city    String?
+  state   String?
+  country String?
 
   // Dates
-  startDate   DateTime?
-  endDate     DateTime?
-  dateRange   String?
+  startDate DateTime?
+  endDate   DateTime?
+  dateRange String?
 
   // Cost (if available)
-  costMin     Int?
-  costMax     Int?
-  currency    String?
+  costMin  Int?
+  costMax  Int?
+  currency String?
 
   // Source tracking
-  sourceType  EventSourceType @default(AI)
-  rawJson     Json?
+  sourceType EventSourceType @default(AI)
+  rawJson    Json?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
   bdEventOpps BDEventOpp[]
@@ -1188,17 +1185,17 @@ enum EventOppStatus {
 }
 
 model BDEventOpp {
-  id            String @id @default(cuid())
+  id String @id @default(cuid())
 
-  companyHQId   String
-  ownerId       String
+  companyHQId String
+  ownerId     String
 
   // Link to global event
-  eventMetaId   String
-  eventMeta     EventMeta @relation(fields: [eventMetaId], references: [id], onDelete: Cascade)
+  eventMetaId String
+  eventMeta   EventMeta @relation(fields: [eventMetaId], references: [id], onDelete: Cascade)
 
   // Link to persona used for analysis
-  personaId     String?
+  personaId String?
 
   // BD scoring
   personaAlignment Int?
@@ -1209,13 +1206,13 @@ model BDEventOpp {
   notes            String?
 
   // Status
-  status         EventOppStatus @default(CONSIDERING)
+  status EventOppStatus @default(CONSIDERING)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  eventPlans     EventPlanOpp[]
+  eventPlans EventPlanOpp[]
 
   @@index([companyHQId])
   @@index([ownerId])
@@ -1230,24 +1227,24 @@ model BDEventOpp {
 // ============================================
 
 model EventPlan {
-  id            String @id @default(cuid())
-  companyHQId   String
-  ownerId       String
+  id          String @id @default(cuid())
+  companyHQId String
+  ownerId     String
 
-  name          String
-  description   String?
-  year          Int?
+  name        String
+  description String?
+  year        Int?
 
   // Analytics
-  totalCost     Int?
-  totalTrips    Int?
-  spacingScore  Int?
+  totalCost    Int?
+  totalTrips   Int?
+  spacingScore Int?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations (via junction table)
-  opps          EventPlanOpp[]
+  opps EventPlanOpp[]
 
   @@index([companyHQId])
   @@index([ownerId])
@@ -1255,14 +1252,14 @@ model EventPlan {
 }
 
 model EventPlanOpp {
-  id          String @id @default(cuid())
-  eventPlanId String
-  eventPlan   EventPlan @relation(fields: [eventPlanId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  eventPlanId  String
+  eventPlan    EventPlan  @relation(fields: [eventPlanId], references: [id], onDelete: Cascade)
   bdEventOppId String
-  bdEventOpp  BDEventOpp @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
-  order       Int?
+  bdEventOpp   BDEventOpp @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
+  order        Int?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([eventPlanId, bdEventOppId])
   @@index([eventPlanId])
