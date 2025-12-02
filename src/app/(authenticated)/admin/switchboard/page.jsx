@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Building2, Users, FileText, ArrowRight, Plus, Shield } from 'lucide-react';
 import api from '@/lib/api';
 import { switchTenant } from '@/lib/tenant';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function TenantSwitchboard() {
   const router = useRouter();
@@ -12,37 +14,61 @@ export default function TenantSwitchboard() {
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [switching, setSwitching] = useState(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
+  // Wait for Firebase auth to initialize
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('✅ Switchboard: Firebase auth initialized, user:', firebaseUser.uid);
+        setAuthInitialized(true);
+      } else {
+        console.log('⚠️ Switchboard: No Firebase user');
+        setAuthInitialized(false);
+        router.push('/signup');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Load data after auth is initialized
+  useEffect(() => {
+    if (!authInitialized) return;
+
     const loadData = async () => {
       try {
-        // Check if user is SuperAdmin
-        const ownerResponse = await api.get('/api/owner/hydrate');
-        if (ownerResponse.data?.success) {
-          const isAdmin = ownerResponse.data.isSuperAdmin === true;
-          setIsSuperAdmin(isAdmin);
-
-          if (!isAdmin) {
-            // Not SuperAdmin, redirect to dashboard
-            router.push('/growth-dashboard');
-            return;
-          }
-
-          // Fetch all CompanyHQs
-          const hqsResponse = await api.get('/api/admin/companyhqs');
-          if (hqsResponse.data?.success) {
-            setCompanyHQs(hqsResponse.data.companyHQs || []);
-          }
+        // Try to fetch CompanyHQs - this route checks SuperAdmin status
+        // If not SuperAdmin, it will return 403 and we redirect
+        const hqsResponse = await api.get('/api/admin/companyhqs');
+        
+        if (hqsResponse.data?.success) {
+          setIsSuperAdmin(true);
+          setCompanyHQs(hqsResponse.data.companyHQs || []);
         }
       } catch (error) {
         console.error('Error loading switchboard:', error);
+        
+        // If 403, not SuperAdmin - redirect
+        if (error.response?.status === 403) {
+          console.log('❌ Switchboard: Not SuperAdmin, redirecting...');
+          router.push('/growth-dashboard');
+          return;
+        }
+        
+        // If 401, auth issue - redirect to signup
+        if (error.response?.status === 401) {
+          console.log('❌ Switchboard: Auth error, redirecting to signup...');
+          router.push('/signup');
+          return;
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [router]);
+  }, [authInitialized, router]);
 
   const handleSwitchTenant = (companyHQId) => {
     switchTenant(companyHQId);
