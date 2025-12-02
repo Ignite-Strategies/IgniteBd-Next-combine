@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import api from '@/lib/api';
 
 const defaultCompanyHQId =
   process.env.NEXT_PUBLIC_DEFAULT_COMPANY_HQ_ID || '';
@@ -33,13 +34,8 @@ export default function PersonaCreatePage() {
         const query = companyHQId
           ? `?companyHQId=${encodeURIComponent(companyHQId)}`
           : '';
-        const res = await fetch(`/api/products${query}`, {
-          cache: 'no-store',
-        });
-        if (!res.ok) {
-          throw new Error('Failed to load products');
-        }
-        const data = await res.json();
+        const response = await api.get(`/api/products${query}`);
+        const data = response.data;
         setProducts(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
@@ -66,22 +62,13 @@ export default function PersonaCreatePage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/personas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...form,
-          alignmentScore: undefined, // allow server to calculate
-        }),
+      console.log('🚀 Calling /api/personas');
+      const response = await api.post('/api/personas', {
+        ...form,
+        alignmentScore: undefined, // allow server to calculate
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create persona');
-      }
+      const data = response.data;
 
       setResult({
         personaId: data.personaId,

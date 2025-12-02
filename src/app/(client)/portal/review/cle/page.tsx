@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuth } from 'firebase/auth';
+import api from '@/lib/api';
 
 interface Section {
   title: string;
@@ -44,18 +45,9 @@ export default function PortalReviewCLEPage() {
 
         setAuthenticated(true);
 
-        // Fetch presentation
-        const response = await fetch('/api/portal/review/presentation', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch presentation');
-        }
-
-        const data = await response.json();
+        // Fetch presentation using api client (token automatically attached)
+        const response = await api.get('/api/portal/review/presentation');
+        const data = response.data;
         if (data.success && data.presentation) {
           setPresentation(data.presentation);
           // Initialize comments from existing feedback
@@ -84,30 +76,14 @@ export default function PortalReviewCLEPage() {
     setSaved({ ...saved, [sectionIndex]: false });
 
     try {
-      const firebaseUser = getAuth().currentUser;
-      if (!firebaseUser) return;
-
-      const token = await firebaseUser.getIdToken();
-      if (!token) return;
-
-      const response = await fetch('/api/portal/review/cle/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          presentationId: presentation.id,
-          sectionIndex,
-          comment,
-        }),
+      // Use api client (token automatically attached)
+      const response = await api.post('/api/portal/review/cle/feedback', {
+        presentationId: presentation.id,
+        sectionIndex,
+        comment,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to save feedback');
-      }
-
-      const data = await response.json();
+      const data = response.data;
       if (data.success) {
         // Update local state
         const updatedFeedback = {

@@ -4,10 +4,15 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 export async function GET(request) {
   try {
+    // Log token for debugging
+    const authHeader = request.headers.get('authorization');
+    console.log('🔥 HYDRATE: Token received:', authHeader ? `${authHeader.substring(0, 30)}...` : 'NO TOKEN');
+
     let firebaseUser;
     try {
       firebaseUser = await verifyFirebaseToken(request);
     } catch (error) {
+      console.error('❌ HYDRATE: Token verification failed:', error.message);
       return NextResponse.json(
         { success: false, error: 'Firebase authentication required' },
         { status: 401 },

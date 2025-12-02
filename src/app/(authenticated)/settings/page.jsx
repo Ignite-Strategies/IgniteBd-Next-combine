@@ -100,6 +100,7 @@ export default function SettingsPage() {
     // Check SuperAdmin status
     const checkSuperAdmin = async () => {
       try {
+        console.log('🚀 Calling /api/owner/hydrate');
         const response = await api.get('/api/owner/hydrate');
         if (response.data?.success) {
           setIsSuperAdmin(response.data.isSuperAdmin === true);
