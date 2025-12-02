@@ -148,9 +148,14 @@ export default function TenantSwitchboard() {
                         <h3 className="text-lg font-semibold text-gray-900">
                           {hq.companyName}
                         </h3>
-                        {hq.id === 'ignitebd_master_hq' && (
+                        {hq.ultraTenantId === null && (
                           <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-800">
-                            Master HQ
+                            Ultra Tenant
+                          </span>
+                        )}
+                        {hq.ultraTenantId === 'cmhmdw78k0001mb1vioxdw2g8' && (
+                          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800">
+                            Child of Ignite Strategies
                           </span>
                         )}
                       </div>

@@ -66,11 +66,24 @@ export async function GET(request) {
             email: true,
           },
         },
+        ultraTenant: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        subTenants: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
         _count: {
           select: {
             companies: true,
             contacts: true,
             proposals: true,
+            subTenants: true,
           },
         },
       },

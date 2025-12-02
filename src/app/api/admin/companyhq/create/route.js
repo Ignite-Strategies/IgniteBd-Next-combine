@@ -104,6 +104,9 @@ export async function POST(request) {
       }
     }
 
+    // Auto-assign Ultra Tenant (Ignite Strategies)
+    const ULTRA_TENANT_ID = 'cmhmdw78k0001mb1vioxdw2g8';
+
     // Create CompanyHQ
     const companyHQ = await prisma.companyHQ.create({
       data: {
@@ -111,6 +114,7 @@ export async function POST(request) {
         ownerId: ownerId || null,
         contactOwnerId: contactOwnerId || null,
         managerId: managerId || null,
+        ultraTenantId: ULTRA_TENANT_ID, // Auto-assign to Ignite Strategies
       },
       include: {
         owner: {
@@ -133,6 +137,18 @@ export async function POST(request) {
             firstName: true,
             lastName: true,
             email: true,
+          },
+        },
+        ultraTenant: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        subTenants: {
+          select: {
+            id: true,
+            companyName: true,
           },
         },
       },

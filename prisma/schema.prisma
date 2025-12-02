@@ -83,6 +83,12 @@ model CompanyHQ {
   ownerId              String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
   contactOwnerId       String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
   managerId            String?
+  
+  // Ultra Tenant Parent-Child Relationship
+  ultraTenantId        String? // Parent tenant (Ignite Strategies is root with null)
+  ultraTenant          CompanyHQ?              @relation("UltraTenantChildren", fields: [ultraTenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  subTenants           CompanyHQ[]             @relation("UltraTenantChildren")
+  
   companies            Company[]
   manager              Owner?                  @relation("ManagerOf", fields: [managerId], references: [id])
   owner                Owner?                  @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
