@@ -42,55 +42,73 @@ export async function GET(request) {
     }
 
     // Fetch all CompanyHQs
-    const companyHQs = await prisma.companyHQ.findMany({
-      include: {
-        owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    let companyHQs;
+    try {
+      companyHQs = await prisma.companyHQ.findMany({
+        include: {
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          manager: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          contactOwner: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          ultraTenant: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+          subTenants: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+          _count: {
+            select: {
+              companies: true,
+              contacts: true,
+              proposals: true,
+              subTenants: true,
+            },
           },
         },
-        manager: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+        orderBy: {
+          createdAt: 'desc',
         },
-        contactOwner: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+      });
+    } catch (error) {
+      // If ultraTenantId column doesn't exist, migration hasn't been run
+      if (error.code === 'P2022' && error.message?.includes('ultraTenantId')) {
+        console.error('❌ Migration not applied: ultraTenantId column missing');
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Database migration required',
+            message: 'The ultraTenantId column does not exist. Please run: node scripts/apply-ultra-tenant-migration.js',
+            code: 'MIGRATION_REQUIRED',
           },
-        },
-        ultraTenant: {
-          select: {
-            id: true,
-            companyName: true,
-          },
-        },
-        subTenants: {
-          select: {
-            id: true,
-            companyName: true,
-          },
-        },
-        _count: {
-          select: {
-            companies: true,
-            contacts: true,
-            proposals: true,
-            subTenants: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+          { status: 500 },
+        );
+      }
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
