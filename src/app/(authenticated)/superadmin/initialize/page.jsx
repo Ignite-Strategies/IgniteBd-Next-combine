@@ -50,8 +50,8 @@ export default function SuperAdminInitialize() {
       setInitializing(true);
       setError(null);
 
-      console.log('🚀 SuperAdmin Initialize: Calling upsert API for ownerId:', ownerId);
-      const response = await api.post('/api/admin/superadmin/upsert');
+      console.log('🚀 SuperAdmin Initialize: Calling create API for ownerId:', ownerId);
+      const response = await api.post('/api/superadmin/create');
 
       if (response.data?.success) {
         setSuccess(true);
