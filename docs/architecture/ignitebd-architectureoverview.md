@@ -12,9 +12,12 @@ Complete architecture guide for IgniteBD Next.js stack.
 6. [Authentication Flow](#authentication-flow)
 7. [Database & Prisma](#database--prisma)
 8. [Core Data Model Relationships](#core-data-model-relationships)
-9. [Development Workflow](#development-workflow)
-10. [Deployment](#deployment)
-11. [Key Differences from Original Stack](#key-differences-from-original-stack)
+9. [Ecosystem Intelligence Architecture](#ecosystem-intelligence-architecture)
+10. [Events Architecture](#events-architecture)
+11. [Personas Architecture](#personas-architecture)
+12. [Development Workflow](#development-workflow)
+13. [Deployment](#deployment)
+14. [Key Differences from Original Stack](#key-differences-from-original-stack)
 
 ---
 
@@ -115,6 +118,15 @@ src/app/
 │   │   ├── campaigns/
 │   │   └── campaigns/[campaignId]/
 │   ├── personas/
+│   │   ├── page.jsx       # Personas list
+│   │   ├── builder/       # Persona builder
+│   │   ├── [personaId]/   # Persona detail
+│   │   └── build-from-contacts/
+│   ├── ecosystem/
+│   │   └── associations/  # Ecosystem Intelligence - Associations
+│   ├── events/
+│   │   ├── page.jsx       # Events hub
+│   │   └── build-from-persona/  # Event recommendations
 │   ├── pipelines/
 │   │   ├── layout.jsx     # Pipeline context hydration
 │   │   └── roadmap/
@@ -128,6 +140,20 @@ src/app/
     │   └── [ownerId]/profile/route.js
     ├── contacts/
     ├── company/
+    ├── personas/
+    │   ├── generate/route.ts
+    │   ├── [personaId]/route.ts
+    │   ├── [personaId]/product-fit/route.ts
+    │   └── [personaId]/bd-intel/route.ts
+    ├── ecosystem/
+    │   └── org/
+    │       └── ingest/route.ts  # EcosystemOrg ingestion
+    ├── events/
+    │   ├── meta/
+    │   │   └── ingest/route.ts  # EventMeta catalog
+    │   ├── opp/
+    │   │   └── generate/route.ts  # BDEventOpp generation
+    │   └── save/route.ts
     └── [other entities]/
 ```
 
@@ -409,6 +435,401 @@ Client Portal (workPackageId) ← Access via localStorage
 
 ---
 
+## Ecosystem Intelligence Architecture
+
+### Overview
+
+The Ecosystem Intelligence system maps and analyzes the business development ecosystem through organizations (associations, commercial producers, media, nonprofits, etc.) and their events. This architecture provides a complete "who are they?" → "what events do they produce?" → "should I attend?" intelligence pipeline.
+
+### Core Models
+
+#### EcosystemOrg (The Root)
+**File**: `prisma/schema.prisma`
+
+```prisma
+model EcosystemOrg {
+  id               String   @id @default(cuid())
+  
+  // Raw ingest
+  sourceType       EcosystemOrgSourceType @default(MANUAL)
+  rawName          String
+  rawWebsite       String?
+  rawLocation      String?
+  
+  // Identity
+  normalizedName   String
+  organizationType OrganizationType  // ASSOCIATION, COMMERCIAL, MEDIA, NONPROFIT, GOVERNMENT
+  
+  // AI Enrichment
+  description      String?
+  whatTheyDo       String?
+  howTheyMatter    String?
+  industryTags     String[]
+  authorityLevel   Int?        // 1–5
+  sizeEstimate     String?
+  memberTypes      String[]
+  
+  // BD Intelligence
+  personaAlignment Json?       // { personaId: score }
+  bdRelevanceScore Int?        // 0–100
+  
+  // Relations
+  eventMetas       EventMeta[]
+}
+```
+
+**Purpose**: Central intelligence model for all ecosystem organizations. Stores AI-inferred insights about what organizations do, who their members are, and their BD value.
+
+**Enums**:
+- `EcosystemOrgSourceType`: MANUAL, CSV, EVENT, AI
+- `OrganizationType`: ASSOCIATION, COMMERCIAL, MEDIA, NONPROFIT, GOVERNMENT
+
+#### EventMeta (The Catalog)
+**File**: `prisma/schema.prisma`
+
+```prisma
+model EventMeta {
+  id         String @id @default(cuid())
+  
+  // Identity
+  name       String
+  seriesName String?
+  eventType  EventType  // ASSOCIATION, COMMERCIAL, MEDIA, INDUSTRY, PRIVATE, CORPORATE
+  
+  // Organizer Link
+  organizerId String?
+  organizer   EcosystemOrg? @relation(fields: [organizerId], references: [id])
+  
+  // Location, Dates, Cost
+  city        String?
+  state       String?
+  country     String?
+  startDate   DateTime?
+  endDate     DateTime?
+  dateRange   String?
+  costMin     Int?
+  costMax     Int?
+  currency    String?
+  
+  // Source tracking
+  sourceType  EventSourceType @default(AI)
+  rawJson     Json?
+  
+  // Relations
+  bdEventOpps BDEventOpp[]
+}
+```
+
+**Purpose**: Global event catalog - "everything that exists". Events are linked to their organizing EcosystemOrg for intelligence inheritance.
+
+**Enums**:
+- `EventType`: ASSOCIATION, COMMERCIAL, MEDIA, INDUSTRY, PRIVATE, CORPORATE
+- `EventSourceType`: AI, CSV, MANUAL, WEB
+
+#### BDEventOpp (The Analyzer)
+**File**: `prisma/schema.prisma`
+
+```prisma
+model BDEventOpp {
+  id            String @id @default(cuid())
+  
+  companyHQId   String
+  ownerId       String
+  
+  // Link to global event
+  eventMetaId   String
+  eventMeta     EventMeta @relation(fields: [eventMetaId], references: [id])
+  
+  // Link to persona used for analysis
+  personaId     String?
+  
+  // BD scoring
+  personaAlignment Int?       // 0–100
+  travelBurden     Int?       // 1–10
+  costFit          Int?       // 1–10
+  ecosystemFit     Int?       // 0–100 from organizer org
+  bdOpportunity    Int?       // composite score
+  notes            String?
+  
+  // Status
+  status         EventOppStatus @default(CONSIDERING)
+  
+  // Relations
+  eventPlans     EventPlanOpp[]
+}
+```
+
+**Purpose**: BD-scoped opportunity analysis. Links a global EventMeta to a persona + company context, providing "should I go to this event?" intelligence.
+
+**Status Enum**: CONSIDERING, SHORTLIST, GOING, PASSED
+
+#### EventPlan (Strategy Container)
+**File**: `prisma/schema.prisma`
+
+```prisma
+model EventPlan {
+  id            String @id @default(cuid())
+  companyHQId   String
+  ownerId       String
+  
+  name          String      // "Q1 2026 Roadmap"
+  description   String?
+  year          Int?
+  
+  // Analytics
+  totalCost     Int?
+  totalTrips    Int?
+  spacingScore  Int?
+  
+  // Relations (via junction)
+  opps          EventPlanOpp[]
+}
+```
+
+**Purpose**: User's BD master plan - a container for selected event opportunities with analytics.
+
+### Connection Flow
+
+```
+EcosystemOrg ───────↘
+                    EventMeta ───↘
+                                    BDEventOpp ───↘ 
+                                                   EventPlan
+
+Persona ─────────────↗
+```
+
+**Flow 1: Ingest Organizers**
+- CSV/Text/Manual → `/api/ecosystem/org/ingest`
+- AI inference enriches with BD intelligence
+- Saves to `EcosystemOrg`
+
+**Flow 2: Build EventMeta Catalog**
+- Persona + priorities → `/api/events/meta/ingest`
+- GPT generates event recommendations
+- Extract organizer → fuzzy match `EcosystemOrg`
+- Save `EventMeta` linked to organizer
+
+**Flow 3: Generate BDEventOpp**
+- `EventMeta` + Persona + Priorities → `/api/events/opp/generate`
+- GPT scorer analyzes BD opportunity
+- Creates `BDEventOpp` with scores
+
+**Flow 4: Build EventPlan**
+- User selects multiple `BDEventOpps`
+- Creates `EventPlan` with analytics
+
+### API Routes
+
+#### Ecosystem Org Ingestion
+**POST** `/api/ecosystem/org/ingest`
+- Accepts: CSV/XLSX file, text list, or single manual entry
+- Process: Parse → AI inference → Save `EcosystemOrg`
+- Returns: Enriched ecosystem orgs
+
+**GET** `/api/ecosystem/org/ingest`
+- Query params: `limit`, `offset`, `organizationType`
+- Returns: List of ecosystem orgs
+
+#### EventMeta Catalog
+**POST** `/api/events/meta/ingest`
+- Body: `{ type: 'persona', data: { personaId, priorities, ... } }`
+- Process: Generate events → Match organizer → Save `EventMeta`
+- Returns: EventMeta records with organizer links
+
+**GET** `/api/events/meta`
+- Query params: `limit`, `offset`, `eventType`
+- Returns: List of EventMeta with organizer info
+
+#### BDEventOpp Generation
+**POST** `/api/events/opp/generate`
+- Body: `{ personaId, priorities: { travel, cost, networking, learning, ecosystem }, companyHQId, ownerId }`
+- Process: Pull EventMeta candidates → GPT scorer → Create `BDEventOpp`
+- Returns: BDEventOpp records with scores
+
+### Services
+
+**File**: `src/lib/services/ecosystemOrgInference.ts`
+- `runEcosystemOrgInference()` - AI-powered org intelligence inference
+
+**File**: `src/lib/services/organizerMatcher.ts`
+- `findOrCreateOrganizer()` - Fuzzy match organizer names to EcosystemOrg records
+
+### Key Features
+
+1. **Organizer Intelligence**: EcosystemOrg provides BD intelligence (relevance scores, industry tags, persona alignment) that flows through to events
+2. **Global Event Catalog**: EventMeta is a single source of truth - once created, referenced by all BDEventOpps
+3. **Persona-Driven Scoring**: BDEventOpp scoring uses persona + priorities + ecosystem intelligence
+4. **Fuzzy Matching**: Automatic organizer matching prevents duplicates and links events to orgs
+
+---
+
+## Events Architecture
+
+### Overview
+
+The Events system provides a complete pipeline from event discovery to BD opportunity analysis to strategic planning. Events are generated via AI recommendations, cataloged in EventMeta, scored as BDEventOpp, and organized into EventPlans.
+
+### Event Models Hierarchy
+
+```
+EventMeta (Global Catalog)
+  ↓
+BDEventOpp (BD Analysis) ──→ EventPlan (Strategy)
+```
+
+### Event Generation Flow
+
+1. **Discovery**: Persona-based event recommendations via GPT
+2. **Cataloging**: Events saved to EventMeta with organizer linkage
+3. **Analysis**: BDEventOpp scoring for specific persona/company context
+4. **Planning**: EventPlan organizes selected opportunities
+
+### Event Types
+
+- **ASSOCIATION**: Events produced by professional associations
+- **COMMERCIAL**: Commercial event producers
+- **MEDIA**: Media company events
+- **INDUSTRY**: Industry-specific events
+- **PRIVATE**: Private/closed events
+- **CORPORATE**: Corporate-hosted events
+
+### BD Scoring System
+
+BDEventOpp uses a 5-dimensional scoring system:
+- `personaAlignment` (0-100): Overall fit with target persona
+- `travelBurden` (1-10): Travel cost/complexity (lower = better)
+- `costFit` (1-10): Cost-effectiveness (higher = better)
+- `ecosystemFit` (0-100): Derived from organizer's BD relevance score
+- `bdOpportunity` (0-100): Composite score weighted by user priorities
+
+### API Routes
+
+**POST** `/api/events/meta/ingest` - Create EventMeta records
+**GET** `/api/events/meta` - List events
+**POST** `/api/events/opp/generate` - Generate BDEventOpp from EventMeta
+**POST** `/api/events/save` - Save event (legacy, will migrate to EventMeta)
+
+### UI Pages
+
+- `/events` - Events hub
+- `/events/build-from-persona` - Persona-based event recommendations
+
+---
+
+## Personas Architecture
+
+### Overview
+
+**Personas** are CompanyHQ-scoped templates representing ideal customer archetypes. They are NOT individual contacts - they are reusable profiles that many contacts can match to.
+
+**Purpose**: 
+- Match contacts to personas automatically
+- Score product fit using persona data
+- Guide BD Intelligence with rich context
+- Link products to personas for targeted recommendations
+- Drive event recommendations and ecosystem intelligence
+
+### Persona Model
+
+**File**: `prisma/schema.prisma`
+
+```prisma
+model Persona {
+  id              String      @id @default(cuid())
+  companyHQId     String      // Required - tenant scoping
+  personName      String      @default("")
+  title           String
+  headline        String?
+  seniority       String?
+  industry        String?
+  subIndustries   String[]
+  description     String?
+  whatTheyWant    String?
+  painPoints      String[]
+  risks           String[]
+  decisionDrivers String[]
+  buyerTriggers   String[]
+  
+  // Relations
+  companyHQ       CompanyHQ   @relation(...)
+  productFit      ProductFit?
+  bdIntel         BdIntel?
+  bdosScores      BDOSScore[]
+}
+```
+
+**Key Fields**:
+- `personName`: Persona name (e.g., "Solo Biz Owner")
+- `title`: Role/Title (e.g., "Sole Proprietor")
+- `whatTheyWant`: Goals and desires
+- `painPoints`: Array of pain points
+- `buyerTriggers`: What triggers them to buy
+
+### Persona Generation
+
+**Three Generation Methods**:
+
+1. **From Enriched Contact** (Apollo):
+   - `POST /api/personas/generate`
+   - Uses Apollo enrichment data from Redis
+   - Generates persona fields via GPT-4o
+
+2. **From Description**:
+   - `POST /api/personas/generate-from-description`
+   - Free-form text description → GPT → Persona
+
+3. **Unified Generation** (Recommended):
+   - `POST /api/personas/generate-unified`
+   - Generates Persona + ProductFit + BdIntel in one call
+
+### Persona Intelligence
+
+**Product Fit**: `ProductFit` model links personas to products
+- `valuePropToThem`: How product solves persona's problems
+- `alignmentReasoning`: Why this persona fits this product
+
+**BD Intelligence**: `BdIntel` model provides BD insights
+- `fitScore`: Overall fit (0-100)
+- `painAlignmentScore`: Pain point alignment (0-100)
+- `recommendedTalkTrack`: Recommended messaging
+- `recommendedSequence`: Outreach sequence
+
+### Persona Usage
+
+**Event Recommendations**:
+- Personas drive event recommendation generation
+- Events scored based on persona attributes (industry, role, goals)
+
+**Contact Matching**:
+- Automatic persona matching for contacts
+- Uses role, industry, and semantic similarity
+
+**Product Targeting**:
+- Products can target specific personas
+- Enables persona-based product recommendations
+
+### API Routes
+
+**GET** `/api/personas` - List personas for companyHQ
+**POST** `/api/personas` - Create persona
+**GET** `/api/personas/[personaId]` - Get persona detail
+**POST** `/api/personas/generate` - Generate from enriched contact
+**POST** `/api/personas/generate-from-description` - Generate from text
+**POST** `/api/personas/[personaId]/product-fit` - Generate product fit
+**POST** `/api/personas/[personaId]/bd-intel` - Generate BD intelligence
+
+### UI Pages
+
+- `/personas` - Personas list
+- `/personas/builder` - Persona builder
+- `/personas/[personaId]` - Persona detail view
+- `/personas/build-from-contacts` - Generate personas from contacts
+
+**Documentation**: See `docs/personas-parser/PERSONA_ARCHITECTURE.md` for complete reference.
+
+---
+
 ## Development Workflow
 
 ### Local Development
@@ -553,6 +974,9 @@ import Link from 'next/link';
 - **`docs/architecture/contacts.md`** - Contact management architecture
 - **`docs/architecture/hooks.md`** - React hooks guide
 - **`docs/architecture/client-operations.md`** - Client operations architecture
+- **`docs/personas-parser/PERSONA_ARCHITECTURE.md`** - Complete persona model and API reference
+- **`docs/ECOSYSTEM_FORENSIC_AUDIT.md`** - Ecosystem/events forensic scan findings
+- **`docs/ECOSYSTEM_REFACTOR_COMPLETE.md`** - Ecosystem intelligence refactor summary
 
 ---
 
@@ -565,6 +989,9 @@ import Link from 'next/link';
 - Hydration flows (Welcome, Contacts, Outreach, Pipelines)
 - Feature-level layouts with context
 - Dynamic routes ([contactId], [personaId], [proposalId])
+- **Ecosystem Intelligence**: EcosystemOrg → EventMeta → BDEventOpp → EventPlan architecture
+- **Events System**: Complete event catalog and BD opportunity analysis
+- **Personas System**: Persona generation, matching, and intelligence scoring
 
 **🚧 In Progress:**
 - Full API route migration from Express
