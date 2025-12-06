@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
-import { usePipelinesContext } from '../../pipelines/layout.jsx';
+import { usePipelinesContext } from '@/hooks/usePipelines';
 
 const FALLBACK_PIPELINES = {
   prospect: ['interest', 'meeting', 'proposal', 'contract', 'contract-signed'],

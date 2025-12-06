@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Send, Users } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOutreachContext } from '../../layout.jsx';
+import { useOutreachContext } from '@/hooks/useOutreach';
 
 export default function CampaignDetailPage({ params }) {
   const router = useRouter();
