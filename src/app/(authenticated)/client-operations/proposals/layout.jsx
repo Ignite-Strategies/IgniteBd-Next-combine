@@ -1,38 +1,17 @@
 'use client';
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
+import { ProposalsContext } from './ProposalsContext';
 
 // Note: Proposals are hydrated by Growth Dashboard via useCompanyHydration hook
 // This layout just reads from localStorage - no separate API calls
-
-const ProposalsContext = createContext({
-  proposals: [],
-  setProposals: () => {},
-  companyHQId: '',
-  hydrated: false,
-  hydrating: false, // Always false - no auto-hydrating
-  refreshProposals: async () => {}, // Manual refresh only
-  updateProposal: (proposalId, updates) => {},
-  addProposal: (proposal) => {},
-  removeProposal: (proposalId) => {},
-});
-
-export function useProposals() {
-  const context = useContext(ProposalsContext);
-  if (!context) {
-    throw new Error('useProposals must be used within ProposalsLayout');
-  }
-  return context;
-}
 
 export default function ProposalsLayout({ children }) {
   const { companyHQId } = useCompanyHQ();
