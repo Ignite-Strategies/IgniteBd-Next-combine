@@ -80,6 +80,12 @@ model CompanyHQ {
   teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  
+  // TODO WEDNESDAY FIX #4: BD Goal fields (add on Thursday)
+  // bdGoal           Float?    // Target BD revenue goal (e.g., 1_000_000)
+  // bdGoalStart      DateTime? // Goal period start date
+  // bdGoalEnd        DateTime? // Goal period end date
+  
   ownerId          String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
   contactOwnerId   String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
   managerId        String?
@@ -108,6 +114,7 @@ model CompanyHQ {
   templates            Template[]
   landingPages         LandingPage[]
   presentations        Presentation[]
+  deckArtifacts        DeckArtifact[]
 
   @@map("company_hqs")
 }
@@ -810,6 +817,23 @@ model Presentation {
   @@index([companyHQId])
   @@index([published])
   @@map("presentations")
+}
+
+model DeckArtifact {
+  id          String   @id @default(cuid())
+  companyHQId String
+  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  title       String
+  outlineJson Json     // structured IgniteBD outline
+  blobText    String?  // the generated Gamma blob
+  status      String   @default("pending") // pending | generating | ready | error
+  fileUrl     String?  // returned PPTX / deck URL
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyHQId])
+  @@index([status])
+  @@map("deck_artifacts")
 }
 
 model ProspectCandidate {
