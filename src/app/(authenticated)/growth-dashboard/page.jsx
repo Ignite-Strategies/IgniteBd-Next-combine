@@ -204,11 +204,26 @@ export default function GrowthDashboardPage() {
   }, [contacts]);
 
   // Move all hooks BEFORE any conditional returns to avoid React error #310
-  const dashboardData = useMemo(() => ({
-    targetRevenue: 1_000_000,
-    currentRevenue: 0,
-    timeHorizon: 12,
-  }), []);
+  // TODO WEDNESDAY FIX #4: BD Goal Refactor (Full implementation on Thursday)
+  // Current: Hardcoded $1M goal and 12-month horizon
+  // Future: Read from companyHQ.bdGoal, companyHQ.bdGoalStart, companyHQ.bdGoalEnd
+  // TODO: Replace hardcoded targetRevenue with companyHQ.bdGoal || 1_000_000
+  // TODO: Replace hardcoded timeHorizon with calculated months from bdGoalStart to bdGoalEnd || 12
+  const dashboardData = useMemo(() => {
+    // TODO WEDNESDAY FIX #4: Read BD goal from companyHQ.bdGoal instead of hardcoded value
+    // const bdGoal = companyHQ?.bdGoal || 1_000_000;
+    // const bdGoalStart = companyHQ?.bdGoalStart ? new Date(companyHQ.bdGoalStart) : null;
+    // const bdGoalEnd = companyHQ?.bdGoalEnd ? new Date(companyHQ.bdGoalEnd) : null;
+    // const timeHorizon = bdGoalStart && bdGoalEnd 
+    //   ? Math.round((bdGoalEnd - bdGoalStart) / (1000 * 60 * 60 * 24 * 30)) // months
+    //   : 12;
+    
+    return {
+      targetRevenue: 1_000_000, // TODO: Replace with companyHQ.bdGoal
+      currentRevenue: 0, // TODO: Calculate from proposals/contracts
+      timeHorizon: 12, // TODO: Calculate from companyHQ.bdGoalStart to bdGoalEnd
+    };
+  }, []); // TODO: Add companyHQ to dependencies when implementing
 
   // Memoize stackCards to prevent unnecessary re-renders and jerky updates
   const stackCards = useMemo(() => [

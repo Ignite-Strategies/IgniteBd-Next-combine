@@ -7,6 +7,8 @@ import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit, Trash2, CheckCi
 import api from '@/lib/api';
 
 function PersonasPageContent() {
+  // TODO WEDNESDAY FIX #3: Personas must be tenant-scoped using companyHQId, not ownerId
+  // All persona queries must include companyHQId parameter
   const router = useRouter();
   const searchParams = useSearchParams();
   const [personas, setPersonas] = useState([]);

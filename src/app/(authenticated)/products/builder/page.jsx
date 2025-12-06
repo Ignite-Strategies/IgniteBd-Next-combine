@@ -42,6 +42,8 @@ export default function ProductBuilderPage({ searchParams }) {
   const [personas, setPersonas] = useState([]);
   const [isParserModalOpen, setIsParserModalOpen] = useState(false);
 
+  // TODO WEDNESDAY FIX #2: Product creation must store companyHQId (not ownerId)
+  // TODO WEDNESDAY FIX #2: Product editing must maintain companyHQId (not ownerId)
   const derivedCompanyId = useMemo(() => {
     if (typeof window === 'undefined') return '';
     return (

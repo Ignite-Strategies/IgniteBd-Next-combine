@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 
+// TODO WEDNESDAY FIX #3: Remove defaultCompanyHQId env var pattern - use tenant context instead
+// TODO WEDNESDAY FIX #3: Persona creation must read companyHQId from tenant context (localStorage)
 const defaultCompanyHQId =
   process.env.NEXT_PUBLIC_DEFAULT_COMPANY_HQ_ID || '';
 

@@ -7,6 +7,8 @@ import {
   mapDatabaseToApi,
 } from '@/lib/services/ProductServiceMapper';
 
+// TODO WEDNESDAY FIX #2: Products MUST be scoped by companyHQId, never by ownerId
+// TODO WEDNESDAY FIX #2: All product queries must use: where: { companyHQId: currentCompanyHQId }
 const DEFAULT_COMPANY_HQ_ID = process.env.DEFAULT_COMPANY_HQ_ID || null;
 
 export async function GET(request) {

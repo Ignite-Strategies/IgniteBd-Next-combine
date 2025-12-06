@@ -25,6 +25,7 @@ const useOwnerStore = create(
         });
       },
       
+      // TODO WEDNESDAY FIX #1: clearOwner() is called during tenant hydration to reset tenant-scoped owner data
       clearOwner: () => {
         set({
           owner: null,

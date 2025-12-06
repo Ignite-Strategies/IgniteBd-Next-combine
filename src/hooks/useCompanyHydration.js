@@ -9,6 +9,9 @@ import api from '@/lib/api';
  * Comprehensive hydration hook for companyHQ data.
  * Fetches and stores all company-related data in localStorage.
  * 
+ * TODO WEDNESDAY FIX #1: Company hydration cache is cleared during tenant switch
+ * localStorage key pattern: companyHydration_${companyHQId}
+ * 
  * @param {string} companyHQId - CompanyHQ ID to hydrate
  * @returns {Object} { data, loading, hydrated, error, refresh }
  */

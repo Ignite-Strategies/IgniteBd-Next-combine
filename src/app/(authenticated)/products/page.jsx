@@ -6,6 +6,8 @@ import { Plus, Package, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function ProductsPage() {
+  // TODO WEDNESDAY FIX #2: Products must be tenant-scoped using companyHQId, not ownerId
+  // All product queries must include companyHQId parameter
   const [products, setProducts] = useState([]);
   const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
