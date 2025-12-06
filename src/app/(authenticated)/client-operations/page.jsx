@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
 import { useProposals } from '@/hooks/useProposals';
-import { useContacts } from '@/app/(authenticated)/contacts/layout';
+import { useContacts } from '@/hooks/useContacts';
 
 export default function ClientOperationsPage() {
   const router = useRouter();

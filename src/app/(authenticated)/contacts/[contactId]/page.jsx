@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Mail, Phone, Building2, ArrowLeft, Sparkles, X } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useContactsContext } from '../layout.jsx';
+import { useContactsContext } from '@/hooks/useContacts';
 import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
 import ContactOutlook from '@/components/enrichment/ContactOutlook';
 

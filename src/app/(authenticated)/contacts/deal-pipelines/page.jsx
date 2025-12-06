@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useContactsContext } from '../layout.jsx';
+import { useContactsContext } from '@/hooks/useContacts';
 import { usePipelinesContext } from '../../pipelines/layout.jsx';
 
 const FALLBACK_PIPELINES = {
