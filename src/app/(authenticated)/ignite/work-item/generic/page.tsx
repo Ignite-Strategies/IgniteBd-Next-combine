@@ -1,12 +1,10 @@
 export default async function GenericPage({ 
   searchParams 
 }: { 
-  searchParams: Promise<{ label?: string }> | { label?: string } 
+  searchParams: Promise<{ label?: string }>
 }) {
-  // Handle both Promise and object cases
-  const params = searchParams instanceof Promise
-    ? await searchParams 
-    : searchParams;
+  // In Next.js 15, searchParams is always a Promise in server components
+  const params = await searchParams;
   
   return (
     <div>
