@@ -111,9 +111,10 @@ export default function PresentationsPage() {
       } else {
         throw new Error(response.data?.error || 'Failed to generate deck');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error generating deck:', err);
-      alert(err.message || 'Failed to generate deck. Please try again.');
+      const errorMessage = err?.message || err?.response?.data?.error || 'Failed to generate deck. Please try again.';
+      alert(errorMessage);
     } finally {
       setGenerating({ ...generating, [presentationId]: false });
     }
