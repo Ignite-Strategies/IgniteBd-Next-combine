@@ -3,18 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { buildGammaBlob } from '@/lib/deck/blob-mapper';
 import { generateDeckWithGamma } from '@/lib/deck/gamma-service';
-import type { DeckSpec } from '@/lib/deck/blob-mapper';
+import { presentationToDeckSpec } from '@/lib/deck/presentation-converter';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/decks/generate
- * Generate a deck using Gamma API
+ * Generate a deck using Gamma API from a Presentation
  * 
  * Request body:
  * {
- *   deckArtifactId: string
+ *   presentationId: string
  * }
  */
 export async function POST(request: Request) {
@@ -30,50 +30,79 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { deckArtifactId } = body;
+    const { presentationId } = body;
 
-    if (!deckArtifactId) {
+    if (!presentationId) {
       return NextResponse.json(
-        { success: false, error: 'deckArtifactId is required' },
+        { success: false, error: 'presentationId is required' },
         { status: 400 }
       );
     }
 
-    // Load DeckArtifact with its structured outline
-    const deckArtifact = await prisma.deckArtifact.findUnique({
-      where: { id: deckArtifactId },
+    // Load Presentation
+    const presentation = await prisma.presentation.findUnique({
+      where: { id: presentationId },
     });
 
-    if (!deckArtifact) {
+    if (!presentation) {
       return NextResponse.json(
-        { success: false, error: 'Deck artifact not found' },
+        { success: false, error: 'Presentation not found' },
         { status: 404 }
       );
     }
 
     // Check if already generating or ready
-    if (deckArtifact.status === 'generating') {
+    if (presentation.gammaStatus === 'generating') {
       return NextResponse.json(
         { success: false, error: 'Deck is already being generated' },
         { status: 409 }
       );
     }
 
-    if (deckArtifact.status === 'ready' && deckArtifact.fileUrl) {
+    if (presentation.gammaStatus === 'ready' && presentation.gammaDeckUrl) {
       return NextResponse.json({
         success: true,
         status: 'ready',
-        fileUrl: deckArtifact.fileUrl,
+        deckUrl: presentation.gammaDeckUrl,
+        pptxUrl: presentation.gammaPptxUrl,
         message: 'Deck already generated',
       });
     }
 
-    // Parse outlineJson as DeckSpec
-    const deckSpec = deckArtifact.outlineJson as DeckSpec;
+    // Normalize slides structure before conversion
+    let normalizedSlides = presentation.slides;
+    if (normalizedSlides) {
+      // If slides is a string, try to parse it
+      if (typeof normalizedSlides === 'string') {
+        try {
+          normalizedSlides = JSON.parse(normalizedSlides);
+        } catch (e) {
+          console.warn(`Failed to parse slides JSON for presentation ${presentation.id}:`, e);
+          normalizedSlides = { sections: [] };
+        }
+      }
+      // Ensure slides has sections array
+      if (typeof normalizedSlides === 'object' && normalizedSlides !== null) {
+        if (!normalizedSlides.sections || !Array.isArray(normalizedSlides.sections)) {
+          normalizedSlides.sections = [];
+        }
+      } else {
+        normalizedSlides = { sections: [] };
+      }
+    } else {
+      normalizedSlides = { sections: [] };
+    }
 
-    if (!deckSpec || !deckSpec.title || !deckSpec.slides) {
+    // Convert Presentation.slides to DeckSpec
+    const deckSpec = presentationToDeckSpec(
+      presentation.title,
+      presentation.description,
+      normalizedSlides as any
+    );
+
+    if (!deckSpec || !deckSpec.title || !deckSpec.slides || deckSpec.slides.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Invalid deck specification in outlineJson' },
+        { success: false, error: 'Presentation has no slides to generate' },
         { status: 400 }
       );
     }
@@ -82,11 +111,12 @@ export async function POST(request: Request) {
     const blob = buildGammaBlob(deckSpec);
 
     // Save blob to DB and set status to generating
-    await prisma.deckArtifact.update({
-      where: { id: deckArtifactId },
+    await prisma.presentation.update({
+      where: { id: presentationId },
       data: {
-        blobText: blob,
-        status: 'generating',
+        gammaBlob: blob,
+        gammaStatus: 'generating',
+        gammaError: null,
       },
     });
 
@@ -96,18 +126,19 @@ export async function POST(request: Request) {
       const result = await generateDeckWithGamma(blob);
       fileUrl = result.fileUrl;
     } catch (gammaError) {
-      // Update status to error
-      await prisma.deckArtifact.update({
-        where: { id: deckArtifactId },
-        data: {
-          status: 'error',
-        },
-      });
-
       const errorMessage =
         gammaError instanceof Error
           ? gammaError.message
           : 'Unknown error from Gamma API';
+
+      // Update status to error
+      await prisma.presentation.update({
+        where: { id: presentationId },
+        data: {
+          gammaStatus: 'error',
+          gammaError: errorMessage,
+        },
+      });
 
       return NextResponse.json(
         {
@@ -119,21 +150,31 @@ export async function POST(request: Request) {
       );
     }
 
-    // Save fileUrl and set status to ready
-    await prisma.deckArtifact.update({
-      where: { id: deckArtifactId },
+    // Gamma API returns a URL - it could be a deck URL or PPTX URL
+    // We'll store it as gammaDeckUrl and check if we can extract a PPTX URL
+    // Note: Gamma may return different formats, so we store what we get
+    const isPptxUrl = fileUrl.includes('.pptx') || fileUrl.includes('pptx');
+    const deckUrl = isPptxUrl ? null : fileUrl;
+    const pptxUrl = isPptxUrl ? fileUrl : null;
+
+    // Save URLs and set status to ready
+    await prisma.presentation.update({
+      where: { id: presentationId },
       data: {
-        fileUrl,
-        status: 'ready',
+        gammaStatus: 'ready',
+        gammaDeckUrl: deckUrl || fileUrl, // Store deck URL (or fileUrl if we can't determine)
+        gammaPptxUrl: pptxUrl,
+        gammaError: null,
       },
     });
 
-    console.log('✅ Deck generated successfully:', deckArtifactId);
+    console.log('✅ Deck generated successfully for presentation:', presentationId);
 
     return NextResponse.json({
       success: true,
       status: 'ready',
-      fileUrl,
+      deckUrl: deckUrl || fileUrl,
+      pptxUrl: pptxUrl,
     });
   } catch (error) {
     console.error('❌ GenerateDeck error:', error);

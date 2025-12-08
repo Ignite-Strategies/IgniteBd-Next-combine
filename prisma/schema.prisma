@@ -114,7 +114,6 @@ model CompanyHQ {
   templates            Template[]
   landingPages         LandingPage[]
   presentations        Presentation[]
-  deckArtifacts        DeckArtifact[]
 
   @@map("company_hqs")
 }
@@ -717,9 +716,13 @@ model WorkCollateral {
   workPackageItemId String?
   workPackageItem   WorkPackageItem? @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
 
-  type        String // BLOG | PERSONA | PRESENTATION_DECK | TEMPLATE | ETC
+  // Reference to Presentation model (for PRESENTATION_DECK and CLE_DECK types)
+  presentationId    String?
+  presentation      Presentation?    @relation(fields: [presentationId], references: [id], onDelete: SetNull)
+
+  type        String // BLOG | PERSONA | PRESENTATION_DECK | CLE_DECK | TEMPLATE | ETC
   title       String?
-  contentJson Json?
+  contentJson Json? // DEPRECATED: Use presentationId to reference Presentation model instead
 
   status WorkCollateralStatus @default(IN_PROGRESS)
 
@@ -731,6 +734,7 @@ model WorkCollateral {
 
   @@index([workPackageId])
   @@index([workPackageItemId])
+  @@index([presentationId])
   @@index([status])
   @@index([type])
   @@map("work_collateral")
@@ -805,36 +809,34 @@ model Presentation {
   companyHQId String
   companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   title       String
-  slides      Json? // Array of slide objects with sections
+  slides      Json? // Array of slide objects with sections: { sections: [{ title: string, bullets: string[] }] }
   presenter   String?
   description String?
   feedback    Json? // JSON map: { "0": "...", "5": "...", "7": "..." } - feedback keyed by sectionIndex
   published   Boolean   @default(false)
   publishedAt DateTime?
+  
+  // Gamma deck generation fields
+  gammaStatus   String?  // "pending" | "generating" | "ready" | "error" - status of Gamma deck generation
+  gammaDeckUrl  String?  // Gamma deck URL (for viewing in Gamma)
+  gammaPptxUrl  String?  // PPTX download URL from Gamma (if available separately)
+  gammaBlob     String?  // The blob text sent to Gamma API (for reference/debugging)
+  gammaError    String?  // Error message if Gamma generation failed
+  
+  // WorkCollateral references (for work package deliverables)
+  workCollateral WorkCollateral[]
+  
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([companyHQId])
   @@index([published])
+  @@index([gammaStatus])
   @@map("presentations")
 }
 
-model DeckArtifact {
-  id          String   @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  title       String
-  outlineJson Json     // structured IgniteBD outline
-  blobText    String?  // the generated Gamma blob
-  status      String   @default("pending") // pending | generating | ready | error
-  fileUrl     String?  // returned PPTX / deck URL
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([companyHQId])
-  @@index([status])
-  @@map("deck_artifacts")
-}
+// DEPRECATED: DeckArtifact model removed - use Presentation model with gammaStatus/gammaDeckUrl fields instead
+// Migration note: If you have existing DeckArtifact data, migrate it to Presentation before removing this model
 
 model ProspectCandidate {
   id          String   @id @default(cuid())

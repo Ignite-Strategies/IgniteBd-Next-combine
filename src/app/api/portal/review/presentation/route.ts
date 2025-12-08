@@ -32,7 +32,10 @@ export async function GET(request: Request) {
       include: {
         workCollateral: {
           where: {
-            type: 'CLE_DECK',
+            type: { in: ['CLE_DECK', 'PRESENTATION_DECK'] },
+          },
+          include: {
+            presentation: true, // Load the actual Presentation model
           },
         },
       },
@@ -45,33 +48,58 @@ export async function GET(request: Request) {
       );
     }
 
-    // Load presentation content from WorkCollateral.contentJson (snapshot)
-    // WorkCollateral contains the full content, not a reference
-    let presentationContent = null;
+    // Find WorkCollateral with Presentation reference
+    let presentation = null;
     let workCollateralId = null;
     
     for (const collateral of workItem.workCollateral) {
       if (collateral.type === 'PRESENTATION_DECK' || collateral.type === 'CLE_DECK') {
+        // Prefer Presentation model reference over contentJson snapshot
+        if (collateral.presentationId && collateral.presentation) {
+          presentation = collateral.presentation;
+          workCollateralId = collateral.id;
+          break;
+        }
+        // Fallback to contentJson snapshot for backward compatibility
         if (collateral.contentJson && typeof collateral.contentJson === 'object') {
-          presentationContent = collateral.contentJson as any;
+          presentation = collateral.contentJson as any;
           workCollateralId = collateral.id;
           break;
         }
       }
     }
 
-    if (!presentationContent) {
+    if (!presentation) {
       return NextResponse.json(
-        { success: false, error: 'Presentation content not found for this WorkItem' },
+        { success: false, error: 'Presentation not found for this WorkItem' },
         { status: 404 },
       );
     }
 
-    // Return the snapshot content from WorkCollateral
-    // This IS the presentation - no FK lookup needed
+    // Normalize slides structure if it's a Presentation model
+    if (presentation.slides) {
+      if (typeof presentation.slides === 'string') {
+        try {
+          presentation.slides = JSON.parse(presentation.slides);
+        } catch (e) {
+          console.warn(`Failed to parse slides JSON:`, e);
+          presentation.slides = { sections: [] };
+        }
+      }
+      if (typeof presentation.slides === 'object' && presentation.slides !== null) {
+        if (!presentation.slides.sections || !Array.isArray(presentation.slides.sections)) {
+          presentation.slides.sections = [];
+        }
+      } else {
+        presentation.slides = { sections: [] };
+      }
+    } else {
+      presentation.slides = { sections: [] };
+    }
+
     return NextResponse.json({
       success: true,
-      presentation: presentationContent,
+      presentation,
       workCollateralId,
     });
   } catch (error: any) {

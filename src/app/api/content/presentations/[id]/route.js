@@ -36,6 +36,30 @@ export async function GET(request, { params }) {
       );
     }
 
+    // Normalize slides structure to ensure outlines are properly hydrated
+    if (presentation.slides) {
+      // If slides is a string, try to parse it
+      if (typeof presentation.slides === 'string') {
+        try {
+          presentation.slides = JSON.parse(presentation.slides);
+        } catch (e) {
+          console.warn(`Failed to parse slides JSON for presentation ${presentation.id}:`, e);
+          presentation.slides = { sections: [] };
+        }
+      }
+      // Ensure slides has sections array
+      if (typeof presentation.slides === 'object' && presentation.slides !== null) {
+        if (!presentation.slides.sections || !Array.isArray(presentation.slides.sections)) {
+          presentation.slides.sections = [];
+        }
+      } else {
+        presentation.slides = { sections: [] };
+      }
+    } else {
+      // If slides is null/undefined, initialize with empty structure
+      presentation.slides = { sections: [] };
+    }
+
     return NextResponse.json({
       success: true,
       presentation,

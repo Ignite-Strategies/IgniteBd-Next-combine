@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2 } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, Play, Download, ExternalLink, Loader2 } from 'lucide-react';
 
 export default function PresentationsPage() {
   const router = useRouter();
   const [presentations, setPresentations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [generating, setGenerating] = useState({});
 
   useEffect(() => {
     loadPresentations();
@@ -26,8 +27,11 @@ export default function PresentationsPage() {
       
       const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
       
+      console.log('🔍 Presentations page - companyHQId from localStorage:', companyHQId);
+      
       if (!companyHQId) {
-        console.warn('No companyHQId found');
+        console.warn('⚠️ No companyHQId found in localStorage');
+        console.warn('   Available keys:', Object.keys(localStorage).filter(k => k.includes('company')));
         setLoading(false);
         setSyncing(false);
         return;
@@ -53,10 +57,15 @@ export default function PresentationsPage() {
       }
 
       // Always fetch fresh data from API
+      console.log(`🌐 Fetching presentations from API for companyHQId: ${companyHQId}`);
       const response = await api.get(`/api/content/presentations?companyHQId=${companyHQId}`);
+      console.log('📦 API Response:', response.data);
       if (response.data?.success) {
         const freshPresentations = response.data.presentations || [];
         console.log(`✅ Fetched ${freshPresentations.length} presentations from API`);
+        if (freshPresentations.length === 0) {
+          console.warn('⚠️ API returned success but 0 presentations. Check companyHQId match.');
+        }
         setPresentations(freshPresentations);
         
         // Update localStorage with fresh data
@@ -82,6 +91,40 @@ export default function PresentationsPage() {
 
   const handleSync = () => {
     loadPresentations(true);
+  };
+
+  const handleBuildDeck = async (presentationId) => {
+    try {
+      setGenerating({ ...generating, [presentationId]: true });
+
+      const response = await api.post('/api/decks/generate', {
+        presentationId,
+      });
+
+      if (response.data?.success) {
+        // Refresh presentations to get updated gammaStatus
+        await loadPresentations(true);
+        
+        if (response.data.status === 'ready') {
+          alert('Deck generated successfully!');
+        }
+      } else {
+        throw new Error(response.data?.error || 'Failed to generate deck');
+      }
+    } catch (err: any) {
+      console.error('Error generating deck:', err);
+      alert(err.message || 'Failed to generate deck. Please try again.');
+    } finally {
+      setGenerating({ ...generating, [presentationId]: false });
+    }
+  };
+
+  const handleDownloadPPTX = (presentationId) => {
+    window.open(`/api/presentations/${presentationId}/download`, '_blank');
+  };
+
+  const handleViewDeck = (deckUrl) => {
+    window.open(deckUrl, '_blank');
   };
 
   const handleDelete = async (presentationId, e) => {
@@ -192,7 +235,7 @@ export default function PresentationsPage() {
                             {presentation.description}
                           </p>
                         )}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           {presentation.published && (
                             <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">
                               Published
@@ -203,10 +246,67 @@ export default function PresentationsPage() {
                               Draft
                             </span>
                           )}
+                          {presentation.gammaStatus === 'ready' && (
+                            <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
+                              Deck Ready
+                            </span>
+                          )}
+                          {presentation.gammaStatus === 'generating' && (
+                            <span className="px-2 py-1 text-xs font-semibold bg-orange-100 text-orange-800 rounded-full flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Generating...
+                            </span>
+                          )}
+                          {presentation.gammaStatus === 'error' && (
+                            <span className="px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full">
+                              Generation Failed
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Build the Deck Button - Primary Action */}
+                      {presentation.gammaStatus === 'ready' ? (
+                        <>
+                          {presentation.gammaDeckUrl && (
+                            <button
+                              onClick={() => handleViewDeck(presentation.gammaDeckUrl)}
+                              className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              View Deck
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDownloadPPTX(presentation.id)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            <Download className="h-4 w-4" />
+                            Download PPTX
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleBuildDeck(presentation.id)}
+                          disabled={generating[presentation.id] || presentation.gammaStatus === 'generating'}
+                          className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {generating[presentation.id] || presentation.gammaStatus === 'generating' ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-4 w-4" />
+                              Build the Deck
+                            </>
+                          )}
+                        </button>
+                      )}
+                      
+                      {/* Secondary Actions */}
                       <button
                         onClick={() => router.push(`/builder/presentation/${presentation.id}`)}
                         className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
