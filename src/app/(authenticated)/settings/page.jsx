@@ -20,10 +20,6 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState(null); // 'profile' | 'company' | 'integrations' | null
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  // LocalStorage grabber state
-  const [localStorageData, setLocalStorageData] = useState(null);
-  const [showLocalStorageData, setShowLocalStorageData] = useState(false);
-  
   // Profile form state
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -272,43 +268,6 @@ export default function SettingsPage() {
       setError(errorMsg);
     } finally {
       setBecomingSuperAdmin(false);
-    }
-  };
-
-  // Grab localStorage data
-  const grabLocalStorageData = () => {
-    if (typeof window === 'undefined') return;
-
-    const data = {};
-    
-    // Get all localStorage keys
-    const keys = Object.keys(localStorage);
-    
-    // Parse all localStorage items
-    keys.forEach(key => {
-      try {
-        const value = localStorage.getItem(key);
-        // Try to parse as JSON, fallback to string
-        try {
-          data[key] = JSON.parse(value);
-        } catch {
-          data[key] = value;
-        }
-      } catch (err) {
-        data[key] = `[Error parsing: ${err.message}]`;
-      }
-    });
-
-    setLocalStorageData(data);
-    setShowLocalStorageData(true);
-  };
-
-  const copyLocalStorageData = () => {
-    if (localStorageData) {
-      const jsonString = JSON.stringify(localStorageData, null, 2);
-      navigator.clipboard.writeText(jsonString).then(() => {
-        alert('Copied to clipboard!');
-      });
     }
   };
 
