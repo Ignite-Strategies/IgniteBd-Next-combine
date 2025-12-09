@@ -946,9 +946,28 @@ model Invoice {
   workPackage        WorkPackage        @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
   invoiceName        String
   invoiceDescription String?
+  
+  // Invoice identification (for client portal compatibility)
+  invoiceNumber      String?            @unique // Human-readable (e.g., "INV-2025-001")
+  
+  // Amount fields (for Stripe line items)
+  amount             Float?             // Total invoice amount (for Stripe)
+  currency           String             @default("USD")
+  
+  // Existing totals (keep for backward compatibility)
   totalExpected      Int                @default(0)
   totalReceived      Int                @default(0)
-  status             String             @default("pending") // "pending" | "partial" | "paid"
+  
+  // Payment status
+  status             String             @default("pending") // "pending" | "partial" | "paid" | "failed" | "refunded"
+  paidAt             DateTime?          // When invoice was paid
+  paidByContactId    String?            // Which contact paid (from Stripe session metadata)
+  
+  // Stripe integration fields (CRITICAL for client portal payment processing)
+  stripeCheckoutSessionId String?       @unique // Links to Stripe checkout session
+  stripePaymentIntentId   String?       @unique // Links to Stripe payment intent
+  stripeCustomerId        String?               // Stripe customer ID (reused across invoices)
+  
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   milestones         InvoiceMilestone[]
@@ -956,6 +975,9 @@ model Invoice {
 
   @@index([workPackageId])
   @@index([status])
+  @@index([stripeCheckoutSessionId])
+  @@index([stripePaymentIntentId])
+  @@index([stripeCustomerId])
   @@map("invoices")
 }
 
