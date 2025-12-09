@@ -865,56 +865,6 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
-
-          {/* TEMPORARY: Grab My Local Stuff */}
-          <div className="group relative rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 p-6 shadow-sm hover:border-orange-400 hover:shadow-md transition-all text-left md:col-span-2">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100 group-hover:bg-orange-200 transition-colors mb-4">
-                  <svg className="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Grab My Local Stuff (Temporary)
-                </h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  See what's stored in your browser's localStorage
-                </p>
-                
-                {!showLocalStorageData ? (
-                  <button
-                    onClick={grabLocalStorageData}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                  >
-                    Grab My Local Stuff
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={copyLocalStorageData}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
-                      >
-                        Copy JSON
-                      </button>
-                      <button
-                        onClick={() => setShowLocalStorageData(false)}
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                      >
-                        Hide
-                      </button>
-                    </div>
-                    <div className="mt-4 p-4 bg-white border border-orange-200 rounded-lg max-h-96 overflow-auto">
-                      <pre className="text-xs text-gray-800 whitespace-pre-wrap break-words">
-                        {JSON.stringify(localStorageData, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
