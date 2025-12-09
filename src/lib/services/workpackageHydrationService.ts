@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import type { WorkPackageCSVRow } from '@/lib/utils/csv';
+import { computePhaseTimelineStatus } from '@/lib/utils/workPackageTimeline';
 
 export interface HydrationResult {
   workPackageId: string;
@@ -342,6 +343,156 @@ export async function hydrateWorkPackageFromCSV(params: {
     itemsCreated,
     itemsUpdated,
     totalEstimatedHours,
+  };
+}
+
+/**
+ * Hydrate WorkPackage with WorkCollateral and calculate progress
+ * Uses WorkCollateral model as source of truth
+ */
+export async function hydrateWorkPackage(
+  workPackage: any,
+  options: { clientView?: boolean; includeTimeline?: boolean } = {}
+): Promise<any> {
+  const { clientView = false, includeTimeline = !clientView } = options;
+
+  // Hydrate each item with its WorkCollateral
+  const hydratedItems = await Promise.all(
+    workPackage.items.map(async (item: any) => {
+      // Get WorkCollateral for this item
+      const workCollateral = await prisma.workCollateral.findMany({
+        where: { workPackageItemId: item.id },
+      });
+
+      const completedCount = workCollateral.filter(
+        (wc) => wc.status === 'APPROVED'
+      ).length;
+
+      const progress = {
+        completed: completedCount,
+        total: item.quantity,
+        percentage: item.quantity > 0 ? Math.round((completedCount / item.quantity) * 100) : 0,
+      };
+
+      return {
+        ...item,
+        workCollateral,
+        progress,
+      };
+    })
+  );
+
+  // Calculate overall progress
+  const totalItems = hydratedItems.length;
+  const completedItems = hydratedItems.filter(
+    (item) => item.progress.completed >= item.progress.total
+  ).length;
+  const overallProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  // Hydrate phases - READ-ONLY (no database mutations)
+  let hydratedPhases: any[] = [];
+  if (workPackage.phases && Array.isArray(workPackage.phases)) {
+    hydratedPhases = workPackage.phases.map((phase: any) => {
+      // Calculate aggregated hours from items in this phase
+      const phaseItems = hydratedItems.filter((item: any) => item.workPackagePhaseId === phase.id);
+      const aggregatedHours = phaseItems.reduce((sum, item) => {
+        return sum + (item.estimatedHoursEach || 0) * (item.quantity || 0);
+      }, 0);
+
+      // Use stored dates as-is
+      const effectiveDate = phase.estimatedStartDate 
+        ? new Date(phase.estimatedStartDate)
+        : (phase.position === 1 && workPackage.effectiveStartDate)
+          ? new Date(workPackage.effectiveStartDate)
+          : null;
+
+      // Calculate end date
+      let expectedEndDate = null;
+      if (includeTimeline) {
+        if (phase.actualEndDate) {
+          expectedEndDate = new Date(phase.actualEndDate);
+        } else if (phase.estimatedEndDate) {
+          expectedEndDate = new Date(phase.estimatedEndDate);
+        } else if (effectiveDate && phase.phaseTotalDuration) {
+          expectedEndDate = new Date(effectiveDate);
+          expectedEndDate.setDate(expectedEndDate.getDate() + phase.phaseTotalDuration);
+        }
+      }
+
+      // Calculate phase status
+      const allItemsCompleted = phaseItems.length > 0 && phaseItems.every(
+        (item: any) => item.status === 'completed' || (item.progress?.completed >= item.progress?.total)
+      );
+      const hasInProgressItems = phaseItems.some((item: any) => item.status === 'in_progress');
+      const phaseStatus = phase.status || (allItemsCompleted ? 'completed' : (hasInProgressItems ? 'in_progress' : 'not_started'));
+
+      // Calculate timeline status
+      const timelineStatus = includeTimeline
+        ? computePhaseTimelineStatus(phaseStatus, expectedEndDate || phase.estimatedEndDate)
+        : null;
+
+      return {
+        ...phase,
+        totalEstimatedHours: phase.totalEstimatedHours || aggregatedHours || 0,
+        estimatedStartDate: phase.estimatedStartDate ? new Date(phase.estimatedStartDate).toISOString() : null,
+        estimatedEndDate: phase.estimatedEndDate ? new Date(phase.estimatedEndDate).toISOString() : null,
+        actualStartDate: phase.actualStartDate ? new Date(phase.actualStartDate).toISOString() : null,
+        actualEndDate: phase.actualEndDate ? new Date(phase.actualEndDate).toISOString() : null,
+        status: phase.status || null,
+        phaseTotalDuration: phase.phaseTotalDuration || null,
+        effectiveDate: effectiveDate ? effectiveDate.toISOString() : null,
+        expectedEndDate: expectedEndDate ? expectedEndDate.toISOString() : null,
+        timelineStatus,
+        items: phaseItems,
+      };
+    });
+
+    // Sort phases by position
+    const sortedPhases = hydratedPhases.sort((a, b) => a.position - b.position);
+    
+    // Current phase = first phase not completed
+    const currentPhase = sortedPhases.find(
+      (phase) => phase.status !== 'completed'
+    ) || null;
+    
+    // Calculate phase progress
+    const totalPhases = sortedPhases.length;
+    const completedPhases = sortedPhases.filter((p) => p.status === 'completed').length;
+    const phaseProgress = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+    
+    return {
+      ...workPackage,
+      items: hydratedItems,
+      phases: sortedPhases,
+      currentPhase,
+      progress: {
+        completed: completedItems,
+        total: totalItems,
+        percentage: overallProgress,
+      },
+      phaseProgress: {
+        completed: completedPhases,
+        total: totalPhases,
+        percentage: phaseProgress,
+      },
+    };
+  }
+
+  return {
+    ...workPackage,
+    items: hydratedItems,
+    phases: hydratedPhases,
+    currentPhase: null,
+    progress: {
+      completed: completedItems,
+      total: totalItems,
+      percentage: overallProgress,
+    },
+    phaseProgress: {
+      completed: 0,
+      total: 0,
+      percentage: 0,
+    },
   };
 }
 

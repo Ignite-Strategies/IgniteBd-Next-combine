@@ -15,7 +15,7 @@ function InvoiceDetailContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const invoiceId = params.invoiceId as string;
+  const invoiceId = params?.invoiceId || '';
   const showSuccess = searchParams.get('created') === 'true';
 
   const [invoice, setInvoice] = useState(null);

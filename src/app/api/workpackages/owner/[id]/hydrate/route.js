@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { hydrateWorkPackage } from '@/lib/services/WorkPackageHydrationService';
+import { hydrateWorkPackage } from '@/lib/services/workpackageHydrationService';
 
 /**
  * GET /api/workpackages/owner/:id/hydrate

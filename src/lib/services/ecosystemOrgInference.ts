@@ -1,6 +1,17 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let client: OpenAI | null = null;
+
+function getOpenAIClient() {
+  if (!client) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not configured");
+    }
+    client = new OpenAI({ apiKey });
+  }
+  return client;
+}
 
 export async function runEcosystemOrgInference(raw: {
   name: string;
@@ -46,7 +57,7 @@ Return ONLY valid JSON.
 }
 `;
 
-  const completion = await client.chat.completions.create({
+  const completion = await getOpenAIClient().chat.completions.create({
     model: "gpt-4o",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
