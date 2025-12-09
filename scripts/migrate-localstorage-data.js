@@ -9,7 +9,11 @@
  * Or paste JSON directly into the script below (see INLINE_DATA)
  */
 
+// Try .env.local first, then fallback to .env
 require('dotenv').config({ path: '.env.local' });
+if (!process.env.DATABASE_URL) {
+  require('dotenv').config({ path: '.env' });
+}
 const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const path = require('path');
@@ -141,7 +145,7 @@ async function migrateData(localStorageData) {
                 : (companyHQData.yearsInBusiness?.toString() || null),
               teamSize: companyHQData.teamSize || null,
               ownerId: ownerId,
-              ultraTenantId: companyHQData.ultraTenantId || 'cmhmdw78k0001mb1vioxdw2g8',
+              ultraTenantId: null, // Set to null initially, can be updated later if needed
             },
           });
           results.companyHQs.updated++;
@@ -165,7 +169,7 @@ async function migrateData(localStorageData) {
                 : (companyHQData.yearsInBusiness?.toString() || null),
               teamSize: companyHQData.teamSize || null,
               ownerId: ownerId,
-              ultraTenantId: companyHQData.ultraTenantId || 'cmhmdw78k0001mb1vioxdw2g8',
+              ultraTenantId: null, // Set to null initially, can be updated later if needed
             },
           });
           results.companyHQs.created++;
@@ -349,9 +353,22 @@ async function migrateData(localStorageData) {
 
     for (const personaData of personas) {
       try {
-        const personaCompanyHQId = personaData.companyHQId
-          ? (companyHQMap.get(personaData.companyHQId) || primaryCompanyHQId)
-          : primaryCompanyHQId;
+        // Map old companyHQId to new one, or use primary
+        let personaCompanyHQId = primaryCompanyHQId;
+        if (personaData.companyHQId) {
+          const mappedId = companyHQMap.get(personaData.companyHQId);
+          if (mappedId) {
+            personaCompanyHQId = mappedId;
+          } else {
+            // If not found in map, try to find by name
+            const foundHQ = await prisma.companyHQ.findFirst({
+              where: { ownerId: ownerId },
+            });
+            if (foundHQ) {
+              personaCompanyHQId = foundHQ.id;
+            }
+          }
+        }
 
         const existing = await prisma.persona.findFirst({
           where: {
@@ -381,7 +398,9 @@ async function migrateData(localStorageData) {
             location: personaData.location || null,
             description: personaData.description || personaData.goals || null,
             whatTheyWant: personaData.whatTheyWant || personaData.desiredOutcome || null,
-            painPoints: personaData.painPoints || (personaData.painPoints ? personaData.painPoints.split('\n') : []),
+            painPoints: Array.isArray(personaData.painPoints) 
+              ? personaData.painPoints 
+              : (typeof personaData.painPoints === 'string' ? personaData.painPoints.split('\n').filter(p => p.trim()) : []),
             risks: personaData.risks || [],
             decisionDrivers: personaData.decisionDrivers || [],
             buyerTriggers: personaData.buyerTriggers || [],
@@ -411,9 +430,22 @@ async function migrateData(localStorageData) {
 
     for (const presData of presentations) {
       try {
-        const presCompanyHQId = presData.companyHQId
-          ? (companyHQMap.get(presData.companyHQId) || primaryCompanyHQId)
-          : primaryCompanyHQId;
+        // Map old companyHQId to new one
+        let presCompanyHQId = primaryCompanyHQId;
+        if (presData.companyHQId) {
+          const mappedId = companyHQMap.get(presData.companyHQId);
+          if (mappedId) {
+            presCompanyHQId = mappedId;
+          } else {
+            // If not found in map, use primary
+            const foundHQ = await prisma.companyHQ.findFirst({
+              where: { ownerId: ownerId },
+            });
+            if (foundHQ) {
+              presCompanyHQId = foundHQ.id;
+            }
+          }
+        }
 
         const existing = await prisma.presentation.findFirst({
           where: {
@@ -522,7 +554,10 @@ async function migrateData(localStorageData) {
                     unitOfMeasure: itemData.unitOfMeasure || 'item',
                     estimatedHoursEach: itemData.estimatedHoursEach || 0,
                     duration: itemData.duration || null,
-                    status: itemData.status || 'NOT_STARTED',
+                    status: itemData.status === 'not_started' ? 'NOT_STARTED' 
+                      : itemData.status === 'in_progress' ? 'IN_PROGRESS'
+                      : itemData.status === 'completed' ? 'APPROVED'
+                      : itemData.status?.toUpperCase() || 'NOT_STARTED',
                   },
                 });
               }
