@@ -578,8 +578,25 @@ async function migrateData(localStorageData) {
 
     console.log('\n✅ Migration completed!');
     console.log(JSON.stringify(results, null, 2));
+    
+    // Print important info for updating localStorage
+    console.log('\n📋 IMPORTANT: Update your localStorage with these new IDs:');
+    console.log('   New CompanyHQ IDs:');
+    companyHQMap.forEach((newId, oldId) => {
+      const hq = Array.from(companyHQMap.values()).find(id => id === newId);
+      if (hq) {
+        console.log(`     Old: ${oldId} → New: ${newId}`);
+      }
+    });
+    if (companyHQMap.size === 0 && primaryCompanyHQId) {
+      console.log(`   Primary CompanyHQ ID: ${primaryCompanyHQId}`);
+    }
 
-    return results;
+    return {
+      ...results,
+      companyHQIdMap: Object.fromEntries(companyHQMap),
+      primaryCompanyHQId,
+    };
   } catch (error) {
     console.error('❌ Migration failed:', error);
     throw error;
