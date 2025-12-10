@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
+import { useCompanyHydration } from '@/hooks/useCompanyHydration';
 import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, Play, Download, ExternalLink, Loader2 } from 'lucide-react';
 
 export default function PresentationsPage() {
@@ -13,9 +14,37 @@ export default function PresentationsPage() {
   const [syncing, setSyncing] = useState(false);
   const [generating, setGenerating] = useState({});
 
+  // Get companyHQId from localStorage
+  const [companyHQId, setCompanyHQId] = useState('');
+  
   useEffect(() => {
-    loadPresentations();
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+      setCompanyHQId(stored);
+    }
   }, []);
+
+  // Use company hydration hook to sync presentations
+  const { presentations: hydratedPresentations, refresh: refreshHydration } = useCompanyHydration(companyHQId);
+
+  // Sync presentations from hydration hook
+  useEffect(() => {
+    if (hydratedPresentations && Array.isArray(hydratedPresentations)) {
+      console.log(`📦 Syncing ${hydratedPresentations.length} presentations from hydration hook`);
+      setPresentations(hydratedPresentations);
+      if (loading) {
+        setLoading(false);
+      }
+    }
+  }, [hydratedPresentations, loading]);
+
+  // Load presentations on mount (fallback if hook hasn't loaded yet)
+  useEffect(() => {
+    if (!companyHQId) return;
+    if (presentations.length > 0) return; // Already loaded from hook
+    
+    loadPresentations(false);
+  }, [companyHQId]);
 
   const loadPresentations = async (forceRefresh = false) => {
     try {
@@ -89,8 +118,23 @@ export default function PresentationsPage() {
     }
   };
 
-  const handleSync = () => {
-    loadPresentations(true);
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      // Refresh full company hydration (this will update presentations)
+      if (companyHQId && refreshHydration) {
+        await refreshHydration();
+      } else {
+        // Fallback to direct API call
+        await loadPresentations(true);
+      }
+    } catch (err) {
+      console.error('Error syncing:', err);
+      // Fallback to direct API call
+      await loadPresentations(true);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleBuildDeck = async (presentationId) => {
