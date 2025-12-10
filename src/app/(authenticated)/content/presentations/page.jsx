@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useCompanyHydration } from '@/hooks/useCompanyHydration';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, Play, Download, ExternalLink, Loader2 } from 'lucide-react';
 
 export default function PresentationsPage() {
@@ -13,10 +15,26 @@ export default function PresentationsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [generating, setGenerating] = useState({});
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   // Get companyHQId from localStorage
   const [companyHQId, setCompanyHQId] = useState('');
   
+  // Wait for Firebase auth to initialize
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('✅ Presentations: Firebase auth initialized, user:', firebaseUser.uid);
+        setAuthInitialized(true);
+      } else {
+        console.warn('⚠️ Presentations: No Firebase user - redirecting to signup');
+        router.push('/signup');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
@@ -38,13 +56,14 @@ export default function PresentationsPage() {
     }
   }, [hydratedPresentations, loading]);
 
-  // Load presentations on mount (fallback if hook hasn't loaded yet)
+  // Load presentations on mount (only after auth is initialized)
   useEffect(() => {
+    if (!authInitialized) return; // Wait for Firebase auth
     if (!companyHQId) return;
     if (presentations.length > 0) return; // Already loaded from hook
     
     loadPresentations(false);
-  }, [companyHQId]);
+  }, [companyHQId, authInitialized]);
 
   const loadPresentations = async (forceRefresh = false) => {
     try {
@@ -119,6 +138,11 @@ export default function PresentationsPage() {
   };
 
   const handleSync = async () => {
+    if (!authInitialized) {
+      console.warn('⚠️ Cannot sync: Firebase auth not initialized');
+      return;
+    }
+    
     setSyncing(true);
     try {
       // Refresh full company hydration (this will update presentations)
