@@ -26,15 +26,15 @@ function CreateInvoiceContent() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Load WorkPackages on mount
+  // Load WorkPackages on mount - CHECK LOCALSTORAGE FIRST
   useEffect(() => {
     loadWorkPackages();
   }, []);
 
-  // Load selected WorkPackage details
+  // Load selected WorkPackage details and hydrate if needed
   useEffect(() => {
     if (selectedWorkPackageId) {
-      loadWorkPackageDetails(selectedWorkPackageId);
+      loadWorkPackageDetailsAndHydrate(selectedWorkPackageId);
     } else {
       setSelectedWorkPackage(null);
     }
@@ -43,9 +43,35 @@ function CreateInvoiceContent() {
   const loadWorkPackages = async () => {
     try {
       setLoading(true);
+      
+      // CHECK LOCALSTORAGE FIRST
+      if (typeof window !== 'undefined') {
+        const cached = window.localStorage.getItem('workPackages');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              console.log('✅ Loaded workpackages from localStorage:', parsed.length);
+              setWorkPackages(parsed);
+              setLoading(false);
+              return; // Use cached data, skip API call
+            }
+          } catch (err) {
+            console.warn('Failed to parse cached work packages', err);
+          }
+        }
+      }
+
+      // If no localStorage or empty, fetch from API
       const response = await api.get('/api/workpackages');
       if (response.data?.success) {
-        setWorkPackages(response.data.workPackages || []);
+        const packages = response.data.workPackages || [];
+        setWorkPackages(packages);
+        
+        // Store in localStorage
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('workPackages', JSON.stringify(packages));
+        }
       }
     } catch (err) {
       console.error('Error loading work packages:', err);
@@ -55,14 +81,67 @@ function CreateInvoiceContent() {
     }
   };
 
-  const loadWorkPackageDetails = async (workPackageId) => {
+  const loadWorkPackageDetailsAndHydrate = async (workPackageId) => {
     try {
+      // Check localStorage first for this specific workPackage
+      if (typeof window !== 'undefined') {
+        const cached = window.localStorage.getItem('workPackages');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            const found = parsed.find((wp) => wp.id === workPackageId);
+            if (found) {
+              setSelectedWorkPackage(found);
+              
+              // Get companyHQ from workPackage contact (contact.crmId is the companyHQId)
+              const companyHQId = found.contact?.crmId;
+              if (companyHQId) {
+                await hydrateWorkPackagesByCompanyHQ(companyHQId);
+              }
+              return;
+            }
+          } catch (err) {
+            console.warn('Failed to parse cached work packages', err);
+          }
+        }
+      }
+
+      // If not in cache, fetch from API
       const response = await api.get(`/api/workpackages?id=${workPackageId}`);
       if (response.data?.success) {
-        setSelectedWorkPackage(response.data.workPackage);
+        const workPackage = response.data.workPackage;
+        setSelectedWorkPackage(workPackage);
+        
+        // Get companyHQ from workPackage contact (contact.crmId is the companyHQId)
+        const companyHQId = workPackage.contact?.crmId;
+        if (companyHQId) {
+          await hydrateWorkPackagesByCompanyHQ(companyHQId);
+        }
       }
     } catch (err) {
       console.error('Error loading work package details:', err);
+    }
+  };
+
+  const hydrateWorkPackagesByCompanyHQ = async (companyHQId) => {
+    try {
+      console.log('🔄 Hydrating workpackages for companyHQ:', companyHQId);
+      
+      // Fetch all workpackages for this companyHQ
+      const response = await api.get(`/api/workpackages?companyHQId=${companyHQId}`);
+      if (response.data?.success) {
+        const packages = response.data.workPackages || [];
+        setWorkPackages(packages);
+        
+        // Store in localStorage
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('workPackages', JSON.stringify(packages));
+          console.log('✅ Stored', packages.length, 'workpackages in localStorage');
+        }
+      }
+    } catch (err) {
+      console.error('Error hydrating workpackages by companyHQ:', err);
+      // Don't set error - this is a background operation
     }
   };
 

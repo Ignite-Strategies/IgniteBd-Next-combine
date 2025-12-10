@@ -120,6 +120,7 @@ export async function GET(request) {
               firstName: true,
               lastName: true,
               email: true,
+              crmId: true, // Include crmId (companyHQId) for hydration
               contactCompany: {
                 select: {
                   id: true,
@@ -132,6 +133,7 @@ export async function GET(request) {
             select: {
               id: true,
               companyName: true,
+              companyHQId: true, // Include companyHQId
             },
           },
           items: true,
@@ -192,6 +194,7 @@ export async function GET(request) {
             firstName: true,
             lastName: true,
             email: true,
+            crmId: true, // Include crmId (companyHQId) for filtering/hydration
             contactCompany: {
               select: {
                 id: true,
