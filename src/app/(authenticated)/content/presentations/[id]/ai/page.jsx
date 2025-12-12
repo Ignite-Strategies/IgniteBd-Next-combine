@@ -105,6 +105,7 @@ export default function AIPresentationBuilderPage() {
                 onChange={(e) => setPresentationIdea(e.target.value)}
                 placeholder="Describe your presentation idea or what you want to add..."
                 rows={6}
+                spellCheck={true}
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
               />
             </div>

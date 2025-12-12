@@ -88,6 +88,7 @@ export default function CreatePresentationPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Presentation title"
+                spellCheck={true}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
               />
             </div>
@@ -101,6 +102,7 @@ export default function CreatePresentationPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief description of the presentation"
                 rows={4}
+                spellCheck={true}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
               />
             </div>
