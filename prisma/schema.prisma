@@ -704,7 +704,7 @@ model Presentation {
   gammaStatus       String?
   presenter         String?
   gammaGenerationId String?
-  company_hqs       company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  companyHQ         company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@index([companyHQId])
   @@index([published])
