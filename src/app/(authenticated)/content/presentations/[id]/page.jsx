@@ -292,52 +292,33 @@ export default function PresentationPage() {
               </label>
             </div>
 
-            {/* Gamma/PPT Status */}
-            {(gammaStatus || gammaDeckUrl || gammaPptxUrl) && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-blue-900 mb-1">PPT Status</h3>
-                    {gammaStatus === 'ready' && (
-                      <div className="space-y-2">
-                        {gammaDeckUrl && (
-                          <a
-                            href={gammaDeckUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-700 hover:text-blue-900 underline"
-                          >
-                            View Deck
-                          </a>
-                        )}
-                        {gammaPptxUrl && (
-                          <a
-                            href={gammaPptxUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-700 hover:text-blue-900 underline block"
-                          >
-                            Download PPTX
-                          </a>
-                        )}
-                      </div>
-                    )}
-                    {gammaStatus === 'generating' && (
-                      <p className="text-sm text-blue-700">Generating PPT...</p>
-                    )}
-                    {gammaStatus === 'error' && (
-                      <p className="text-sm text-red-700">PPT generation failed</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3 border-t border-gray-200 pt-6">
+              {/* Edit/Builder Button */}
+              <button
+                onClick={() => router.push(`/builder/presentation/${presentationId}`)}
+                className="flex items-center gap-2 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <ArrowLeft className="h-4 w-4 rotate-180" />
+                Edit in Builder
+              </button>
 
-            <div className="flex justify-between items-center">
+              {/* AI Enhancement Button */}
+              <button
+                onClick={() => router.push(`/content/presentations/${presentationId}/ai`)}
+                className="flex items-center gap-2 rounded border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Enhance with AI
+              </button>
+
+              {/* Build PPT Button */}
               <button
                 onClick={handleBuildPPT}
                 disabled={buildingPPT || gammaStatus === 'generating' || !slides || slides.length === 0}
-                className="flex items-center gap-2 rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {buildingPPT || gammaStatus === 'generating' ? (
                   <>
@@ -351,24 +332,68 @@ export default function PresentationPage() {
                   </>
                 )}
               </button>
-              
-              <div className="flex gap-4">
-                <button
-                  onClick={() => router.push(`/content/presentations/${presentationId}/ai`)}
-                  className="flex items-center gap-2 rounded border border-gray-300 bg-white px-6 py-2 text-gray-700 hover:bg-gray-50"
-                >
-                  Enhance with AI
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  <Save className="h-4 w-4" />
-                  {saving ? 'Saving...' : 'Save Presentation'}
-                </button>
-              </div>
+
+              {/* Save Button */}
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="ml-auto flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? 'Saving...' : 'Save'}
+              </button>
             </div>
+
+            {/* Gamma/PPT Status - Show after build */}
+            {(gammaStatus || gammaDeckUrl || gammaPptxUrl) && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                      {gammaStatus === 'ready' ? '✅ PPT Ready!' : gammaStatus === 'generating' ? '🔄 Generating PPT...' : '❌ PPT Generation Failed'}
+                    </h3>
+                    {gammaStatus === 'ready' && (
+                      <div className="flex flex-wrap gap-3">
+                        {gammaDeckUrl && (
+                          <a
+                            href={gammaDeckUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View Deck (Gamma)
+                          </a>
+                        )}
+                        {gammaPptxUrl && (
+                          <a
+                            href={gammaPptxUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download PPTX
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {gammaStatus === 'generating' && (
+                      <p className="text-sm text-blue-700">Gamma is generating your presentation deck. This may take a minute...</p>
+                    )}
+                    {gammaStatus === 'error' && (
+                      <p className="text-sm text-red-700">PPT generation failed. Please try again or check your slides.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
