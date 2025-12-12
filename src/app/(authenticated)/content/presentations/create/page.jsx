@@ -1,21 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
+import { Building2, RefreshCw, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 export default function CreatePresentationPage() {
   const router = useRouter();
+  const { companyHQId, companyHQ, loading: companyLoading, refresh: refreshCompany } = useCompanyHQ();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [slideCount, setSlideCount] = useState(10);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const companyHQId = typeof window !== 'undefined'
-    ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
-    : '';
+  // Try to refresh company data on mount if missing
+  useEffect(() => {
+    if (!companyHQId && !companyLoading && !refreshing) {
+      setRefreshing(true);
+      refreshCompany().finally(() => setRefreshing(false));
+    }
+  }, [companyHQId, companyLoading, refreshCompany, refreshing]);
+
+  const handleRefreshCompany = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      await refreshCompany();
+      if (!companyHQId) {
+        setError('Company data not found. Please set up your company profile.');
+      }
+    } catch (err) {
+      console.error('Error refreshing company:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -24,7 +47,7 @@ export default function CreatePresentationPage() {
     }
 
     if (!companyHQId) {
-      setError('Missing company context. Please complete onboarding first.');
+      setError('Company profile required');
       return;
     }
 
@@ -73,7 +96,44 @@ export default function CreatePresentationPage() {
 
         <div className="mt-8 rounded-2xl bg-white p-6 shadow">
           <div className="space-y-6">
-            {error && (
+            {!companyHQId && (
+              <div className="rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="rounded-full bg-amber-100 p-3">
+                      <Building2 className="h-6 w-6 text-amber-600" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="mb-1 text-lg font-semibold text-gray-900">
+                      Company Profile Required
+                    </h3>
+                    <p className="mb-4 text-sm text-gray-600">
+                      To create presentations, we need your company information set up first. This helps us organize your content and ensure everything is properly linked.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => router.push('/company/profile')}
+                        className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                      >
+                        Set Up Company Profile
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={handleRefreshCompany}
+                        disabled={refreshing}
+                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                        {refreshing ? 'Checking...' : 'Refresh Company Data'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {error && companyHQId && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
               </div>
@@ -140,7 +200,7 @@ export default function CreatePresentationPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !title.trim()}
+                disabled={saving || !title.trim() || !companyHQId}
                 className="rounded bg-red-600 px-6 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Creating...' : 'Create Presentation'}
