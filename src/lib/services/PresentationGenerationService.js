@@ -80,7 +80,7 @@ Return ONLY valid JSON. No markdown, no code blocks, just the JSON object.`;
         },
       ],
       response_format: { type: 'json_object' }, // Ensure JSON response
-      max_tokens: 4000,
+      max_tokens: 8000, // Increased for larger presentations (up to 100 slides)
     });
 
     const content = completion.choices?.[0]?.message?.content;

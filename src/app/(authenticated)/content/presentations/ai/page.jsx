@@ -102,12 +102,19 @@ export default function AIPresentationBuilderPage() {
                 value={slideCount}
                 onChange={(e) => {
                   const value = e.target.value;
-                  // Allow typing (including empty for deletion)
+                  // Allow typing freely
                   if (value === '') {
-                    setSlideCount(6); // Default if cleared
-                  } else {
-                    const numValue = parseInt(value, 10);
-                    if (!isNaN(numValue) && numValue >= 1 && numValue <= 100) {
+                    // Allow empty while typing
+                    return;
+                  }
+                  const numValue = parseInt(value, 10);
+                  if (!isNaN(numValue)) {
+                    // Clamp to valid range but allow typing
+                    if (numValue < 1) {
+                      setSlideCount(1);
+                    } else if (numValue > 100) {
+                      setSlideCount(100);
+                    } else {
                       setSlideCount(numValue);
                     }
                   }
@@ -119,6 +126,8 @@ export default function AIPresentationBuilderPage() {
                     setSlideCount(6);
                   } else if (value > 100) {
                     setSlideCount(100);
+                  } else {
+                    setSlideCount(value);
                   }
                 }}
                 min={1}
