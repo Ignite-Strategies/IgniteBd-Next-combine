@@ -30,10 +30,7 @@ export async function GET(request) {
           include: {
             owner: true,
             manager: true,
-            contacts: {
-              take: 5,
-              orderBy: { createdAt: 'desc' },
-            },
+            // Don't include contacts - can cause schema mismatches
             contactLists: {
               take: 5,
             },

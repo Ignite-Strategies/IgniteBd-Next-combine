@@ -54,6 +54,7 @@ export async function POST(request) {
       );
     }
 
+    // Don't include presenter field - may not exist in DB
     const presentation = await prisma.presentation.create({
       data: {
         companyHQId,
@@ -62,6 +63,7 @@ export async function POST(request) {
         slides: slides || null,
         published,
         publishedAt: published ? new Date() : null,
+        // presenter field removed - not in current schema
       },
     });
 
