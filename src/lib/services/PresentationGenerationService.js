@@ -18,9 +18,11 @@ export async function generatePresentationOutline(presentationIdea, slideCount =
     console.log(`🎯 Generating presentation outline: ${slideCount} slides`);
 
     // Build the user prompt
-    const userPrompt = `Create a presentation outline with ${slideCount} slides based on this idea:
+    const userPrompt = `Create a presentation outline with EXACTLY ${slideCount} slides based on this idea:
 
 ${presentationIdea}
+
+CRITICAL: You must return EXACTLY ${slideCount} slides in the slides array. No more, no less.
 
 Generate a structured presentation outline. Return ONLY a valid JSON object with these exact keys:
 {
@@ -36,7 +38,7 @@ Generate a structured presentation outline. Return ONLY a valid JSON object with
   ]
 }
 
-Make sure you generate exactly ${slideCount} slides. Each slide should have:
+Each slide should have:
 - A clear, compelling title
 - Content that includes key points, bullet points, or talking points
 - Optional presenter notes if helpful
@@ -44,23 +46,26 @@ Make sure you generate exactly ${slideCount} slides. Each slide should have:
 Structure the slides logically:
 - Start with an introduction/title slide
 - Include agenda/overview if appropriate
-- Build through main content slides
+- Build through main content slides (distribute content across all ${slideCount} slides)
 - End with conclusion/next steps/call to action
+
+IMPORTANT: The slides array MUST contain exactly ${slideCount} items. Count them before returning.
 
 Be specific to the presentation idea provided and make it practical and actionable.`;
 
     // System prompt
     const systemPrompt = `You are an expert presentation designer. Your job is to create structured, compelling presentation outlines that help presenters deliver clear and engaging content.
 
-Guidelines:
-1. Create exactly the requested number of slides
+CRITICAL REQUIREMENTS:
+1. You MUST create EXACTLY the requested number of slides - count them in the slides array before returning
 2. Make each slide focused and actionable
 3. Use clear, compelling titles
 4. Provide useful talking points in the content field
 5. Structure logically with introduction, main content, and conclusion
 6. Be specific to the presentation topic/idea
+7. Distribute content evenly across all slides - don't cram everything into a few slides
 
-Return ONLY valid JSON. No markdown, no code blocks, just the JSON object.`;
+Return ONLY valid JSON. No markdown, no code blocks, just the JSON object. The slides array must have exactly the number of slides requested.`;
 
     // Call OpenAI
     console.log('🤖 Calling OpenAI for presentation outline generation...');
