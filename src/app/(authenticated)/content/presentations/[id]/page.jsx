@@ -118,6 +118,7 @@ export default function PresentationPage() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                spellCheck={true}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
               />
             </div>
@@ -130,6 +131,7 @@ export default function PresentationPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
+                spellCheck={true}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
               />
             </div>
@@ -155,6 +157,7 @@ export default function PresentationPage() {
                         value={slide.title || ''}
                         onChange={(e) => updateSlide(index, 'title', e.target.value)}
                         placeholder="Slide title"
+                        spellCheck={true}
                         className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                       />
                       <textarea
@@ -162,6 +165,7 @@ export default function PresentationPage() {
                         onChange={(e) => updateSlide(index, 'content', e.target.value)}
                         placeholder="Slide content (key points, talking points, etc.)"
                         rows={3}
+                        spellCheck={true}
                         className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                       />
                     </div>
