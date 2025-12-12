@@ -2,24 +2,95 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 
 export default function CompanyProfilePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    companyName: 'Ignite Strategies',
-    whatYouDo: 'Business acquisition services for professional service solo founders.',
-    companyStreet: '2604 N. George Mason Dr.',
-    companyCity: 'Arlington',
-    companyState: 'VA 22207',
-    companyWebsite: 'https://www.ignitestrategies.co',
+    companyName: '',
+    whatYouDo: '',
+    companyStreet: '',
+    companyCity: '',
+    companyState: '',
+    companyWebsite: '',
     yearsInBusiness: '',
     industry: '',
     annualRevenue: '',
     teamSize: '',
   });
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [existingCompany, setExistingCompany] = useState(null);
+
+  // Check if company already exists on mount
+  useEffect(() => {
+    const checkExistingCompany = async () => {
+      try {
+        // First check localStorage
+        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+        const storedCompany = localStorage.getItem('companyHQ');
+        
+        if (companyHQId && storedCompany) {
+          try {
+            const company = JSON.parse(storedCompany);
+            setExistingCompany(company);
+            setFormData({
+              companyName: company.companyName || '',
+              whatYouDo: company.whatYouDo || '',
+              companyStreet: company.companyStreet || '',
+              companyCity: company.companyCity || '',
+              companyState: company.companyState || '',
+              companyWebsite: company.companyWebsite || '',
+              yearsInBusiness: company.yearsInBusiness || '',
+              industry: company.companyIndustry || '',
+              annualRevenue: company.companyAnnualRev || '',
+              teamSize: company.teamSize || '',
+            });
+            setChecking(false);
+            return;
+          } catch (e) {
+            console.warn('Failed to parse stored company:', e);
+          }
+        }
+
+        // If no localStorage, check via API
+        const hydrateResponse = await api.get('/api/owner/hydrate');
+        if (hydrateResponse.data?.success && hydrateResponse.data?.owner) {
+          const owner = hydrateResponse.data.owner;
+          const companyHQId = owner.companyHQId;
+          const companyHQ = owner.companyHQ;
+
+          if (companyHQId && companyHQ) {
+            setExistingCompany(companyHQ);
+            setFormData({
+              companyName: companyHQ.companyName || '',
+              whatYouDo: companyHQ.whatYouDo || '',
+              companyStreet: companyHQ.companyStreet || '',
+              companyCity: companyHQ.companyCity || '',
+              companyState: companyHQ.companyState || '',
+              companyWebsite: companyHQ.companyWebsite || '',
+              yearsInBusiness: companyHQ.yearsInBusiness || '',
+              industry: companyHQ.companyIndustry || '',
+              annualRevenue: companyHQ.companyAnnualRev || '',
+              teamSize: companyHQ.teamSize || '',
+            });
+            
+            // Update localStorage
+            localStorage.setItem('companyHQId', companyHQId);
+            localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not check for existing company:', err);
+        // Continue with empty form
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    checkExistingCompany();
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -35,16 +106,8 @@ export default function CompanyProfilePage() {
     setLoading(true);
 
     try {
-      const ownerId =
-        localStorage.getItem('ownerId') || localStorage.getItem('adminId');
-
-      if (!ownerId) {
-        alert('No owner ID found. Please sign up again.');
-        router.replace('/signup');
-        return;
-      }
-
-      const response = await api.post('/api/company', {
+      // Use upsert API which handles both create and update
+      const response = await api.put('/api/company/upsert', {
         companyName: formData.companyName,
         whatYouDo: formData.whatYouDo,
         companyStreet: formData.companyStreet,
@@ -55,7 +118,6 @@ export default function CompanyProfilePage() {
         companyAnnualRev: formData.annualRevenue || null,
         yearsInBusiness: formData.yearsInBusiness || null,
         teamSize: formData.teamSize,
-        ownerId,
       });
 
       const companyHQ = response.data?.companyHQ;
@@ -64,6 +126,7 @@ export default function CompanyProfilePage() {
         localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
       }
 
+      // Refresh owner data
       try {
         const hydrateResponse = await api.get('/api/owner/hydrate');
         if (hydrateResponse.data.success && hydrateResponse.data.owner) {
@@ -82,12 +145,24 @@ export default function CompanyProfilePage() {
 
       router.push('/company/create-success');
     } catch (error) {
-      console.error('Company creation error:', error);
-      alert('Company creation failed. Please try again.');
+      console.error('Company save error:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to save company';
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4" />
+          <p className="text-white text-xl">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-8">
@@ -101,9 +176,13 @@ export default function CompanyProfilePage() {
             className="mx-auto mb-6 h-16 w-16 object-contain"
             priority
           />
-          <h1 className="text-4xl font-bold text-white mb-4">Create Your Company</h1>
+          <h1 className="text-4xl font-bold text-white mb-4">
+            {existingCompany ? 'Update Your Company' : 'Create Your Company'}
+          </h1>
           <p className="text-white/80 text-lg">
-            Tell us about your business to get started
+            {existingCompany 
+              ? 'Update your company information below' 
+              : 'Tell us about your business to get started'}
           </p>
         </div>
 
@@ -311,7 +390,9 @@ export default function CompanyProfilePage() {
                 disabled={loading}
                 className="flex-1 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-medium rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                {loading ? 'Creating…' : 'Create Company →'}
+                {loading 
+                  ? (existingCompany ? 'Updating…' : 'Creating…') 
+                  : (existingCompany ? 'Update Company →' : 'Create Company →')}
               </button>
             </div>
           </form>
