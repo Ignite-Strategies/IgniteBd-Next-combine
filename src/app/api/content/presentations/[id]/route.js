@@ -4,15 +4,20 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 export async function GET(request, { params }) {
   try {
-    await verifyFirebaseToken(request);
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401 },
-    );
-  }
+    const firebaseUser = await verifyFirebaseToken(request);
+    
+    // Get owner
+    const owner = await prisma.owner.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
 
-  try {
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
@@ -23,6 +28,13 @@ export async function GET(request, { params }) {
 
     const presentation = await prisma.presentation.findUnique({
       where: { id },
+      include: {
+        companyHQ: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
     });
 
     if (!presentation) {
@@ -32,11 +44,28 @@ export async function GET(request, { params }) {
       );
     }
 
+    // Verify presentation belongs to owner's companyHQ
+    if (presentation.companyHQ.ownerId !== owner.id) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied' },
+        { status: 403 },
+      );
+    }
+
+    // Remove companyHQ from response (internal check only)
+    const { companyHQ, ...presentationData } = presentation;
+
     return NextResponse.json({
       success: true,
-      presentation,
+      presentation: presentationData,
     });
   } catch (error) {
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
     console.error('❌ GetPresentation error:', error);
     return NextResponse.json(
       {
@@ -51,20 +80,51 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
-    await verifyFirebaseToken(request);
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401 },
-    );
-  }
+    const firebaseUser = await verifyFirebaseToken(request);
+    
+    // Get owner
+    const owner = await prisma.owner.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
 
-  try {
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Presentation ID is required' },
         { status: 400 },
+      );
+    }
+
+    // Verify presentation belongs to owner's companyHQ
+    const presentation = await prisma.presentation.findUnique({
+      where: { id },
+      include: {
+        companyHQ: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!presentation) {
+      return NextResponse.json(
+        { success: false, error: 'Presentation not found' },
+        { status: 404 },
+      );
+    }
+
+    if (presentation.companyHQ.ownerId !== owner.id) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied' },
+        { status: 403 },
       );
     }
 
@@ -85,18 +145,24 @@ export async function PATCH(request, { params }) {
       updateData.publishedAt = published ? new Date() : null;
     }
 
-    const presentation = await prisma.presentation.update({
+    const updatedPresentation = await prisma.presentation.update({
       where: { id },
       data: updateData,
     });
 
-    console.log('✅ Presentation updated:', presentation.id);
+    console.log('✅ Presentation updated:', updatedPresentation.id);
 
     return NextResponse.json({
       success: true,
-      presentation,
+      presentation: updatedPresentation,
     });
   } catch (error) {
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
     console.error('❌ UpdatePresentation error:', error);
     return NextResponse.json(
       {
@@ -111,20 +177,51 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    await verifyFirebaseToken(request);
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401 },
-    );
-  }
+    const firebaseUser = await verifyFirebaseToken(request);
+    
+    // Get owner
+    const owner = await prisma.owner.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
 
-  try {
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Presentation ID is required' },
         { status: 400 },
+      );
+    }
+
+    // Verify presentation belongs to owner's companyHQ
+    const presentation = await prisma.presentation.findUnique({
+      where: { id },
+      include: {
+        companyHQ: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!presentation) {
+      return NextResponse.json(
+        { success: false, error: 'Presentation not found' },
+        { status: 404 },
+      );
+    }
+
+    if (presentation.companyHQ.ownerId !== owner.id) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied' },
+        { status: 403 },
       );
     }
 
@@ -139,6 +236,12 @@ export async function DELETE(request, { params }) {
       message: 'Presentation deleted successfully',
     });
   } catch (error) {
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
     console.error('❌ DeletePresentation error:', error);
     return NextResponse.json(
       {
