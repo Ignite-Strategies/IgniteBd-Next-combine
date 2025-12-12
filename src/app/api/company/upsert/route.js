@@ -76,8 +76,12 @@ export async function PUT(request) {
       });
       console.log('✅ CompanyHQ updated:', companyHQ.id);
     } else {
-      // Auto-assign Ultra Tenant (Ignite Strategies)
-      const ULTRA_TENANT_ID = 'cmhmdw78k0001mb1vioxdw2g8';
+      // Find IgniteBD root tenant (ultraTenantId = null) to auto-assign as parent
+      // This makes new owners "baby CRM" tenants under IgniteBD
+      const igniteBDHQ = await prisma.companyHQ.findFirst({
+        where: { ultraTenantId: null },
+        orderBy: { createdAt: 'asc' }, // Get the first/oldest root tenant
+      });
       
       // Create new company
       companyHQ = await prisma.companyHQ.create({
@@ -93,7 +97,7 @@ export async function PUT(request) {
           yearsInBusiness: yearsInBusiness || null,
           teamSize: teamSize || null,
           ownerId: owner.id,
-          ultraTenantId: ULTRA_TENANT_ID, // Auto-assign to Ignite Strategies
+          ultraTenantId: igniteBDHQ?.id || null, // Auto-assign to IgniteBD if found
         },
         include: {
           owner: true,

@@ -77,8 +77,18 @@ export async function POST(request) {
       );
     }
 
-    // Auto-assign Ultra Tenant (Ignite Strategies)
-    const ULTRA_TENANT_ID = 'cmhmdw78k0001mb1vioxdw2g8';
+    // Find IgniteBD root tenant (ultraTenantId = null)
+    const igniteBDHQ = await prisma.companyHQ.findFirst({
+      where: { ultraTenantId: null },
+      orderBy: { createdAt: 'asc' }, // Get the first/oldest root tenant
+    });
+
+    if (!igniteBDHQ) {
+      return NextResponse.json(
+        { success: false, error: 'IgniteBD root tenant not found. Please seed the database first.' },
+        { status: 500 },
+      );
+    }
 
     // companyAnnualRev is now String? in schema, so we can store ranges like "500k-1m"
 
@@ -96,7 +106,7 @@ export async function POST(request) {
         yearsInBusiness: yearsInBusiness || null,
         teamSize: teamSize || null,
         ownerId: owner.id, // Set to SuperAdmin's owner ID
-        ultraTenantId: ULTRA_TENANT_ID, // Auto-assign to Ignite Strategies
+        ultraTenantId: igniteBDHQ.id, // Auto-assign to IgniteBD root tenant
       },
       include: {
         owner: {
