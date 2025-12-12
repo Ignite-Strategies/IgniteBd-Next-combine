@@ -98,12 +98,15 @@ export default function AIPresentationBuilderPage() {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700">
-                What is your presentation idea?
+                What is your presentation about?
               </label>
+              <p className="mb-2 text-xs text-gray-500">
+                Describe what you want to present - the AI will create the title, outline, and slide content
+              </p>
               <textarea
                 value={presentationIdea}
                 onChange={(e) => setPresentationIdea(e.target.value)}
-                placeholder="Describe your presentation idea or what you want to add..."
+                placeholder="Example: A pitch deck for our new SaaS product targeting mid-market companies, focusing on ROI and ease of implementation..."
                 rows={6}
                 spellCheck={true}
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"

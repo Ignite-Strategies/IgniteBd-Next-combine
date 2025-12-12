@@ -8,10 +8,68 @@ import api from '@/lib/api';
 export default function SetupWizard({ companyHQ, hasContacts = false, onComplete }) {
   const router = useRouter();
   const [hasAssessment, setHasAssessment] = useState(false);
+  const [hasProfile, setHasProfile] = useState(false);
+  const [companyComplete, setCompanyComplete] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   // Check what's been completed
   const hasCompany = companyHQ && companyHQ.id;
-  const hasOutreach = false; // TODO: Check if outreach setup
+
+  // Check owner profile completeness
+  useEffect(() => {
+    const checkProfile = async () => {
+      try {
+        const ownerStr = typeof window !== 'undefined' ? localStorage.getItem('owner') : null;
+        if (ownerStr) {
+          const owner = JSON.parse(ownerStr);
+          // Check if owner has name and email
+          setHasProfile(!!(owner?.name && owner?.email));
+        } else {
+          // Try API
+          const response = await api.get('/api/owner/hydrate');
+          if (response.data?.success && response.data?.owner) {
+            const owner = response.data.owner;
+            setHasProfile(!!(owner?.name && owner?.email));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not check profile:', err);
+        setHasProfile(false);
+      }
+    };
+
+    checkProfile();
+  }, []);
+
+  // Check company completeness
+  useEffect(() => {
+    if (!hasCompany) {
+      setCompanyComplete(false);
+      setLoading(false);
+      return;
+    }
+
+    const check = () => {
+      // Check if company has required fields
+      const companyStr = typeof window !== 'undefined' ? localStorage.getItem('companyHQ') : null;
+      if (companyStr) {
+        try {
+          const hq = JSON.parse(companyStr);
+          // Check if company has name, whatYouDo, and industry at minimum
+          setCompanyComplete(!!(hq?.companyName && hq?.whatYouDo && hq?.companyIndustry));
+        } catch (e) {
+          setCompanyComplete(false);
+        }
+      } else if (companyHQ) {
+        setCompanyComplete(!!(companyHQ?.companyName && companyHQ?.whatYouDo && companyHQ?.companyIndustry));
+      } else {
+        setCompanyComplete(false);
+      }
+      setLoading(false);
+    };
+
+    check();
+  }, [companyHQ, hasCompany]);
 
   // Check if assessment is completed
   useEffect(() => {
@@ -48,25 +106,33 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
 
     // Only check if companyHQ is available
     if (companyHQ?.id) {
-    checkAssessment();
+      checkAssessment();
     }
   }, [companyHQ]);
   
   const steps = [
     {
+      id: 'profile',
+      title: 'Complete Your Profile',
+      description: 'Add your name and email',
+      completed: hasProfile,
+      route: '/settings',
+      action: hasProfile ? 'View Profile' : 'Complete Profile'
+    },
+    {
       id: 'company',
       title: 'Set Up Your Company',
-      description: 'Company profile created',
-      completed: hasCompany,
-      route: '/company/create-or-choose',
-      action: hasCompany ? 'View Profile' : 'Set Up Company'
+      description: companyComplete ? 'Company profile complete' : 'Add company details',
+      completed: companyComplete,
+      route: companyComplete ? '/settings' : '/company/profile',
+      action: companyComplete ? 'View Company' : hasCompany ? 'Complete Company' : 'Set Up Company'
     },
     {
       id: 'contacts',
       title: 'Add Your First Contacts',
       description: 'Start building your network',
       completed: hasContacts,
-      route: '/contacts/upload', // Always route to upload page
+      route: '/contacts/upload',
       action: hasContacts ? 'Add More Contacts' : 'Add Contacts'
     },
     {
@@ -76,14 +142,6 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
       completed: hasAssessment,
       route: '/assessment',
       action: 'Start Assessment'
-    },
-    {
-      id: 'outreach',
-      title: 'Set Up Outreach',
-      description: 'Start nurturing relationships',
-      completed: hasOutreach,
-      route: '/outreach',
-      action: 'Set Up Outreach'
     }
   ];
   
@@ -95,9 +153,37 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
   if (completedCount === totalSteps && onComplete) {
     return null;
   }
+
+  // Show prominent alert if critical steps are missing
+  const criticalStepsIncomplete = !hasProfile || !hasCompany || !companyComplete;
   
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6 shadow-sm">
+    <div className={`rounded-lg p-6 mb-6 shadow-lg ${
+      criticalStepsIncomplete 
+        ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-300' 
+        : 'bg-white border border-gray-200'
+    }`}>
+      {criticalStepsIncomplete && (
+        <div className="mb-4 pb-4 border-b border-amber-200">
+          <div className="flex items-center gap-2">
+            <div className="flex-shrink-0">
+              <div className="rounded-full bg-amber-100 p-2">
+                <Circle className="h-5 w-5 text-amber-600" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-base font-semibold text-amber-900">
+                Setup Required
+              </h3>
+              <p className="text-sm text-amber-700">
+                Complete the steps below to get started. Some features may not work until setup is complete.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className={`${criticalStepsIncomplete ? '' : 'p-2'}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <h2 className="text-base font-semibold text-gray-900">Getting Started</h2>
@@ -115,7 +201,7 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
       </div>
       
       {/* Compact Steps - Horizontal or Compact Vertical */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {steps.map((step, index) => (
           <button
             key={step.id}
