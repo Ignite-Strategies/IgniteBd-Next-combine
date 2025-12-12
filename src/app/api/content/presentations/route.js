@@ -27,6 +27,7 @@ export async function POST(request) {
     const {
       companyHQId,
       title,
+      presenter,
       description,
       slides,
       published = false,
@@ -54,11 +55,11 @@ export async function POST(request) {
       );
     }
 
-    // Create presentation - only include fields that exist in the database
-    // Explicitly exclude presenter field as it doesn't exist in the DB
+    // Create presentation - match schema exactly
     const presentationData = {
       companyHQId,
       title,
+      presenter: presenter || null,
       description: description || null,
       slides: slides || null,
       published,

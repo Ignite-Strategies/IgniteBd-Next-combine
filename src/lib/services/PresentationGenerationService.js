@@ -11,16 +11,36 @@ const openai = new OpenAI();
  * 
  * @param {string} presentationIdea - The idea/description for the presentation
  * @param {number} slideCount - Number of slides to generate
+ * @param {string} presenter - Optional: Name of the presenter
+ * @param {string} presenterExpertise - Optional: Expertise/background of the presenter (e.g., "10 years in SaaS sales", "Legal expert", "Marketing director")
  * @returns {Promise<Object>} Generated presentation outline with slides
  */
-export async function generatePresentationOutline(presentationIdea, slideCount = 10) {
+export async function generatePresentationOutline(
+  presentationIdea, 
+  slideCount = 10,
+  presenter = null,
+  presenterExpertise = null
+) {
   try {
-    console.log(`🎯 Generating presentation outline: ${slideCount} slides`);
+    console.log(`🎯 Generating presentation outline: ${slideCount} slides${presenter ? ` for ${presenter}` : ''}`);
+
+    // Build presenter context for AI
+    let presenterContext = '';
+    if (presenter || presenterExpertise) {
+      presenterContext = '\n\nPRESENTER CONTEXT:\n';
+      if (presenter) {
+        presenterContext += `- Presenter: ${presenter}\n`;
+      }
+      if (presenterExpertise) {
+        presenterContext += `- Expertise/Background: ${presenterExpertise}\n`;
+      }
+      presenterContext += '\nTailor the content, language, examples, and depth to match this presenter\'s expertise and background. Use terminology and examples that align with their experience level.';
+    }
 
     // Build the user prompt
     const userPrompt = `Create a presentation outline with EXACTLY ${slideCount} slides based on this idea:
 
-${presentationIdea}
+${presentationIdea}${presenterContext}
 
 CRITICAL: You must return EXACTLY ${slideCount} slides in the slides array. No more, no less.
 
@@ -64,6 +84,9 @@ CRITICAL REQUIREMENTS:
 5. Structure logically with introduction, main content, and conclusion
 6. Be specific to the presentation topic/idea
 7. Distribute content evenly across all slides - don't cram everything into a few slides
+8. ${presenter || presenterExpertise ? 'IMPORTANT: Tailor the content, complexity, examples, and terminology to match the presenter\'s expertise and background. Adjust the depth and sophistication of the material based on their experience level.' : ''}
+
+${presenter || presenterExpertise ? `PRESENTER ADAPTATION:\n- Adjust language complexity and technical depth to match their expertise\n- Use examples and case studies relevant to their background\n- Include presenter notes that leverage their specific knowledge and experience\n- Ensure the content is authentic to their voice and expertise level\n` : ''}
 
 Return ONLY valid JSON. No markdown, no code blocks, just the JSON object. The slides array must have exactly the number of slides requested.`;
 

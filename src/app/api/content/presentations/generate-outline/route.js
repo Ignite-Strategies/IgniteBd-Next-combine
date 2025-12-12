@@ -18,7 +18,12 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { presentationIdea, slideCount = 10 } = body ?? {};
+    const { 
+      presentationIdea, 
+      slideCount = 10,
+      presenter = null,
+      presenterExpertise = null,
+    } = body ?? {};
 
     if (!presentationIdea || !presentationIdea.trim()) {
       return NextResponse.json(
@@ -35,11 +40,13 @@ export async function POST(request) {
       );
     }
 
-    console.log(`🎯 Generating presentation outline: ${slideNum} slides`);
+    console.log(`🎯 Generating presentation outline: ${slideNum} slides${presenter ? ` for ${presenter}` : ''}`);
 
     const result = await generatePresentationOutline(
       presentationIdea.trim(),
-      slideNum
+      slideNum,
+      presenter || null,
+      presenterExpertise || null
     );
 
     if (!result.success) {
