@@ -3,37 +3,64 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Plus, Presentation, ArrowRight } from 'lucide-react';
+import { Plus, Presentation, ArrowRight, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function PresentationsPage() {
   const router = useRouter();
   const [presentations, setPresentations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
 
   const companyHQId = typeof window !== 'undefined'
     ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
     : '';
 
+  // Load from localStorage on mount - no API call
   useEffect(() => {
-    if (companyHQId) {
-      loadPresentations();
+    if (typeof window === 'undefined') return;
+    if (!companyHQId) {
+      setLoading(false);
+      return;
     }
-  }, [companyHQId]);
 
-  const loadPresentations = async () => {
     try {
-      setLoading(true);
-      const response = await api.get(`/api/content/presentations?companyHQId=${companyHQId}`);
-      if (response.data?.success) {
-        setPresentations(response.data.presentations || []);
+      const stored = localStorage.getItem(`presentations_${companyHQId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setPresentations(Array.isArray(parsed) ? parsed : []);
+      } else {
+        setPresentations([]);
       }
     } catch (err) {
-      console.error('Error loading presentations:', err);
-      setError('Failed to load presentations');
+      console.warn('Failed to load presentations from localStorage:', err);
+      setPresentations([]);
+    }
+    setLoading(false);
+  }, [companyHQId]);
+
+  // Silent sync function (called by sync button)
+  const handleSync = async () => {
+    if (!companyHQId) return;
+
+    try {
+      setSyncing(true);
+      setError('');
+      
+      const response = await api.get(`/api/content/presentations?companyHQId=${companyHQId}`);
+      if (response.data?.success) {
+        const fetchedPresentations = response.data.presentations || [];
+        setPresentations(fetchedPresentations);
+        
+        // Store in localStorage
+        localStorage.setItem(`presentations_${companyHQId}`, JSON.stringify(fetchedPresentations));
+      }
+    } catch (err) {
+      console.error('Error syncing presentations:', err);
+      // Silent fail - don't show error to user
     } finally {
-      setLoading(false);
+      setSyncing(false);
     }
   };
 
@@ -52,6 +79,15 @@ export default function PresentationsPage() {
             <h2 className="text-xl font-semibold text-gray-900">Your Presentations</h2>
             <div className="flex gap-3">
               <button
+                onClick={handleSync}
+                disabled={syncing || !companyHQId}
+                className="flex items-center gap-2 rounded bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow transition hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Sync presentations from database"
+              >
+                <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync'}
+              </button>
+              <button
                 onClick={() => router.push('/content/presentations/create')}
                 className="flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
               >
@@ -61,17 +97,7 @@ export default function PresentationsPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="rounded-2xl bg-white p-12 text-center shadow">
-              <p className="text-sm font-semibold text-gray-600">Loading presentations...</p>
-            </div>
-          ) : presentations.length === 0 ? (
+          {presentations.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow">
               <Presentation className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-4 text-lg font-semibold text-gray-900">No presentations yet</h3>
