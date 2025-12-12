@@ -3,7 +3,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'presentations'
+        WHERE table_schema = 'public' AND table_name = 'presentations'
     ) THEN
         CREATE TABLE "presentations" (
             "id" TEXT NOT NULL,
@@ -40,35 +40,62 @@ CREATE INDEX IF NOT EXISTS "presentations_gammaStatus_idx" ON "presentations"("g
 DO $$
 BEGIN
     -- Add Gamma fields if they don't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'presentations' AND column_name = 'presenter') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'presentations' AND column_name = 'presenter'
+    ) THEN
         ALTER TABLE "presentations" ADD COLUMN "presenter" TEXT;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'presentations' AND column_name = 'feedback') THEN
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'presentations' AND column_name = 'feedback'
+    ) THEN
         ALTER TABLE "presentations" ADD COLUMN "feedback" JSONB;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'presentations' AND column_name = 'gammaStatus') THEN
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'presentations' AND column_name = 'gammaStatus'
+    ) THEN
         ALTER TABLE "presentations" ADD COLUMN "gammaStatus" TEXT;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'presentations' AND column_name = 'gammaDeckUrl') THEN
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'presentations' AND column_name = 'gammaDeckUrl'
+    ) THEN
         ALTER TABLE "presentations" ADD COLUMN "gammaDeckUrl" TEXT;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'presentations' AND column_name = 'gammaPptxUrl') THEN
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'presentations' AND column_name = 'gammaPptxUrl'
+    ) THEN
         ALTER TABLE "presentations" ADD COLUMN "gammaPptxUrl" TEXT;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'presentations' AND column_name = 'gammaBlob') THEN
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'presentations' AND column_name = 'gammaBlob'
+    ) THEN
         ALTER TABLE "presentations" ADD COLUMN "gammaBlob" TEXT;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'presentations' AND column_name = 'gammaError') THEN
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'presentations' AND column_name = 'gammaError'
+    ) THEN
         ALTER TABLE "presentations" ADD COLUMN "gammaError" TEXT;
     END IF;
 END $$;
 
--- AddForeignKey (idempotent)
+-- AddForeignKey (idempotent - using pg_constraint like other migrations)
 DO $$
 BEGIN
     IF NOT EXISTS (
-        SELECT 1 FROM information_schema.table_constraints 
-        WHERE constraint_name = 'presentations_companyHQId_fkey'
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'presentations_companyHQId_fkey'
     ) THEN
         ALTER TABLE "presentations" ADD CONSTRAINT "presentations_companyHQId_fkey" 
         FOREIGN KEY ("companyHQId") REFERENCES "company_hqs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
