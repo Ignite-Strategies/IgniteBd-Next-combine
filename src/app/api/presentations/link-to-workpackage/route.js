@@ -3,8 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
- * POST /api/presentations/duplicate
- * Duplicate a presentation into a WorkItem (WorkPackageItem)
+ * POST /api/presentations/link-to-workpackage
+ * Link a presentation from Content Hub to a WorkPackageItem by copying content into WorkCollateral
+ * 
+ * This creates a snapshot copy of the presentation content in WorkCollateral, allowing it
+ * to be used as a deliverable in a work package that clients can review.
  * 
  * Body:
  * {
@@ -102,11 +105,11 @@ export async function POST(request) {
       message: `Presentation content copied to work package deliverable successfully.`,
     });
   } catch (error) {
-    console.error('❌ DuplicatePresentation error:', error);
+    console.error('❌ LinkPresentationToWorkPackage error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to duplicate presentation',
+        error: 'Failed to link presentation to work package',
         details: error.message,
       },
       { status: 500 },

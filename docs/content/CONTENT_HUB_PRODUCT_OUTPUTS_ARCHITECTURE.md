@@ -195,7 +195,7 @@ model WorkPackageItem {
 ```
 
 **API Endpoints:**
-- `POST /api/presentations/duplicate` - Copy presentation content into WorkCollateral snapshot
+- `POST /api/presentations/link-to-workpackage` - Link presentation from Content Hub to WorkPackageItem by copying content into WorkCollateral snapshot
 - `GET /api/portal/review/presentation` - Get presentation from WorkCollateral.contentJson
 - `POST /api/portal/review/cle/feedback` - Save client feedback to WorkCollateral.contentJson
 
@@ -551,7 +551,7 @@ const workItems = await prisma.workPackageItem.findMany({
 - `prisma/schema.prisma` - Presentation and WorkCollateral models
 - `src/app/(authenticated)/content/` - Content Hub pages
 - `src/app/api/content/presentations/` - Presentation API routes
-- `src/app/api/presentations/duplicate/` - Work package linking
+- `src/app/api/presentations/link-to-workpackage/` - Work package linking
 
 **Key Models:**
 - `Presentation` - The "deck" artifact

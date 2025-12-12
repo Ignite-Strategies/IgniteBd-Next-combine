@@ -1,6 +1,9 @@
 /**
  * Blob Mapper for Gamma API
- * Converts IgniteBD DeckSpec to Gamma-friendly blob format
+ * Converts IgniteBD DeckSpec to Gamma-friendly human-readable structured narrative
+ * 
+ * Gamma requires a human-readable structured narrative, not JSON or markdown.
+ * Use clear delimiters: "Presentation Title:", "Slide 1: Title", dash-prefixed bullets, optional "Notes:" section
  */
 
 export interface DeckSpec {
@@ -20,80 +23,63 @@ export interface DeckSpec {
 }
 
 /**
- * Builds a Gamma-friendly blob string from a DeckSpec
+ * Builds a Gamma-friendly human-readable structured narrative from a DeckSpec
  * 
  * Format:
- * # {Deck Title}
- * ## {Subtitle}
+ * Presentation Title: {Deck Title}
  * 
- * Brand:
- * - Primary Color: {color}
- * - Accent Color: {color}
- * - Font: {font}
+ * Slide 1: {Slide Title}
+ * - {bullet 1}
+ * - {bullet 2}
+ * Notes: {optional notes}
  * 
- * ---
- * 
- * # Slide 1 — {Slide Title}
- * {each bullet as "- {bullet}"}
- * {if imageUrl: "[Image: {url}]"}
- * {if notes: "Notes: {notes}"}
- * 
- * ---
- * 
- * # Slide 2 — {Slide Title}
+ * Slide 2: {Slide Title}
+ * - {bullet 1}
  * ...
  */
 export function buildGammaBlob(deck: DeckSpec): string {
   const lines: string[] = [];
 
-  // Title
-  lines.push(`# ${deck.title}`);
+  // Presentation Title
+  lines.push(`Presentation Title: ${deck.title}`);
 
   // Subtitle (if present)
   if (deck.subtitle) {
-    lines.push(`## ${deck.subtitle}`);
+    lines.push(`Subtitle: ${deck.subtitle}`);
   }
 
-  // Brand section (if present)
+  // Brand section (if present) - include as context
   if (deck.brand) {
     lines.push('');
-    lines.push('Brand:');
     if (deck.brand.primaryColor) {
-      lines.push(`- Primary Color: ${deck.brand.primaryColor}`);
+      lines.push(`Primary Color: ${deck.brand.primaryColor}`);
     }
     if (deck.brand.accentColor) {
-      lines.push(`- Accent Color: ${deck.brand.accentColor}`);
+      lines.push(`Accent Color: ${deck.brand.accentColor}`);
     }
     if (deck.brand.font) {
-      lines.push(`- Font: ${deck.brand.font}`);
+      lines.push(`Font: ${deck.brand.font}`);
     }
   }
 
   // Slides
   deck.slides.forEach((slide, index) => {
-    // Separator (except before first slide if no brand section)
-    if (index > 0 || deck.brand) {
-      lines.push('');
-      lines.push('---');
-      lines.push('');
-    }
+    lines.push('');
+    lines.push(`Slide ${index + 1}: ${slide.title}`);
 
-    // Slide title
-    lines.push(`# Slide ${index + 1} — ${slide.title}`);
-
-    // Bullets
+    // Bullets (dash-prefixed)
     if (slide.bullets && slide.bullets.length > 0) {
       slide.bullets.forEach((bullet) => {
         lines.push(`- ${bullet}`);
       });
     }
 
-    // Image
+    // Image (if present)
     if (slide.imageUrl) {
-      lines.push(`[Image: ${slide.imageUrl}]`);
+      lines.push(`Image: ${slide.imageUrl}`);
     }
 
-    // Notes
+    // Notes (optional)
     if (slide.notes) {
       lines.push(`Notes: ${slide.notes}`);
     }

@@ -64,7 +64,6 @@ export async function POST(request: Request) {
         success: true,
         status: 'ready',
         deckUrl: presentation.gammaDeckUrl,
-        pptxUrl: presentation.gammaPptxUrl,
         message: 'Deck already generated',
       });
     }
@@ -140,19 +139,34 @@ export async function POST(request: Request) {
     }
 
     // Call Gamma API
-    let fileUrl: string;
+    let gammaId: string;
+    let deckUrl: string;
     try {
       console.log('🎨 Calling Gamma API for presentation:', presentationId);
       const result = await generateDeckWithGamma(blob);
-      fileUrl = result.fileUrl;
-      console.log('✅ Gamma API returned fileUrl:', fileUrl);
+      gammaId = result.id;
+      deckUrl = result.url;
+      console.log('✅ Gamma API returned:', { id: gammaId, url: deckUrl });
     } catch (gammaError) {
-      const errorMessage =
-        gammaError instanceof Error
-          ? gammaError.message
-          : 'Unknown error from Gamma API';
+      // Better error extraction and logging
+      let errorMessage = 'Unknown error from Gamma API';
+      
+      if (gammaError instanceof Error) {
+        errorMessage = gammaError.message;
+      } else if (gammaError && typeof gammaError === 'object') {
+        // Try to extract meaningful error info from object
+        errorMessage = JSON.stringify(gammaError, Object.getOwnPropertyNames(gammaError), 2);
+      } else {
+        errorMessage = String(gammaError);
+      }
 
-      console.error('❌ Gamma API error:', errorMessage, gammaError);
+      console.error('❌ Gamma API error:', {
+        errorMessage,
+        errorType: typeof gammaError,
+        errorConstructor: gammaError?.constructor?.name,
+        fullError: gammaError,
+        errorString: JSON.stringify(gammaError, Object.getOwnPropertyNames(gammaError || {})),
+      });
 
       // Update status to error
       await prisma.presentation.update({
@@ -173,20 +187,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Gamma API returns a URL - it could be a deck URL or PPTX URL
-    // We'll store it as gammaDeckUrl and check if we can extract a PPTX URL
-    // Note: Gamma may return different formats, so we store what we get
-    const isPptxUrl = fileUrl.includes('.pptx') || fileUrl.includes('pptx');
-    const deckUrl = isPptxUrl ? null : fileUrl;
-    const pptxUrl = isPptxUrl ? fileUrl : null;
-
-    // Save URLs and set status to ready
+    // Gamma API returns id (gammaId) and url (shareable deck URL)
+    // Store the URL as gammaDeckUrl
     await prisma.presentation.update({
       where: { id: presentationId },
       data: {
         gammaStatus: 'ready',
-        gammaDeckUrl: deckUrl || fileUrl, // Store deck URL (or fileUrl if we can't determine)
-        gammaPptxUrl: pptxUrl,
+        gammaDeckUrl: deckUrl,
+        gammaPptxUrl: null, // Gamma v1.0 returns shareable URL, not separate PPTX
         gammaError: null,
       },
     });
@@ -196,8 +204,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       status: 'ready',
-      deckUrl: deckUrl || fileUrl,
-      pptxUrl: pptxUrl,
+      id: gammaId,
+      deckUrl: deckUrl,
     });
   } catch (error) {
     console.error('❌ GenerateDeck error:', error);
