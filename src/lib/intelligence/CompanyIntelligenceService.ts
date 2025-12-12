@@ -5,15 +5,15 @@
  * These scores are derived from enrichment and stored in Company model
  */
 
-import type { Company } from '@prisma/client';
+import type { companies } from '@prisma/client';
 
 /**
- * Compute company readiness score from Company model
+ * Compute company readiness score from companies model
  * 
  * Returns companyHealthScore from stored field
  * Falls back to 0 if score not computed yet
  */
-export function computeCompanyReadiness(company: Company): number {
+export function computeCompanyReadiness(company: companies): number {
   return company.companyHealthScore ?? 0;
 }
 

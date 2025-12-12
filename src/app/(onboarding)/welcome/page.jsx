@@ -7,7 +7,7 @@ import { useOwner } from '@/hooks/useOwner';
 
 export default function WelcomePage() {
   const router = useRouter();
-  const { ownerId, owner, companyHQId, loading, hydrated, error, refresh } = useOwner();
+  const { ownerId, owner, companyHQId, companyHQ, loading, hydrated, error, refresh } = useOwner();
   const [nextRoute, setNextRoute] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 

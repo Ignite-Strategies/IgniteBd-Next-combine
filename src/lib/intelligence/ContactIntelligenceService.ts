@@ -5,7 +5,7 @@
  * These scores are derived from enrichment and stored in Contact model
  */
 
-import type { Contact } from '@prisma/client';
+import type { contacts } from '@prisma/client';
 
 export interface ContactIntelligence {
   seniority: number; // 0-100
@@ -14,12 +14,12 @@ export interface ContactIntelligence {
 }
 
 /**
- * Compute contact intelligence from Contact model
+ * Compute contact intelligence from contacts model
  * 
  * Returns intelligence scores from stored fields (seniorityScore, buyingPowerScore, urgencyScore)
  * Falls back to 0 if scores not computed yet
  */
-export function computeContactIntelligence(contact: Contact): ContactIntelligence {
+export function computeContactIntelligence(contact: contacts): ContactIntelligence {
   return {
     seniority: contact.seniorityScore ?? 0,
     buyingPower: contact.buyingPowerScore ?? 0,
