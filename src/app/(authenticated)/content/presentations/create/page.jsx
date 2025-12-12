@@ -76,9 +76,15 @@ export default function CreatePresentationPage() {
       return;
     }
 
-    const finalCompanyHQId = resolvedCompanyHQId || companyHQId;
+    // Try to resolve companyHQId on submit
+    let finalCompanyHQId = resolvedCompanyHQId || companyHQId;
+    
+    if (!finalCompanyHQId && typeof window !== 'undefined') {
+      finalCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    }
+
     if (!finalCompanyHQId) {
-      setError('Company profile required');
+      setError('Company profile required. Please set up your company first.');
       return;
     }
 
@@ -232,7 +238,7 @@ export default function CreatePresentationPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !title.trim() || !(resolvedCompanyHQId || companyHQId)}
+                disabled={saving || !title.trim()}
                 className="rounded bg-red-600 px-6 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Creating...' : 'Create Presentation'}
