@@ -15,38 +15,82 @@ export default function PresentationsPage() {
 
   const [companyHQId, setCompanyHQId] = useState('');
 
-  // Load from localStorage on mount and sync if empty
+  // Load ONLY from localStorage on mount - NO API CALLS
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Get companyHQId
+    // Get companyHQId (for syncing button only)
     const id = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
     setCompanyHQId(id);
-    
-    if (!id) {
-      setLoading(false);
-      return;
-    }
 
+    // Load from localStorage - check multiple possible keys
     try {
-      const stored = localStorage.getItem(`presentations_${id}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setPresentations(Array.isArray(parsed) ? parsed : []);
-      } else {
-        // If no localStorage, sync immediately
-        handleSync(id);
-        return;
+      let loaded = false;
+      
+      // First try: presentations_${id} (if we have id)
+      if (id) {
+        const stored = localStorage.getItem(`presentations_${id}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPresentations(parsed);
+            loaded = true;
+            console.log('✅ Loaded', parsed.length, 'presentations from localStorage');
+          }
+        }
+      }
+      
+      // Second try: Check hydration data (companyHydration_${id})
+      if (!loaded && id) {
+        const hydrationKey = `companyHydration_${id}`;
+        const hydrationData = localStorage.getItem(hydrationKey);
+        if (hydrationData) {
+          try {
+            const parsed = JSON.parse(hydrationData);
+            if (parsed?.data?.presentations && Array.isArray(parsed.data.presentations)) {
+              setPresentations(parsed.data.presentations);
+              loaded = true;
+              console.log('✅ Loaded', parsed.data.presentations.length, 'presentations from hydration data');
+            }
+          } catch (e) {
+            console.warn('Failed to parse hydration data:', e);
+          }
+        }
+      }
+      
+      // Third try: Check any presentations_* key (fallback)
+      if (!loaded) {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('presentations_')) {
+            try {
+              const stored = localStorage.getItem(key);
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setPresentations(parsed);
+                  loaded = true;
+                  console.log('✅ Loaded', parsed.length, 'presentations from fallback localStorage key:', key);
+                  break;
+                }
+              }
+            } catch (e) {
+              // Skip invalid entries
+            }
+          }
+        }
+      }
+      
+      // If nothing loaded, show empty state (NO AUTO-SYNC)
+      if (!loaded) {
+        setPresentations([]);
+        console.log('ℹ️ No presentations found in localStorage - click Sync to load from server');
       }
     } catch (err) {
       console.warn('Failed to load presentations from localStorage:', err);
       setPresentations([]);
-      // Try to sync if we can
-      if (id) {
-        handleSync(id);
-        return;
-      }
     }
+    
     setLoading(false);
   }, []);
 
