@@ -46,7 +46,7 @@ export async function POST(request) {
     }
 
     // Check if SuperAdmin
-    const isSuperAdmin = owner.superAdmin?.active === true;
+    const isSuperAdmin = !!owner.superAdmin; // If SuperAdmin record exists, they're active
 
     if (!isSuperAdmin) {
       return NextResponse.json(

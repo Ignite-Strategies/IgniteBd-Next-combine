@@ -53,38 +53,22 @@ async function createSuperAdmin() {
     });
 
     if (existingSuperAdmin) {
-      if (existingSuperAdmin.active) {
-        console.log('⚠️  SuperAdmin already exists and is active for this Owner');
-        console.log('SuperAdmin:', {
-          id: existingSuperAdmin.id,
-          ownerId: existingSuperAdmin.ownerId,
-          active: existingSuperAdmin.active,
-        });
-      } else {
-        // Reactivate
-        const updated = await prisma.superAdmin.update({
-          where: { id: existingSuperAdmin.id },
-          data: { active: true },
-        });
-        console.log('✅ Reactivated SuperAdmin:', {
-          id: updated.id,
-          ownerId: updated.ownerId,
-          active: updated.active,
-        });
-      }
+      console.log('⚠️  SuperAdmin already exists for this Owner');
+      console.log('SuperAdmin:', {
+        id: existingSuperAdmin.id,
+        ownerId: existingSuperAdmin.ownerId,
+      });
     } else {
       // Create SuperAdmin
       const superAdmin = await prisma.superAdmin.create({
         data: {
           ownerId: owner.id,
-          active: true,
         },
       });
 
       console.log('✅ Created SuperAdmin:', {
         id: superAdmin.id,
         ownerId: superAdmin.ownerId,
-        active: superAdmin.active,
       });
     }
 

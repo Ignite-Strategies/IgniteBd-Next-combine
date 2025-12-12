@@ -43,19 +43,11 @@ async function main() {
 
     if (superAdmin) {
       console.log(`✅ SuperAdmin already exists for owner ${owner.id}`);
-      if (!superAdmin.active) {
-        superAdmin = await prisma.superAdmin.update({
-          where: { ownerId: owner.id },
-          data: { active: true },
-        });
-        console.log('✅ Activated SuperAdmin');
-      }
     } else {
       try {
         superAdmin = await prisma.superAdmin.create({
           data: {
             ownerId: owner.id,
-            active: true,
           },
         });
         console.log(`✅ Created SuperAdmin: ${superAdmin.id}\n`);
@@ -136,7 +128,7 @@ async function main() {
 
     console.log('\n🎉 Seeding complete!');
     console.log('\n📊 Summary:');
-    console.log(`   - SuperAdmin: ${superAdmin.active ? '✅ Active' : '❌ Inactive'}`);
+    console.log(`   - SuperAdmin: ✅ Active (record exists)`);
     console.log(`   - IgniteBD CompanyHQ: ${igniteBDHQ.id} (root tenant)`);
     console.log(`   - Sub-tenants: ${otherHQs.length} CompanyHQs linked to IgniteBD`);
   } catch (error) {

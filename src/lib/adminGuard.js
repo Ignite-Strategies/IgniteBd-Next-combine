@@ -24,7 +24,7 @@ export async function requireSuperAdmin(request) {
       redirect('/growth-dashboard');
     }
 
-    const isSuperAdmin = owner.superAdmin?.active === true;
+    const isSuperAdmin = !!owner.superAdmin; // If SuperAdmin record exists, they're active
 
     if (!isSuperAdmin) {
       redirect('/growth-dashboard');

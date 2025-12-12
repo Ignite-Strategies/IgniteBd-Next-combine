@@ -66,7 +66,7 @@ export async function GET(request) {
       where: { ownerId: owner.id },
     });
 
-    const isSuperAdmin = superAdmin?.active === true;
+    const isSuperAdmin = !!superAdmin; // If SuperAdmin record exists, they're active
 
     const primaryCompanyHQ = owner.ownedCompanies?.[0] || null;
 

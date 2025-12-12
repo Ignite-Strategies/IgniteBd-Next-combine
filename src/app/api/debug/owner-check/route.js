@@ -56,7 +56,7 @@ export async function GET(request) {
               hasOwnedCompanies: owner.ownedCompanies.length > 0,
               managedCompanyIds: owner.managedCompanies.map((c) => c.id),
               ownedCompanyIds: owner.ownedCompanies.map((c) => c.id),
-              isSuperAdmin: owner.superAdmin?.active === true,
+              isSuperAdmin: !!owner.superAdmin, // If SuperAdmin record exists, they're active
             }
           : null,
         ownerFound: !!owner,
