@@ -36,6 +36,12 @@ export async function generateDeckWithGamma(
     throw new Error('GAMMA_API_KEY environment variable is not set');
   }
 
+  console.log('🎨 Gamma API Request:', {
+    url: GAMMA_API_URL,
+    blobLength: blob.length,
+    hasApiKey: !!apiKey,
+  });
+
   try {
     const response = await fetch(GAMMA_API_URL, {
       method: 'POST',
@@ -52,6 +58,8 @@ export async function generateDeckWithGamma(
         },
       }),
     });
+
+    console.log('🎨 Gamma API Response Status:', response.status, response.statusText);
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -120,16 +120,39 @@ export async function POST(request: Request) {
       },
     });
 
+    // Check if Gamma API key is configured
+    if (!process.env.GAMMA_API_KEY) {
+      console.error('❌ GAMMA_API_KEY environment variable is not set');
+      await prisma.presentation.update({
+        where: { id: presentationId },
+        data: {
+          gammaStatus: 'error',
+          gammaError: 'GAMMA_API_KEY not configured',
+        },
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Gamma API key not configured. Please set GAMMA_API_KEY environment variable.',
+        },
+        { status: 500 }
+      );
+    }
+
     // Call Gamma API
     let fileUrl: string;
     try {
+      console.log('🎨 Calling Gamma API for presentation:', presentationId);
       const result = await generateDeckWithGamma(blob);
       fileUrl = result.fileUrl;
+      console.log('✅ Gamma API returned fileUrl:', fileUrl);
     } catch (gammaError) {
       const errorMessage =
         gammaError instanceof Error
           ? gammaError.message
           : 'Unknown error from Gamma API';
+
+      console.error('❌ Gamma API error:', errorMessage, gammaError);
 
       // Update status to error
       await prisma.presentation.update({
