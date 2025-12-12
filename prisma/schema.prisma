@@ -809,7 +809,6 @@ model Presentation {
   companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   title       String
   slides      Json? // Array of slide objects with sections: { sections: [{ title: string, bullets: string[] }] }
-  presenter   String?
   description String?
   feedback    Json? // JSON map: { "0": "...", "5": "...", "7": "..." } - feedback keyed by sectionIndex
   published   Boolean   @default(false)

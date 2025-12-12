@@ -54,17 +54,23 @@ export async function POST(request) {
       );
     }
 
-    // Don't include presenter field - may not exist in DB
+    // Create presentation - only include fields that exist in the database
+    // Explicitly exclude presenter field as it doesn't exist in the DB
+    const presentationData = {
+      companyHQId,
+      title,
+      description: description || null,
+      slides: slides || null,
+      published,
+    };
+    
+    // Only include publishedAt if published is true
+    if (published) {
+      presentationData.publishedAt = new Date();
+    }
+
     const presentation = await prisma.presentation.create({
-      data: {
-        companyHQId,
-        title,
-        description: description || null,
-        slides: slides || null,
-        published,
-        publishedAt: published ? new Date() : null,
-        // presenter field removed - not in current schema
-      },
+      data: presentationData,
     });
 
     console.log('✅ Presentation created:', presentation.id);
