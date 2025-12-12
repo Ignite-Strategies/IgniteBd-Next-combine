@@ -163,9 +163,15 @@ export async function GET(request) {
 
     // Ensure prisma.presentation exists
     if (!prisma.presentation) {
-      console.error('❌ prisma.presentation is undefined - Prisma client may need regeneration');
+      console.error('❌ prisma.presentation is undefined');
+      console.error('Available Prisma models:', Object.keys(prisma).filter(k => !k.startsWith('$')).join(', '));
+      console.error('Prisma client type:', typeof prisma);
       return NextResponse.json(
-        { success: false, error: 'Database client error - please contact support' },
+        { 
+          success: false, 
+          error: 'Database client error - Prisma client needs regeneration',
+          details: 'prisma.presentation model not found. Available models: ' + Object.keys(prisma).filter(k => !k.startsWith('$')).join(', ')
+        },
         { status: 500 },
       );
     }
