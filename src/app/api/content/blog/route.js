@@ -24,6 +24,8 @@ export async function POST(request) {
       subtitle,
       blogText,
       sections,
+      presenter,
+      description,
       blogDraft, // Accept BlogDraft from AI generation
     } = body ?? {};
 
@@ -60,6 +62,8 @@ export async function POST(request) {
         subtitle: subtitle || null,
         blogText: finalBlogText || null,
         sections: finalSections || null,
+        presenter: presenter || null,
+        description: description || null,
       },
     });
 

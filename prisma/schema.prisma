@@ -203,7 +203,7 @@ model company_hqs {
   landing_pages                                 landing_pages[]
   personas                                      personas[]
   phase_templates                               phase_templates[]
-  presentations                                 presentations[]
+  presentations                                 Presentation[]
   products                                      products[]
   proposals                                     proposals[]
   templates                                     templates[]
@@ -686,7 +686,7 @@ model pipelines {
   contacts  contacts @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
-model presentations {
+model Presentation {
   id                String      @id
   companyHQId       String
   title             String
@@ -708,6 +708,7 @@ model presentations {
 
   @@index([companyHQId])
   @@index([published])
+  @@map("presentations")
 }
 
 model product_fits {

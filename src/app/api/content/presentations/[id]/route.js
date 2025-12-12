@@ -18,7 +18,8 @@ export async function GET(request, { params }) {
       );
     }
 
-    const { id } = params || {};
+    // Await params in Next.js 15+ App Router
+    const { id } = await params || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Presentation ID is required' },
@@ -94,7 +95,8 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const { id } = params || {};
+    // Await params in Next.js 15+ App Router
+    const { id } = await params || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Presentation ID is required' },
@@ -191,7 +193,8 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const { id } = params || {};
+    // Await params in Next.js 15+ App Router
+    const { id } = await params || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Presentation ID is required' },
