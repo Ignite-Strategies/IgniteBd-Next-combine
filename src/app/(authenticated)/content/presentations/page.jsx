@@ -118,6 +118,13 @@ export default function PresentationsPage() {
       const response = await api.get(`/api/content/presentations?companyHQId=${id}`);
       if (response.data?.success) {
         const fetchedPresentations = response.data.presentations || [];
+        
+        // Log to verify we got full objects
+        if (fetchedPresentations.length > 0) {
+          console.log('✅ Synced presentation sample fields:', Object.keys(fetchedPresentations[0]).join(', '));
+          console.log('✅ Sample presentation:', JSON.stringify(fetchedPresentations[0], null, 2).substring(0, 500));
+        }
+        
         setPresentations(fetchedPresentations);
         
         // Store in localStorage

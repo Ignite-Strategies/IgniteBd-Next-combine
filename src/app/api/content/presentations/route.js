@@ -166,7 +166,14 @@ export async function GET(request) {
       orderBy: {
         createdAt: 'desc',
       },
+      // Ensure we return all fields including gamma fields
+      select: undefined, // Return all fields
     });
+
+    // Log to verify we're getting full objects
+    if (presentations.length > 0) {
+      console.log('✅ Returning', presentations.length, 'presentations with fields:', Object.keys(presentations[0]).join(', '));
+    }
 
     return NextResponse.json({
       success: true,
