@@ -113,18 +113,39 @@ Return ONLY valid JSON. No markdown, no code blocks, just the JSON object. The s
       throw new Error('Invalid presentation structure from OpenAI');
     }
 
-    // Ensure we have the right number of slides
+    // Ensure we have the right number of slides - pad or truncate if needed
     if (presentationData.slides.length !== slideCount) {
-      console.warn(`⚠️ Requested ${slideCount} slides, got ${presentationData.slides.length}`);
+      console.warn(`⚠️ Requested ${slideCount} slides, got ${presentationData.slides.length}. Adjusting...`);
+      
+      if (presentationData.slides.length < slideCount) {
+        // Add empty slides to reach the count
+        const missing = slideCount - presentationData.slides.length;
+        for (let i = 0; i < missing; i++) {
+          presentationData.slides.push({
+            slideNumber: presentationData.slides.length + 1,
+            title: `Slide ${presentationData.slides.length + 1}`,
+            content: '',
+            notes: null,
+          });
+        }
+      } else if (presentationData.slides.length > slideCount) {
+        // Truncate to the requested count
+        presentationData.slides = presentationData.slides.slice(0, slideCount);
+      }
     }
 
-    // Ensure slides have required fields
+    // Ensure slides have required fields and correct numbering
     presentationData.slides = presentationData.slides.map((slide, index) => ({
-      slideNumber: slide.slideNumber || index + 1,
+      slideNumber: index + 1,
       title: slide.title || `Slide ${index + 1}`,
       content: slide.content || '',
       notes: slide.notes || null,
     }));
+    
+    // Ensure we have exactly the right count after processing
+    if (presentationData.slides.length !== slideCount) {
+      throw new Error(`Failed to generate exactly ${slideCount} slides. Got ${presentationData.slides.length} instead.`);
+    }
 
     console.log(`✅ Presentation outline generated: "${presentationData.title}" with ${presentationData.slides.length} slides`);
 

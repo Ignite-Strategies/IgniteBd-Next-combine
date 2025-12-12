@@ -258,6 +258,7 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }
