@@ -80,15 +80,15 @@ model CompanyHQ {
   teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  
+
   // TODO WEDNESDAY FIX #4: BD Goal fields (add on Thursday)
   // bdGoal           Float?    // Target BD revenue goal (e.g., 1_000_000)
   // bdGoalStart      DateTime? // Goal period start date
   // bdGoalEnd        DateTime? // Goal period end date
-  
-  ownerId          String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
-  contactOwnerId   String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
-  managerId        String?
+
+  ownerId        String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
+  contactOwnerId String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
+  managerId      String?
 
   // Ultra Tenant Parent-Child Relationship
   ultraTenantId String? // Parent tenant (Ignite Strategies is root with null)
@@ -717,8 +717,8 @@ model WorkCollateral {
   workPackageItem   WorkPackageItem? @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
 
   // Reference to Presentation model (for PRESENTATION_DECK and CLE_DECK types)
-  presentationId    String?
-  presentation      Presentation?    @relation(fields: [presentationId], references: [id], onDelete: SetNull)
+  presentationId String?
+  presentation   Presentation? @relation(fields: [presentationId], references: [id], onDelete: SetNull)
 
   type        String // BLOG | PERSONA | PRESENTATION_DECK | CLE_DECK | TEMPLATE | ETC
   title       String?
@@ -786,23 +786,6 @@ model Template {
 // Old EventPlan model removed - replaced with BD EventPlan architecture
 // If needed, rename this to EventAgenda or similar for event planning use cases
 
-model Presentation {
-  id          String    @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  slides      Json? // Array of slide objects: [{ slideNumber: 1, title: "...", content: "...", notes: "..." }]
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([companyHQId])
-  @@index([published])
-  @@map("presentations")
-}
-
 model LandingPage {
   id          String    @id @default(cuid())
   companyHQId String
@@ -832,19 +815,19 @@ model Presentation {
   feedback    Json? // JSON map: { "0": "...", "5": "...", "7": "..." } - feedback keyed by sectionIndex
   published   Boolean   @default(false)
   publishedAt DateTime?
-  
+
   // Gamma deck generation fields
-  gammaStatus   String?  // "pending" | "generating" | "ready" | "error" - status of Gamma deck generation
-  gammaDeckUrl  String?  // Gamma deck URL (for viewing in Gamma)
-  gammaPptxUrl  String?  // PPTX download URL from Gamma (if available separately)
-  gammaBlob     String?  // The blob text sent to Gamma API (for reference/debugging)
-  gammaError    String?  // Error message if Gamma generation failed
-  
+  gammaStatus  String? // "pending" | "generating" | "ready" | "error" - status of Gamma deck generation
+  gammaDeckUrl String? // Gamma deck URL (for viewing in Gamma)
+  gammaPptxUrl String? // PPTX download URL from Gamma (if available separately)
+  gammaBlob    String? // The blob text sent to Gamma API (for reference/debugging)
+  gammaError   String? // Error message if Gamma generation failed
+
   // WorkCollateral references (for work package deliverables)
   workCollateral WorkCollateral[]
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyHQId])
   @@index([published])
@@ -958,37 +941,37 @@ model CompanyMembership {
 // ============================================
 
 model Invoice {
-  id                 String             @id @default(cuid())
+  id                 String      @id @default(cuid())
   workPackageId      String
-  workPackage        WorkPackage        @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  workPackage        WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
   invoiceName        String
   invoiceDescription String?
-  
+
   // Invoice identification (for client portal compatibility)
-  invoiceNumber      String?            @unique // Human-readable (e.g., "INV-2025-001")
-  
+  invoiceNumber String? @unique // Human-readable (e.g., "INV-2025-001")
+
   // Amount fields (for Stripe line items)
-  amount             Float?             // Total invoice amount (for Stripe)
-  currency           String             @default("USD")
-  
+  amount   Float? // Total invoice amount (for Stripe)
+  currency String @default("USD")
+
   // Existing totals (keep for backward compatibility)
-  totalExpected      Int                @default(0)
-  totalReceived      Int                @default(0)
-  
+  totalExpected Int @default(0)
+  totalReceived Int @default(0)
+
   // Payment status
-  status             String             @default("pending") // "pending" | "partial" | "paid" | "failed" | "refunded"
-  paidAt             DateTime?          // When invoice was paid
-  paidByContactId    String?            // Which contact paid (from Stripe session metadata)
-  
+  status          String    @default("pending") // "pending" | "partial" | "paid" | "failed" | "refunded"
+  paidAt          DateTime? // When invoice was paid
+  paidByContactId String? // Which contact paid (from Stripe session metadata)
+
   // Stripe integration fields (CRITICAL for client portal payment processing)
-  stripeCheckoutSessionId String?       @unique // Links to Stripe checkout session
-  stripePaymentIntentId   String?       @unique // Links to Stripe payment intent
-  stripeCustomerId        String?               // Stripe customer ID (reused across invoices)
-  
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  milestones         InvoiceMilestone[]
-  payments           Payment[]
+  stripeCheckoutSessionId String? @unique // Links to Stripe checkout session
+  stripePaymentIntentId   String? @unique // Links to Stripe payment intent
+  stripeCustomerId        String? // Stripe customer ID (reused across invoices)
+
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  milestones InvoiceMilestone[]
+  payments   Payment[]
 
   @@index([workPackageId])
   @@index([status])
