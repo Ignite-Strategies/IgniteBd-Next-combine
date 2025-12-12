@@ -30,12 +30,12 @@ export default function SettingsPage() {
   // Company form state
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companyData, setCompanyData] = useState({
-    companyName: 'GoFast',
+    companyName: '',
     whatYouDo: '',
-    companyStreet: '2614 N. George Mason Dr.',
-    companyCity: 'Arlington',
-    companyState: 'VA',
-    companyWebsite: 'gofastcrushgoals.com',
+    companyStreet: '',
+    companyCity: '',
+    companyState: '',
+    companyWebsite: '',
     companyIndustry: '',
     companyAnnualRev: '',
     yearsInBusiness: '',
