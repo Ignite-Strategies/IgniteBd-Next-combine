@@ -27,6 +27,15 @@ export async function GET(request, { params }) {
       );
     }
 
+    // Ensure prisma.presentation exists
+    if (!prisma.presentation) {
+      console.error('❌ prisma.presentation is undefined - Prisma client may need regeneration');
+      return NextResponse.json(
+        { success: false, error: 'Database client error - please contact support' },
+        { status: 500 },
+      );
+    }
+
     const presentation = await prisma.presentation.findUnique({
       where: { id },
       include: {
@@ -101,6 +110,15 @@ export async function PATCH(request, { params }) {
       return NextResponse.json(
         { success: false, error: 'Presentation ID is required' },
         { status: 400 },
+      );
+    }
+
+    // Ensure prisma.presentation exists
+    if (!prisma.presentation) {
+      console.error('❌ prisma.presentation is undefined - Prisma client may need regeneration');
+      return NextResponse.json(
+        { success: false, error: 'Database client error - please contact support' },
+        { status: 500 },
       );
     }
 
@@ -199,6 +217,15 @@ export async function DELETE(request, { params }) {
       return NextResponse.json(
         { success: false, error: 'Presentation ID is required' },
         { status: 400 },
+      );
+    }
+
+    // Ensure prisma.presentation exists
+    if (!prisma.presentation) {
+      console.error('❌ prisma.presentation is undefined - Prisma client may need regeneration');
+      return NextResponse.json(
+        { success: false, error: 'Database client error - please contact support' },
+        { status: 500 },
       );
     }
 
