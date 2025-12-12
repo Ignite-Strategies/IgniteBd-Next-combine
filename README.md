@@ -11,6 +11,7 @@ Unified Next.js (App Router) application that powers the Ignite BD BusinessIntel
 - Node.js 18+
 - PostgreSQL connection string (`DATABASE_URL`)
 - OpenAI API key (`OPENAI_API_KEY`)
+- Gamma API key (`GAMMA_API_KEY`) - For PPT/deck generation
 - Default tenant identifier (`DEFAULT_COMPANY_HQ_ID`)
 
 > Expose `DEFAULT_COMPANY_HQ_ID` to the client with `NEXT_PUBLIC_DEFAULT_COMPANY_HQ_ID` if you want the forms pre-filled.  
@@ -23,9 +24,17 @@ Create `.env.local`:
 ```bash
 DATABASE_URL="postgresql://user:pass@host:5432/database?schema=public"
 OPENAI_API_KEY="sk-..."
+GAMMA_API_KEY="your-gamma-api-key"
 DEFAULT_COMPANY_HQ_ID="company-hq-id"
 NEXT_PUBLIC_DEFAULT_COMPANY_HQ_ID="company-hq-id"
 ```
+
+**Required Environment Variables:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `OPENAI_API_KEY` - For AI features (presentation generation, etc.)
+- `GAMMA_API_KEY` - For PPT/deck generation via Gamma API (get from https://gamma.app)
+- `FIREBASE_SERVICE_ACCOUNT_KEY` - Firebase Admin SDK (JSON string)
+- `SENDGRID_API_KEY` - Optional, for email sending
 
 ### Prisma
 
