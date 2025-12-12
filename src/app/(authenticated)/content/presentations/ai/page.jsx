@@ -188,7 +188,27 @@ export default function AIPresentationBuilderPage() {
       });
 
       if (createResponse.data?.success && createResponse.data?.presentation) {
-        console.log('✅ Presentation created successfully:', createResponse.data.presentation.id);
+        const savedPresentation = createResponse.data.presentation;
+        console.log('✅ Presentation created successfully:', savedPresentation.id);
+        
+        // Save to localStorage
+        if (typeof window !== 'undefined' && companyHQId) {
+          try {
+            const cachedKey = `presentations_${companyHQId}`;
+            const cached = localStorage.getItem(cachedKey);
+            const presentations = cached ? JSON.parse(cached) : [];
+            const existingIndex = presentations.findIndex(p => p.id === savedPresentation.id);
+            if (existingIndex >= 0) {
+              presentations[existingIndex] = savedPresentation;
+            } else {
+              presentations.unshift(savedPresentation); // Add to beginning
+            }
+            localStorage.setItem(cachedKey, JSON.stringify(presentations));
+            console.log('💾 Saved presentation to localStorage');
+          } catch (e) {
+            console.warn('Failed to save to localStorage:', e);
+          }
+        }
         
         // Clean up Redis key if stored
         if (redisKey) {
@@ -199,7 +219,8 @@ export default function AIPresentationBuilderPage() {
           }
         }
         
-        router.push(`/content/presentations/${createResponse.data.presentation.id}`);
+        // Success! Redirect to presentation page
+        router.push(`/content/presentations/${savedPresentation.id}`);
       } else {
         throw new Error('Failed to create presentation - no presentation returned');
       }

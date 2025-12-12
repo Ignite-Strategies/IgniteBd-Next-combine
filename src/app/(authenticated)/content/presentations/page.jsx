@@ -13,54 +13,82 @@ export default function PresentationsPage() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
 
-  const companyHQId = typeof window !== 'undefined'
-    ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
-    : '';
+  const [companyHQId, setCompanyHQId] = useState('');
 
-  // Load from localStorage on mount - no API call
+  // Load from localStorage on mount and sync if empty
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!companyHQId) {
+    
+    // Get companyHQId
+    const id = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+    setCompanyHQId(id);
+    
+    if (!id) {
       setLoading(false);
       return;
     }
 
     try {
-      const stored = localStorage.getItem(`presentations_${companyHQId}`);
+      const stored = localStorage.getItem(`presentations_${id}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         setPresentations(Array.isArray(parsed) ? parsed : []);
       } else {
-        setPresentations([]);
+        // If no localStorage, sync immediately
+        handleSync(id);
+        return;
       }
     } catch (err) {
       console.warn('Failed to load presentations from localStorage:', err);
       setPresentations([]);
+      // Try to sync if we can
+      if (id) {
+        handleSync(id);
+        return;
+      }
     }
     setLoading(false);
-  }, [companyHQId]);
+  }, []);
 
-  // Silent sync function (called by sync button)
-  const handleSync = async () => {
-    if (!companyHQId) return;
+  // Silent sync function (called by sync button or on mount)
+  const handleSync = async (overrideCompanyId = null) => {
+    const id = overrideCompanyId || companyHQId;
+    if (!id) {
+      // Try to get it fresh
+      const freshId = typeof window !== 'undefined'
+        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+        : '';
+      if (!freshId) {
+        console.warn('No companyHQId available for sync');
+        return;
+      }
+      setCompanyHQId(freshId);
+      id = freshId;
+    }
 
     try {
       setSyncing(true);
+      setLoading(true);
       setError('');
       
-      const response = await api.get(`/api/content/presentations?companyHQId=${companyHQId}`);
+      const response = await api.get(`/api/content/presentations?companyHQId=${id}`);
       if (response.data?.success) {
         const fetchedPresentations = response.data.presentations || [];
         setPresentations(fetchedPresentations);
         
         // Store in localStorage
-        localStorage.setItem(`presentations_${companyHQId}`, JSON.stringify(fetchedPresentations));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`presentations_${id}`, JSON.stringify(fetchedPresentations));
+          console.log('✅ Synced', fetchedPresentations.length, 'presentations to localStorage');
+        }
       }
     } catch (err) {
       console.error('Error syncing presentations:', err);
-      // Silent fail - don't show error to user
+      setError('Failed to sync presentations. Please try again.');
+      // Still show error, but don't block
     } finally {
       setSyncing(false);
+      setLoading(false);
     }
   };
 
@@ -79,8 +107,8 @@ export default function PresentationsPage() {
             <h2 className="text-xl font-semibold text-gray-900">Your Presentations</h2>
             <div className="flex gap-3">
               <button
-                onClick={handleSync}
-                disabled={syncing || !companyHQId}
+                onClick={() => handleSync()}
+                disabled={syncing}
                 className="flex items-center gap-2 rounded bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow transition hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Sync presentations from database"
               >

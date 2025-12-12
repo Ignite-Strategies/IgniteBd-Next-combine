@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Save, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function PresentationPage() {
@@ -18,6 +18,10 @@ export default function PresentationPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [gammaStatus, setGammaStatus] = useState(null);
+  const [gammaDeckUrl, setGammaDeckUrl] = useState(null);
+  const [gammaPptxUrl, setGammaPptxUrl] = useState(null);
+  const [buildingPPT, setBuildingPPT] = useState(false);
 
   useEffect(() => {
     if (presentationId) {
@@ -35,6 +39,9 @@ export default function PresentationPage() {
         setDescription(presentation.description || '');
         setSlides(presentation.slides || []);
         setPublished(presentation.published || false);
+        setGammaStatus(presentation.gammaStatus || null);
+        setGammaDeckUrl(presentation.gammaDeckUrl || null);
+        setGammaPptxUrl(presentation.gammaPptxUrl || null);
       }
     } catch (err) {
       console.error('Error loading presentation:', err);
@@ -62,6 +69,30 @@ export default function PresentationPage() {
       });
 
       if (response.data?.success) {
+        const savedPresentation = response.data.presentation;
+        
+        // Save to localStorage
+        if (typeof window !== 'undefined') {
+          const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+          if (companyHQId) {
+            try {
+              const cachedKey = `presentations_${companyHQId}`;
+              const cached = localStorage.getItem(cachedKey);
+              const presentations = cached ? JSON.parse(cached) : [];
+              const existingIndex = presentations.findIndex(p => p.id === savedPresentation.id);
+              if (existingIndex >= 0) {
+                presentations[existingIndex] = savedPresentation;
+              } else {
+                presentations.unshift(savedPresentation);
+              }
+              localStorage.setItem(cachedKey, JSON.stringify(presentations));
+              console.log('💾 Saved presentation to localStorage');
+            } catch (e) {
+              console.warn('Failed to save to localStorage:', e);
+            }
+          }
+        }
+        
         router.push('/content/presentations');
       } else {
         throw new Error('Failed to save presentation');
@@ -78,6 +109,40 @@ export default function PresentationPage() {
     const updated = [...slides];
     updated[index] = { ...updated[index], [field]: value };
     setSlides(updated);
+  };
+
+  const handleBuildPPT = async () => {
+    if (!presentationId) return;
+    
+    setBuildingPPT(true);
+    setError('');
+    
+    try {
+      const response = await api.post('/api/decks/generate', {
+        presentationId,
+      });
+      
+      if (response.data?.success) {
+        if (response.data.status === 'ready') {
+          setGammaStatus('ready');
+          setGammaDeckUrl(response.data.deckUrl);
+          setGammaPptxUrl(response.data.pptxUrl);
+          
+          // Reload presentation to get updated status
+          await loadPresentation();
+        } else {
+          setGammaStatus('generating');
+        }
+      } else {
+        throw new Error(response.data?.error || 'Failed to generate PPT');
+      }
+    } catch (err) {
+      console.error('Error building PPT:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to build PPT. Please try again.');
+      setGammaStatus('error');
+    } finally {
+      setBuildingPPT(false);
+    }
   };
 
   if (loading) {
@@ -187,21 +252,82 @@ export default function PresentationPage() {
               </label>
             </div>
 
-            <div className="flex justify-end gap-4">
+            {/* Gamma/PPT Status */}
+            {(gammaStatus || gammaDeckUrl || gammaPptxUrl) && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-900 mb-1">PPT Status</h3>
+                    {gammaStatus === 'ready' && (
+                      <div className="space-y-2">
+                        {gammaDeckUrl && (
+                          <a
+                            href={gammaDeckUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-700 hover:text-blue-900 underline"
+                          >
+                            View Deck
+                          </a>
+                        )}
+                        {gammaPptxUrl && (
+                          <a
+                            href={gammaPptxUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-700 hover:text-blue-900 underline block"
+                          >
+                            Download PPTX
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {gammaStatus === 'generating' && (
+                      <p className="text-sm text-blue-700">Generating PPT...</p>
+                    )}
+                    {gammaStatus === 'error' && (
+                      <p className="text-sm text-red-700">PPT generation failed</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center">
               <button
-                onClick={() => router.push(`/content/presentations/${presentationId}/ai`)}
-                className="flex items-center gap-2 rounded border border-gray-300 bg-white px-6 py-2 text-gray-700 hover:bg-gray-50"
+                onClick={handleBuildPPT}
+                disabled={buildingPPT || gammaStatus === 'generating' || !slides || slides.length === 0}
+                className="flex items-center gap-2 rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Enhance with AI
+                {buildingPPT || gammaStatus === 'generating' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Building PPT...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Build the PPT
+                  </>
+                )}
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Presentation'}
-              </button>
+              
+              <div className="flex gap-4">
+                <button
+                  onClick={() => router.push(`/content/presentations/${presentationId}/ai`)}
+                  className="flex items-center gap-2 rounded border border-gray-300 bg-white px-6 py-2 text-gray-700 hover:bg-gray-50"
+                >
+                  Enhance with AI
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  <Save className="h-4 w-4" />
+                  {saving ? 'Saving...' : 'Save Presentation'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
