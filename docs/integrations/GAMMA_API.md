@@ -25,9 +25,14 @@ Content-Type: application/json
 
 ```json
 {
-  "inputText": "string"
+  "inputText": "string",
+  "textMode": "generate"
 }
 ```
+
+**Required Fields:**
+- `inputText`: Human-readable structured narrative
+- `textMode`: Must be `"generate"` (valid values: `"generate"`, `"condense"`, `"preserve"`)
 
 **Important**: `inputText` must be a **human-readable structured narrative**, not JSON slides or markdown.
 
@@ -108,7 +113,8 @@ curl -X POST https://public-api.gamma.app/v1.0/generations \
   -H "X-API-KEY: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "inputText": "Presentation Title: My Presentation\n\nSlide 1: Introduction\n- Point 1\n- Point 2\n\nSlide 2: Conclusion\n- Summary point"
+    "inputText": "Presentation Title: My Presentation\n\nSlide 1: Introduction\n- Point 1\n- Point 2\n\nSlide 2: Conclusion\n- Summary point",
+    "textMode": "generate"
   }'
 ```
 

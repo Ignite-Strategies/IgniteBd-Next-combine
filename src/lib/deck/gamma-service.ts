@@ -31,6 +31,7 @@ export async function generateDeckWithGamma(
 
   const requestBody = {
     inputText: inputText,
+    textMode: 'generate', // Required: 'generate' | 'condense' | 'preserve'
   };
 
   console.log('🎨 Gamma API Request:', {
