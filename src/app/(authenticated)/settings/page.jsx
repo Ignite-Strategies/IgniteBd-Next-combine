@@ -23,8 +23,11 @@ export default function SettingsPage() {
   // Profile form state
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileData, setProfileData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
+    title: '',
+    yearsAtCompany: '',
   });
   
   // Company form state
@@ -87,9 +90,17 @@ export default function SettingsPage() {
   useEffect(() => {
     // Load profile data from owner
     if (owner) {
+      // Split name into first/last if it exists
+      const nameParts = owner.name ? owner.name.split(' ') : [];
+      const firstName = nameParts.length > 0 ? nameParts[0] : '';
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      
       setProfileData({
-        name: owner.name || '',
+        firstName: firstName,
+        lastName: lastName,
         email: owner.email || '',
+        title: '', // TODO: Add title field to Owner model
+        yearsAtCompany: '', // TODO: Add yearsAtCompany field to Owner model
       });
     }
     
@@ -164,8 +175,14 @@ export default function SettingsPage() {
       setProfileLoading(true);
       setError(null);
       
+      // Combine firstName and lastName into name
+      const fullName = [profileData.firstName, profileData.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim() || null;
+
       const response = await api.put(`/api/owner/${ownerId}/profile`, {
-        name: profileData.name,
+        name: fullName,
         email: profileData.email,
       });
 
@@ -328,18 +345,35 @@ export default function SettingsPage() {
             <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
               <div className="p-6">
                 <form onSubmit={handleProfileUpdate} className="space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      value={profileData.name}
-                      onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
-                      placeholder="Your name"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        id="firstName"
+                        value={profileData.firstName}
+                        onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
+                        spellCheck={true}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                        placeholder="John"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        id="lastName"
+                        value={profileData.lastName}
+                        onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
+                        spellCheck={true}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                        placeholder="Doe"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -353,6 +387,37 @@ export default function SettingsPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
                       placeholder="your@email.com"
                     />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                        Title / Role
+                      </label>
+                      <input
+                        type="text"
+                        id="title"
+                        value={profileData.title}
+                        onChange={(e) => setProfileData({ ...profileData, title: e.target.value })}
+                        spellCheck={true}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                        placeholder="e.g., CEO, Founder, BD Director"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="yearsAtCompany" className="block text-sm font-medium text-gray-700 mb-1">
+                        Years at Company
+                      </label>
+                      <input
+                        type="number"
+                        id="yearsAtCompany"
+                        min="0"
+                        max="50"
+                        value={profileData.yearsAtCompany}
+                        onChange={(e) => setProfileData({ ...profileData, yearsAtCompany: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
                   <div className="flex justify-end">
                     <button
@@ -727,9 +792,9 @@ export default function SettingsPage() {
                 <p className="text-sm text-gray-500">
                   Update your name and email address
                 </p>
-                {profileData.name && (
+                {(profileData.firstName || profileData.lastName) && (
                   <p className="text-xs text-gray-400 mt-2">
-                    Current: {profileData.name}
+                    {[profileData.firstName, profileData.lastName].filter(Boolean).join(' ') || 'No name set'}
                   </p>
                 )}
               </div>
