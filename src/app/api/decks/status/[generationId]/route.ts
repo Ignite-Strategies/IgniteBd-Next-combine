@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { generationId: string } }
+  { params }: { params: Promise<{ generationId: string }> }
 ) {
   try {
     // Verify authentication
@@ -27,7 +27,7 @@ export async function GET(
   }
 
   try {
-    const { generationId } = params;
+    const { generationId } = await params;
     const { searchParams } = new URL(request.url);
     const presentationId = searchParams.get('presentationId');
 
