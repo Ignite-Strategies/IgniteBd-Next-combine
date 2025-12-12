@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { buildGammaBlob } from '@/lib/deck/blob-mapper';
-import { generateDeckWithGamma } from '@/lib/deck/gamma-service';
+import { generateDeckWithGamma, checkGammaGenerationStatus } from '@/lib/deck/gamma-service';
 import { presentationToDeckSpec } from '@/lib/deck/presentation-converter';
 
 // Force dynamic rendering
@@ -138,15 +138,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Call Gamma API
-    let gammaId: string;
-    let deckUrl: string;
+    // Call Gamma API (asynchronous - returns only generationId)
+    let generationId: string;
     try {
       console.log('🎨 Calling Gamma API for presentation:', presentationId);
       const result = await generateDeckWithGamma(blob);
-      gammaId = result.id;
-      deckUrl = result.url;
-      console.log('✅ Gamma API returned:', { id: gammaId, url: deckUrl });
+      generationId = result.generationId;
+      console.log('✅ Gamma API returned generationId:', generationId);
     } catch (gammaError) {
       // Better error extraction and logging
       let errorMessage = 'Unknown error from Gamma API';
@@ -187,26 +185,79 @@ export async function POST(request: Request) {
       );
     }
 
-    // Gamma API returns id (gammaId) and url (shareable deck URL)
-    // Store the URL as gammaDeckUrl
+    // Store generationId and set status to generating
+    // The generation is asynchronous - we'll check status separately
     await prisma.presentation.update({
       where: { id: presentationId },
       data: {
-        gammaStatus: 'ready',
-        gammaDeckUrl: deckUrl,
-        gammaPptxUrl: null, // Gamma v1.0 returns shareable URL, not separate PPTX
+        gammaGenerationId: generationId,
+        gammaStatus: 'generating',
         gammaError: null,
       },
     });
 
-    console.log('✅ Deck generated successfully for presentation:', presentationId);
+    // Check generation status immediately (might be ready already)
+    try {
+      const statusResult = await checkGammaGenerationStatus(generationId);
+      
+      if (statusResult.status === 'ready' && statusResult.id && statusResult.url) {
+        // Generation is already complete
+        await prisma.presentation.update({
+          where: { id: presentationId },
+          data: {
+            gammaStatus: 'ready',
+            gammaDeckUrl: statusResult.url,
+            gammaPptxUrl: null,
+            gammaError: null,
+          },
+        });
 
-    return NextResponse.json({
-      success: true,
-      status: 'ready',
-      id: gammaId,
-      deckUrl: deckUrl,
-    });
+        console.log('✅ Deck generated successfully (immediate):', presentationId);
+
+        return NextResponse.json({
+          success: true,
+          status: 'ready',
+          id: statusResult.id,
+          deckUrl: statusResult.url,
+        });
+      } else if (statusResult.status === 'error') {
+        // Generation failed
+        await prisma.presentation.update({
+          where: { id: presentationId },
+          data: {
+            gammaStatus: 'error',
+            gammaError: statusResult.error || 'Generation failed',
+          },
+        });
+
+        return NextResponse.json({
+          success: false,
+          error: 'Gamma generation failed',
+          details: statusResult.error || 'Unknown error',
+        }, { status: 500 });
+      } else {
+        // Still processing - return generationId for client to poll
+        console.log('⏳ Deck generation in progress:', presentationId);
+
+        return NextResponse.json({
+          success: true,
+          status: 'generating',
+          generationId: generationId,
+          message: 'Generation started. Use GET /api/decks/status/{generationId} to check status.',
+        });
+      }
+    } catch (statusError) {
+      // Status check failed, but generation was started
+      // Client can poll for status later
+      console.warn('⚠️ Could not check initial generation status:', statusError);
+      
+      return NextResponse.json({
+        success: true,
+        status: 'generating',
+        generationId: generationId,
+        message: 'Generation started. Status check will be available shortly.',
+      });
+    }
   } catch (error) {
     console.error('❌ GenerateDeck error:', error);
 

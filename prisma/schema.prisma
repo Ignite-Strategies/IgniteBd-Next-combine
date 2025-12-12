@@ -821,11 +821,12 @@ model Presentation {
   publishedAt DateTime?
 
   // Gamma deck generation fields
-  gammaStatus  String? // "pending" | "generating" | "ready" | "error" - status of Gamma deck generation
-  gammaDeckUrl String? // Gamma deck URL (for viewing in Gamma)
-  gammaPptxUrl String? // PPTX download URL from Gamma (if available separately)
-  gammaBlob    String? // The blob text sent to Gamma API (for reference/debugging)
-  gammaError   String? // Error message if Gamma generation failed
+  gammaStatus      String? // "pending" | "generating" | "ready" | "error" - status of Gamma deck generation
+  gammaGenerationId String? // Generation ID returned from POST (used to check status)
+  gammaDeckUrl     String? // Gamma deck URL (for viewing in Gamma)
+  gammaPptxUrl     String? // PPTX download URL from Gamma (if available separately)
+  gammaBlob        String? // The blob text sent to Gamma API (for reference/debugging)
+  gammaError       String? // Error message if Gamma generation failed
 
   // WorkCollateral references (for work package deliverables)
   workCollateral WorkCollateral[]
