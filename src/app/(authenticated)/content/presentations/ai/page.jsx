@@ -11,6 +11,8 @@ export default function AIPresentationBuilderPage() {
   const [presentationIdea, setPresentationIdea] = useState('');
   const [slideCount, setSlideCount] = useState(6);
   const [title, setTitle] = useState('');
+  const [presenter, setPresenter] = useState('');
+  const [presenterExpertise, setPresenterExpertise] = useState('');
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +54,8 @@ export default function AIPresentationBuilderPage() {
       const response = await api.post('/api/content/presentations/generate-outline', {
         presentationIdea,
         slideCount,
+        presenter: presenter.trim() || null,
+        presenterExpertise: presenterExpertise.trim() || null,
       });
 
       if (!response.data?.success || !response.data?.outline) {
@@ -177,6 +181,7 @@ export default function AIPresentationBuilderPage() {
       const createResponse = await api.post('/api/content/presentations', {
         companyHQId,
         title: finalTitle,
+        presenter: presenter.trim() || null,
         description: finalDescription,
         slides: slidesToSave, // This is now { sections: [...] }
         published: false,
@@ -292,6 +297,40 @@ export default function AIPresentationBuilderPage() {
                       placeholder="Leave blank - AI will suggest one"
                       className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Presenter Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={presenter}
+                      onChange={(e) => setPresenter(e.target.value)}
+                      placeholder="e.g., John Smith, Sarah Johnson"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Who will be presenting? Helps AI tailor the content.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Presenter Expertise (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={presenterExpertise}
+                      onChange={(e) => setPresenterExpertise(e.target.value)}
+                      placeholder="e.g., 10 years in SaaS sales, Legal expert, Marketing director"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Their background/expertise helps AI customize the content.
+                    </p>
                   </div>
                 </div>
 
