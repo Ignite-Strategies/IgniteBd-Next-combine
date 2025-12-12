@@ -37,7 +37,39 @@ export default function PresentationPage() {
         const presentation = response.data.presentation;
         setTitle(presentation.title || '');
         setDescription(presentation.description || '');
-        setSlides(presentation.slides || []);
+        
+        // Handle slides format - could be { sections: [...] } or array or string
+        let slidesData = [];
+        if (presentation.slides) {
+          if (typeof presentation.slides === 'string') {
+            try {
+              const parsed = JSON.parse(presentation.slides);
+              if (parsed.sections && Array.isArray(parsed.sections)) {
+                // Convert sections format to array format for editing
+                slidesData = parsed.sections.map((section, idx) => ({
+                  slideNumber: idx + 1,
+                  title: section.title || '',
+                  content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
+                }));
+              } else if (Array.isArray(parsed)) {
+                slidesData = parsed;
+              }
+            } catch (e) {
+              console.warn('Failed to parse slides JSON:', e);
+            }
+          } else if (presentation.slides.sections && Array.isArray(presentation.slides.sections)) {
+            // Convert sections format to array format for editing
+            slidesData = presentation.slides.sections.map((section, idx) => ({
+              slideNumber: idx + 1,
+              title: section.title || '',
+              content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
+            }));
+          } else if (Array.isArray(presentation.slides)) {
+            slidesData = presentation.slides;
+          }
+        }
+        setSlides(slidesData);
+        
         setPublished(presentation.published || false);
         setGammaStatus(presentation.gammaStatus || null);
         setGammaDeckUrl(presentation.gammaDeckUrl || null);
@@ -61,10 +93,18 @@ export default function PresentationPage() {
     setSaving(true);
 
     try {
+      // Convert slides array back to sections format for storage
+      const slidesToSave = {
+        sections: slides.map((slide, idx) => ({
+          title: slide.title || `Slide ${idx + 1}`,
+          bullets: slide.content ? slide.content.split('\n').filter(b => b.trim()) : [],
+        })),
+      };
+
       const response = await api.patch(`/api/content/presentations/${presentationId}`, {
         title,
         description,
-        slides,
+        slides: slidesToSave,
         published,
       });
 
