@@ -100,7 +100,18 @@ export default function CreatePresentationPage() {
         notes: null,
       }));
 
-      const finalCompanyHQId = resolvedCompanyHQId || companyHQId;
+      // Resolve companyHQId on submit
+      let finalCompanyHQId = resolvedCompanyHQId || companyHQId;
+      if (!finalCompanyHQId && typeof window !== 'undefined') {
+        finalCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+      }
+
+      if (!finalCompanyHQId) {
+        setError('Company profile required. Please set up your company first.');
+        setSaving(false);
+        return;
+      }
+
       const response = await api.post('/api/content/presentations', {
         companyHQId: finalCompanyHQId,
         title,
@@ -134,44 +145,7 @@ export default function CreatePresentationPage() {
 
         <div className="mt-8 rounded-2xl bg-white p-6 shadow">
           <div className="space-y-6">
-            {!resolvedCompanyHQId && !companyHQId && (
-              <div className="rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="rounded-full bg-amber-100 p-3">
-                      <Building2 className="h-6 w-6 text-amber-600" />
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="mb-1 text-lg font-semibold text-gray-900">
-                      Company Profile Required
-                    </h3>
-                    <p className="mb-4 text-sm text-gray-600">
-                      To create presentations, we need your company information set up first. This helps us organize your content and ensure everything is properly linked.
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={() => router.push('/company/profile')}
-                        className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
-                      >
-                        Set Up Company Profile
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={handleRefreshCompany}
-                        disabled={refreshing}
-                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                        {refreshing ? 'Checking...' : 'Refresh Company Data'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {error && (resolvedCompanyHQId || companyHQId) && (
+            {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
               </div>
