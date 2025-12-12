@@ -185,6 +185,12 @@ export default function PresentationPage() {
 
             <div className="flex justify-end gap-4">
               <button
+                onClick={() => router.push(`/content/presentations/${presentationId}/ai`)}
+                className="flex items-center gap-2 rounded border border-gray-300 bg-white px-6 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                Enhance with AI
+              </button>
+              <button
                 onClick={handleSave}
                 disabled={saving}
                 className="flex items-center gap-2 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 disabled:opacity-50"

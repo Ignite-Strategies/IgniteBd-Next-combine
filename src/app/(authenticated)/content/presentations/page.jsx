@@ -52,12 +52,6 @@ export default function PresentationsPage() {
             <h2 className="text-xl font-semibold text-gray-900">Your Presentations</h2>
             <div className="flex gap-3">
               <button
-                onClick={() => router.push('/content/presentations/ai')}
-                className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                AI Builder
-              </button>
-              <button
                 onClick={() => router.push('/content/presentations/create')}
                 className="flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
               >
@@ -84,18 +78,12 @@ export default function PresentationsPage() {
               <p className="mt-2 text-sm text-gray-500">
                 Get started by creating your first presentation
               </p>
-              <div className="mt-6 flex justify-center gap-3">
+              <div className="mt-6 flex justify-center">
                 <button
                   onClick={() => router.push('/content/presentations/create')}
                   className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
                 >
-                  Create Presentation
-                </button>
-                <button
-                  onClick={() => router.push('/content/presentations/ai')}
-                  className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Use AI Builder
+                  Create Your First Presentation
                 </button>
               </div>
             </div>
