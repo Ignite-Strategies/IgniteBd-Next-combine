@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Save, ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
@@ -22,12 +24,29 @@ export default function PresentationPage() {
   const [gammaDeckUrl, setGammaDeckUrl] = useState(null);
   const [gammaPptxUrl, setGammaPptxUrl] = useState(null);
   const [buildingPPT, setBuildingPPT] = useState(false);
+  const [showErrorStatus, setShowErrorStatus] = useState(false); // Only show error if user tried to generate
+  const [authReady, setAuthReady] = useState(false);
 
+  // Wait for Firebase auth before loading presentation
   useEffect(() => {
-    if (presentationId) {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setAuthReady(true);
+      } else {
+        // No user - redirect to signin
+        router.replace('/signin');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Load presentation only after auth is ready
+  useEffect(() => {
+    if (presentationId && authReady) {
       loadPresentation();
     }
-  }, [presentationId]);
+  }, [presentationId, authReady]);
 
   const loadPresentation = async () => {
     try {
@@ -71,9 +90,13 @@ export default function PresentationPage() {
         setSlides(slidesData);
         
         setPublished(presentation.published || false);
-        setGammaStatus(presentation.gammaStatus || null);
+        const status = presentation.gammaStatus || null;
+        setGammaStatus(status);
         setGammaDeckUrl(presentation.gammaDeckUrl || null);
         setGammaPptxUrl(presentation.gammaPptxUrl || null);
+        // Only show error status box if status is 'ready' or 'generating' on load
+        // Don't show 'error' status on page load - only show if user tries to generate
+        setShowErrorStatus(status === 'ready' || status === 'generating');
       }
     } catch (err) {
       console.error('Error loading presentation:', err);
@@ -156,6 +179,7 @@ export default function PresentationPage() {
     
     setBuildingPPT(true);
     setError('');
+    setShowErrorStatus(true); // Show status box when user clicks generate
     
     try {
       const response = await api.post('/api/decks/generate', {
@@ -266,8 +290,8 @@ export default function PresentationPage() {
             </button>
           </div>
 
-          {/* Gamma/PPT Status - Show after build */}
-          {(gammaStatus || gammaDeckUrl || gammaPptxUrl) && (
+          {/* Gamma/PPT Status - Show after build or if user tried to generate */}
+          {showErrorStatus && (gammaStatus || gammaDeckUrl || gammaPptxUrl) && (
             <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
