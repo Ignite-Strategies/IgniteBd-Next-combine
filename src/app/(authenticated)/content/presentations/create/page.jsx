@@ -16,12 +16,36 @@ export default function CreatePresentationPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [resolvedCompanyHQId, setResolvedCompanyHQId] = useState(null);
 
-  // Try to refresh company data on mount if missing
+  // Resolve companyHQId from multiple sources
   useEffect(() => {
-    if (!companyHQId && !companyLoading && !refreshing) {
+    if (companyHQId) {
+      setResolvedCompanyHQId(companyHQId);
+      return;
+    }
+
+    // Check localStorage directly
+    const storedId = typeof window !== 'undefined' 
+      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
+      : null;
+    
+    if (storedId) {
+      setResolvedCompanyHQId(storedId);
+      return;
+    }
+
+    // Try to refresh from API
+    if (!companyLoading && !refreshing) {
       setRefreshing(true);
-      refreshCompany().finally(() => setRefreshing(false));
+      refreshCompany().then(() => {
+        const refreshedId = typeof window !== 'undefined'
+          ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
+          : null;
+        if (refreshedId) {
+          setResolvedCompanyHQId(refreshedId);
+        }
+      }).finally(() => setRefreshing(false));
     }
   }, [companyHQId, companyLoading, refreshCompany, refreshing]);
 
@@ -30,7 +54,13 @@ export default function CreatePresentationPage() {
     setError('');
     try {
       await refreshCompany();
-      if (!companyHQId) {
+      // Check localStorage after refresh
+      const refreshedId = typeof window !== 'undefined'
+        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
+        : null;
+      if (refreshedId) {
+        setResolvedCompanyHQId(refreshedId);
+      } else {
         setError('Company data not found. Please set up your company profile.');
       }
     } catch (err) {
@@ -46,7 +76,8 @@ export default function CreatePresentationPage() {
       return;
     }
 
-    if (!companyHQId) {
+    const finalCompanyHQId = resolvedCompanyHQId || companyHQId;
+    if (!finalCompanyHQId) {
       setError('Company profile required');
       return;
     }
@@ -63,8 +94,9 @@ export default function CreatePresentationPage() {
         notes: null,
       }));
 
+      const finalCompanyHQId = resolvedCompanyHQId || companyHQId;
       const response = await api.post('/api/content/presentations', {
-        companyHQId,
+        companyHQId: finalCompanyHQId,
         title,
         description,
         slides,
@@ -96,7 +128,7 @@ export default function CreatePresentationPage() {
 
         <div className="mt-8 rounded-2xl bg-white p-6 shadow">
           <div className="space-y-6">
-            {!companyHQId && (
+            {!resolvedCompanyHQId && !companyHQId && (
               <div className="rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-6">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
@@ -133,7 +165,7 @@ export default function CreatePresentationPage() {
               </div>
             )}
 
-            {error && companyHQId && (
+            {error && (resolvedCompanyHQId || companyHQId) && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
               </div>
@@ -200,7 +232,7 @@ export default function CreatePresentationPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !title.trim() || !companyHQId}
+                disabled={saving || !title.trim() || !(resolvedCompanyHQId || companyHQId)}
                 className="rounded bg-red-600 px-6 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Creating...' : 'Create Presentation'}
