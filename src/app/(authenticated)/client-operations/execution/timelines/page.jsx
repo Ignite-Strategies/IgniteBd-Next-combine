@@ -1,17 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
 import api from '@/lib/api';
 import { Loader, Calendar, Package, ArrowLeft, Edit2, Check, X } from 'lucide-react';
+
+// Force dynamic rendering - this page uses search params and makes API calls
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
 
 /**
  * Modify Timelines Page
  * Manage phases and timeline for a work package
  */
 
-export default function ModifyTimelinesPage() {
+function ModifyTimelinesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const workPackageId = searchParams.get('workPackageId');
@@ -232,6 +236,23 @@ export default function ModifyTimelinesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ModifyTimelinesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Loader className="mx-auto h-12 w-12 animate-spin text-gray-400" />
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <ModifyTimelinesContent />
+    </Suspense>
   );
 }
 

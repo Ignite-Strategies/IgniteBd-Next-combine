@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { getAlignmentScore } from '@/lib/alignmentScore';
 import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/firebaseAdmin';
 
+// TODO WEDNESDAY FIX #3: Personas MUST be scoped by companyHQId, never by ownerId
+// TODO WEDNESDAY FIX #3: All persona queries must use: where: { companyHQId: currentCompanyHQId }
 const DEFAULT_COMPANY_HQ_ID = process.env.DEFAULT_COMPANY_HQ_ID || null;
 
 export async function GET(request) {

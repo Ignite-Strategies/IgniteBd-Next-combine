@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { applyPipelineTriggers } from '@/lib/services/PipelineTriggerService.js';
+import { ensureContactPipeline, validatePipeline } from '@/lib/services/pipelineService';
 
 export async function GET(request, { params }) {
   try {
@@ -14,7 +15,9 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const { contactId } = params || {};
+    // Await params in Next.js 15+ App Router
+    const resolvedParams = await params;
+    const { contactId } = resolvedParams || {};
     if (!contactId) {
       return NextResponse.json(
         { success: false, error: 'contactId is required' },
@@ -22,32 +25,103 @@ export async function GET(request, { params }) {
       );
     }
 
-    const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
-      include: {
-        pipeline: true,
-        contactCompany: true,
-      },
-    });
+    console.log('🔍 Fetching contact:', contactId);
+
+    let contact;
+    try {
+      contact = await prisma.contact.findUnique({
+        where: { id: contactId },
+        include: {
+          pipeline: true,
+          company: true, // Universal company relation
+          contactCompany: true, // Legacy relation for backward compatibility
+        },
+      });
+    } catch (prismaError) {
+      console.error('❌ Prisma query error:', prismaError);
+      console.error('❌ Prisma error name:', prismaError.name);
+      console.error('❌ Prisma error message:', prismaError.message);
+      console.error('❌ Prisma error code:', prismaError.code);
+      console.error('❌ Prisma error stack:', prismaError.stack);
+      throw prismaError;
+    }
 
     if (!contact) {
+      console.log('❌ Contact not found:', contactId);
       return NextResponse.json(
         { success: false, error: 'Contact not found' },
         { status: 404 },
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      contact,
-    });
+    console.log('✅ Contact found, serializing...');
+    console.log('✅ Contact ID:', contact.id);
+    console.log('✅ Contact has pipeline:', !!contact.pipeline);
+    console.log('✅ Contact has company:', !!contact.company);
+    console.log('✅ Contact has contactCompany:', !!contact.contactCompany);
+    console.log('✅ Contact has careerTimeline:', !!contact.careerTimeline);
+
+    // Safely serialize the contact, handling JSON fields and potential circular references
+    try {
+      // Use JSON.parse/stringify to ensure clean serialization
+      // This handles any potential circular references or non-serializable values
+      const serializedContact = JSON.parse(JSON.stringify(contact, (key, value) => {
+        // Handle Date objects
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        // Handle BigInt (if any)
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        // Handle undefined (convert to null for JSON)
+        if (value === undefined) {
+          return null;
+        }
+        return value;
+      }));
+
+      return NextResponse.json({
+        success: true,
+        contact: serializedContact,
+      });
+    } catch (serializeError) {
+      console.error('❌ Serialization error:', serializeError);
+      console.error('❌ Serialization error stack:', serializeError.stack);
+      console.error('❌ Contact keys:', Object.keys(contact || {}));
+      
+      // Try to return a minimal version without problematic fields
+      try {
+        const { careerTimeline, ...contactWithoutTimeline } = contact;
+        const minimalContact = JSON.parse(JSON.stringify(contactWithoutTimeline, (key, value) => {
+          if (value instanceof Date) return value.toISOString();
+          if (typeof value === 'bigint') return value.toString();
+          if (value === undefined) return null;
+          return value;
+        }));
+        
+        return NextResponse.json({
+          success: true,
+          contact: minimalContact,
+          warning: 'Some fields may be missing due to serialization issues',
+        });
+      } catch (fallbackError) {
+        console.error('❌ Fallback serialization also failed:', fallbackError);
+        throw serializeError; // Re-throw original error
+      }
+    }
   } catch (error) {
     console.error('❌ GetContact error:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ Error message:', error.message);
+    
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to fetch contact',
         details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },
       { status: 500 },
     );
@@ -65,7 +139,9 @@ export async function PUT(request, { params }) {
   }
 
   try {
-    const { contactId } = params || {};
+    // Await params in Next.js 15+ App Router
+    const resolvedParams = await params;
+    const { contactId } = resolvedParams || {};
     if (!contactId) {
       return NextResponse.json(
         { success: false, error: 'contactId is required' },
@@ -92,13 +168,26 @@ export async function PUT(request, { params }) {
       email,
       phone,
       title,
-      contactCompanyId,
+      companyId,
+      contactCompanyId, // Legacy field for backward compatibility
       buyerDecision,
       howMet,
       notes,
       pipeline,
       stage,
     } = body ?? {};
+
+    // Validate pipeline and stage if provided
+    if (pipeline !== undefined || stage !== undefined) {
+      const finalPipeline = pipeline || 'prospect'; // Default if stage provided but pipeline not
+      const validation = validatePipeline(finalPipeline, stage);
+      if (!validation.isValid) {
+        return NextResponse.json(
+          { success: false, error: validation.error },
+          { status: 400 },
+        );
+      }
+    }
 
     const updateData = {};
     if (firstName !== undefined) updateData.firstName = firstName;
@@ -107,7 +196,14 @@ export async function PUT(request, { params }) {
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (title !== undefined) updateData.title = title;
-    if (contactCompanyId !== undefined) updateData.contactCompanyId = contactCompanyId;
+    // Prefer companyId over contactCompanyId
+    if (companyId !== undefined) {
+      updateData.companyId = companyId;
+      updateData.contactCompanyId = companyId; // Also set legacy field for backward compatibility
+    } else if (contactCompanyId !== undefined) {
+      updateData.companyId = contactCompanyId;
+      updateData.contactCompanyId = contactCompanyId;
+    }
     if (buyerDecision !== undefined) updateData.buyerDecision = buyerDecision;
     if (howMet !== undefined) updateData.howMet = howMet;
     if (notes !== undefined) updateData.notes = notes;
@@ -117,18 +213,21 @@ export async function PUT(request, { params }) {
       data: updateData,
       include: {
         pipeline: true,
-        contactCompany: true,
+        company: true, // Universal company relation
+        contactCompany: true, // Legacy relation for backward compatibility
       },
     });
 
+    // Handle pipeline update/creation
     if (pipeline !== undefined || stage !== undefined) {
       const currentPipeline = await prisma.pipeline.findUnique({
         where: { contactId },
       });
 
       const newPipeline = pipeline !== undefined ? pipeline : currentPipeline?.pipeline || 'prospect';
-      const newStage = stage !== undefined ? stage : currentPipeline?.stage || null;
+      const newStage = stage !== undefined ? stage : currentPipeline?.stage || 'interest';
 
+      // Check for pipeline conversion triggers (prospect → client)
       const convertedContact = await applyPipelineTriggers(contactId, newPipeline, newStage);
       if (convertedContact) {
         return NextResponse.json({
@@ -138,39 +237,34 @@ export async function PUT(request, { params }) {
         });
       }
 
-      const pipelineUpdate = {};
-      if (pipeline !== undefined) pipelineUpdate.pipeline = pipeline;
-      if (stage !== undefined) pipelineUpdate.stage = stage;
-
-      await prisma.pipeline.upsert({
-        where: { contactId },
-        update: pipelineUpdate,
-        create: {
-          contactId,
-          pipeline: pipeline || 'prospect',
-          stage: stage || null,
-        },
+      // Update pipeline
+      await ensureContactPipeline(contactId, {
+        pipeline: newPipeline,
+        stage: newStage,
       });
-
-      const updatedContact = await prisma.contact.findUnique({
-        where: { id: contactId },
-        include: {
-          pipeline: true,
-          contactCompany: true,
-        },
-      });
-
-      return NextResponse.json({
-        success: true,
-        contact: updatedContact,
+    } else {
+      // Ensure pipeline exists even if not updating (default to prospect/interest)
+      await ensureContactPipeline(contactId, {
+        pipeline: 'prospect',
+        stage: 'interest',
       });
     }
 
-    console.log('✅ Contact updated:', contact.id);
+    // Re-fetch contact with pipeline
+    const updatedContact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      include: {
+        pipeline: true,
+        company: true,
+        contactCompany: true,
+      },
+    });
+
+    console.log('✅ Contact updated:', updatedContact.id);
 
     return NextResponse.json({
       success: true,
-      contact,
+      contact: updatedContact,
     });
   } catch (error) {
     console.error('❌ UpdateContact error:', error);
@@ -196,7 +290,9 @@ export async function DELETE(request, { params }) {
   }
 
   try {
-    const { contactId } = params || {};
+    // Await params in Next.js 15+ App Router
+    const resolvedParams = await params;
+    const { contactId } = resolvedParams || {};
     if (!contactId) {
       return NextResponse.json(
         { success: false, error: 'contactId is required' },

@@ -106,6 +106,8 @@ export async function GET(request) {
     const id = searchParams.get('id');
     const contactId = searchParams.get('contactId');
     const companyHQId = searchParams.get('companyHQId');
+    const contactCompanyId = searchParams.get('contactCompanyId');
+    const search = searchParams.get('search');
 
     if (id) {
       // Get single WorkPackage
@@ -118,12 +120,20 @@ export async function GET(request) {
               firstName: true,
               lastName: true,
               email: true,
+              crmId: true, // Include crmId (companyHQId) for hydration
+              contactCompany: {
+                select: {
+                  id: true,
+                  companyName: true,
+                },
+              },
             },
           },
-          contactCompany: {
+          company: {
             select: {
               id: true,
               companyName: true,
+              companyHQId: true, // Include companyHQId
             },
           },
           items: true,
@@ -145,26 +155,61 @@ export async function GET(request) {
 
     // List WorkPackages
     const where = {};
-    if (contactId) where.contactId = contactId;
+    if (contactId) {
+      where.contactId = contactId;
+    }
+    // Filter by companyHQId and/or contactCompanyId through contact relationship
+    if (companyHQId || contactCompanyId) {
+      where.contact = {};
+      if (companyHQId) {
+        where.contact.crmId = companyHQId;
+      }
+      if (contactCompanyId) {
+        where.contact.contactCompanyId = contactCompanyId;
+      }
+    }
+    // Search by workpackage title
+    if (search) {
+      where.title = {
+        contains: search,
+        mode: 'insensitive',
+      };
+    }
 
+    // For list view, return minimal data (IDs only) to reduce payload
+    // Full hydration happens on detail page
     const workPackages = await prisma.workPackage.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        totalCost: true,
+        effectiveStartDate: true,
+        createdAt: true,
+        updatedAt: true,
         contact: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
             email: true,
+            crmId: true, // Include crmId (companyHQId) for filtering/hydration
+            contactCompany: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
           },
         },
-        phases: {
-          include: {
+        // Only include counts, not full objects
+        _count: {
+          select: {
+            phases: true,
             items: true,
           },
-          orderBy: { position: 'asc' },
         },
-        items: true,
       },
       orderBy: {
         createdAt: 'desc',

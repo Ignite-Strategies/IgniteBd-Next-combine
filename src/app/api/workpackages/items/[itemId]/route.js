@@ -45,7 +45,17 @@ export async function PATCH(request, { params }) {
     if (quantity !== undefined) updateData.quantity = quantity;
     if (unitOfMeasure !== undefined) updateData.unitOfMeasure = unitOfMeasure;
     if (duration !== undefined) updateData.duration = duration;
-    if (status !== undefined) updateData.status = status;
+    if (status !== undefined) {
+      // Validate status is one of the canonical statuses
+      const validStatuses = ['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'CHANGES_NEEDED', 'CHANGES_IN_PROGRESS', 'APPROVED'];
+      if (!validStatuses.includes(status.toUpperCase())) {
+        return NextResponse.json(
+          { success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+          { status: 400 },
+        );
+      }
+      updateData.status = status.toUpperCase();
+    }
 
     const updated = await prisma.workPackageItem.update({
       where: { id: itemId },

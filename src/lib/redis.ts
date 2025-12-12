@@ -7,7 +7,7 @@ import { Redis } from '@upstash/redis';
 
 let redis: Redis | null = null;
 
-function getRedis(): Redis {
+export function getRedis(): Redis {
   if (redis) {
     return redis;
   }
@@ -15,17 +15,34 @@ function getRedis(): Redis {
   // Use Upstash Redis REST API
   // Automatically reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from env
   try {
+    // Try fromEnv first - it handles quote stripping internally
     redis = Redis.fromEnv();
     console.log('✅ Upstash Redis client initialized');
     return redis;
   } catch (error: any) {
     // Fallback to manual initialization if fromEnv() fails
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    let url = process.env.UPSTASH_REDIS_REST_URL;
+    let token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
     if (!url || !token) {
       throw new Error(
-        'Upstash Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.'
+        'Upstash Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.\n\n' +
+        'Note: These should be REST API credentials, not Redis CLI connection strings.\n' +
+        'Get them from: https://console.upstash.com/redis -> Your Database -> REST API'
+      );
+    }
+
+    // Strip quotes from URL and token (common issue when env vars are set with quotes in .env files)
+    // Handles: "https://..." or 'https://...' or ""https://..."" or ''https://...''
+    url = url.trim().replace(/^["']+|["']+$/g, '');
+    token = token.trim().replace(/^["']+|["']+$/g, '');
+
+    // Validate URL format
+    if (!url.startsWith('https://')) {
+      throw new Error(
+        `Invalid UPSTASH_REDIS_REST_URL format. Expected https:// URL, got: ${url}\n\n` +
+        'Note: UPSTASH_REDIS_REST_URL should be the REST API URL (https://...), not a Redis CLI connection string (redis://...).\n' +
+        'Get the correct URL from: https://console.upstash.com/redis -> Your Database -> REST API'
       );
     }
 
@@ -76,6 +93,63 @@ export async function storeEnrichedContact(
     });
     // Don't throw - just log, we don't want to break the flow
     return '';
+  }
+}
+
+/**
+ * Store enriched contact data in Redis by contactId
+ * 
+ * @param contactId - Contact ID
+ * @param rawEnrichmentPayload - Raw Apollo JSON payload
+ * @param ttl - Time to live in seconds (default: 7 days)
+ * @returns Promise<string> - Redis key
+ */
+export async function storeEnrichedContactByContactId(
+  contactId: string,
+  rawEnrichmentPayload: any,
+  ttl: number = 7 * 24 * 60 * 60 // 7 days
+): Promise<string> {
+  try {
+    const redisClient = getRedis();
+    const timestamp = Date.now();
+    const key = `apollo:contact:${contactId}:${timestamp}`;
+    
+    // Store raw enrichment payload
+    const dataToStore = JSON.stringify({
+      contactId,
+      rawEnrichmentPayload,
+      enrichedAt: new Date().toISOString(),
+    });
+    
+    await redisClient.setex(key, ttl, dataToStore);
+    
+    console.log(`✅ Enriched data stored in Redis: ${key} (TTL: ${ttl}s)`);
+    return key;
+  } catch (error: any) {
+    console.error('❌ Redis store error:', error);
+    return '';
+  }
+}
+
+/**
+ * Get enriched contact data from Redis by key
+ * 
+ * @param redisKey - Full Redis key (e.g., "apollo:contact:123:timestamp")
+ * @returns Promise<any | null> - Enriched data or null
+ */
+export async function getEnrichedContactByKey(redisKey: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(redisKey);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get error:', error);
+    return null;
   }
 }
 
@@ -137,6 +211,28 @@ export async function deleteEnrichedContact(linkedinUrl: string): Promise<boolea
   } catch (error: any) {
     console.error('❌ Upstash Redis delete error:', error);
     return false;
+  }
+}
+
+/**
+ * Get preview intelligence data from Redis by previewId
+ * 
+ * @param previewId - Preview ID (e.g., "preview:123:abc")
+ * @returns Promise<any | null> - Preview data or null
+ */
+export async function getPreviewIntelligence(previewId: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(previewId);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get preview error:', error);
+    return null;
   }
 }
 

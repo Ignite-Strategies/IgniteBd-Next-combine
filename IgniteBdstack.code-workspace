@@ -1,22 +1,28 @@
 {
 	"folders": [
 		{
+			"path": "../../GoFast/trainingmvp"
+		},
+		{
+			"path": "../../GoFast/gofastapp-mvp"
+		},
+		{
+			"path": "../../GoFast/GoFastCompany"
+		},
+		{
+			"path": "../../GoFast/packages"
+		},
+		{
+			"path": "../../GoFast/GoFast"
+		},
+		{
+			"path": "../workme-nextapp"
+		},
+		{
 			"path": "."
 		},
 		{
 			"path": "../ignitebd-clientportal"
-		},
-		{
-			"path": "../ignitestrategescrm-frontend"
-		},
-		{
-			"path": "../eventscrm-backend"
-		},
-		{
-			"path": "../../GoFast/gofastfrontend-mvp1"
-		},
-		{
-			"path": "../../GoFast/gofastbackendv2-fall2025"
 		}
 	],
 	"settings": {}

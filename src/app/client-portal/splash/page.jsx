@@ -14,9 +14,8 @@ export default function ClientPortalSplashPage() {
     const timer = setTimeout(() => {
       unsubscribe = onAuthStateChanged(auth, (user) => {
         if (user) {
-          // Check if user has access to client portal (proposal access)
-          // For now, redirect to welcome - we'll add proposal access check there
-          router.replace('/client-portal/welcome');
+          // Redirect authenticated users directly to review page
+          router.replace('/portal/review');
         } else {
           router.replace('/client-portal/login');
         }

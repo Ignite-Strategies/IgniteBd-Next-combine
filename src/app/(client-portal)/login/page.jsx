@@ -31,9 +31,8 @@ export default function ClientPortalLoginPage() {
         localStorage.setItem('firebaseId', result.uid);
       }
 
-      // Check if user has client portal access (has proposals)
-      // For now, just redirect to welcome
-      router.push('/client-portal/welcome');
+      // Redirect authenticated users directly to review page
+      router.push('/portal/review');
     } catch (error) {
       console.error('Google sign-in failed:', error);
       setError('Sign-in failed. Please try again.');
@@ -58,7 +57,7 @@ export default function ClientPortalLoginPage() {
         localStorage.setItem('firebaseId', result.uid);
       }
 
-      router.push('/client-portal/welcome');
+      router.push('/portal/review');
     } catch (error) {
       console.error('Email sign-in failed:', error);
       setError('Sign-in failed. Please check your credentials.');

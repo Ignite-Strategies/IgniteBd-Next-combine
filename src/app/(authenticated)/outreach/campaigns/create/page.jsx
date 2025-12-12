@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOutreachContext } from '../../layout.jsx';
+import { useOutreachContext } from '@/hooks/useOutreach';
 
 const DEFAULT_FORM = {
   name: '',

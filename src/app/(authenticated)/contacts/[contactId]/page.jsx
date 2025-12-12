@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useContactsContext } from '../layout.jsx';
+import { useContactsContext } from '@/hooks/useContacts';
+import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
+import ContactOutlook from '@/components/enrichment/ContactOutlook';
 
 export default function ContactDetailPage({ params }) {
   const router = useRouter();
@@ -93,6 +95,9 @@ export default function ContactDetailPage({ params }) {
 
   const [generatingPortal, setGeneratingPortal] = useState(false);
   const [portalLink, setPortalLink] = useState(null);
+  const [showEnrichmentModal, setShowEnrichmentModal] = useState(false);
+  const [showRawJSON, setShowRawJSON] = useState(false);
+  const [rawJSON, setRawJSON] = useState(null);
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
@@ -195,10 +200,44 @@ export default function ContactDetailPage({ params }) {
         </div>
 
         <div className="space-y-6">
+          {/* Enrichment Banner */}
+          {contact.enrichmentRedisKey && !contact.enrichmentFetchedAt && (
+            <div className="rounded-xl border-2 border-yellow-200 bg-yellow-50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-5 w-5 text-yellow-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-900">
+                      Unsaved enrichment available
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      Enrichment data is ready to be saved to this contact
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEnrichmentModal(true)}
+                  className="rounded-lg bg-yellow-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-yellow-700"
+                >
+                  Review & Save
+                </button>
+              </div>
+            </div>
+          )}
+
           <section className="rounded-2xl bg-white p-6 shadow">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">
-              Contact Information
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Contact Information
+              </h3>
+              <button
+                onClick={() => setShowEnrichmentModal(true)}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                <Sparkles className="h-4 w-4" />
+                Enrich Contact
+              </button>
+            </div>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-sm font-semibold text-gray-500">Preferred Name</dt>
@@ -235,7 +274,7 @@ export default function ContactDetailPage({ params }) {
                 <div>
                   <dt className="text-sm font-semibold text-gray-500">Company</dt>
                   <dd className="mt-1 text-base text-gray-900">
-                    {contact.contactCompany?.companyName || '—'}
+                    {contact.company?.companyName || contact.contactCompany?.companyName || contact.companyName || '—'}
                   </dd>
                 </div>
               </div>
@@ -254,6 +293,15 @@ export default function ContactDetailPage({ params }) {
               {contact.notes || 'Add notes from meetings, emails, and relationship updates.'}
             </p>
           </section>
+
+          {/* Contact Outlook Section */}
+          <ContactOutlook 
+            contact={contact} 
+            onViewRawJSON={(json) => {
+              setRawJSON(json);
+              setShowRawJSON(true);
+            }}
+          />
 
           {/* Client Portal Access */}
           {contact.email && (
@@ -296,6 +344,48 @@ export default function ContactDetailPage({ params }) {
             </section>
           )}
         </div>
+
+        {/* Enrichment Modal */}
+        <EnrichmentModal
+          isOpen={showEnrichmentModal}
+          onClose={() => setShowEnrichmentModal(false)}
+          contactId={contactId || contact?.id}
+          onEnrichmentSaved={() => {
+            // Refresh contact data
+            if (contactId) {
+              api.get(`/api/contacts/${contactId}`).then((response) => {
+                if (response.data?.success && response.data.contact) {
+                  setContact(response.data.contact);
+                }
+              });
+            }
+          }}
+        />
+
+        {/* Raw JSON Modal */}
+        {showRawJSON && rawJSON && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <h2 className="text-xl font-bold text-gray-900">Raw Enrichment JSON</h2>
+                <button
+                  onClick={() => {
+                    setShowRawJSON(false);
+                    setRawJSON(null);
+                  }}
+                  className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
+                <pre className="text-xs bg-gray-50 p-4 rounded-lg overflow-x-auto">
+                  {JSON.stringify(rawJSON, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

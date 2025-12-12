@@ -6,10 +6,12 @@ import { getInvoiceStatus, getOutstandingAmount, getLastPaymentDate } from '@/li
 /**
  * GET /api/admin/billing
  * List all invoices with derived status
+ * Requires Owner authentication - filters invoices by owner's companies
  */
 export async function GET(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -18,13 +20,77 @@ export async function GET(request) {
   }
 
   try {
+    // Get Owner by firebaseId
+    const owner = await prisma.owner.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      include: {
+        managedCompanies: {
+          select: { id: true },
+        },
+        ownedCompanies: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!owner) {
+      console.error('❌ Owner not found for firebaseId:', firebaseUser.uid);
+      console.error('Firebase user:', {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.name,
+      });
+      
+      // Check if any owners exist
+      const ownerCount = await prisma.owner.count();
+      console.error(`Total owners in DB: ${ownerCount}`);
+      
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Owner not found',
+          debug: {
+            firebaseUid: firebaseUser.uid,
+            firebaseEmail: firebaseUser.email,
+            hint: 'Visit /api/debug/owner-check to diagnose, or /api/debug/fix-owner to create Owner record',
+          },
+        },
+        { status: 403 },
+      );
+    }
+
+    // Get all company IDs the owner has access to
+    const ownerCompanyIds = [
+      ...owner.managedCompanies.map((c) => c.id),
+      ...owner.ownedCompanies.map((c) => c.id),
+    ];
+
     const { searchParams } = request.nextUrl;
     const workPackageId = searchParams.get('workPackageId');
     const status = searchParams.get('status'); // Filter by status
     const search = searchParams.get('search'); // Search by invoice name or client name
 
+    // Build where clause - filter by owner's companies via WorkPackage
+    // WorkPackage -> Company -> CompanyHQ (where CompanyHQ.id in ownerCompanyIds)
     const where = {};
-    if (workPackageId) where.workPackageId = workPackageId;
+    
+    if (workPackageId) {
+      // If specific workPackage requested, just filter by ID
+      // (will verify access via company relationship in query)
+      where.workPackageId = workPackageId;
+    } else if (ownerCompanyIds.length > 0) {
+      // Filter by owner's companies
+      where.workPackage = {
+        company: {
+          companyHQId: {
+            in: ownerCompanyIds,
+          },
+        },
+      };
+    } else {
+      // Owner has no companies - return empty result
+      where.workPackageId = '__no_access__';
+    }
 
     // Get invoices with relations
     const invoices = await prisma.invoice.findMany({

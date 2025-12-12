@@ -1,29 +1,13 @@
 'use client';
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
 import api from '@/lib/api';
-
-const PipelinesContext = createContext({
-  pipelineConfig: null,
-  hydrating: false,
-  hydrated: false,
-  refreshPipelineConfig: async () => {},
-});
-
-export function usePipelinesContext() {
-  const context = useContext(PipelinesContext);
-  if (!context) {
-    throw new Error('usePipelinesContext must be used within PipelinesLayout');
-  }
-  return context;
-}
+import { PipelinesContext } from './PipelinesContext';
 
 export default function PipelinesLayout({ children }) {
   const [pipelineConfig, setPipelineConfig] = useState(null);

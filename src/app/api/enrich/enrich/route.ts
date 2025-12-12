@@ -78,8 +78,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Store enriched data in Redis - just let it chill there
-    // NO database writes, NO contact creation
+    // Store enriched data in Redis
     let redisKey = '';
     try {
       redisKey = await storeEnrichedContact(linkedinUrl, {
@@ -93,12 +92,13 @@ export async function POST(request: Request) {
     }
 
     // Return enriched data + raw Apollo response + Redis key
-    // NO database writes - just chill and return data
+    // NO database writes - user must call /api/contacts/enrich/save to persist
     return NextResponse.json({
       success: true,
       enrichedProfile: enrichedData,
-      rawApolloResponse: rawApolloResponse, // Include full raw response
+      rawApolloResponse: rawApolloResponse, // Include full raw response for preview
       redisKey: redisKey || null, // Redis key where data is stored
+      fullPreview: true, // Indicates this is a preview, not saved
     });
   } catch (error: any) {
     console.error('❌ Enrich route error:', error);

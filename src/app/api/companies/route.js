@@ -13,6 +13,7 @@ export async function GET(request) {
   try {
     const { searchParams } = request.nextUrl;
     const companyHQId = searchParams.get('companyHQId');
+    const query = searchParams.get('query');
 
     if (!companyHQId) {
       return NextResponse.json(
@@ -21,8 +22,16 @@ export async function GET(request) {
       );
     }
 
+    const where = { companyHQId };
+    if (query) {
+      where.companyName = {
+        contains: query,
+        mode: 'insensitive',
+      };
+    }
+
     const companies = await prisma.company.findMany({
-      where: { companyHQId },
+      where,
       include: {
         contacts: {
           select: {

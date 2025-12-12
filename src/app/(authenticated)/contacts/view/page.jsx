@@ -11,8 +11,10 @@ import {
   Plus,
   Trash2,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import api from '@/lib/api';
+import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
 
 export default function ContactsViewPage() {
   const router = useRouter();
@@ -21,10 +23,15 @@ export default function ContactsViewPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [pipelineFilter, setPipelineFilter] = useState('');
+  const [enrichmentFilter, setEnrichmentFilter] = useState(''); // 'enriched' | 'not-enriched' | ''
+  const [scoreFilter, setScoreFilter] = useState(''); // 'buyingPower' | 'readiness' | 'urgency' | 'momentum' | ''
+  const [scoreMin, setScoreMin] = useState(75); // Minimum score for filter
+  const [companyHealthFilter, setCompanyHealthFilter] = useState(''); // 'high' | 'medium' | 'low' | ''
   const [deletingId, setDeletingId] = useState(null);
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [enrichmentModalContactId, setEnrichmentModalContactId] = useState(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -244,6 +251,60 @@ export default function ContactsViewPage() {
     );
   };
 
+  const getIntelligenceBadges = (contact) => {
+    const badges = [];
+    
+    if (contact.buyingPowerScore !== null && contact.buyingPowerScore > 75) {
+      badges.push(
+        <span
+          key="buying-power"
+          className="rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-800"
+          title={`Buying Power: ${contact.buyingPowerScore}/100`}
+        >
+          High Buyer Power
+        </span>
+      );
+    }
+    
+    if (contact.readinessToBuyScore !== null && contact.readinessToBuyScore > 75) {
+      badges.push(
+        <span
+          key="readiness"
+          className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800"
+          title={`Readiness: ${contact.readinessToBuyScore}/100`}
+        >
+          High Readiness
+        </span>
+      );
+    }
+    
+    if (contact.urgencyScore !== null && contact.urgencyScore > 75) {
+      badges.push(
+        <span
+          key="urgency"
+          className="rounded-full bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-800"
+          title={`Urgency: ${contact.urgencyScore}/100`}
+        >
+          High Urgency
+        </span>
+      );
+    }
+    
+    if (contact.careerMomentumScore !== null && contact.careerMomentumScore > 75) {
+      badges.push(
+        <span
+          key="momentum"
+          className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800"
+          title={`Career Momentum: ${contact.careerMomentumScore}/100`}
+        >
+          Fast Career Momentum
+        </span>
+      );
+    }
+    
+    return badges;
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -318,15 +379,15 @@ export default function ContactsViewPage() {
           </div>
 
           <div className="mt-4 border-t border-gray-200 pt-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search contacts by name, email, or company…"
+                  placeholder="Search contacts…"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="relative">
@@ -334,13 +395,49 @@ export default function ContactsViewPage() {
                 <select
                   value={pipelineFilter}
                   onChange={(event) => setPipelineFilter(event.target.value)}
-                  className="w-full appearance-none rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  className="w-full appearance-none rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Pipelines</option>
                   <option value="prospect">Prospect</option>
                   <option value="client">Client</option>
                   <option value="collaborator">Collaborator</option>
                   <option value="institution">Institution</option>
+                </select>
+              </div>
+              <div className="relative">
+                <select
+                  value={enrichmentFilter}
+                  onChange={(event) => setEnrichmentFilter(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Contacts</option>
+                  <option value="enriched">Enriched</option>
+                  <option value="not-enriched">Not Enriched</option>
+                </select>
+              </div>
+              <div className="relative">
+                <select
+                  value={scoreFilter}
+                  onChange={(event) => setScoreFilter(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Scores</option>
+                  <option value="buyingPower">Buying Power &gt; {scoreMin}</option>
+                  <option value="readiness">Readiness &gt; {scoreMin}</option>
+                  <option value="urgency">Urgency &gt; {scoreMin}</option>
+                  <option value="momentum">Career Momentum &gt; {scoreMin}</option>
+                </select>
+              </div>
+              <div className="relative">
+                <select
+                  value={companyHealthFilter}
+                  onChange={(event) => setCompanyHealthFilter(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Company Health</option>
+                  <option value="high">High Health (75+)</option>
+                  <option value="medium">Medium Health (50-74)</option>
+                  <option value="low">Low Health (&lt;50)</option>
                 </select>
               </div>
             </div>
@@ -408,6 +505,9 @@ export default function ContactsViewPage() {
                       Company
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                      Intelligence
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
                       Pipeline
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
@@ -437,13 +537,18 @@ export default function ContactsViewPage() {
                         />
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        <span className="hover:text-blue-600 hover:underline">
-                          {contact.goesBy ||
-                            `${contact.firstName || ''} ${
-                              contact.lastName || ''
-                            }`.trim() ||
-                            'Unnamed Contact'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="hover:text-blue-600 hover:underline">
+                            {contact.goesBy ||
+                              `${contact.firstName || ''} ${
+                                contact.lastName || ''
+                              }`.trim() ||
+                              'Unnamed Contact'}
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {getIntelligenceBadges(contact)}
+                          </div>
+                        </div>
                         {contact.title && (
                           <div className="mt-1 text-xs text-gray-400">
                             {contact.title}
@@ -457,24 +562,86 @@ export default function ContactsViewPage() {
                         {contact.phone || 'N/A'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {contact.contactCompany?.companyName || 'N/A'}
+                        <div className="flex items-center gap-2">
+                          <span>
+                            {contact.company?.companyName || 
+                             contact.contactCompany?.companyName || 
+                             contact.companyName || 
+                             'N/A'}
+                          </span>
+                          {contact.company?.companyHealthScore !== null && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                contact.company.companyHealthScore >= 75
+                                  ? 'bg-green-100 text-green-800'
+                                  : contact.company.companyHealthScore >= 50
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                              title={`Company Health: ${contact.company.companyHealthScore}/100`}
+                            >
+                              {contact.company.companyHealthScore}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {contact.buyingPowerScore !== null && (
+                            <span
+                              className="rounded-full bg-purple-50 px-2 py-0.5 text-xs text-purple-700"
+                              title={`Buying Power: ${contact.buyingPowerScore}/100`}
+                            >
+                              BP: {contact.buyingPowerScore}
+                            </span>
+                          )}
+                          {contact.readinessToBuyScore !== null && (
+                            <span
+                              className="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700"
+                              title={`Readiness: ${contact.readinessToBuyScore}/100`}
+                            >
+                              R: {contact.readinessToBuyScore}
+                            </span>
+                          )}
+                          {contact.urgencyScore !== null && (
+                            <span
+                              className="rounded-full bg-orange-50 px-2 py-0.5 text-xs text-orange-700"
+                              title={`Urgency: ${contact.urgencyScore}/100`}
+                            >
+                              U: {contact.urgencyScore}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">{getPipelineBadge(contact.pipeline)}</td>
                       <td className="px-6 py-4">{getStageBadge(contact.pipeline)}</td>
                       <td className="px-6 py-4">
-                        <button
-                          type="button"
-                          onClick={(event) => handleDelete(contact.id, event)}
-                          disabled={deletingId === contact.id}
-                          className={`rounded-lg p-2 transition ${
-                            deletingId === contact.id
-                              ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                              : 'bg-red-50 text-red-600 hover:bg-red-100'
-                          }`}
-                          title="Delete contact"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setEnrichmentModalContactId(contact.id);
+                            }}
+                            className="rounded-lg p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                            title="Enrich contact"
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => handleDelete(contact.id, event)}
+                            disabled={deletingId === contact.id}
+                            className={`rounded-lg p-2 transition ${
+                              deletingId === contact.id
+                                ? 'cursor-not-allowed bg-gray-200 text-gray-400'
+                                : 'bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                            title="Delete contact"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -482,6 +649,19 @@ export default function ContactsViewPage() {
               </table>
             </div>
           </div>
+        )}
+
+        {/* Enrichment Modal */}
+        {enrichmentModalContactId && (
+          <EnrichmentModal
+            isOpen={!!enrichmentModalContactId}
+            onClose={() => setEnrichmentModalContactId(null)}
+            contactId={enrichmentModalContactId}
+            onEnrichmentSaved={() => {
+              refreshContactsFromAPI(true);
+              setEnrichmentModalContactId(null);
+            }}
+          />
         )}
       </div>
     </div>

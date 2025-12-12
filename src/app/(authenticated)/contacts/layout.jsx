@@ -1,40 +1,14 @@
 'use client';
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
-
-const ContactsContext = createContext({
-  contacts: [],
-  setContacts: () => {},
-  companyHQId: '',
-  hydrated: false,
-  hydrating: false,
-  refreshContacts: async () => {},
-  updateContact: (contactId, updates) => {},
-  addContact: (contact) => {},
-  removeContact: (contactId) => {},
-});
-
-export function useContacts() {
-  const context = useContext(ContactsContext);
-  if (!context) {
-    throw new Error('useContacts must be used within ContactsLayout');
-  }
-  return context;
-}
-
-// Alias for backward compatibility
-export function useContactsContext() {
-  return useContacts();
-}
+import { ContactsContext } from './ContactsContext';
 
 export default function ContactsLayout({ children }) {
   const { companyHQId } = useCompanyHQ(); // Get companyHQId from hook

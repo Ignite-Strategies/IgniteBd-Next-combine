@@ -13,7 +13,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOutreachContext } from './layout.jsx';
+import { useOutreachContext } from '@/hooks/useOutreach';
 import api from '@/lib/api';
 
 // Component that uses useSearchParams - needs to be separate for Suspense

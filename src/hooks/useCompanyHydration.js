@@ -9,6 +9,9 @@ import api from '@/lib/api';
  * Comprehensive hydration hook for companyHQ data.
  * Fetches and stores all company-related data in localStorage.
  * 
+ * TODO WEDNESDAY FIX #1: Company hydration cache is cleared during tenant switch
+ * localStorage key pattern: companyHydration_${companyHQId}
+ * 
  * @param {string} companyHQId - CompanyHQ ID to hydrate
  * @returns {Object} { data, loading, hydrated, error, refresh }
  */
@@ -23,6 +26,10 @@ export function useCompanyHydration(companyHQId) {
     phaseTemplates: [],
     deliverableTemplates: [],
     workPackages: [],
+    presentations: [],
+    blogs: [],
+    templates: [],
+    landingPages: [],
     stats: {
       personaCount: 0,
       contactCount: 0,
@@ -50,8 +57,32 @@ export function useCompanyHydration(companyHQId) {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.data) {
-          setData(parsed.data);
+          // Ensure presentations and other content types are included
+          const hydratedData = {
+            ...parsed.data,
+            presentations: parsed.data.presentations || [],
+            blogs: parsed.data.blogs || [],
+            templates: parsed.data.templates || [],
+            landingPages: parsed.data.landingPages || [],
+          };
+          setData(hydratedData);
           setHydrated(true);
+        }
+      } else {
+        // Fallback: Try to load presentations from the presentations-specific key
+        // This handles cases where presentations were saved separately
+        try {
+          const presentationsKey = `presentations_${companyHQId}`;
+          const cachedPresentations = localStorage.getItem(presentationsKey);
+          if (cachedPresentations) {
+            const presentations = JSON.parse(cachedPresentations);
+            setData((prev) => ({
+              ...prev,
+              presentations: Array.isArray(presentations) ? presentations : [],
+            }));
+          }
+        } catch (e) {
+          console.warn('Failed to load presentations from fallback key:', e);
         }
       }
     } catch (err) {
@@ -89,6 +120,10 @@ export function useCompanyHydration(companyHQId) {
         phaseTemplates: response.data.phaseTemplates || [],
         deliverableTemplates: response.data.deliverableTemplates || [],
         workPackages: response.data.workPackages || [],
+        presentations: response.data.presentations || [],
+        blogs: response.data.blogs || [],
+        templates: response.data.templates || [],
+        landingPages: response.data.landingPages || [],
         stats: response.data.stats || {
           personaCount: 0,
           contactCount: 0,
@@ -128,6 +163,12 @@ export function useCompanyHydration(companyHQId) {
       localStorage.setItem('proposals', JSON.stringify(hydratedData.proposals));
       localStorage.setItem('phaseTemplates', JSON.stringify(hydratedData.phaseTemplates));
       localStorage.setItem('deliverableTemplates', JSON.stringify(hydratedData.deliverableTemplates));
+      // Store presentations in both the hook key and the presentations-specific key
+      localStorage.setItem('presentations', JSON.stringify(hydratedData.presentations));
+      localStorage.setItem(`presentations_${companyHQId}`, JSON.stringify(hydratedData.presentations));
+      localStorage.setItem('blogs', JSON.stringify(hydratedData.blogs));
+      localStorage.setItem('templates', JSON.stringify(hydratedData.templates));
+      localStorage.setItem('landingPages', JSON.stringify(hydratedData.landingPages));
 
       setLoading(false);
     } catch (err) {
@@ -153,6 +194,10 @@ export function useCompanyHydration(companyHQId) {
     phaseTemplates: data.phaseTemplates,
     deliverableTemplates: data.deliverableTemplates,
     workPackages: data.workPackages,
+    presentations: data.presentations,
+    blogs: data.blogs,
+    templates: data.templates,
+    landingPages: data.landingPages,
     stats: data.stats,
   };
 }

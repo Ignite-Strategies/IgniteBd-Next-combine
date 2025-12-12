@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Plus, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOutreachContext } from '../layout.jsx';
+import { useOutreachContext } from '@/hooks/useOutreach';
 
 export default function CampaignsPage() {
   const router = useRouter();

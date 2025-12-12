@@ -19,6 +19,10 @@ import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/fireba
  * - proposals: Array of proposals (or empty array)
  * - phaseTemplates: Array of phase templates (or empty array)
  * - deliverableTemplates: Array of deliverable templates (or empty array)
+ * - presentations: Array of presentations (or empty array)
+ * - blogs: Array of blogs (or empty array)
+ * - templates: Array of content templates (or empty array)
+ * - landingPages: Array of landing pages (or empty array)
  * - stats: Counts and metrics
  */
 export async function GET(request) {
@@ -39,7 +43,7 @@ export async function GET(request) {
     console.log(`🚀 COMPANY HYDRATE: Fetching all data for companyHQId: ${companyHQId}`);
 
     // Fetch all data in parallel
-    const [companyHQ, personas, contacts, products, pipelines, proposals, phaseTemplates, deliverableTemplates, workPackages] = await Promise.all([
+    const [companyHQ, personas, contacts, products, pipelines, proposals, phaseTemplates, deliverableTemplates, workPackages, presentations, blogs, templates, landingPages] = await Promise.all([
       // CompanyHQ
       prisma.companyHQ.findUnique({
         where: { id: companyHQId },
@@ -172,6 +176,59 @@ export async function GET(request) {
         },
         orderBy: { createdAt: 'desc' },
       }).catch(() => []), // Return empty array on error
+
+      // Presentations (content)
+      // Ensure slides field is properly structured for outline hydration
+      prisma.presentation.findMany({
+        where: { companyHQId },
+        orderBy: { createdAt: 'desc' },
+      }).then((presentations) => {
+        // Normalize slides structure to ensure outlines are properly hydrated
+        return presentations.map((p) => {
+          // Ensure slides has the correct structure with sections array
+          if (p.slides) {
+            // If slides is a string, try to parse it
+            if (typeof p.slides === 'string') {
+              try {
+                p.slides = JSON.parse(p.slides);
+              } catch (e) {
+                console.warn(`Failed to parse slides JSON for presentation ${p.id}:`, e);
+                p.slides = { sections: [] };
+              }
+            }
+            // Ensure slides has sections array
+            if (typeof p.slides === 'object' && p.slides !== null) {
+              if (!p.slides.sections || !Array.isArray(p.slides.sections)) {
+                p.slides.sections = [];
+              }
+            } else {
+              p.slides = { sections: [] };
+            }
+          } else {
+            // If slides is null/undefined, initialize with empty structure
+            p.slides = { sections: [] };
+          }
+          return p;
+        });
+      }).catch(() => []), // Return empty array on error
+
+      // Blogs (content)
+      prisma.blog.findMany({
+        where: { companyHQId },
+        orderBy: { createdAt: 'desc' },
+      }).catch(() => []), // Return empty array on error
+
+      // Templates (content)
+      prisma.template.findMany({
+        where: { companyHQId },
+        orderBy: { createdAt: 'desc' },
+      }).catch(() => []), // Return empty array on error
+
+      // Landing Pages (content)
+      prisma.landingPage.findMany({
+        where: { companyHQId },
+        orderBy: { createdAt: 'desc' },
+      }).catch(() => []), // Return empty array on error
     ]);
 
     if (!companyHQ) {
@@ -207,6 +264,10 @@ export async function GET(request) {
       phaseTemplates: phaseTemplates || [],
       deliverableTemplates: deliverableTemplates || [],
       workPackages: workPackages || [],
+      presentations: presentations || [],
+      blogs: blogs || [],
+      templates: templates || [],
+      landingPages: landingPages || [],
       stats,
       timestamp: new Date().toISOString(),
     };

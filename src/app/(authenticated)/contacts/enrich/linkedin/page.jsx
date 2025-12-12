@@ -1,26 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
-import { Search, RefreshCw, Sparkles, Linkedin, User, X } from 'lucide-react';
+import { Search, RefreshCw, Linkedin, X, Sparkles, Save, CheckCircle, User, ArrowRight } from 'lucide-react';
+import IntelligencePreview from '@/components/enrichment/IntelligencePreview';
 
-export default function LinkedInEnrich() {
+function LinkedInEnrichContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams?.get('returnTo');
+  
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
-  const [enriching, setEnriching] = useState(false);
-  const [enriched, setEnriched] = useState(null);
-  const [rawApolloResponse, setRawApolloResponse] = useState(null);
+  const [generatingIntel, setGeneratingIntel] = useState(false);
+  const [intelligenceData, setIntelligenceData] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
-  const [redisKey, setRedisKey] = useState(null);
+  const [rawJson, setRawJson] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [savedContactId, setSavedContactId] = useState(null);
 
   async function handlePreview() {
     setLoading(true);
     setPreview(null);
-    setEnriched(null);
-    setRawApolloResponse(null);
-    setShowRawJson(false);
-    setRedisKey(null);
+    setIntelligenceData(null); // Clear intelligence when new preview
 
     try {
       const r = await api.post('/api/enrich/preview', { linkedinUrl: url });
@@ -32,37 +37,123 @@ export default function LinkedInEnrich() {
     }
   }
 
-  async function handleEnrich() {
-    setEnriching(true);
-    setEnriched(null);
-    setRawApolloResponse(null);
-    setShowRawJson(false);
-    setRedisKey(null);
+  async function handleGenerateIntelligence() {
+    if (!preview) {
+      alert('Please preview the contact first');
+      return;
+    }
+
+    setGeneratingIntel(true);
 
     try {
-      const r = await api.post('/api/enrich/enrich', { linkedinUrl: url });
-      setEnriched(r.data.enrichedProfile || null);
-      setRawApolloResponse(r.data.rawApolloResponse || null);
-      setRedisKey(r.data.redisKey || null);
+      const response = await api.post('/api/contacts/enrich/generate-intel', {
+        linkedinUrl: url,
+      });
+
+      if (response.data?.success) {
+        // Store intelligence data in component state (not Redis previewId)
+        setIntelligenceData({
+          normalizedContact: response.data.normalizedContact,
+          normalizedCompany: response.data.normalizedCompany,
+          intelligenceScores: response.data.intelligenceScores,
+          companyIntelligence: response.data.companyIntelligence,
+          redisKey: response.data.redisKey,
+          previewId: response.data.previewId,
+          profileSummary: response.data.profileSummary,
+          tenureYears: response.data.tenureYears,
+          currentTenureYears: response.data.currentTenureYears,
+          totalExperienceYears: response.data.totalExperienceYears,
+          avgTenureYears: response.data.avgTenureYears,
+          careerTimeline: response.data.careerTimeline,
+          companyPositioning: response.data.companyPositioning,
+          linkedinUrl: url,
+        });
+      } else {
+        alert(response.data?.error || 'Failed to generate intelligence');
+      }
     } catch (err) {
-      alert(err.response?.data?.details || err.message || 'Enrichment failed');
+      console.error('Error generating intelligence:', err);
+      alert(err.response?.data?.error || err.message || 'Failed to generate intelligence');
     } finally {
-      setEnriching(false);
+      setGeneratingIntel(false);
     }
   }
 
+  async function handleSave() {
+    if (!intelligenceData) {
+      alert('No intelligence data available');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const companyHQId = typeof window !== 'undefined' 
+        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
+        : null;
+      if (!companyHQId) {
+        alert('Company context required. Please set your company first.');
+        setSaving(false);
+        return;
+      }
+
+      // Step 1: Create contact in CRM
+      const contactResponse = await api.post('/api/contacts', {
+        crmId: companyHQId,
+        firstName: intelligenceData.normalizedContact.firstName,
+        lastName: intelligenceData.normalizedContact.lastName,
+        email: intelligenceData.normalizedContact.email,
+        phone: intelligenceData.normalizedContact.phone,
+        title: intelligenceData.normalizedContact.title,
+      });
+
+      if (!contactResponse.data?.contact) {
+        throw new Error('Failed to create contact');
+      }
+
+      const contactId = contactResponse.data.contact.id;
+
+      // Step 2: Save enrichment data with intelligence scores + inferences
+      await api.post('/api/contacts/enrich/save', {
+        contactId,
+        redisKey: intelligenceData.redisKey,
+        previewId: intelligenceData.previewId, // Pass previewId to get inference fields
+      });
+
+      // Step 3: Show success modal with next steps
+      setSaving(false);
+      setShowSuccessModal(true);
+      setSavedContactId(contactId);
+    } catch (err) {
+      console.error('Error saving contact:', err);
+      alert(err.response?.data?.error || err.message || 'Failed to save contact');
+      setSaving(false);
+    }
+  }
+
+  const handleViewRawJSON = async () => {
+    if (!intelligenceData?.redisKey) return;
+    
+    try {
+      const response = await fetch(`/api/contacts/enrich/raw?redisKey=${encodeURIComponent(intelligenceData.redisKey)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setRawJson(data.rawEnrichmentPayload);
+        setShowRawJson(true);
+      } else {
+        console.error('Failed to fetch raw JSON');
+      }
+    } catch (error) {
+      console.error('Failed to fetch raw JSON:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-10">
-      <div className="mx-auto max-w-2xl px-6">
+      <div className="mx-auto max-w-4xl px-6">
         <h1 className="text-3xl font-bold mb-6">🔍 LinkedIn Lookup & Enrich</h1>
 
-        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-          <p className="text-xs text-blue-700">
-            ⚠️ <strong>External lookup only</strong> - No CRM lookups, no contact creation. Data stored in Redis.
-          </p>
-        </div>
-
-        {/* URL Input */}
+        {/* URL Input - Always visible */}
         <div className="flex gap-3 mb-6">
           <input
             type="url"
@@ -75,10 +166,11 @@ export default function LinkedInEnrich() {
                 handlePreview();
               }
             }}
+            disabled={loading || generatingIntel || saving}
           />
           <button
             onClick={handlePreview}
-            disabled={loading || !url}
+            disabled={loading || !url || generatingIntel || saving}
             className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? <RefreshCw className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
@@ -86,103 +178,241 @@ export default function LinkedInEnrich() {
           </button>
         </div>
 
-        {/* Preview Card */}
-        {preview && (
+        {/* Preview Card - Step 1: Preview Only */}
+        {preview && !intelligenceData && (
           <div className="bg-white p-5 rounded-lg shadow border mb-6">
-            <div className="flex justify-between">
+            <div className="flex justify-between mb-4">
               <h2 className="font-semibold text-lg">Preview Found</h2>
-              <button onClick={() => setPreview(null)}>
+              <button onClick={() => {
+                setPreview(null);
+                setIntelligenceData(null);
+              }}>
                 <X className="h-5 w-5 text-gray-400" />
               </button>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 space-y-2">
               {preview.firstName || preview.lastName ? (
-                <p className="font-semibold text-gray-900">
+                <p className="font-semibold text-gray-900 text-lg">
                   {preview.firstName} {preview.lastName}
                 </p>
               ) : null}
 
-              {preview.title && <p className="text-gray-700 text-sm">{preview.title}</p>}
+              {preview.title && (
+                <p className="text-gray-700 text-sm">
+                  <span className="font-medium">Title:</span> {preview.title}
+                </p>
+              )}
+              
               {preview.companyName && (
-                <p className="text-gray-700 text-sm">Company: {preview.companyName}</p>
+                <p className="text-gray-700 text-sm">
+                  <span className="font-medium">Company:</span> {preview.companyName}
+                </p>
+              )}
+
+              {preview.email && (
+                <p className="text-gray-700 text-sm">
+                  <span className="font-medium">Email:</span> {preview.email}
+                </p>
               )}
 
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 text-sm underline flex items-center gap-1 mt-2"
+                className="text-blue-600 text-sm underline flex items-center gap-1 mt-3"
               >
-                <Linkedin className="h-4 w-4" /> View LinkedIn
+                <Linkedin className="h-4 w-4" /> View LinkedIn Profile
               </a>
             </div>
 
-            {/* Enrich Button */}
+            {/* Generate Intelligence Button */}
             <button
-              onClick={handleEnrich}
-              disabled={enriching}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleGenerateIntelligence}
+              disabled={generatingIntel}
+              className="mt-6 w-full bg-indigo-600 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-indigo-700 transition"
             >
-              {enriching ? <RefreshCw className="animate-spin h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-              Enrich
+              {generatingIntel ? (
+                <>
+                  <RefreshCw className="animate-spin h-5 w-5" />
+                  Generating Intelligence...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-5 w-5" />
+                  Generate Intelligence
+                </>
+              )}
             </button>
+
+            <p className="mt-2 text-xs text-gray-500 text-center">
+              This will compute all intelligence scores and show you the full profile
+            </p>
           </div>
         )}
 
-        {/* Enriched Card */}
-        {enriched && (
-          <div className="bg-green-50 border border-green-200 p-5 rounded-lg shadow mb-6">
-            <h2 className="font-semibold text-lg text-green-700 mb-2">✅ Enrichment Complete</h2>
-            
-            {redisKey && (
-              <div className="mb-3 text-xs text-green-600">
-                Redis key: <code className="bg-green-100 px-1 py-0.5 rounded">{redisKey}</code>
-              </div>
-            )}
+        {/* Intelligence Preview - Step 2: Inline Intelligence */}
+        {intelligenceData && intelligenceData.normalizedContact && intelligenceData.intelligenceScores && (
+          <div className="space-y-6 mb-6">
+            {/* Intelligence Preview Component */}
+            <IntelligencePreview
+              normalizedContact={intelligenceData.normalizedContact}
+              normalizedCompany={intelligenceData.normalizedCompany}
+              intelligenceScores={intelligenceData.intelligenceScores}
+              companyIntelligence={intelligenceData.companyIntelligence}
+              linkedinUrl={intelligenceData.linkedinUrl}
+              onViewRawJSON={handleViewRawJSON}
+              profileSummary={intelligenceData.profileSummary}
+              tenureYears={intelligenceData.tenureYears}
+              currentTenureYears={intelligenceData.currentTenureYears}
+              totalExperienceYears={intelligenceData.totalExperienceYears}
+              avgTenureYears={intelligenceData.avgTenureYears}
+              careerTimeline={intelligenceData.careerTimeline}
+              companyPositioning={intelligenceData.companyPositioning}
+            />
 
-            <div className="mb-3">
-              {enriched.firstName || enriched.lastName ? (
-                <p className="font-semibold text-gray-900">
-                  {enriched.firstName} {enriched.lastName}
-                </p>
-              ) : null}
-              {enriched.email && <p className="text-sm text-gray-700">Email: {enriched.email}</p>}
-              {enriched.title && <p className="text-sm text-gray-700">Title: {enriched.title}</p>}
-              {enriched.companyName && <p className="text-sm text-gray-700">Company: {enriched.companyName}</p>}
-              {enriched.phone && <p className="text-sm text-gray-700">Phone: {enriched.phone}</p>}
-            </div>
-
-            {/* Raw Apollo JSON */}
-            {rawApolloResponse && (
-              <div className="mt-4">
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between gap-4 bg-white rounded-lg p-4 shadow">
+              <button
+                onClick={handleViewRawJSON}
+                className="text-sm text-gray-600 hover:text-gray-800 font-medium"
+              >
+                {showRawJson ? '▼ Hide' : '▶ Show'} Full Apollo JSON
+              </button>
+              
+              <div className="flex gap-3">
                 <button
-                  onClick={() => setShowRawJson(!showRawJson)}
-                  className="text-xs text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                  onClick={() => {
+                    setPreview(null);
+                    setIntelligenceData(null);
+                    setUrl('');
+                  }}
+                  className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  disabled={saving}
                 >
-                  {showRawJson ? '▼ Hide' : '▶ Show'} Full Apollo JSON
+                  Start Over
                 </button>
-                {showRawJson && (
-                  <pre className="mt-2 text-xs bg-gray-900 text-green-300 p-4 rounded max-h-[400px] overflow-y-auto">
-                    {JSON.stringify(rawApolloResponse, null, 2)}
-                  </pre>
-                )}
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save to CRM
+                    </>
+                  )}
+                </button>
               </div>
-            )}
+            </div>
+          </div>
+        )}
 
-            <button
-              onClick={() => {
-                setEnriched(null);
-                setPreview(null);
-                setRawApolloResponse(null);
-                setShowRawJson(false);
-                setRedisKey(null);
-                setUrl('');
-              }}
-              className="mt-4 bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm"
-            >
-              Clear & Search Again
-            </button>
+        {/* Raw JSON Modal */}
+        {showRawJson && rawJson && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <h2 className="text-xl font-bold text-gray-900">Raw Apollo JSON</h2>
+                <button
+                  onClick={() => {
+                    setShowRawJson(false);
+                    setRawJson(null);
+                  }}
+                  className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
+                <pre className="text-xs bg-gray-50 p-4 rounded-lg overflow-x-auto">
+                  {JSON.stringify(rawJson, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success Modal */}
+        {showSuccessModal && savedContactId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-xl">
+              <div className="p-6">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="rounded-full bg-green-100 p-3">
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+                  Contact Enriched Successfully!
+                </h2>
+                <p className="text-gray-600 text-center mb-6">
+                  All intelligence scores and profile data have been saved. What would you like to do next?
+                </p>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      router.push(`/contacts/${savedContactId}`);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">View Contact</div>
+                        <div className="text-sm text-gray-600">See full contact details and intelligence</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-blue-600" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      router.push(`/personas/builder?contactId=${savedContactId}`);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Sparkles className="h-5 w-5 text-purple-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">Start Persona Flow</div>
+                        <div className="text-sm text-gray-600">Create a persona from this enriched contact</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-purple-600" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      setPreview(null);
+                      setIntelligenceData(null);
+                      setUrl('');
+                      setSavedContactId(null);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border border-gray-300 bg-white px-6 py-4 text-left transition hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Search className="h-5 w-5 text-gray-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">Enrich Another Contact</div>
+                        <div className="text-sm text-gray-600">Start a new enrichment</div>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-600" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -190,3 +420,19 @@ export default function LinkedInEnrich() {
   );
 }
 
+export default function LinkedInEnrich() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-10">
+        <div className="mx-auto max-w-4xl px-6">
+          <div className="text-center py-8">
+            <RefreshCw className="animate-spin h-6 w-6 mx-auto mb-2 text-gray-400" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <LinkedInEnrichContent />
+    </Suspense>
+  );
+}

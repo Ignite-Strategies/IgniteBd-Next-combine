@@ -281,10 +281,20 @@ export default function BillingPage() {
           {/* Create Invoice Tab */}
           {activeTab === 'create' && (
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <p className="text-gray-600">Create Invoice form will be implemented here...</p>
-              <p className="text-sm text-gray-500 mt-2">
-                This will include: client selection, invoice details, and milestone builder.
-              </p>
+              <div className="text-center py-8">
+                <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Create New Invoice</h3>
+                <p className="text-gray-600 mb-6">
+                  Create an invoice with payment milestones for a work package.
+                </p>
+                <a
+                  href="/billing/invoices/create"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Invoice
+                </a>
+              </div>
             </div>
           )}
 

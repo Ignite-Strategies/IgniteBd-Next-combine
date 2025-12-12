@@ -1,40 +1,29 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
+import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
 
 const DEFAULT_VALUES = {
   personaName: '',
   role: '',
+  description: '',
   painPoints: '',
   goals: '',
   whatTheyWant: '',
   companyId: '',
 };
 
-// Prefilled template for "Solo Biz Owner" persona
-const SOLO_BIZ_OWNER_TEMPLATE = {
-  personaName: 'Solo Biz Owner',
-  role: 'Sole Proprietor',
-  painPoints: `- Wears all hats (operations, sales, marketing, delivery)
-- No time for business development
-- Can't scale because they're doing everything
-- Revenue plateaus because they're maxed out on delivery
-- Knows they need help but doesn't know where to start
-- Struggles to find time for strategic planning`,
-  goals: `- Grow revenue without working more hours
-- Systematize operations to free up time
-- Build a sustainable business that doesn't depend solely on them
-- Create systems that can run without constant oversight
-- Scale to the next level (hire first employee or contractor)`,
-  whatTheyWant: `A business development system that works while they focus on delivery. They need someone to handle outreach, relationship building, and pipeline management so they can focus on what they do best - delivering value to clients. They want predictable revenue growth without having to become a sales expert themselves.`,
-};
-
-export default function PersonaBuilderPage({ searchParams }) {
+function PersonaBuilderContent({ searchParams }) {
   const router = useRouter();
-  const personaId = searchParams?.personaId || null;
+  const urlSearchParams = useSearchParams();
+  const personaId = searchParams?.personaId || urlSearchParams?.get('personaId') || null;
+  const mode = searchParams?.mode || urlSearchParams?.get('mode') || null;
+  const enrichedKey = searchParams?.enrichedKey || urlSearchParams?.get('enrichedKey') || null;
+  const contactId = searchParams?.contactId || urlSearchParams?.get('contactId') || null;
 
   const [isHydrating, setIsHydrating] = useState(Boolean(personaId));
   const [fetchError, setFetchError] = useState(null);
@@ -42,6 +31,12 @@ export default function PersonaBuilderPage({ searchParams }) {
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimerRef = useRef(null);
   const [hasInitialized, setHasInitialized] = useState(false);
+  
+  // AI generation state
+  const [showAIGeneration, setShowAIGeneration] = useState(mode === 'ai');
+  const [aiDescription, setAiDescription] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const derivedCompanyId = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -73,20 +68,123 @@ export default function PersonaBuilderPage({ searchParams }) {
     }
   }, []);
 
-  // Pre-fill form with test data when creating a new persona (not editing)
+  // Initialize companyId and handle prefill/enrichedKey/contactId
   useEffect(() => {
-    if (!personaId && derivedCompanyId && !hasInitialized) {
-      // Pre-fill with test template for testing upsert logic
-      reset({
-        ...SOLO_BIZ_OWNER_TEMPLATE,
-        companyId: derivedCompanyId,
-      });
-      setHasInitialized(true);
-    } else if (derivedCompanyId && !hasInitialized) {
-      setValue('companyId', derivedCompanyId);
-      setHasInitialized(true);
+    if (!hasInitialized && !personaId) {
+      // Handle contactId from enrichment flow
+      if (contactId && derivedCompanyId) {
+        setIsHydrating(true);
+        (async () => {
+          try {
+            const contactResponse = await api.get(`/api/contacts/${contactId}`);
+            if (contactResponse.data?.success && contactResponse.data?.contact) {
+              const contact = contactResponse.data.contact;
+              
+              // Build description with profile summary and LinkedIn URL if available
+              let description = contact.profileSummary || '';
+              if (contact.linkedinUrl) {
+                if (description) {
+                  description += `\n\nLinkedIn: ${contact.linkedinUrl}`;
+                } else {
+                  description = `LinkedIn: ${contact.linkedinUrl}`;
+                }
+              }
+              
+              reset({
+                personaName: contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'New Persona',
+                role: contact.title || '',
+                description: description,
+                painPoints: Array.isArray(contact.painPoints) ? contact.painPoints.join('\n') : (contact.painPoints || ''),
+                goals: Array.isArray(contact.goals) ? contact.goals.join('\n') : (contact.goals || ''),
+                whatTheyWant: contact.notes || '',
+                companyId: derivedCompanyId,
+              });
+              handleShowToast('Persona pre-filled from enriched contact!');
+            }
+          } catch (err) {
+            console.error('Failed to load contact for persona:', err);
+            setFetchError('Failed to load contact data');
+          } finally {
+            setIsHydrating(false);
+            setHasInitialized(true);
+          }
+        })();
+        return;
+      }
+
+      // Handle enrichedKey from enrichment flow
+      if (enrichedKey && derivedCompanyId) {
+        setIsHydrating(true);
+        (async () => {
+          try {
+            const response = await api.post('/api/personas/generate', {
+              redisKey: enrichedKey,
+              companyHQId: derivedCompanyId,
+            });
+            
+            if (response.data?.success && response.data?.persona) {
+              const personaData = response.data.persona;
+              reset({
+                personaName: personaData.personName || '',
+                role: personaData.title || '',
+                painPoints: Array.isArray(personaData.painPoints) 
+                  ? personaData.painPoints.join('\n')
+                  : (personaData.painPoints || ''),
+                goals: Array.isArray(personaData.goals)
+                  ? personaData.goals.join('\n')
+                  : (personaData.goals || ''),
+                whatTheyWant: personaData.whatTheyWant || '',
+                companyId: derivedCompanyId,
+              });
+              handleShowToast('Persona generated from enrichment!');
+            }
+          } catch (err) {
+            console.error('Failed to generate persona from enrichment:', err);
+            setFetchError('Failed to generate persona from enriched data');
+          } finally {
+            setIsHydrating(false);
+            setHasInitialized(true);
+          }
+        })();
+        return;
+      }
+
+      // Check for prefill data from AI generation
+      if (typeof window !== 'undefined') {
+        const prefill = sessionStorage.getItem('personaPrefill');
+        if (prefill) {
+          try {
+            const personaData = JSON.parse(prefill);
+            // Map AI-generated persona to form fields
+            reset({
+              personaName: personaData.personName || personaData.name || '',
+              role: personaData.title || personaData.role || '',
+              description: personaData.description || '',
+              painPoints: Array.isArray(personaData.painPoints) 
+                ? personaData.painPoints.join('\n')
+                : (personaData.painPoints || ''),
+              goals: Array.isArray(personaData.goals)
+                ? personaData.goals.join('\n')
+                : (personaData.goals || ''),
+              whatTheyWant: personaData.whatTheyWant || personaData.valueProp || '',
+              companyId: derivedCompanyId || '',
+            });
+            sessionStorage.removeItem('personaPrefill');
+            setHasInitialized(true);
+            return;
+          } catch (err) {
+            console.warn('Failed to parse prefill data:', err);
+          }
+        }
+      }
+      
+      // No prefill - just set companyId
+      if (derivedCompanyId) {
+        setValue('companyId', derivedCompanyId);
+        setHasInitialized(true);
+      }
     }
-  }, [derivedCompanyId, personaId, setValue, reset, hasInitialized]);
+  }, [derivedCompanyId, personaId, enrichedKey, setValue, reset, hasInitialized]);
 
   useEffect(() => {
     if (!personaId) {
@@ -112,10 +210,11 @@ export default function PersonaBuilderPage({ searchParams }) {
 
         reset({
           personaName: persona.name ?? '',
-          role: persona.role ?? '',
+          role: persona.role ?? persona.title ?? '',
+          description: persona.description ?? '',
           painPoints: persona.painPoints ?? '',
           goals: persona.goals ?? '',
-          whatTheyWant: persona.valuePropToPersona ?? '',
+          whatTheyWant: persona.valuePropToPersona ?? persona.whatTheyWant ?? '',
           companyId: persona.companyHQId ?? derivedCompanyId ?? '',
         });
         setHasInitialized(true);
@@ -146,6 +245,55 @@ export default function PersonaBuilderPage({ searchParams }) {
     }, 1200);
   };
 
+  const handleAIGenerate = async () => {
+    if (!aiDescription.trim()) {
+      setAiError('Please enter a description');
+      return;
+    }
+
+    if (!derivedCompanyId) {
+      setAiError('Company context is required');
+      return;
+    }
+
+    setAiGenerating(true);
+    setAiError(null);
+
+    try {
+      const response = await api.post('/api/personas/generate-from-description', {
+        description: aiDescription.trim(),
+        companyHQId: derivedCompanyId,
+      });
+
+      if (response.data?.success && response.data?.persona) {
+        const personaData = response.data.persona;
+        // Pre-fill form with generated data
+        reset({
+          personaName: personaData.personName || personaData.name || '',
+          role: personaData.title || personaData.role || '',
+          description: personaData.description || '',
+          painPoints: Array.isArray(personaData.painPoints) 
+            ? personaData.painPoints.join('\n')
+            : (personaData.painPoints || ''),
+          goals: Array.isArray(personaData.goals)
+            ? personaData.goals.join('\n')
+            : (personaData.goals || ''),
+          whatTheyWant: personaData.whatTheyWant || personaData.valueProp || '',
+          companyId: derivedCompanyId || '',
+        });
+        setShowAIGeneration(false);
+        handleShowToast('Persona generated! Review and edit as needed.');
+      } else {
+        throw new Error(response.data?.error || 'Failed to generate persona');
+      }
+    } catch (err) {
+      console.error('Failed to generate persona:', err);
+      setAiError(err.response?.data?.error || err.message || 'Failed to generate persona. Please try again.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
 
@@ -158,10 +306,11 @@ export default function PersonaBuilderPage({ searchParams }) {
       const response = await api.post('/api/personas', {
         id: personaId,
         name: values.personaName,
-        role: values.role,
+        title: values.role,
+        description: values.description,
         painPoints: values.painPoints,
         goals: values.goals,
-        valuePropToPersona: values.whatTheyWant,
+        whatTheyWant: values.whatTheyWant,
         companyHQId: values.companyId,
       });
 
@@ -208,13 +357,28 @@ export default function PersonaBuilderPage({ searchParams }) {
 
       <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {personaId ? 'Edit Persona' : 'Create Persona'}
-          </h1>
-          <p className="text-sm text-gray-600">
-            Keep the details aligned with your activation strategy and
-            messaging.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {personaId ? 'Edit Persona' : 'Create Persona'}
+              </h1>
+              <p className="text-sm text-gray-600">
+                Keep the details aligned with your activation strategy and
+                messaging.
+              </p>
+            </div>
+            {!personaId && (
+              <button
+                type="button"
+                onClick={() => router.push('/contacts/enrich?returnTo=persona')}
+                disabled={isBusy}
+                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="h-4 w-4" />
+                Build from Enrichment
+              </button>
+            )}
+          </div>
         </div>
 
         {fetchError && (
@@ -229,25 +393,75 @@ export default function PersonaBuilderPage({ searchParams }) {
           </div>
         )}
 
-        {/* Template Helper - Only show when creating new persona */}
-        {!personaId && (
-          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <p className="mb-3 text-sm text-gray-600">
-              Form is pre-filled with test data. Edit as needed to test upsert logic.
+        {/* AI Generation Mode */}
+        {showAIGeneration && !personaId && (
+          <div className="mb-6 rounded-xl border-2 border-purple-200 bg-purple-50 p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h2 className="text-lg font-bold text-gray-900">Generate with AI</h2>
+            </div>
+            <p className="mb-4 text-sm text-gray-600">
+              Describe your ideal customer and AI will generate a detailed persona for you.
             </p>
+            
+            {aiError && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4" />
+                {aiError}
+              </div>
+            )}
+
+            <textarea
+              value={aiDescription}
+              onChange={(e) => setAiDescription(e.target.value)}
+              placeholder="e.g., A solo business owner who's maxed out on delivery time and needs help growing revenue without working more hours. They struggle with sales and marketing while trying to focus on client work..."
+              rows={6}
+              className="mb-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+              disabled={aiGenerating}
+            />
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleAIGenerate}
+                disabled={aiGenerating || !aiDescription.trim() || !derivedCompanyId}
+                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {aiGenerating ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Generate Persona
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAIGeneration(false)}
+                disabled={aiGenerating}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Toggle AI Mode Button (when not in AI mode and not editing) */}
+        {!showAIGeneration && !personaId && (
+          <div className="mb-6">
             <button
               type="button"
-              onClick={() => {
-                reset({
-                  ...SOLO_BIZ_OWNER_TEMPLATE,
-                  companyId: derivedCompanyId,
-                });
-                handleShowToast('Template reloaded!');
-              }}
+              onClick={() => setShowAIGeneration(true)}
               disabled={isBusy}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:opacity-60"
+              className="flex items-center gap-2 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-700 transition hover:bg-purple-100 disabled:opacity-60"
             >
-              Reload Template
+              <Sparkles className="h-4 w-4" />
+              Generate with AI Instead
             </button>
           </div>
         )}
@@ -292,6 +506,19 @@ export default function PersonaBuilderPage({ searchParams }) {
                 {...register('role')}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Description
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Brief description of this persona (who they are, their context)"
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
+              disabled={isBusy}
+              {...register('description')}
+            />
           </div>
 
           <div>
@@ -353,6 +580,21 @@ export default function PersonaBuilderPage({ searchParams }) {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function PersonaBuilderPage({ searchParams }) {
+  return (
+    <Suspense fallback={
+      <div className="relative mx-auto max-w-3xl space-y-6 p-6">
+        <div className="text-center py-8">
+          <RefreshCw className="animate-spin h-6 w-6 mx-auto mb-2 text-gray-400" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <PersonaBuilderContent searchParams={searchParams} />
+    </Suspense>
   );
 }
 

@@ -11,7 +11,7 @@
 'use client';
 
 import axios from 'axios';
-import { getAuth } from 'firebase/auth';
+import { auth } from './firebase';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || '',
@@ -34,22 +34,25 @@ if (typeof window !== 'undefined') {
     }
 
     try {
-      const firebaseAuth = getAuth();
-      const user = firebaseAuth.currentUser;
+      const user = auth.currentUser;
 
       if (user) {
         try {
+          console.log('🔥 Axios: Interceptor fired for', config.url);
           const token = await user.getIdToken();
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('🔥 Axios Token:', token ? `${token.substring(0, 20)}...` : 'null');
         } catch (error) {
-          console.error('Failed to fetch Firebase token:', error);
+          console.error('❌ Failed to fetch Firebase token:', error);
         }
+      } else {
+        console.warn('⚠️ Axios: No Firebase user found for', config.url);
       }
     } catch (error) {
       // Firebase not initialized yet - skip token for now
       // This can happen on initial page load before Firebase is ready
       if (error.code !== 'app/no-app') {
-        console.warn('Firebase auth not available:', error.message);
+        console.warn('⚠️ Firebase auth not available:', error.message);
       }
     }
 

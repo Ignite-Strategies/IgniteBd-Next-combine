@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useProposals } from './layout';
-import { useContacts } from '@/app/(authenticated)/contacts/layout';
+import { useProposals } from '@/hooks/useProposals';
+import { useContacts } from '@/hooks/useContacts';
 
 export default function ClientOperationsProposalsPage() {
   const router = useRouter();

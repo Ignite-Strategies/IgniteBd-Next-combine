@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { enrichPerson, normalizeApolloResponse, type NormalizedContactData } from '@/lib/apollo';
+import { storeEnrichedContactByContactId } from '@/lib/redis';
 
 /**
  * POST /api/contacts/enrich
@@ -71,10 +72,13 @@ export async function POST(request: Request) {
     }
 
     // Enrich contact using Apollo ENRICHMENT (/people/enrich - deep lookup)
+    let rawApolloResponse: any;
     let enrichedData: NormalizedContactData;
     try {
       const apolloResponse = await enrichPerson({ email, linkedinUrl });
+      rawApolloResponse = apolloResponse;
       enrichedData = normalizeApolloResponse(apolloResponse);
+      console.log('✅ Enrichment successful');
     } catch (error: any) {
       console.error('❌ Apollo enrichment error:', error);
       return NextResponse.json(
@@ -87,62 +91,25 @@ export async function POST(request: Request) {
       );
     }
 
-    // Merge only defined Apollo fields into Contact
-    // Only update fields that have values (don't overwrite with undefined)
-    const updateData: any = {
-      enrichmentSource: 'Apollo',
-      enrichmentFetchedAt: new Date(),
-      enrichmentPayload: enrichedData,
-    };
-
-    // Only set fields that are defined in enrichedData
-    if (enrichedData.fullName !== undefined) updateData.fullName = enrichedData.fullName;
-    if (enrichedData.firstName !== undefined) updateData.firstName = enrichedData.firstName;
-    if (enrichedData.lastName !== undefined) updateData.lastName = enrichedData.lastName;
-    if (enrichedData.title !== undefined) updateData.title = enrichedData.title;
-    if (enrichedData.seniority !== undefined) updateData.seniority = enrichedData.seniority;
-    if (enrichedData.department !== undefined) updateData.department = enrichedData.department;
-    if (enrichedData.linkedinUrl !== undefined) updateData.linkedinUrl = enrichedData.linkedinUrl;
-    if (enrichedData.phone !== undefined) updateData.phone = enrichedData.phone;
-    if (enrichedData.city !== undefined) updateData.city = enrichedData.city;
-    if (enrichedData.state !== undefined) updateData.state = enrichedData.state;
-    if (enrichedData.country !== undefined) updateData.country = enrichedData.country;
-    if (enrichedData.companyName !== undefined) updateData.companyName = enrichedData.companyName;
-    if (enrichedData.companyDomain !== undefined) updateData.companyDomain = enrichedData.companyDomain;
-
-    // Also update email if we have it and it's different (normalize case)
-    // Use email from enriched data if available (from LinkedIn enrichment), otherwise use provided email
-    const enrichedEmail = enrichedData.email || email;
-    if (enrichedEmail && enrichedEmail.toLowerCase() !== existingContact.email?.toLowerCase()) {
-      updateData.email = enrichedEmail.toLowerCase();
+    // Store raw enrichment payload in Redis ONLY (not in database)
+    let redisKey = '';
+    try {
+      redisKey = await storeEnrichedContactByContactId(contactId, rawApolloResponse);
+      console.log('✅ Raw enrichment stored in Redis:', redisKey);
+    } catch (redisError: any) {
+      console.warn('⚠️ Redis store failed (non-critical):', redisError.message);
+      // Continue - we can still return preview data
     }
 
-    // Update domain if we have a company domain
-    if (enrichedData.companyDomain && !updateData.domain) {
-      updateData.domain = enrichedData.companyDomain;
-    } else if (enrichedEmail && enrichedEmail.includes('@') && !updateData.domain && !existingContact.domain) {
-      // Fallback: extract domain from email if no company domain
-      const emailDomain = enrichedEmail.split('@')[1];
-      if (emailDomain) {
-        updateData.domain = emailDomain.toLowerCase();
-      }
-    }
-
-    // Save changes via Prisma
-    const updatedContact = await prisma.contact.update({
-      where: { id: contactId },
-      data: updateData,
-      include: {
-        contactCompany: true,
-        contactList: true,
-        pipeline: true,
-      },
-    });
-
+    // Return preview data (normalized fields + intelligence scores for preview)
+    // User must call /api/contacts/enrich/save to persist to database
     return NextResponse.json({
       success: true,
-      contact: updatedContact,
-      enrichedData,
+      enrichedContact: enrichedData,
+      rawApolloResponse: rawApolloResponse, // Full raw response for preview
+      redisKey: redisKey || null,
+      fullPreview: true, // Indicates this is a preview, not saved
+      message: 'Enrichment complete. Call /api/contacts/enrich/save to persist to database.',
     });
   } catch (error: any) {
     console.error('❌ Enrich contact error:', error);

@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { Package } from 'lucide-react';
+import { Package, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 import { PRODUCT_CONFIG } from '@/lib/config/productConfig';
 import { mapDatabaseToForm } from '@/lib/services/ProductServiceMapper';
 import { ProductFormFields } from '@/components/forms/ProductFormFields';
+import UniversalParserModal from '@/components/parsers/UniversalParserModal';
 
 // Default values from config
 const DEFAULT_VALUES = {
@@ -27,34 +28,6 @@ const DEFAULT_VALUES = {
   companyId: '',
 };
 
-// Prefilled template for IgniteBD Business Development Platform
-// Based on IgniteBD's core mission: Attract → Engage → Nurture
-const BD_PLATFORM_TEMPLATE = {
-  name: 'IgniteBD Business Development Platform',
-  valueProp: 'Systematic outreach, relationship building, and growth acceleration for professional services clients. Turn your network into predictable revenue through Attract → Engage → Nurture methodology.',
-  description: 'A comprehensive business development platform designed to help professional services clients with systematic outreach, relationship building, and growth acceleration. We provide the tools, systems, and expertise to turn contacts into clients through proven Attract → Engage → Nurture methodology.',
-  price: '',
-  priceCurrency: 'USD',
-  pricingModel: 'recurring',
-  category: 'Business Development Service',
-  deliveryTimeline: '2-4 weeks setup, ongoing support',
-  targetMarketSize: 'small-business',
-  salesCycleLength: 'medium',
-  features: `- Systematic outreach and relationship building
-- Contact management and pipeline tracking
-- Personalized campaign creation and management
-- BD Intelligence scoring for contact-product fit
-- Pipeline roadmap and stage tracking
-- Proposal generation and management
-- Event and meeting coordination
-- Multi-tenant company management`,
-  competitiveAdvantages: `- Contact + Company First Architecture - designed for relationship-driven growth
-- BD Intelligence scoring powered by OpenAI for optimal contact-product matching
-- Systematic methodology (Attract → Engage → Nurture) proven for professional services
-- Multi-tenant platform with CompanyHQ scoping for scalable operations
-- Integrated pipeline and stage tracking for intentional relationship management`,
-  targetedTo: '',
-};
 
 export default function ProductBuilderPage({ searchParams }) {
   const router = useRouter();
@@ -67,7 +40,10 @@ export default function ProductBuilderPage({ searchParams }) {
   const toastTimerRef = useRef(null);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [personas, setPersonas] = useState([]);
+  const [isParserModalOpen, setIsParserModalOpen] = useState(false);
 
+  // TODO WEDNESDAY FIX #2: Product creation must store companyHQId (not ownerId)
+  // TODO WEDNESDAY FIX #2: Product editing must maintain companyHQId (not ownerId)
   const derivedCompanyId = useMemo(() => {
     if (typeof window === 'undefined') return '';
     return (
@@ -114,15 +90,7 @@ export default function ProductBuilderPage({ searchParams }) {
       }
     };
     
-    if (!productId && derivedCompanyId && !hasInitialized) {
-      // Pre-fill with template for testing upsert logic
-      reset({
-        ...BD_PLATFORM_TEMPLATE,
-        companyId: derivedCompanyId,
-      });
-      setHasInitialized(true);
-      fetchPersonas();
-    } else if (derivedCompanyId && !hasInitialized) {
+    if (derivedCompanyId && !hasInitialized) {
       setValue('companyId', derivedCompanyId);
       setHasInitialized(true);
       fetchPersonas();
@@ -255,6 +223,33 @@ export default function ProductBuilderPage({ searchParams }) {
 
   const isBusy = isHydrating || isSubmitting;
 
+  // Handle parser result application
+  // HYDRATE ONLY - NEVER SAVE: Parser only fills form fields, user must click Save button to persist
+  // Field Mapping Contract: Maps parsedResult to form fields according to strict rules
+  const handleParserApply = (parsedResult, inputId) => {
+    // Log inputId for tracking
+    if (inputId) {
+      console.log('Parser result applied with inputId:', inputId);
+    }
+
+    // FILL THE FORM FIELDS - No database save, only UI hydration
+    setValue('name', parsedResult.name ?? '');
+    setValue('category', parsedResult.category ?? '');
+    setValue('description', parsedResult.description ?? '');
+    setValue('valueProp', parsedResult.valueProp ?? '');
+    setValue('price', parsedResult.price !== null ? parsedResult.price.toString() : '');
+    setValue('priceCurrency', parsedResult.priceCurrency ?? 'USD');
+    setValue('pricingModel', parsedResult.pricingModel ?? '');
+    setValue('targetedTo', parsedResult.targetedTo ?? '');
+    setValue('targetMarketSize', parsedResult.targetMarketSize ?? '');
+    setValue('salesCycleLength', parsedResult.salesCycleLength ?? '');
+    setValue('deliveryTimeline', parsedResult.deliveryTimeline ?? '');
+    setValue('features', Array.isArray(parsedResult.features) ? parsedResult.features.join('\n') : (parsedResult.features ?? ''));
+    setValue('competitiveAdvantages', Array.isArray(parsedResult.competitiveAdvantages) ? parsedResult.competitiveAdvantages.join('\n') : (parsedResult.competitiveAdvantages ?? ''));
+
+    handleShowToast('Parsed data applied to form!');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -291,31 +286,18 @@ export default function ProductBuilderPage({ searchParams }) {
             </div>
           )}
 
-          {/* Template Helper - Only show when creating new product */}
-          {!productId && (
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="mb-2 text-sm font-medium text-blue-900">
-                ✨ Pre-filled with IgniteBD Platform Template
-              </p>
-              <p className="mb-3 text-sm text-blue-700">
-                Form is pre-filled with IgniteBD's core business development platform offering based on the Attract → Engage → Nurture methodology. Edit as needed for your specific product/service.
-              </p>
+          {/* AI Parser Button - Independent of form state */}
+          <div className="mb-6 flex justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  reset({
-                    ...BD_PLATFORM_TEMPLATE,
-                    companyId: derivedCompanyId,
-                  });
-                  handleShowToast('Template reloaded!');
-                }}
-                disabled={isBusy}
-                className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+                onClick={() => setIsParserModalOpen(true)}
+                disabled={!derivedCompanyId}
+                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Reload IgniteBD Template
+                <Sparkles className="h-4 w-4" />
+                Build with AI
               </button>
-            </div>
-          )}
+          </div>
 
           <form onSubmit={onSubmit} className="space-y-6">
             <input
@@ -352,6 +334,17 @@ export default function ProductBuilderPage({ searchParams }) {
           </form>
         </div>
       </div>
+
+      {/* AI Parser Modal */}
+      {derivedCompanyId && (
+        <UniversalParserModal
+          isOpen={isParserModalOpen}
+          onClose={() => setIsParserModalOpen(false)}
+          onApply={handleParserApply}
+          defaultType="product_definition"
+          companyHqId={derivedCompanyId}
+        />
+      )}
     </div>
   );
 }

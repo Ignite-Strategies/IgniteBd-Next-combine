@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { hydrateWorkPackage } from '@/lib/services/WorkPackageHydrationService';
+import { hydrateWorkPackage } from '@/lib/services/workpackageHydrationService';
 
 /**
  * GET /api/workpackages/owner/:id/hydrate
@@ -51,20 +51,26 @@ export async function GET(request, { params }) {
           },
         },
         phases: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            position: true,
+            description: true,
+            totalEstimatedHours: true,
+            estimatedStartDate: true, // Calculated: WorkPackage start + previous phases
+            estimatedEndDate: true,   // Calculated: estimatedStartDate + (totalEstimatedHours / 8)
+            actualStartDate: true,    // Set when phase status → "in_progress"
+            actualEndDate: true,      // Set when phase status → "completed"
+            status: true,             // not_started | in_progress | completed
+            createdAt: true,
+            updatedAt: true,
             items: {
-              include: {
-                collateral: true,
-              },
               orderBy: { createdAt: 'asc' },
             },
           },
           orderBy: { position: 'asc' },
         },
         items: {
-          include: {
-            collateral: true,
-          },
           orderBy: { createdAt: 'asc' },
         },
       },
