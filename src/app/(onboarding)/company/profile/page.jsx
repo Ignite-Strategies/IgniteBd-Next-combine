@@ -23,35 +23,17 @@ export default function CompanyProfilePage() {
   const [checking, setChecking] = useState(true);
   const [existingCompany, setExistingCompany] = useState(null);
 
-  // Check if company already exists on mount
+  // Check if company already exists on mount - if so, redirect
   useEffect(() => {
     const checkExistingCompany = async () => {
       try {
         // First check localStorage
         const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
-        const storedCompany = localStorage.getItem('companyHQ');
         
-        if (companyHQId && storedCompany) {
-          try {
-            const company = JSON.parse(storedCompany);
-            setExistingCompany(company);
-            setFormData({
-              companyName: company.companyName || '',
-              whatYouDo: company.whatYouDo || '',
-              companyStreet: company.companyStreet || '',
-              companyCity: company.companyCity || '',
-              companyState: company.companyState || '',
-              companyWebsite: company.companyWebsite || '',
-              yearsInBusiness: company.yearsInBusiness || '',
-              industry: company.companyIndustry || '',
-              annualRevenue: company.companyAnnualRev || '',
-              teamSize: company.teamSize || '',
-            });
-            setChecking(false);
-            return;
-          } catch (e) {
-            console.warn('Failed to parse stored company:', e);
-          }
+        if (companyHQId) {
+          // Company exists - redirect to success/dashboard
+          router.push('/company/create-success');
+          return;
         }
 
         // If no localStorage, check via API
@@ -59,26 +41,11 @@ export default function CompanyProfilePage() {
         if (hydrateResponse.data?.success && hydrateResponse.data?.owner) {
           const owner = hydrateResponse.data.owner;
           const companyHQId = owner.companyHQId;
-          const companyHQ = owner.companyHQ;
 
-          if (companyHQId && companyHQ) {
-            setExistingCompany(companyHQ);
-            setFormData({
-              companyName: companyHQ.companyName || '',
-              whatYouDo: companyHQ.whatYouDo || '',
-              companyStreet: companyHQ.companyStreet || '',
-              companyCity: companyHQ.companyCity || '',
-              companyState: companyHQ.companyState || '',
-              companyWebsite: companyHQ.companyWebsite || '',
-              yearsInBusiness: companyHQ.yearsInBusiness || '',
-              industry: companyHQ.companyIndustry || '',
-              annualRevenue: companyHQ.companyAnnualRev || '',
-              teamSize: companyHQ.teamSize || '',
-            });
-            
-            // Update localStorage
-            localStorage.setItem('companyHQId', companyHQId);
-            localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
+          if (companyHQId) {
+            // Company exists - redirect
+            router.push('/company/create-success');
+            return;
           }
         }
       } catch (err) {
@@ -90,7 +57,7 @@ export default function CompanyProfilePage() {
     };
 
     checkExistingCompany();
-  }, []);
+  }, [router]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -176,13 +143,9 @@ export default function CompanyProfilePage() {
             className="mx-auto mb-6 h-16 w-16 object-contain"
             priority
           />
-          <h1 className="text-4xl font-bold text-white mb-4">
-            {existingCompany ? 'Update Your Company' : 'Create Your Company'}
-          </h1>
+          <h1 className="text-4xl font-bold text-white mb-4">Create Your Company</h1>
           <p className="text-white/80 text-lg">
-            {existingCompany 
-              ? 'Update your company information below' 
-              : 'Tell us about your business to get started'}
+            Tell us about your business to get started
           </p>
         </div>
 
@@ -390,9 +353,7 @@ export default function CompanyProfilePage() {
                 disabled={loading}
                 className="flex-1 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-medium rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                {loading 
-                  ? (existingCompany ? 'Updating…' : 'Creating…') 
-                  : (existingCompany ? 'Update Company →' : 'Create Company →')}
+                {loading ? 'Creating…' : 'Create Company →'}
               </button>
             </div>
           </form>
