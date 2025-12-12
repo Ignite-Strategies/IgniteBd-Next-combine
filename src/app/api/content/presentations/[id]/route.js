@@ -16,32 +16,32 @@ export async function GET(request, { params }) {
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'CleDeck ID is required' },
+        { success: false, error: 'Presentation ID is required' },
         { status: 400 },
       );
     }
 
-    const cledeck = await prisma.cleDeck.findUnique({
+    const presentation = await prisma.presentation.findUnique({
       where: { id },
     });
 
-    if (!cledeck) {
+    if (!presentation) {
       return NextResponse.json(
-        { success: false, error: 'CleDeck not found' },
+        { success: false, error: 'Presentation not found' },
         { status: 404 },
       );
     }
 
     return NextResponse.json({
       success: true,
-      cledeck,
+      presentation,
     });
   } catch (error) {
-    console.error('❌ GetCleDeck error:', error);
+    console.error('❌ GetPresentation error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to get cledeck',
+        error: 'Failed to get presentation',
         details: error.message,
       },
       { status: 500 },
@@ -63,7 +63,7 @@ export async function PATCH(request, { params }) {
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'CleDeck ID is required' },
+        { success: false, error: 'Presentation ID is required' },
         { status: 400 },
       );
     }
@@ -71,39 +71,37 @@ export async function PATCH(request, { params }) {
     const body = await request.json();
     const {
       title,
-      slides,
-      presenter,
       description,
+      slides,
       published,
     } = body ?? {};
 
     const updateData = {};
     if (title !== undefined) updateData.title = title;
-    if (slides !== undefined) updateData.slides = slides;
-    if (presenter !== undefined) updateData.presenter = presenter;
     if (description !== undefined) updateData.description = description;
+    if (slides !== undefined) updateData.slides = slides;
     if (published !== undefined) {
       updateData.published = published;
       updateData.publishedAt = published ? new Date() : null;
     }
 
-    const cledeck = await prisma.cleDeck.update({
+    const presentation = await prisma.presentation.update({
       where: { id },
       data: updateData,
     });
 
-    console.log('✅ CleDeck updated:', cledeck.id);
+    console.log('✅ Presentation updated:', presentation.id);
 
     return NextResponse.json({
       success: true,
-      cledeck,
+      presentation,
     });
   } catch (error) {
-    console.error('❌ UpdateCleDeck error:', error);
+    console.error('❌ UpdatePresentation error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to update cledeck',
+        error: 'Failed to update presentation',
         details: error.message,
       },
       { status: 500 },
@@ -125,27 +123,27 @@ export async function DELETE(request, { params }) {
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'CleDeck ID is required' },
+        { success: false, error: 'Presentation ID is required' },
         { status: 400 },
       );
     }
 
-    await prisma.cleDeck.delete({
+    await prisma.presentation.delete({
       where: { id },
     });
 
-    console.log('✅ CleDeck deleted:', id);
+    console.log('✅ Presentation deleted:', id);
 
     return NextResponse.json({
       success: true,
-      message: 'CleDeck deleted successfully',
+      message: 'Presentation deleted successfully',
     });
   } catch (error) {
-    console.error('❌ DeleteCleDeck error:', error);
+    console.error('❌ DeletePresentation error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to delete cledeck',
+        error: 'Failed to delete presentation',
         details: error.message,
       },
       { status: 500 },

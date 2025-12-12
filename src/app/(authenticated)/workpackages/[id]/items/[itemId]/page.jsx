@@ -56,6 +56,7 @@ export default function WorkPackageItemPage() {
       OUTREACH_TEMPLATE: `/builder/template/new?workPackageId=${workPackageId}&itemId=${itemId}`,
       EVENT_CLE_PLAN: `/builder/event/new?workPackageId=${workPackageId}&itemId=${itemId}`,
       CLE_DECK: `/builder/cledeck/new?workPackageId=${workPackageId}&itemId=${itemId}`,
+      PRESENTATION_DECK: `/builder/cledeck/new?workPackageId=${workPackageId}&itemId=${itemId}`,
       LANDING_PAGE: `/builder/landingpage/new?workPackageId=${workPackageId}&itemId=${itemId}`,
     };
 
@@ -93,6 +94,7 @@ export default function WorkPackageItemPage() {
       OUTREACH_TEMPLATE: `/builder/template/${artifactId}`,
       EVENT_CLE_PLAN: `/builder/event/${artifactId}`,
       CLE_DECK: `/builder/cledeck/${artifactId}`,
+      PRESENTATION_DECK: `/builder/cledeck/${artifactId}`,
       LANDING_PAGE: `/builder/landingpage/${artifactId}`,
     };
     return paths[type] || '#';

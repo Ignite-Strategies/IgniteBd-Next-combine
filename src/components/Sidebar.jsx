@@ -26,6 +26,7 @@ import {
   Layers,
   Receipt,
   PlayCircle,
+  Presentation,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -51,6 +52,7 @@ const navigationGroups = [
     items: [
       { name: 'Ads & SEO', path: '/ads', icon: BarChart },
       { name: 'Content', path: '/content', icon: FileText },
+      { name: 'Presentations', path: '/content/presentations', icon: Presentation },
     ],
   },
   {

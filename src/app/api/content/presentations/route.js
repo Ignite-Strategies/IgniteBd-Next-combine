@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
- * POST /api/artifacts/cledecks
- * Create a new cledeck
+ * POST /api/content/presentations
+ * Create a new presentation
  */
 export async function POST(request) {
   try {
@@ -21,9 +21,8 @@ export async function POST(request) {
     const {
       companyHQId,
       title,
-      slides,
-      presenter,
       description,
+      slides,
       published = false,
     } = body ?? {};
 
@@ -34,30 +33,29 @@ export async function POST(request) {
       );
     }
 
-    const cledeck = await prisma.cleDeck.create({
+    const presentation = await prisma.presentation.create({
       data: {
         companyHQId,
-        title: title || null,
-        slides: slides || null,
-        presenter: presenter || null,
+        title,
         description: description || null,
+        slides: slides || null,
         published,
         publishedAt: published ? new Date() : null,
       },
     });
 
-    console.log('✅ CleDeck created:', cledeck.id);
+    console.log('✅ Presentation created:', presentation.id);
 
     return NextResponse.json({
       success: true,
-      cledeck,
+      presentation,
     });
   } catch (error) {
-    console.error('❌ CreateCleDeck error:', error);
+    console.error('❌ CreatePresentation error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to create cledeck',
+        error: 'Failed to create presentation',
         details: error.message,
       },
       { status: 500 },
@@ -66,8 +64,8 @@ export async function POST(request) {
 }
 
 /**
- * GET /api/artifacts/cledecks
- * List cledecks
+ * GET /api/content/presentations
+ * List presentations
  */
 export async function GET(request) {
   try {
@@ -88,7 +86,7 @@ export async function GET(request) {
     if (companyHQId) where.companyHQId = companyHQId;
     if (published !== null) where.published = published === 'true';
 
-    const cledecks = await prisma.cleDeck.findMany({
+    const presentations = await prisma.presentation.findMany({
       where,
       orderBy: {
         createdAt: 'desc',
@@ -97,14 +95,14 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      cledecks,
+      presentations,
     });
   } catch (error) {
-    console.error('❌ ListCleDecks error:', error);
+    console.error('❌ ListPresentations error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to list cledecks',
+        error: 'Failed to list presentations',
         details: error.message,
       },
       { status: 500 },

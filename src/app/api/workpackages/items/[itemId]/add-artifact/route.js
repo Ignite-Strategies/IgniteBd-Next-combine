@@ -83,6 +83,7 @@ export async function PATCH(request, { params }) {
         }));
         break;
       case 'CLE_DECK':
+      case 'PRESENTATION_DECK':
         artifactExists = !!(await prisma.cleDeck.findUnique({
           where: { id: artifactId },
         }));
@@ -117,6 +118,7 @@ export async function PATCH(request, { params }) {
         updateData.eventPlanIds = { push: artifactId };
         break;
       case 'CLE_DECK':
+      case 'PRESENTATION_DECK':
         updateData.cleDeckIds = { push: artifactId };
         break;
       case 'LANDING_PAGE':
@@ -171,6 +173,7 @@ function getCurrentArray(item, type) {
     case 'EVENT_CLE_PLAN':
       return item.eventPlanIds || [];
     case 'CLE_DECK':
+    case 'PRESENTATION_DECK':
       return item.cleDeckIds || [];
     case 'LANDING_PAGE':
       return item.landingPageIds || [];
@@ -190,6 +193,7 @@ function getArrayFieldName(type) {
     case 'EVENT_CLE_PLAN':
       return 'eventPlanIds';
     case 'CLE_DECK':
+    case 'PRESENTATION_DECK':
       return 'cleDeckIds';
     case 'LANDING_PAGE':
       return 'landingPageIds';
