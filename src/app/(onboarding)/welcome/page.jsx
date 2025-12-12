@@ -133,11 +133,22 @@ export default function WelcomePage() {
       <div className="text-center max-w-md mx-auto px-4">
         <div className="bg-white rounded-xl shadow-xl p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome{owner?.name ? `, ${owner.name.split(' ')[0]}` : ''}!
+            {(() => {
+              if (owner?.name) {
+                const firstName = owner.name.split(' ')[0];
+                return `Welcome, ${firstName}!`;
+              } else if (owner?.email) {
+                const emailName = owner.email.split('@')[0];
+                return `Welcome, ${emailName}!`;
+              }
+              return 'Welcome!';
+            })()}
           </h1>
           <p className="text-gray-600 mb-6">
             {owner?.companyHQ?.companyName
               ? `Ready to manage ${owner.companyHQ.companyName}?`
+              : owner?.ownedCompanies?.[0]?.companyName
+              ? `Ready to manage ${owner.ownedCompanies[0].companyName}?`
               : 'Ready to get started?'}
           </p>
 
