@@ -236,3 +236,79 @@ export async function getPreviewIntelligence(previewId: string): Promise<any | n
   }
 }
 
+/**
+ * Store presentation outline in Redis
+ * 
+ * @param outline - Generated presentation outline
+ * @param title - Optional title
+ * @param description - Optional description
+ * @param ttl - Time to live in seconds (default: 1 hour)
+ * @returns Promise<string> - Redis key
+ */
+export async function storePresentationOutline(
+  outline: any,
+  title?: string,
+  description?: string,
+  ttl: number = 60 * 60 // 1 hour
+): Promise<string> {
+  try {
+    const redisClient = getRedis();
+    const timestamp = Date.now();
+    const key = `presentation:outline:${timestamp}`;
+    
+    const dataToStore = JSON.stringify({
+      outline,
+      title,
+      description,
+      storedAt: new Date().toISOString(),
+    });
+    
+    await redisClient.setex(key, ttl, dataToStore);
+    
+    console.log(`✅ Presentation outline stored in Redis: ${key} (TTL: ${ttl}s)`);
+    return key;
+  } catch (error: any) {
+    console.error('❌ Redis store outline error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get presentation outline from Redis by key
+ * 
+ * @param redisKey - Full Redis key (e.g., "presentation:outline:1234567890")
+ * @returns Promise<any | null> - Outline data or null
+ */
+export async function getPresentationOutline(redisKey: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(redisKey);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get outline error:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete presentation outline from Redis
+ * 
+ * @param redisKey - Full Redis key
+ * @returns Promise<boolean> - Success status
+ */
+export async function deletePresentationOutline(redisKey: string): Promise<boolean> {
+  try {
+    const redisClient = getRedis();
+    await redisClient.del(redisKey);
+    return true;
+  } catch (error: any) {
+    console.error('❌ Redis delete outline error:', error);
+    return false;
+  }
+}
+

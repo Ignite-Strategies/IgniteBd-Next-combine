@@ -70,70 +70,26 @@ export default function CreatePresentationPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleGenerate = () => {
     // Description is now the main field - title is optional
     if (!description.trim()) {
       setError('Please describe what your presentation is about');
       return;
     }
 
-    // Try to resolve companyHQId on submit
-    let finalCompanyHQId = resolvedCompanyHQId || companyHQId;
-    
-    if (!finalCompanyHQId && typeof window !== 'undefined') {
-      finalCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    // Store the form data temporarily and redirect to AI builder
+    // We'll create the presentation only after user saves in AI builder
+    if (typeof window !== 'undefined') {
+      const tempData = {
+        title: title.trim() || '',
+        description: description.trim(),
+        slideCount,
+      };
+      localStorage.setItem('temp_presentation_data', JSON.stringify(tempData));
     }
 
-    if (!finalCompanyHQId) {
-      setError('Company profile required. Please set up your company first.');
-      return;
-    }
-
-    setError('');
-    setSaving(true);
-
-    try {
-      // Create empty slides array
-      const slides = Array.from({ length: slideCount }, (_, i) => ({
-        slideNumber: i + 1,
-        title: '',
-        content: '',
-        notes: null,
-      }));
-
-      // Resolve companyHQId on submit
-      let finalCompanyHQId = resolvedCompanyHQId || companyHQId;
-      if (!finalCompanyHQId && typeof window !== 'undefined') {
-        finalCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
-      }
-
-      if (!finalCompanyHQId) {
-        setError('Company profile required. Please set up your company first.');
-        setSaving(false);
-        return;
-      }
-
-      // Create presentation with description - AI will generate the rest
-      const response = await api.post('/api/content/presentations', {
-        companyHQId: finalCompanyHQId,
-        title: title.trim() || 'Untitled Presentation', // Use title if provided, otherwise placeholder
-        description, // This is the main input - AI will use this
-        slides,
-        published: false,
-      });
-
-      if (response.data?.success && response.data?.presentation) {
-        // Immediately redirect to AI builder to generate the content
-        router.push(`/content/presentations/${response.data.presentation.id}/ai`);
-      } else {
-        throw new Error('Failed to create presentation');
-      }
-    } catch (err) {
-      console.error('Error creating presentation:', err);
-      setError('Failed to create presentation. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+    // Redirect to AI builder (no ID - it's a new presentation)
+    router.push('/content/presentations/ai');
   };
 
   return (
@@ -241,20 +197,14 @@ export default function CreatePresentationPage() {
                 Cancel
               </button>
               <button
-                onClick={handleSave}
-                disabled={saving || !description.trim()}
+                onClick={handleGenerate}
+                disabled={!description.trim()}
                 className="flex items-center gap-2 rounded bg-red-600 px-6 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? (
-                  'Creating...'
-                ) : (
-                  <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Create & Generate with AI
-                  </>
-                )}
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Generate with AI
               </button>
             </div>
           </div>
