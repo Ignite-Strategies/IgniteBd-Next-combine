@@ -39,6 +39,35 @@ export default function WelcomePage() {
     }
   }, [authChecked, hydrated, loading, refresh]);
 
+  // Ensure company data is in localStorage after hydration
+  useEffect(() => {
+    if (!hydrated || loading) return;
+
+    // Store companyHQId in localStorage if we have it
+    if (companyHQId && typeof window !== 'undefined') {
+      localStorage.setItem('companyHQId', companyHQId);
+      // Also store as companyId for backward compatibility
+      localStorage.setItem('companyId', companyHQId);
+    }
+
+    // Store companyHQ object if we have it
+    if (owner?.companyHQ && typeof window !== 'undefined') {
+      localStorage.setItem('companyHQ', JSON.stringify(owner.companyHQ));
+    } else if (companyHQ && typeof window !== 'undefined') {
+      localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
+    }
+
+    // Store ownerId if we have it
+    if (ownerId && typeof window !== 'undefined') {
+      localStorage.setItem('ownerId', ownerId);
+    }
+
+    // Store owner object if we have it
+    if (owner && typeof window !== 'undefined') {
+      localStorage.setItem('owner', JSON.stringify(owner));
+    }
+  }, [hydrated, loading, companyHQId, owner, companyHQ, ownerId]);
+
   // Determine next route based on hydration
   useEffect(() => {
     if (!authChecked || !hydrated || loading) return;
