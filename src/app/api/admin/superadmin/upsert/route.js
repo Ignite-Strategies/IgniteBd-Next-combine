@@ -35,10 +35,12 @@ export async function POST(request) {
     }
 
     // Upsert SuperAdmin - simple and direct
+    // If record exists, it's already active (no active field needed)
+    // If it doesn't exist, create it
     const superAdmin = await prisma.superAdmin.upsert({
       where: { ownerId: owner.id },
-      update: { active: true },
-      create: { ownerId: owner.id, active: true },
+      update: {}, // No update needed - existence = active
+      create: { ownerId: owner.id },
     });
 
     return NextResponse.json({
