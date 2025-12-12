@@ -161,13 +161,20 @@ export async function GET(request) {
       where.published = published === 'true';
     }
 
+    // Ensure prisma.presentation exists
+    if (!prisma.presentation) {
+      console.error('❌ prisma.presentation is undefined - Prisma client may need regeneration');
+      return NextResponse.json(
+        { success: false, error: 'Database client error - please contact support' },
+        { status: 500 },
+      );
+    }
+
     const presentations = await prisma.presentation.findMany({
       where,
       orderBy: {
         createdAt: 'desc',
       },
-      // Ensure we return all fields including gamma fields
-      select: undefined, // Return all fields
     });
 
     // Log to verify we're getting full objects
