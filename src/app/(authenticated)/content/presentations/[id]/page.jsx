@@ -233,50 +233,100 @@ export default function PresentationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - runs once, all logic inside function
 
-  // Poll for generation status when status is 'generating' (separate concern, not hydration)
+  // Poll for generation status when status is 'generating' (calm, resilient async flow)
   useEffect(() => {
     if (gammaStatus !== 'generating' || !gammaGenerationId || !presentationId) {
       return;
     }
 
-    console.log('🔄 Starting polling for generation status:', gammaGenerationId);
+    console.log('🔄 Starting Gamma status polling:', {
+      generationId: gammaGenerationId,
+      presentationId,
+      pollInterval: '10 seconds',
+      maxPolls: 30,
+      maxTimeout: '5 minutes',
+    });
+    
+    let pollCount = 0;
+    const MAX_POLLS = 30; // 5 minutes at 10 seconds per poll
+    const POLL_INTERVAL = 10000; // 10 seconds (minimum 8 seconds per requirements)
     
     const pollInterval = setInterval(async () => {
+      pollCount++;
+      
       try {
         const response = await api.get(`/api/decks/status/${gammaGenerationId}?presentationId=${presentationId}`);
         
         if (response.data?.success) {
           const status = response.data.status;
           
+          // Log status response payload
+          console.log(`📊 Gamma status poll #${pollCount}:`, {
+            generationId: gammaGenerationId,
+            status,
+            id: response.data.id,
+            url: response.data.url,
+            pptxUrl: response.data.pptxUrl,
+            error: response.data.error,
+          });
+          
+          // Handle status explicitly
           if (status === 'ready' && response.data.url) {
-            console.log('✅ Generation complete!');
+            // Generation complete - stop polling immediately
+            console.log('✅ Generation complete!', {
+              generationId: gammaGenerationId,
+              url: response.data.url,
+              pptxUrl: response.data.pptxUrl,
+            });
             setGammaStatus('ready');
             setGammaDeckUrl(response.data.url);
             setGammaPptxUrl(response.data.pptxUrl || null);
-            // Reload presentation to get all updated fields (call hydrate function directly)
+            // Reload presentation to get all updated fields
             await hydrateFromLocalStorage();
             clearInterval(pollInterval);
-          } else if (status === 'error') {
-            console.error('❌ Generation failed:', response.data.error);
+            return;
+          } else if (status === 'failed' || status === 'error') {
+            // Generation failed - stop polling immediately
+            console.error('❌ Generation failed:', {
+              generationId: gammaGenerationId,
+              status,
+              error: response.data.error,
+            });
             setGammaStatus('error');
             setError(response.data.error || 'PPT generation failed');
             clearInterval(pollInterval);
+            return;
+          } else if (status === 'processing' || status === 'pending') {
+            // Normal processing state - continue polling (not an error)
+            console.log(`🔄 Generation still processing (poll #${pollCount}/${MAX_POLLS})`);
+            // Continue polling - do nothing, let the interval continue
+          } else {
+            // Unknown status - log but continue polling
+            console.warn('⚠️ Unknown Gamma status:', status);
           }
-          // If still processing, continue polling
         }
       } catch (err) {
-        console.error('Error polling generation status:', err);
-        // Don't stop polling on error - might be temporary
+        // Network/API errors - log but don't stop polling (might be temporary)
+        console.warn(`⚠️ Poll #${pollCount} error (continuing):`, err);
+        // Don't stop polling on transient errors
       }
-    }, 3000); // Poll every 3 seconds
+      
+      // Check max polls limit
+      if (pollCount >= MAX_POLLS) {
+        console.warn('⏰ Max polls reached (30 polls = 5 minutes)');
+        clearInterval(pollInterval);
+        setGammaStatus('error');
+        setError('PPT generation is taking longer than expected. You can try again or refresh the page.');
+      }
+    }, POLL_INTERVAL);
 
-    // Cleanup: stop polling after 5 minutes (safety timeout)
+    // Safety timeout (5 minutes = 30 polls * 10 seconds)
     const timeout = setTimeout(() => {
       console.warn('⏰ Polling timeout after 5 minutes');
       clearInterval(pollInterval);
       if (gammaStatus === 'generating') {
         setGammaStatus('error');
-        setError('PPT generation is taking longer than expected. Please refresh the page.');
+        setError('PPT generation timed out after 5 minutes. You can try again or refresh the page.');
       }
     }, 5 * 60 * 1000);
 

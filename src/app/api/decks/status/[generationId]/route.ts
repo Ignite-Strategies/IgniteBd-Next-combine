@@ -41,19 +41,32 @@ export async function GET(
     // Check generation status
     const statusResult = await checkGammaGenerationStatus(generationId);
 
+    // Log the status response payload
+    console.log('📊 Gamma status check result:', {
+      generationId,
+      status: statusResult.status,
+      id: statusResult.id,
+      url: statusResult.url,
+      pptxUrl: statusResult.pptxUrl,
+      error: statusResult.error,
+    });
+
     // If presentationId provided, update the presentation record
     if (presentationId) {
       if (statusResult.status === 'ready' && statusResult.id && statusResult.url) {
+        // Generation complete - store URLs
         await prisma.presentation.update({
           where: { id: presentationId },
           data: {
             gammaStatus: 'ready',
             gammaDeckUrl: statusResult.url,
-            gammaPptxUrl: null,
+            gammaPptxUrl: statusResult.pptxUrl || null,
             gammaError: null,
           },
         });
-      } else if (statusResult.status === 'error') {
+        console.log('✅ Updated presentation with ready status and URLs');
+      } else if (statusResult.status === 'failed' || statusResult.status === 'error') {
+        // Generation failed
         await prisma.presentation.update({
           where: { id: presentationId },
           data: {
@@ -61,14 +74,25 @@ export async function GET(
             gammaError: statusResult.error || 'Generation failed',
           },
         });
-      } else {
-        // Still processing
+        console.log('❌ Updated presentation with failed status');
+      } else if (statusResult.status === 'processing' || statusResult.status === 'pending') {
+        // Still processing - normal state, continue polling
         await prisma.presentation.update({
           where: { id: presentationId },
           data: {
             gammaStatus: 'generating',
           },
         });
+        console.log('🔄 Updated presentation with processing status (continuing to poll)');
+      } else {
+        // Unknown status - keep as generating
+        await prisma.presentation.update({
+          where: { id: presentationId },
+          data: {
+            gammaStatus: 'generating',
+          },
+        });
+        console.log('⚠️ Unknown status, keeping as generating:', statusResult.status);
       }
     }
 
@@ -77,6 +101,7 @@ export async function GET(
       status: statusResult.status,
       id: statusResult.id,
       url: statusResult.url,
+      pptxUrl: statusResult.pptxUrl,
       error: statusResult.error,
     });
   } catch (error) {

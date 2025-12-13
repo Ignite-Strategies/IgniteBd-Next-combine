@@ -14,10 +14,11 @@ export interface GammaGenerateResponse {
 }
 
 export interface GammaStatusResponse {
-  status: 'pending' | 'processing' | 'ready' | 'error';
+  status: 'pending' | 'processing' | 'ready' | 'failed' | 'error';
   id?: string;      // Deck ID (only when status === 'ready')
   url?: string;     // Shareable deck URL (only when status === 'ready')
-  error?: string;   // Error message (only when status === 'error')
+  pptxUrl?: string; // PPTX download URL (only when status === 'ready')
+  error?: string;   // Error message (only when status === 'failed' or 'error')
 }
 
 /**
@@ -188,11 +189,15 @@ export async function checkGammaGenerationStatus(
 
     const data: GammaStatusResponse = await response.json();
 
-    console.log('🎨 Gamma generation status:', {
+    // Log the full status response payload
+    console.log('🎨 Gamma generation status response:', {
       generationId,
       status: data.status,
-      hasId: !!data.id,
-      hasUrl: !!data.url,
+      id: data.id,
+      url: data.url,
+      pptxUrl: data.pptxUrl,
+      error: data.error,
+      fullResponse: JSON.stringify(data, null, 2),
     });
 
     return data;
