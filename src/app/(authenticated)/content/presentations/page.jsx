@@ -162,10 +162,10 @@ export default function PresentationsPage() {
             <h2 className="text-xl font-semibold text-gray-900">Your Presentations</h2>
             <div className="flex gap-3">
               <button
-                onClick={() => handleSync()}
-                disabled={syncing}
+                onClick={handleSync}
+                disabled={syncing || !ENABLE_PRESENTATION_API_SYNC}
                 className="flex items-center gap-2 rounded bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow transition hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Sync presentations from database"
+                title={ENABLE_PRESENTATION_API_SYNC ? "Sync presentations from server" : "API sync is disabled"}
               >
                 <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Syncing...' : 'Sync'}
