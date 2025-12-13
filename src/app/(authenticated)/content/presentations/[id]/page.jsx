@@ -8,6 +8,9 @@ import PageHeader from '@/components/PageHeader.jsx';
 import { Save, ArrowLeft, FileText, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 
+// 🎯 LOCAL-FIRST FLAG: API fallback is optional and explicit only
+const ENABLE_PRESENTATION_API_FALLBACK = true;
+
 export default function PresentationPage() {
   const params = useParams();
   const router = useRouter();
@@ -42,7 +45,7 @@ export default function PresentationPage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Load presentation only after auth is ready
+  // 🎯 LOCAL-FIRST: Load presentation from localStorage first, API only as fallback
   useEffect(() => {
     if (presentationId && authReady) {
       loadPresentation();
@@ -102,61 +105,107 @@ export default function PresentationPage() {
     };
   }, [gammaStatus, gammaGenerationId, presentationId, loadPresentation]);
 
+  // 🎯 LOCAL-FIRST: Load from localStorage first, API only as fallback
   const loadPresentation = useCallback(async () => {
     if (!presentationId) return;
     
     try {
       setLoading(true);
-      const response = await api.get(`/api/content/presentations/${presentationId}`);
-      if (response.data?.success) {
-        const presentation = response.data.presentation;
-        setTitle(presentation.title || '');
-        setDescription(presentation.description || '');
+      setError('');
+
+      // 🎯 LOCAL-FIRST: Try to load from localStorage first
+      let presentation = null;
+      
+      if (typeof window !== 'undefined') {
+        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
         
-        // Handle slides format - could be { sections: [...] } or array or string
-        let slidesData = [];
-        if (presentation.slides) {
-          if (typeof presentation.slides === 'string') {
+        // Try presentations_${companyHQId} first
+        if (companyHQId) {
+          const cachedKey = `presentations_${companyHQId}`;
+          const cached = localStorage.getItem(cachedKey);
+          if (cached) {
             try {
-              const parsed = JSON.parse(presentation.slides);
-              if (parsed.sections && Array.isArray(parsed.sections)) {
-                // Convert sections format to array format for editing
-                slidesData = parsed.sections.map((section, idx) => ({
-                  slideNumber: idx + 1,
-                  title: section.title || '',
-                  content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
-                }));
-              } else if (Array.isArray(parsed)) {
-                slidesData = parsed;
+              const presentations = JSON.parse(cached);
+              if (Array.isArray(presentations)) {
+                presentation = presentations.find(p => p.id === presentationId);
+                if (presentation) {
+                  console.log('✅ [LOCAL-FIRST] Loaded presentation from localStorage');
+                }
               }
             } catch (e) {
-              console.warn('Failed to parse slides JSON:', e);
+              console.warn('[LOCAL-FIRST] Failed to parse cached presentations:', e);
             }
-          } else if (presentation.slides.sections && Array.isArray(presentation.slides.sections)) {
-            // Convert sections format to array format for editing
-            slidesData = presentation.slides.sections.map((section, idx) => ({
-              slideNumber: idx + 1,
-              title: section.title || '',
-              content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
-            }));
-          } else if (Array.isArray(presentation.slides)) {
-            slidesData = presentation.slides;
           }
         }
-        setSlides(slidesData);
         
-        setPublished(presentation.published || false);
-        const status = presentation.gammaStatus || null;
-        setGammaStatus(status);
-        setGammaDeckUrl(presentation.gammaDeckUrl || null);
-        setGammaPptxUrl(presentation.gammaPptxUrl || null);
-        setGammaGenerationId(presentation.gammaGenerationId || null);
-        // Only show error status box if status is 'ready' or 'generating' on load
-        // Don't show 'error' status on page load - only show if user tries to generate
-        setShowErrorStatus(status === 'ready' || status === 'generating');
+        // Try hydration data as fallback
+        if (!presentation && companyHQId) {
+          const hydrationKey = `companyHydration_${companyHQId}`;
+          const hydrationData = localStorage.getItem(hydrationKey);
+          if (hydrationData) {
+            try {
+              const parsed = JSON.parse(hydrationData);
+              if (parsed?.data?.presentations && Array.isArray(parsed.data.presentations)) {
+                presentation = parsed.data.presentations.find(p => p.id === presentationId);
+                if (presentation) {
+                  console.log('✅ [LOCAL-FIRST] Loaded presentation from hydration data');
+                }
+              }
+            } catch (e) {
+              console.warn('[LOCAL-FIRST] Failed to parse hydration data:', e);
+            }
+          }
+        }
+      }
+
+      // 🎯 LOCAL-FIRST: If found locally, use it and skip API
+      if (presentation) {
+        setPresentationData(presentation);
+        setLoading(false);
+        return; // Skip API call entirely
+      }
+
+      // 🎯 LOCAL-FIRST: Not found locally - use API as fallback (if enabled)
+      if (!ENABLE_PRESENTATION_API_FALLBACK) {
+        console.warn('⚠️ [LOCAL-FIRST] Presentation not found locally and API fallback is disabled');
+        setError('Presentation not found in local storage. API fallback is disabled.');
+        setLoading(false);
+        return;
+      }
+
+      console.warn('⚠️ [LOCAL-FIRST] Presentation not found locally — using API fallback');
+      
+      // API fallback
+      const response = await api.get(`/api/content/presentations/${presentationId}`);
+      if (response.data?.success) {
+        presentation = response.data.presentation;
+        
+        // 🎯 LOCAL-FIRST: Save to localStorage for future use
+        if (typeof window !== 'undefined' && presentation) {
+          const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+          if (companyHQId) {
+            try {
+              const cachedKey = `presentations_${companyHQId}`;
+              const cached = localStorage.getItem(cachedKey);
+              const presentations = cached ? JSON.parse(cached) : [];
+              const existingIndex = presentations.findIndex(p => p.id === presentation.id);
+              if (existingIndex >= 0) {
+                presentations[existingIndex] = presentation;
+              } else {
+                presentations.unshift(presentation);
+              }
+              localStorage.setItem(cachedKey, JSON.stringify(presentations));
+              console.log('✅ [LOCAL-FIRST] Saved presentation to localStorage from API fallback');
+            } catch (e) {
+              console.warn('[LOCAL-FIRST] Failed to save to localStorage:', e);
+            }
+          }
+        }
+        
+        setPresentationData(presentation);
       }
     } catch (err) {
-      console.error('❌ Error loading presentation:', err);
+      console.error('❌ [LOCAL-FIRST] Error loading presentation:', err);
       const errorMessage = err.response?.data?.error || 
                           err.response?.data?.details || 
                           err.message || 
@@ -171,6 +220,54 @@ export default function PresentationPage() {
       setLoading(false);
     }
   }, [presentationId]);
+
+  // Helper function to set presentation data from either localStorage or API
+  const setPresentationData = (presentation) => {
+    setTitle(presentation.title || '');
+    setDescription(presentation.description || '');
+    
+    // Handle slides format - could be { sections: [...] } or array or string
+    let slidesData = [];
+    if (presentation.slides) {
+      if (typeof presentation.slides === 'string') {
+        try {
+          const parsed = JSON.parse(presentation.slides);
+          if (parsed.sections && Array.isArray(parsed.sections)) {
+            // Convert sections format to array format for editing
+            slidesData = parsed.sections.map((section, idx) => ({
+              slideNumber: idx + 1,
+              title: section.title || '',
+              content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
+            }));
+          } else if (Array.isArray(parsed)) {
+            slidesData = parsed;
+          }
+        } catch (e) {
+          console.warn('Failed to parse slides JSON:', e);
+        }
+      } else if (presentation.slides.sections && Array.isArray(presentation.slides.sections)) {
+        // Convert sections format to array format for editing
+        slidesData = presentation.slides.sections.map((section, idx) => ({
+          slideNumber: idx + 1,
+          title: section.title || '',
+          content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
+        }));
+      } else if (Array.isArray(presentation.slides)) {
+        slidesData = presentation.slides;
+      }
+    }
+    setSlides(slidesData);
+    
+    setPublished(presentation.published || false);
+    const status = presentation.gammaStatus || null;
+    setGammaStatus(status);
+    setGammaDeckUrl(presentation.gammaDeckUrl || null);
+    setGammaPptxUrl(presentation.gammaPptxUrl || null);
+    setGammaGenerationId(presentation.gammaGenerationId || null);
+    // Only show error status box if status is 'ready' or 'generating' on load
+    // Don't show 'error' status on page load - only show if user tries to generate
+    setShowErrorStatus(status === 'ready' || status === 'generating');
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -200,7 +297,7 @@ export default function PresentationPage() {
       if (response.data?.success) {
         const savedPresentation = response.data.presentation;
         
-        // Save to localStorage
+        // 🎯 LOCAL-FIRST: Save to localStorage (authoritative source)
         if (typeof window !== 'undefined') {
           const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
           if (companyHQId) {
@@ -215,9 +312,9 @@ export default function PresentationPage() {
                 presentations.unshift(savedPresentation);
               }
               localStorage.setItem(cachedKey, JSON.stringify(presentations));
-              console.log('💾 Saved presentation to localStorage');
+              console.log('✅ [LOCAL-FIRST] Saved presentation to localStorage');
             } catch (e) {
-              console.warn('Failed to save to localStorage:', e);
+              console.warn('[LOCAL-FIRST] Failed to save to localStorage:', e);
             }
           }
         }
