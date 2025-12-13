@@ -200,14 +200,14 @@ export async function POST(request: Request) {
     try {
       const statusResult = await checkGammaGenerationStatus(generationId);
       
-      if (statusResult.status === 'ready' && statusResult.id && statusResult.url) {
+      if (statusResult.status === 'completed' && statusResult.gammaUrl) {
         // Generation is already complete
         await prisma.presentation.update({
           where: { id: presentationId },
           data: {
             gammaStatus: 'ready',
-            gammaDeckUrl: statusResult.url,
-            gammaPptxUrl: null,
+            gammaDeckUrl: statusResult.gammaUrl,
+            gammaPptxUrl: statusResult.pptxUrl || null,
             gammaError: null,
           },
         });
@@ -218,9 +218,10 @@ export async function POST(request: Request) {
           success: true,
           status: 'ready',
           id: statusResult.id,
-          deckUrl: statusResult.url,
+          deckUrl: statusResult.gammaUrl,
+          pptxUrl: statusResult.pptxUrl,
         });
-      } else if (statusResult.status === 'error') {
+      } else if (statusResult.status === 'error' || statusResult.status === 'failed') {
         // Generation failed
         await prisma.presentation.update({
           where: { id: presentationId },
