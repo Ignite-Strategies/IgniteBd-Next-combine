@@ -325,7 +325,7 @@ export async function storeBlogDraft(
   blogDraft: any,
   title?: string,
   subtitle?: string,
-  ttl: number = 60 * 60 // 1 hour
+  ttl: number = 60 * 60
 ): Promise<string> {
   try {
     const redisClient = getRedis();
