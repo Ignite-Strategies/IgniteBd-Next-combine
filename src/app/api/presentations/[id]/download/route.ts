@@ -70,29 +70,12 @@ export async function GET(
       return NextResponse.redirect(presentation.gammaPptxUrl);
     }
 
-    // If we only have a deck URL, we need to construct the PPTX export URL
-    // Gamma deck URLs are typically: https://gamma.app/deck/{id}
-    // PPTX export is typically: https://gamma.app/api/decks/{id}/export/pptx
+    // If we only have a deck URL, redirect to it (Gamma doesn't provide direct PPTX download via API)
+    // Gamma deck URLs are: https://gamma.app/docs/{id}
+    // Users can export PPTX from the Gamma web interface
     if (presentation.gammaDeckUrl) {
-      // Try to extract deck ID from URL
-      const deckIdMatch = presentation.gammaDeckUrl.match(/\/deck\/([a-zA-Z0-9_-]+)/);
-      if (deckIdMatch) {
-        const deckId = deckIdMatch[1];
-        // Construct PPTX export URL
-        const pptxUrl = `https://gamma.app/api/decks/${deckId}/export/pptx`;
-        
-        // Redirect to Gamma's PPTX export endpoint
-        // Note: This might require authentication, so we may need to proxy it
-        return NextResponse.redirect(pptxUrl);
-      }
-
-      // If we can't extract the ID, return the deck URL and let the user know
-      return NextResponse.json({
-        success: false,
-        error: 'PPTX download URL not available',
-        deckUrl: presentation.gammaDeckUrl,
-        message: 'Please use the deck URL to access the presentation in Gamma and export manually',
-      }, { status: 400 });
+      // Redirect to the Gamma deck URL where users can view and export
+      return NextResponse.redirect(presentation.gammaDeckUrl);
     }
 
     return NextResponse.json(
