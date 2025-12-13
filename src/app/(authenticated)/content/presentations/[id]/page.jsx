@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -23,6 +23,7 @@ export default function PresentationPage() {
   const [gammaStatus, setGammaStatus] = useState(null);
   const [gammaDeckUrl, setGammaDeckUrl] = useState(null);
   const [gammaPptxUrl, setGammaPptxUrl] = useState(null);
+  const [gammaGenerationId, setGammaGenerationId] = useState(null);
   const [buildingPPT, setBuildingPPT] = useState(false);
   const [showErrorStatus, setShowErrorStatus] = useState(false); // Only show error if user tried to generate
   const [authReady, setAuthReady] = useState(false);
@@ -48,7 +49,62 @@ export default function PresentationPage() {
     }
   }, [presentationId, authReady]);
 
-  const loadPresentation = async () => {
+  // Poll for generation status when status is 'generating'
+  useEffect(() => {
+    if (gammaStatus !== 'generating' || !gammaGenerationId || !presentationId) {
+      return;
+    }
+
+    console.log('🔄 Starting polling for generation status:', gammaGenerationId);
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await api.get(`/api/decks/status/${gammaGenerationId}?presentationId=${presentationId}`);
+        
+        if (response.data?.success) {
+          const status = response.data.status;
+          
+          if (status === 'ready' && response.data.url) {
+            console.log('✅ Generation complete!');
+            setGammaStatus('ready');
+            setGammaDeckUrl(response.data.url);
+            setGammaPptxUrl(response.data.pptxUrl || null);
+            // Reload presentation to get all updated fields
+            await loadPresentation();
+            clearInterval(pollInterval);
+          } else if (status === 'error') {
+            console.error('❌ Generation failed:', response.data.error);
+            setGammaStatus('error');
+            setError(response.data.error || 'PPT generation failed');
+            clearInterval(pollInterval);
+          }
+          // If still processing, continue polling
+        }
+      } catch (err) {
+        console.error('Error polling generation status:', err);
+        // Don't stop polling on error - might be temporary
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Cleanup: stop polling after 5 minutes (safety timeout)
+    const timeout = setTimeout(() => {
+      console.warn('⏰ Polling timeout after 5 minutes');
+      clearInterval(pollInterval);
+      if (gammaStatus === 'generating') {
+        setGammaStatus('error');
+        setError('PPT generation is taking longer than expected. Please refresh the page.');
+      }
+    }, 5 * 60 * 1000);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearTimeout(timeout);
+    };
+  }, [gammaStatus, gammaGenerationId, presentationId, loadPresentation]);
+
+  const loadPresentation = useCallback(async () => {
+    if (!presentationId) return;
+    
     try {
       setLoading(true);
       const response = await api.get(`/api/content/presentations/${presentationId}`);
@@ -94,17 +150,27 @@ export default function PresentationPage() {
         setGammaStatus(status);
         setGammaDeckUrl(presentation.gammaDeckUrl || null);
         setGammaPptxUrl(presentation.gammaPptxUrl || null);
+        setGammaGenerationId(presentation.gammaGenerationId || null);
         // Only show error status box if status is 'ready' or 'generating' on load
         // Don't show 'error' status on page load - only show if user tries to generate
         setShowErrorStatus(status === 'ready' || status === 'generating');
       }
     } catch (err) {
-      console.error('Error loading presentation:', err);
-      setError('Failed to load presentation');
+      console.error('❌ Error loading presentation:', err);
+      const errorMessage = err.response?.data?.error || 
+                          err.response?.data?.details || 
+                          err.message || 
+                          'Failed to load presentation';
+      setError(errorMessage);
+      
+      // If it's a 404, the presentation might not exist
+      if (err.response?.status === 404) {
+        setError('Presentation not found. It may have been deleted.');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [presentationId]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -177,32 +243,64 @@ export default function PresentationPage() {
   const handleBuildPPT = async () => {
     if (!presentationId) return;
     
+    // Validate slides before generating
+    if (!slides || slides.length === 0) {
+      setError('Please add at least one slide before generating the PPT');
+      return;
+    }
+
+    // Check if slides have content
+    const hasContent = slides.some(slide => 
+      (slide.title && slide.title.trim()) || 
+      (slide.content && slide.content.trim())
+    );
+    
+    if (!hasContent) {
+      setError('Please add content to at least one slide before generating the PPT');
+      return;
+    }
+    
     setBuildingPPT(true);
     setError('');
     setShowErrorStatus(true); // Show status box when user clicks generate
     
     try {
+      console.log('🚀 Starting PPT generation for presentation:', presentationId);
       const response = await api.post('/api/decks/generate', {
         presentationId,
       });
       
+      console.log('📦 PPT generation response:', response.data);
+      
       if (response.data?.success) {
         if (response.data.status === 'ready') {
+          // Already complete
           setGammaStatus('ready');
           setGammaDeckUrl(response.data.deckUrl);
-          setGammaPptxUrl(response.data.pptxUrl);
+          setGammaPptxUrl(response.data.pptxUrl || null);
           
           // Reload presentation to get updated status
           await loadPresentation();
-        } else {
+        } else if (response.data.status === 'generating') {
+          // Generation started - start polling
           setGammaStatus('generating');
+          if (response.data.generationId) {
+            setGammaGenerationId(response.data.generationId);
+            console.log('🔄 Generation started, generationId:', response.data.generationId);
+          }
+        } else {
+          throw new Error(response.data.error || 'Unknown status from generation API');
         }
       } else {
         throw new Error(response.data?.error || 'Failed to generate PPT');
       }
     } catch (err) {
-      console.error('Error building PPT:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to build PPT. Please try again.');
+      console.error('❌ Error building PPT:', err);
+      const errorMessage = err.response?.data?.error || 
+                          err.response?.data?.details || 
+                          err.message || 
+                          'Failed to build PPT. Please try again.';
+      setError(errorMessage);
       setGammaStatus('error');
     } finally {
       setBuildingPPT(false);

@@ -134,8 +134,12 @@ export default function PresentationsPage() {
         }
       }
     } catch (err) {
-      console.error('Error syncing presentations:', err);
-      setError('Failed to sync presentations. Please try again.');
+      console.error('❌ Error syncing presentations:', err);
+      const errorMessage = err.response?.data?.error || 
+                          err.response?.data?.details || 
+                          err.message || 
+                          'Failed to sync presentations. Please try again.';
+      setError(errorMessage);
       // Still show error, but don't block
     } finally {
       setSyncing(false);
@@ -176,14 +180,28 @@ export default function PresentationsPage() {
             </div>
           </div>
 
+          {error && (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           {presentations.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow">
               <Presentation className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-4 text-lg font-semibold text-gray-900">No presentations yet</h3>
               <p className="mt-2 text-sm text-gray-500">
-                Get started by creating your first presentation
+                {error ? 'Failed to load presentations. Click Sync to try again.' : 'Get started by creating your first presentation'}
               </p>
-              <div className="mt-6 flex justify-center">
+              <div className="mt-6 flex justify-center gap-3">
+                {error && (
+                  <button
+                    onClick={() => handleSync()}
+                    className="rounded bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+                  >
+                    Sync Again
+                  </button>
+                )}
                 <button
                   onClick={() => router.push('/content/presentations/create')}
                   className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
