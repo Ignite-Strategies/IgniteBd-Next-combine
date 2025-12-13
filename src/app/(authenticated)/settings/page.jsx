@@ -90,10 +90,16 @@ export default function SettingsPage() {
   useEffect(() => {
     // Load profile data from owner
     if (owner) {
-      // Split name into first/last if it exists
-      const nameParts = owner.name ? owner.name.split(' ') : [];
-      const firstName = nameParts.length > 0 ? nameParts[0] : '';
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      // Use firstName/lastName directly, fallback to splitting name for backward compatibility
+      let firstName = owner.firstName || '';
+      let lastName = owner.lastName || '';
+      
+      // If firstName/lastName not set but name exists, try to split it
+      if (!firstName && !lastName && owner.name) {
+        const nameParts = owner.name.split(' ');
+        firstName = nameParts.length > 0 ? nameParts[0] : '';
+        lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      }
       
       setProfileData({
         firstName: firstName,
@@ -174,15 +180,10 @@ export default function SettingsPage() {
     try {
       setProfileLoading(true);
       setError(null);
-      
-      // Combine firstName and lastName into name
-      const fullName = [profileData.firstName, profileData.lastName]
-        .filter(Boolean)
-        .join(' ')
-        .trim() || null;
 
       const response = await api.put(`/api/owner/${ownerId}/profile`, {
-        name: fullName,
+        firstName: profileData.firstName || null,
+        lastName: profileData.lastName || null,
         email: profileData.email,
       });
 

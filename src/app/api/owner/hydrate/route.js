@@ -67,10 +67,17 @@ export async function GET(request) {
 
     const primaryCompanyHQ = owner.ownedCompanies?.[0] || null;
 
+    // Build name from firstName/lastName or fallback to name field for backward compatibility
+    const fullName = owner.firstName && owner.lastName
+      ? `${owner.firstName} ${owner.lastName}`.trim()
+      : owner.firstName || owner.name || null;
+
     const hydratedOwner = {
       id: owner.id,
       firebaseId: owner.firebaseId,
-      name: owner.name,
+      firstName: owner.firstName,
+      lastName: owner.lastName,
+      name: fullName, // Computed full name for backward compatibility
       email: owner.email,
       photoURL: owner.photoURL,
       companyHQId: primaryCompanyHQ?.id || null,

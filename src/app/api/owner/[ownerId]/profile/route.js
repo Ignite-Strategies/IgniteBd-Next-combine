@@ -35,11 +35,24 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { name, email, photoURL, teamSize } = body ?? {};
+    const { firstName, lastName, name, email, photoURL, teamSize } = body ?? {};
 
     // Build update data
     const updateData = {};
-    if (name !== undefined) updateData.name = name || null;
+    if (firstName !== undefined) updateData.firstName = firstName || null;
+    if (lastName !== undefined) updateData.lastName = lastName || null;
+    // Support legacy name field for backward compatibility
+    if (name !== undefined && firstName === undefined && lastName === undefined) {
+      // If name is provided but not firstName/lastName, try to split it
+      if (name) {
+        const nameParts = name.trim().split(/\s+/);
+        updateData.firstName = nameParts[0] || null;
+        updateData.lastName = nameParts.slice(1).join(' ') || null;
+      } else {
+        updateData.firstName = null;
+        updateData.lastName = null;
+      }
+    }
     if (email !== undefined) updateData.email = email || null;
     if (photoURL !== undefined) updateData.photoURL = photoURL || null;
     if (teamSize !== undefined) updateData.teamSize = teamSize || null;

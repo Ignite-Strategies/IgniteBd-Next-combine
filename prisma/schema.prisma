@@ -582,7 +582,9 @@ model landing_pages {
 model owners {
   id                                        String             @id
   firebaseId                                String             @unique
-  name                                      String?
+  firstName                                 String?
+  lastName                                  String?
+  name                                      String?             // Deprecated: Use firstName and lastName instead
   email                                     String?
   photoURL                                  String?
   teamSize                                  String?

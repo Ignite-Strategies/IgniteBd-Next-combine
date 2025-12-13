@@ -24,6 +24,7 @@ export async function POST(request) {
     });
 
     if (!owner) {
+      // Create with firstName and lastName (and legacy name for backward compatibility)
       const name = firstName && lastName
         ? `${firstName} ${lastName}`.trim()
         : firstName || email?.split('@')[0] || null;
@@ -31,7 +32,9 @@ export async function POST(request) {
       owner = await prisma.owner.create({
         data: {
           firebaseId,
-          name: name || null,
+          firstName: firstName || null,
+          lastName: lastName || null,
+          name: name || null, // Keep for backward compatibility
           email: email || null,
           photoURL: photoURL || null,
         },

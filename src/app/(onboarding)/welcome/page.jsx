@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useOwner } from '@/hooks/useOwner';
@@ -10,6 +10,7 @@ export default function WelcomePage() {
   const { ownerId, owner, companyHQId, companyHQ, loading, hydrated, error, refresh } = useOwner();
   const [nextRoute, setNextRoute] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const hasRefreshed = useRef(false);
 
   // Wait for Firebase auth to initialize and check auth state
   useEffect(() => {
@@ -29,15 +30,16 @@ export default function WelcomePage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Refresh from API if not hydrated and auth is checked
+  // Always refresh from API when auth is checked to ensure we have latest data (including name)
   useEffect(() => {
-    if (authChecked && !hydrated && !loading) {
+    if (authChecked && !loading && !hasRefreshed.current) {
+      hasRefreshed.current = true;
       const timer = setTimeout(() => {
         refresh();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [authChecked, hydrated, loading, refresh]);
+  }, [authChecked, loading, refresh]);
 
   // Ensure company data is in localStorage after hydration
   useEffect(() => {
@@ -134,7 +136,10 @@ export default function WelcomePage() {
         <div className="bg-white rounded-xl shadow-xl p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             {(() => {
-              if (owner?.name) {
+              if (owner?.firstName) {
+                return `Welcome, ${owner.firstName}!`;
+              } else if (owner?.name) {
+                // Fallback to legacy name field
                 const firstName = owner.name.split(' ')[0];
                 return `Welcome, ${firstName}!`;
               } else if (owner?.email) {
