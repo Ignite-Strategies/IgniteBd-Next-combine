@@ -82,9 +82,23 @@ export default function PresentationPage() {
     setShowErrorStatus(status === 'ready' || status === 'generating');
   };
 
-  // 🎯 LOCAL-FIRST: Load from localStorage first, API only as fallback
-  const loadPresentation = useCallback(async () => {
-    if (!presentationId) return;
+  // 🎯 LOCAL-FIRST: Hydrate from localStorage (deterministic, runs once)
+  const hydrateFromLocalStorage = async () => {
+    // Check prerequisites inside function (not in useEffect deps)
+    if (!presentationId) {
+      setLoading(false);
+      return;
+    }
+
+    // Wait for auth if needed (check synchronously, don't block)
+    if (typeof window !== 'undefined') {
+      // Give auth a moment to initialize if needed
+      let attempts = 0;
+      while (!authReady && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+    }
     
     try {
       setLoading(true);
@@ -196,10 +210,10 @@ export default function PresentationPage() {
     } finally {
       setLoading(false);
     }
-  }, [presentationId]);
+  };
 
   // 4. useEffect hooks
-  // Wait for Firebase auth before loading presentation
+  // Wait for Firebase auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -213,14 +227,13 @@ export default function PresentationPage() {
     return () => unsubscribe();
   }, [router]);
 
-  // 🎯 LOCAL-FIRST: Load presentation from localStorage first, API only as fallback
+  // 🎯 LOCAL-FIRST: Single deterministic hydration (runs once on mount)
   useEffect(() => {
-    if (presentationId && authReady) {
-      loadPresentation();
-    }
-  }, [presentationId, authReady, loadPresentation]);
+    hydrateFromLocalStorage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - runs once, all logic inside function
 
-  // Poll for generation status when status is 'generating'
+  // Poll for generation status when status is 'generating' (separate concern, not hydration)
   useEffect(() => {
     if (gammaStatus !== 'generating' || !gammaGenerationId || !presentationId) {
       return;
@@ -240,8 +253,8 @@ export default function PresentationPage() {
             setGammaStatus('ready');
             setGammaDeckUrl(response.data.url);
             setGammaPptxUrl(response.data.pptxUrl || null);
-            // Reload presentation to get all updated fields
-            await loadPresentation();
+            // Reload presentation to get all updated fields (call hydrate function directly)
+            await hydrateFromLocalStorage();
             clearInterval(pollInterval);
           } else if (status === 'error') {
             console.error('❌ Generation failed:', response.data.error);
@@ -271,7 +284,9 @@ export default function PresentationPage() {
       clearInterval(pollInterval);
       clearTimeout(timeout);
     };
-  }, [gammaStatus, gammaGenerationId, presentationId, loadPresentation]);
+    // Only depend on the values that trigger polling, not the function
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gammaStatus, gammaGenerationId, presentationId]);
 
   // 5. Handler functions
   const handleSave = async () => {
@@ -382,7 +397,7 @@ export default function PresentationPage() {
           setGammaPptxUrl(response.data.pptxUrl || null);
           
           // Reload presentation to get updated status
-          await loadPresentation();
+          await hydrateFromLocalStorage();
         } else if (response.data.status === 'generating') {
           // Generation started - start polling
           setGammaStatus('generating');
