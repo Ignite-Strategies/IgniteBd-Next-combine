@@ -271,6 +271,7 @@ export default function PresentationPage() {
           });
           
           // Handle status explicitly
+          // Gamma API returns 'completed' but we map it to 'ready' in the backend
           if (status === 'ready' && response.data.url) {
             // Generation complete - stop polling immediately
             console.log('✅ Generation complete!', {
@@ -285,7 +286,25 @@ export default function PresentationPage() {
             await hydrateFromLocalStorage();
             clearInterval(pollInterval);
             return;
-          } else if (status === 'failed' || status === 'error') {
+          } else if (status === 'failed' || status === 'error' || status === 'completed') {
+            // Handle 'completed' without URL as error, or actual failed/error status
+            if (status === 'completed' && !response.data.url) {
+              console.warn('⚠️ Status is completed but no URL provided');
+              setGammaStatus('error');
+              setError('Generation completed but no URL was returned. Please try again.');
+              clearInterval(pollInterval);
+              return;
+            }
+            // Actual failed/error status
+            console.error('❌ Generation failed:', {
+              generationId: gammaGenerationId,
+              status,
+              error: response.data.error,
+            });
+            setGammaStatus('error');
+            setError(response.data.error || 'PPT generation failed');
+            clearInterval(pollInterval);
+            return;
             // Generation failed - stop polling immediately
             console.error('❌ Generation failed:', {
               generationId: gammaGenerationId,

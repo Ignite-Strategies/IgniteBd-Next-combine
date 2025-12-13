@@ -45,26 +45,31 @@ export async function GET(
     console.log('📊 Gamma status check result:', {
       generationId,
       status: statusResult.status,
+      gammaUrl: statusResult.gammaUrl,
       id: statusResult.id,
       url: statusResult.url,
       pptxUrl: statusResult.pptxUrl,
       error: statusResult.error,
+      credits: statusResult.credits,
     });
+
+    // Normalize URL field (Gamma API uses 'gammaUrl', but we support both)
+    const deckUrl = statusResult.gammaUrl || statusResult.url;
 
     // If presentationId provided, update the presentation record
     if (presentationId) {
-      if (statusResult.status === 'ready' && statusResult.id && statusResult.url) {
+      if (statusResult.status === 'completed' && deckUrl) {
         // Generation complete - store URLs
         await prisma.presentation.update({
           where: { id: presentationId },
           data: {
             gammaStatus: 'ready',
-            gammaDeckUrl: statusResult.url,
+            gammaDeckUrl: deckUrl,
             gammaPptxUrl: statusResult.pptxUrl || null,
             gammaError: null,
           },
         });
-        console.log('✅ Updated presentation with ready status and URLs');
+        console.log('✅ Updated presentation with completed status and URLs');
       } else if (statusResult.status === 'failed' || statusResult.status === 'error') {
         // Generation failed
         await prisma.presentation.update({
@@ -85,22 +90,22 @@ export async function GET(
         });
         console.log('🔄 Updated presentation with processing status (continuing to poll)');
       } else {
-        // Unknown status - keep as generating
+        // Unknown status (including 'completed' without URL) - keep as generating
         await prisma.presentation.update({
           where: { id: presentationId },
           data: {
             gammaStatus: 'generating',
           },
         });
-        console.log('⚠️ Unknown status, keeping as generating:', statusResult.status);
+        console.log('⚠️ Unknown or incomplete status, keeping as generating:', statusResult.status);
       }
     }
 
     return NextResponse.json({
       success: true,
-      status: statusResult.status,
-      id: statusResult.id,
-      url: statusResult.url,
+      status: statusResult.status === 'completed' ? 'ready' : statusResult.status, // Map 'completed' to 'ready' for frontend
+      id: statusResult.generationId || statusResult.id,
+      url: deckUrl,
       pptxUrl: statusResult.pptxUrl,
       error: statusResult.error,
     });
