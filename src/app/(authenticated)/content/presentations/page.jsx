@@ -6,6 +6,9 @@ import PageHeader from '@/components/PageHeader.jsx';
 import { Plus, Presentation, ArrowRight, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 
+// 🎯 LOCAL-FIRST FLAG: API sync is optional and explicit only
+const ENABLE_PRESENTATION_API_SYNC = true;
+
 export default function PresentationsPage() {
   const router = useRouter();
   const [presentations, setPresentations] = useState([]);
@@ -15,15 +18,15 @@ export default function PresentationsPage() {
 
   const [companyHQId, setCompanyHQId] = useState('');
 
-  // Load ONLY from localStorage on mount - NO API CALLS
+  // 🎯 LOCAL-FIRST: Load ONLY from localStorage on mount - NO API CALLS
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Get companyHQId (for syncing button only)
+    // Get companyHQId (for syncing button only - not required for display)
     const id = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
     setCompanyHQId(id);
 
-    // Load from localStorage - check multiple possible keys
+    // 🎯 LOCAL-FIRST: Load from localStorage - localStorage is authoritative
     try {
       let loaded = false;
       
@@ -35,7 +38,7 @@ export default function PresentationsPage() {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setPresentations(parsed);
             loaded = true;
-            console.log('✅ Loaded', parsed.length, 'presentations from localStorage');
+            console.log('✅ [LOCAL-FIRST] Loaded', parsed.length, 'presentations from localStorage');
           }
         }
       }
@@ -50,10 +53,10 @@ export default function PresentationsPage() {
             if (parsed?.data?.presentations && Array.isArray(parsed.data.presentations)) {
               setPresentations(parsed.data.presentations);
               loaded = true;
-              console.log('✅ Loaded', parsed.data.presentations.length, 'presentations from hydration data');
+              console.log('✅ [LOCAL-FIRST] Loaded', parsed.data.presentations.length, 'presentations from hydration data');
             }
           } catch (e) {
-            console.warn('Failed to parse hydration data:', e);
+            console.warn('[LOCAL-FIRST] Failed to parse hydration data:', e);
           }
         }
       }
@@ -70,7 +73,7 @@ export default function PresentationsPage() {
                 if (Array.isArray(parsed) && parsed.length > 0) {
                   setPresentations(parsed);
                   loaded = true;
-                  console.log('✅ Loaded', parsed.length, 'presentations from fallback localStorage key:', key);
+                  console.log('✅ [LOCAL-FIRST] Loaded', parsed.length, 'presentations from fallback localStorage key:', key);
                   break;
                 }
               }
@@ -81,33 +84,36 @@ export default function PresentationsPage() {
         }
       }
       
-      // If nothing loaded, show empty state (NO AUTO-SYNC)
+      // 🎯 LOCAL-FIRST: If nothing loaded, show empty state (NO AUTO-SYNC)
       if (!loaded) {
         setPresentations([]);
-        console.log('ℹ️ No presentations found in localStorage - click Sync to load from server');
+        console.log('ℹ️ [LOCAL-FIRST] No presentations found in localStorage - click Sync to load from server');
       }
     } catch (err) {
-      console.warn('Failed to load presentations from localStorage:', err);
+      console.warn('[LOCAL-FIRST] Failed to load presentations from localStorage:', err);
       setPresentations([]);
     }
     
     setLoading(false);
   }, []);
 
-  // Silent sync function (called by sync button or on mount)
-  const handleSync = async (overrideCompanyId = null) => {
-    const id = overrideCompanyId || companyHQId;
+  // 🎯 LOCAL-FIRST: API sync is explicit and optional - only called by user clicking Sync button
+  const handleSync = async () => {
+    // Check if API sync is enabled
+    if (!ENABLE_PRESENTATION_API_SYNC) {
+      console.warn('⚠️ [LOCAL-FIRST] API sync is disabled - skipping');
+      return;
+    }
+
+    // Get companyHQId
+    const id = companyHQId || (typeof window !== 'undefined'
+      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+      : '');
+    
     if (!id) {
-      // Try to get it fresh
-      const freshId = typeof window !== 'undefined'
-        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
-        : '';
-      if (!freshId) {
-        console.warn('No companyHQId available for sync');
-        return;
-      }
-      setCompanyHQId(freshId);
-      id = freshId;
+      console.warn('⚠️ [LOCAL-FIRST] No companyHQId available for sync');
+      setError('Company ID not found. Cannot sync.');
+      return;
     }
 
     try {
@@ -115,32 +121,35 @@ export default function PresentationsPage() {
       setLoading(true);
       setError('');
       
+      console.log('🔄 [LOCAL-FIRST] Starting explicit API sync...');
+      
       const response = await api.get(`/api/content/presentations?companyHQId=${id}`);
+      
       if (response.data?.success) {
         const fetchedPresentations = response.data.presentations || [];
         
         // Log to verify we got full objects
         if (fetchedPresentations.length > 0) {
-          console.log('✅ Synced presentation sample fields:', Object.keys(fetchedPresentations[0]).join(', '));
-          console.log('✅ Sample presentation:', JSON.stringify(fetchedPresentations[0], null, 2).substring(0, 500));
+          console.log('✅ [LOCAL-FIRST] Synced presentation sample fields:', Object.keys(fetchedPresentations[0]).join(', '));
         }
         
-        setPresentations(fetchedPresentations);
-        
-        // Store in localStorage
+        // 🎯 LOCAL-FIRST: Update localStorage (authoritative source)
         if (typeof window !== 'undefined') {
           localStorage.setItem(`presentations_${id}`, JSON.stringify(fetchedPresentations));
-          console.log('✅ Synced', fetchedPresentations.length, 'presentations to localStorage');
+          console.log('✅ [LOCAL-FIRST] Updated localStorage with', fetchedPresentations.length, 'presentations');
         }
+        
+        // Update in-memory state
+        setPresentations(fetchedPresentations);
+        console.log('✅ [LOCAL-FIRST] Sync completed successfully');
+      } else {
+        throw new Error(response.data?.error || 'Sync failed');
       }
     } catch (err) {
-      console.error('❌ Error syncing presentations:', err);
-      const errorMessage = err.response?.data?.error || 
-                          err.response?.data?.details || 
-                          err.message || 
-                          'Failed to sync presentations. Please try again.';
-      setError(errorMessage);
-      // Still show error, but don't block
+      console.error('❌ [LOCAL-FIRST] Error syncing presentations:', err);
+      setError('Failed to sync presentations. Your local data is unchanged.');
+      // 🎯 LOCAL-FIRST: Leave localStorage untouched on error
+      // Do not update state - keep showing local data
     } finally {
       setSyncing(false);
       setLoading(false);
@@ -181,7 +190,7 @@ export default function PresentationsPage() {
           </div>
 
           {error && (
-            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800">
               {error}
             </div>
           )}
@@ -191,17 +200,11 @@ export default function PresentationsPage() {
               <Presentation className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-4 text-lg font-semibold text-gray-900">No presentations yet</h3>
               <p className="mt-2 text-sm text-gray-500">
-                {error ? 'Failed to load presentations. Click Sync to try again.' : 'Get started by creating your first presentation'}
+                {ENABLE_PRESENTATION_API_SYNC 
+                  ? 'Get started by creating your first presentation, or click Sync to load from server'
+                  : 'Get started by creating your first presentation'}
               </p>
               <div className="mt-6 flex justify-center gap-3">
-                {error && (
-                  <button
-                    onClick={() => handleSync()}
-                    className="rounded bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
-                  >
-                    Sync Again
-                  </button>
-                )}
                 <button
                   onClick={() => router.push('/content/presentations/create')}
                   className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
