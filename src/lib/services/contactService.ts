@@ -125,7 +125,7 @@ export async function upsertContactWithDomain(
   // Upsert contact (create or update by email)
   const { crmId: _, ...updateData } = upsertData; // Remove crmId from update data
   
-  const contact = await prisma.contact.upsert({
+  const contact = await prisma.contacts.upsert({
     where: {
       email: normalizedEmail,
     },
@@ -164,7 +164,7 @@ export async function upsertContactWithDomain(
   });
 
   // Re-fetch contact with pipeline to ensure it's included
-  const contactWithPipeline = await prisma.contact.findUnique({
+  const contactWithPipeline = await prisma.contacts.findUnique({
     where: { id: contact.id },
     include: {
       contactCompany: {

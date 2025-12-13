@@ -38,7 +38,8 @@ const INITIAL_FORM = {
   pipeline: '',
   stage: '',
   notes: '',
-  buyerDecision: '',
+  buyerPerson: '',
+  buyingReadiness: '',
   howMet: '',
 };
 
@@ -49,7 +50,8 @@ export default function ContactManualPage() {
   const [saving, setSaving] = useState(false);
   const [pipelineStages, setPipelineStages] = useState([]);
   const [pipelineConfig, setPipelineConfig] = useState(null);
-  const [buyerDecisionConfig, setBuyerDecisionConfig] = useState(null);
+  const [buyerPersonConfig, setBuyerPersonConfig] = useState(null);
+  const [buyingReadinessConfig, setBuyingReadinessConfig] = useState(null);
   const [howMetConfig, setHowMetConfig] = useState(null);
   const [errors, setErrors] = useState([]);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -86,7 +88,8 @@ export default function ContactManualPage() {
         const response = await api.get('/api/pipelines/config');
         if (response.data?.success) {
           setPipelineConfig(response.data.pipelines ?? null);
-          setBuyerDecisionConfig(response.data.buyerDecision ?? null);
+          setBuyerPersonConfig(response.data.buyerPerson ?? null);
+          setBuyingReadinessConfig(response.data.buyingReadiness ?? null);
           setHowMetConfig(response.data.howMet ?? null);
         }
       } catch (error) {
@@ -174,19 +177,24 @@ export default function ContactManualPage() {
     setSaving(true);
 
     try {
-      const contactData = mapFormToContact(formData, companyHQId);
-      const companyData = mapFormToCompany(formData, companyHQId);
-      const pipelineData = mapFormToPipeline(formData);
+      // Format data for /api/contacts (flat format)
+      const requestData = {
+        crmId: companyHQId,
+        firstName: formData.firstName || null,
+        lastName: formData.lastName || null,
+        goesBy: formData.goesBy || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        title: formData.title || null,
+        contactCompanyName: formData.companyName || null,
+        pipeline: formData.pipeline || null,
+        stage: formData.stage || null,
+        buyerDecision: formData.buyerDecision || null,
+        howMet: formData.howMet || null,
+        notes: formData.notes || null,
+      };
 
-      if (!contactData.crmId) {
-        throw new Error('Company ID missing from contact data.');
-      }
-
-      const response = await api.post('/api/contacts/universal-create', {
-        contact: contactData,
-        company: companyData,
-        pipeline: pipelineData,
-      });
+      const response = await api.post('/api/contacts', requestData);
 
       const createdContactId = response.data?.contact?.id ?? null;
 
@@ -686,21 +694,46 @@ export default function ContactManualPage() {
                 </div>
                 <div>
                   <label
-                    htmlFor="buyerDecision"
+                    htmlFor="buyerPerson"
                     className="mb-2 block text-sm font-medium text-gray-700"
                   >
-                    Buyer Decision Type
+                    Buyer Person
                   </label>
                   <select
-                    id="buyerDecision"
-                    name="buyerDecision"
-                    value={formData.buyerDecision}
+                    id="buyerPerson"
+                    name="buyerPerson"
+                    value={formData.buyerPerson}
                     onChange={handleChange}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select buyer type...</option>
-                    {buyerDecisionConfig &&
-                      Object.entries(buyerDecisionConfig.labels).map(
+                    <option value="">Select buyer person...</option>
+                    {buyerPersonConfig &&
+                      Object.entries(buyerPersonConfig.labels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="buyingReadiness"
+                    className="mb-2 block text-sm font-medium text-gray-700"
+                  >
+                    Buying Readiness
+                  </label>
+                  <select
+                    id="buyingReadiness"
+                    name="buyingReadiness"
+                    value={formData.buyingReadiness}
+                    onChange={handleChange}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select buying readiness...</option>
+                    {buyingReadinessConfig &&
+                      Object.entries(buyingReadinessConfig.labels).map(
                         ([value, label]) => (
                           <option key={value} value={value}>
                             {label}

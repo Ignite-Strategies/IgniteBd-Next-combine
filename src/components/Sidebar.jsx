@@ -60,12 +60,7 @@ const navigationGroups = [
     name: 'Engage',
     hubPath: '/contacts',
     items: [
-      { name: 'Manage Contacts', path: '/contacts/view', icon: Users },
-      { name: 'Contact Lists', path: '/contacts/list-manager', icon: List },
-      { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: GitBranch },
-      { name: 'Enrich', path: '/contacts/enrich', icon: Sparkles },
-      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
-      { name: 'Meetings', path: '/meetings', icon: Calendar },
+      { name: 'Contact Hub', path: '/contacts', icon: Users },
     ],
   },
   {

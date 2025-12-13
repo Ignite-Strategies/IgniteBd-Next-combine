@@ -282,7 +282,8 @@ model contacts {
   companyName                                      String?
   companyDomain                                    String?
   contactCompanyId                                 String?
-  buyerDecision                                    String?
+  buyerPerson                                      BuyerPerson?
+  buyingReadiness                                  BuyingReadiness?
   howMet                                           String?
   notes                                            String?
   contactListId                                    String?
@@ -584,7 +585,7 @@ model owners {
   firebaseId                                String             @unique
   firstName                                 String?
   lastName                                  String?
-  name                                      String?             // Deprecated: Use firstName and lastName instead
+  name                                      String? // Deprecated: Use firstName and lastName instead
   email                                     String?
   photoURL                                  String?
   teamSize                                  String?
@@ -1028,4 +1029,15 @@ enum WorkPackageItemStatus {
 enum WorkPackageStatus {
   ACTIVE
   COMPLETED
+}
+
+enum BuyerPerson {
+  BUSINESS_OWNER
+  DIRECTOR_VP
+  PRODUCT_USER
+}
+
+enum BuyingReadiness {
+  READ_BUT_NO_MONEY
+  MONEY_AND_READY
 }

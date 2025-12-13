@@ -12,7 +12,8 @@ export function mapFormToContact(formData, companyHQId) {
     phone: formData.phone || null,
     title: formData.title || null,
     notes: formData.notes || null,
-    buyerDecision: formData.buyerDecision || null,
+    buyerPerson: formData.buyerPerson || null,
+    buyingReadiness: formData.buyingReadiness || null,
     howMet: formData.howMet || null,
     contactCompanyId: null,
   };

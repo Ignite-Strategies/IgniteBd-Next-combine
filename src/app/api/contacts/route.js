@@ -42,7 +42,7 @@ export async function GET(request) {
       }
     }
 
-    const contacts = await prisma.contact.findMany({
+    const contacts = await prisma.contacts.findMany({
       where,
       include: {
         pipeline: true,
@@ -107,7 +107,7 @@ export async function POST(request) {
       );
     }
 
-    const companyHQ = await prisma.companyHQ.findUnique({
+    const companyHQ = await prisma.company_hqs.findUnique({
       where: { id: crmId },
     });
 
@@ -142,7 +142,7 @@ export async function POST(request) {
     // If contactCompanyName provided, try to find/create by name first
     if (contactCompanyName) {
       const normalizedCompanyName = contactCompanyName.trim();
-      const allCompanies = await prisma.company.findMany({
+      const allCompanies = await prisma.companies.findMany({
         where: { companyHQId: crmId },
       });
 
@@ -157,7 +157,7 @@ export async function POST(request) {
         company = await findOrCreateCompanyByDomain(companyDomain, crmId, normalizedCompanyName);
       } else if (!company) {
         // Create new company without domain
-        company = await prisma.company.create({
+        company = await prisma.companies.create({
           data: {
             companyHQId: crmId,
             companyName: normalizedCompanyName,
@@ -185,7 +185,7 @@ export async function POST(request) {
 
     let contact;
     if (email) {
-      const existingContact = await prisma.contact.findFirst({
+      const existingContact = await prisma.contacts.findFirst({
         where: {
           crmId,
           email,
@@ -197,7 +197,7 @@ export async function POST(request) {
       });
 
       if (existingContact) {
-        contact = await prisma.contact.update({
+        contact = await prisma.contacts.update({
           where: { id: existingContact.id },
           data: {
             firstName: firstName || existingContact.firstName,
@@ -225,7 +225,7 @@ export async function POST(request) {
         });
 
         // Re-fetch contact with pipeline
-        contact = await prisma.contact.findUnique({
+        contact = await prisma.contacts.findUnique({
           where: { id: contact.id },
           include: {
             pipeline: true,
@@ -236,7 +236,7 @@ export async function POST(request) {
 
         console.log('✅ Contact updated:', contact.id);
       } else {
-        contact = await prisma.contact.create({
+        contact = await prisma.contacts.create({
           data: {
             crmId,
             firstName: firstName || null,
@@ -265,7 +265,7 @@ export async function POST(request) {
         });
 
         // Re-fetch contact with pipeline
-        contact = await prisma.contact.findUnique({
+        contact = await prisma.contacts.findUnique({
           where: { id: contact.id },
           include: {
             pipeline: true,
@@ -277,7 +277,7 @@ export async function POST(request) {
         console.log('✅ Contact created:', contact.id);
       }
     } else {
-      contact = await prisma.contact.create({
+      contact = await prisma.contacts.create({
         data: {
           crmId,
           firstName: firstName || null,
@@ -304,7 +304,7 @@ export async function POST(request) {
       });
 
       // Re-fetch contact with pipeline
-      contact = await prisma.contact.findUnique({
+      contact = await prisma.contacts.findUnique({
         where: { id: contact.id },
         include: {
           pipeline: true,

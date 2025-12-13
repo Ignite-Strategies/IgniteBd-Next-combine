@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPipelineConfig } from '@/lib/config/pipelineConfig.js';
-import { BUYER_TYPES, BUYER_LABELS } from '@/lib/buyerConfig.js';
+import { BUYER_PERSON_TYPES, BUYER_PERSON_LABELS, BUYING_READINESS_TYPES, BUYING_READINESS_LABELS } from '@/lib/buyerConfig.js';
 import { HOW_MET_TYPES, HOW_MET_LABELS } from '@/lib/config/howMetConfig.js';
 
 export async function GET() {
@@ -12,9 +12,13 @@ export async function GET() {
       pipelines: config.pipelines,
       officialPipelines: config.officialPipelines,
       allStages: config.allStages,
-      buyerDecision: {
-        types: BUYER_TYPES,
-        labels: BUYER_LABELS,
+      buyerPerson: {
+        types: BUYER_PERSON_TYPES,
+        labels: BUYER_PERSON_LABELS,
+      },
+      buyingReadiness: {
+        types: BUYING_READINESS_TYPES,
+        labels: BUYING_READINESS_LABELS,
       },
       howMet: {
         types: HOW_MET_TYPES,
