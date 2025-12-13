@@ -318,7 +318,7 @@ export async function deletePresentationOutline(redisKey: string): Promise<boole
  * @param blogDraft - Generated blog draft (BlogDraft)
  * @param title - Optional title
  * @param subtitle - Optional subtitle
- * @param ttl - Time to live in seconds (default: 1 hour)
+ * @param ttl - Time to live in seconds (default: 1 hour / 3600 seconds)
  * @returns Promise<string> - Redis key
  */
 export async function storeBlogDraft(
