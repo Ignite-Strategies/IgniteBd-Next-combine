@@ -312,3 +312,155 @@ export async function deletePresentationOutline(redisKey: string): Promise<boole
   }
 }
 
+/**
+ * Store blog draft in Redis
+ * 
+ * @param blogDraft - Generated blog draft (BlogDraft)
+ * @param title - Optional title
+ * @param subtitle - Optional subtitle
+ * @param ttl - Time to live in seconds (default: 1 hour)
+ * @returns Promise<string> - Redis key
+ */
+export async function storeBlogDraft(
+  blogDraft: any,
+  title?: string,
+  subtitle?: string,
+  ttl: number = 60 * 60 // 1 hour
+): Promise<string> {
+  try {
+    const redisClient = getRedis();
+    const timestamp = Date.now();
+    const key = `blog:draft:${timestamp}`;
+    
+    const dataToStore = JSON.stringify({
+      blogDraft,
+      title,
+      subtitle,
+      storedAt: new Date().toISOString(),
+    });
+    
+    await redisClient.setex(key, ttl, dataToStore);
+    
+    console.log(`✅ Blog draft stored in Redis: ${key} (TTL: ${ttl}s)`);
+    return key;
+  } catch (error: any) {
+    console.error('❌ Redis store blog draft error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get blog draft from Redis by key
+ * 
+ * @param redisKey - Full Redis key (e.g., "blog:draft:1234567890")
+ * @returns Promise<any | null> - Blog draft data or null
+ */
+export async function getBlogDraft(redisKey: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(redisKey);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get blog draft error:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete blog draft from Redis
+ * 
+ * @param redisKey - Full Redis key
+ * @returns Promise<boolean> - Success status
+ */
+export async function deleteBlogDraft(redisKey: string): Promise<boolean> {
+  try {
+    const redisClient = getRedis();
+    await redisClient.del(redisKey);
+    return true;
+  } catch (error: any) {
+    console.error('❌ Redis delete outline error:', error);
+    return false;
+  }
+}
+
+/**
+ * Store blog draft in Redis
+ * 
+ * @param blogDraft - Generated blog draft (BlogDraft type)
+ * @param title - Optional title override
+ * @param subtitle - Optional subtitle
+ * @param ttl - Time to live in seconds (default: 1 hour)
+ * @returns Promise<string> - Redis key
+ */
+export async function storeBlogDraft(
+  blogDraft: any,
+  title?: string,
+  subtitle?: string,
+  ttl: number = 60 * 60 // 1 hour
+): Promise<string> {
+  try {
+    const redisClient = getRedis();
+    const timestamp = Date.now();
+    const key = `blog:draft:${timestamp}`;
+    
+    const dataToStore = JSON.stringify({
+      blogDraft,
+      title,
+      subtitle,
+      storedAt: new Date().toISOString(),
+    });
+    
+    await redisClient.setex(key, ttl, dataToStore);
+    
+    console.log(`✅ Blog draft stored in Redis: ${key} (TTL: ${ttl}s)`);
+    return key;
+  } catch (error: any) {
+    console.error('❌ Redis store blog draft error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get blog draft from Redis by key
+ * 
+ * @param redisKey - Full Redis key (e.g., "blog:draft:1234567890")
+ * @returns Promise<any | null> - Blog draft data or null
+ */
+export async function getBlogDraft(redisKey: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(redisKey);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get blog draft error:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete blog draft from Redis
+ * 
+ * @param redisKey - Full Redis key
+ * @returns Promise<boolean> - Success status
+ */
+export async function deleteBlogDraft(redisKey: string): Promise<boolean> {
+  try {
+    const redisClient = getRedis();
+    await redisClient.del(redisKey);
+    return true;
+  } catch (error: any) {
+    console.error('❌ Redis delete blog draft error:', error);
+    return false;
+  }
+}
+

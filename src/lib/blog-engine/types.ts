@@ -6,13 +6,14 @@
  */
 
 export type BlogIngest = {
-  mode: "persona";
-  personaId: string;
-  persona: any; // real persona object
-  topic: string; // user-provided
-  problem: string; // user-provided (what BD challenge it solves)
+  mode: "persona" | "idea";
+  personaId?: string;
+  persona?: any; // real persona object (required for persona mode)
+  topic?: string; // user-provided (for persona mode)
+  problem?: string; // user-provided (what BD challenge it solves, for persona mode)
+  idea?: string; // user-provided core idea (required for idea mode)
   angle?: string; // optional: efficiency, dealmaking, risk
-  targetLength?: number; // defaults to 500-700 words
+  targetLength?: number; // defaults to 500 words for idea mode, 500-700 for persona
   companyHQId: string;
 };
 

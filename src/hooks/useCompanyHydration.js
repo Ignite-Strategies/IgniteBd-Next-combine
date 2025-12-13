@@ -166,7 +166,9 @@ export function useCompanyHydration(companyHQId) {
       // Store presentations in both the hook key and the presentations-specific key
       localStorage.setItem('presentations', JSON.stringify(hydratedData.presentations));
       localStorage.setItem(`presentations_${companyHQId}`, JSON.stringify(hydratedData.presentations));
+      // Store blogs in both the hook key and the blogs-specific key
       localStorage.setItem('blogs', JSON.stringify(hydratedData.blogs));
+      localStorage.setItem(`blogs_${companyHQId}`, JSON.stringify(hydratedData.blogs));
       localStorage.setItem('templates', JSON.stringify(hydratedData.templates));
       localStorage.setItem('landingPages', JSON.stringify(hydratedData.landingPages));
 

@@ -6,82 +6,154 @@ import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool } from 'lucide-react';
 
+// 🎯 LOCAL-FIRST FLAG: API sync is optional and explicit only
+const ENABLE_BLOG_API_SYNC = true;
+
 export default function BlogPage() {
   const router = useRouter();
   const [blogs, setBlogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState('');
 
+  const [companyHQId, setCompanyHQId] = useState('');
+
+  // 🎯 LOCAL-FIRST: Load ONLY from localStorage on mount - NO API CALLS
   useEffect(() => {
-    loadBlogs();
-  }, []);
+    if (typeof window === 'undefined') return;
+    
+    // Get companyHQId (for syncing button only - not required for display)
+    const id = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+    setCompanyHQId(id);
 
-  const loadBlogs = async (forceRefresh = false) => {
+    // 🎯 LOCAL-FIRST: Load from localStorage - localStorage is authoritative
     try {
-      if (forceRefresh) {
-        setSyncing(true);
-      } else {
-        setLoading(true);
+      let loaded = false;
+      
+      // First try: blogs_${id} (if we have id)
+      if (id) {
+        const stored = localStorage.getItem(`blogs_${id}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBlogs(parsed);
+            loaded = true;
+            console.log('✅ [LOCAL-FIRST] Loaded', parsed.length, 'blogs from localStorage');
+          }
+        }
       }
       
-      const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-      
-      if (!companyHQId) {
-        console.warn('No companyHQId found');
-        setLoading(false);
-        setSyncing(false);
-        return;
+      // Second try: Check hydration data (companyHydration_${id})
+      if (!loaded && id) {
+        const hydrationKey = `companyHydration_${id}`;
+        const hydrationData = localStorage.getItem(hydrationKey);
+        if (hydrationData) {
+          try {
+            const parsed = JSON.parse(hydrationData);
+            if (parsed?.data?.blogs && Array.isArray(parsed.data.blogs)) {
+              setBlogs(parsed.data.blogs);
+              loaded = true;
+              console.log('✅ [LOCAL-FIRST] Loaded', parsed.data.blogs.length, 'blogs from hydration data');
+            }
+          } catch (e) {
+            console.warn('[LOCAL-FIRST] Failed to parse hydration data:', e);
+          }
+        }
       }
-
-      const cachedKey = `blogs_${companyHQId}`;
-
-      // Try to load from localStorage first (only if not forcing refresh)
-      if (!forceRefresh && typeof window !== 'undefined') {
-        try {
-          const cached = localStorage.getItem(cachedKey);
-          if (cached) {
-            const cachedBlogs = JSON.parse(cached);
-            if (Array.isArray(cachedBlogs) && cachedBlogs.length > 0) {
-              console.log(`📦 Loaded ${cachedBlogs.length} blogs from localStorage`);
-              setBlogs(cachedBlogs);
-              setLoading(false);
+      
+      // Third try: Check any blogs_* key (fallback)
+      if (!loaded) {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('blogs_')) {
+            try {
+              const stored = localStorage.getItem(key);
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setBlogs(parsed);
+                  loaded = true;
+                  console.log('✅ [LOCAL-FIRST] Loaded', parsed.length, 'blogs from fallback localStorage key:', key);
+                  break;
+                }
+              }
+            } catch (e) {
+              // Skip invalid entries
             }
           }
-        } catch (e) {
-          console.warn('Failed to load from localStorage:', e);
         }
       }
-
-      // Always fetch fresh data from API
-      const response = await api.get(`/api/content/blog?companyHQId=${companyHQId}`);
-      if (response.data?.success) {
-        const freshBlogs = response.data.blogs || [];
-        console.log(`✅ Fetched ${freshBlogs.length} blogs from API`);
-        setBlogs(freshBlogs);
-        
-        // Update localStorage with fresh data
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem(cachedKey, JSON.stringify(freshBlogs));
-            console.log('💾 Updated localStorage with fresh blogs');
-          } catch (e) {
-            console.warn('Failed to update localStorage:', e);
-          }
-        }
-      } else {
-        console.warn('API response not successful:', response.data);
+      
+      // 🎯 LOCAL-FIRST: If nothing loaded, show empty state (NO AUTO-SYNC)
+      if (!loaded) {
+        setBlogs([]);
+        console.log('ℹ️ [LOCAL-FIRST] No blogs found in localStorage - click Sync to load from server');
       }
     } catch (err) {
-      console.error('Error loading blogs:', err);
-      alert('Failed to load blogs. Please try again.');
-    } finally {
-      setLoading(false);
-      setSyncing(false);
+      console.warn('[LOCAL-FIRST] Failed to load blogs from localStorage:', err);
+      setBlogs([]);
     }
-  };
+    
+    setLoading(false);
+  }, []);
 
-  const handleSync = () => {
-    loadBlogs(true);
+  // 🎯 LOCAL-FIRST: API sync is explicit and optional - only called by user clicking Sync button
+  const handleSync = async () => {
+    // Check if API sync is enabled
+    if (!ENABLE_BLOG_API_SYNC) {
+      console.warn('⚠️ [LOCAL-FIRST] API sync is disabled - skipping');
+      return;
+    }
+
+    // Get companyHQId
+    const id = companyHQId || (typeof window !== 'undefined'
+      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+      : '');
+    
+    if (!id) {
+      console.warn('⚠️ [LOCAL-FIRST] No companyHQId available for sync');
+      setError('Company ID not found. Cannot sync.');
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setLoading(true);
+      setError('');
+      
+      console.log('🔄 [LOCAL-FIRST] Starting explicit API sync...');
+      
+      const response = await api.get(`/api/content/blog?companyHQId=${id}`);
+      
+      if (response.data?.success) {
+        const fetchedBlogs = response.data.blogs || [];
+        
+        // Log to verify we got full objects
+        if (fetchedBlogs.length > 0) {
+          console.log('✅ [LOCAL-FIRST] Synced blog sample fields:', Object.keys(fetchedBlogs[0]).join(', '));
+        }
+        
+        // 🎯 LOCAL-FIRST: Update localStorage (authoritative source)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`blogs_${id}`, JSON.stringify(fetchedBlogs));
+          console.log('✅ [LOCAL-FIRST] Updated localStorage with', fetchedBlogs.length, 'blogs');
+        }
+        
+        // Update in-memory state
+        setBlogs(fetchedBlogs);
+        console.log('✅ [LOCAL-FIRST] Sync completed successfully');
+      } else {
+        throw new Error(response.data?.error || 'Sync failed');
+      }
+    } catch (err) {
+      console.error('❌ [LOCAL-FIRST] Error syncing blogs:', err);
+      setError('Failed to sync blogs. Your local data is unchanged.');
+      // 🎯 LOCAL-FIRST: Leave localStorage untouched on error
+      // Do not update state - keep showing local data
+    } finally {
+      setSyncing(false);
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (blogId, e) => {
@@ -94,24 +166,25 @@ export default function BlogPage() {
     try {
       const response = await api.delete(`/api/content/blog/${blogId}`);
       if (response.data?.success) {
-        // Remove from state
-        setBlogs(blogs.filter(b => b.id !== blogId));
-        
-        // Remove from localStorage
-        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-        if (companyHQId) {
-          const cachedKey = `blogs_${companyHQId}`;
+        // 🎯 LOCAL-FIRST: Remove from localStorage
+        const id = companyHQId || localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+        if (id) {
+          const cachedKey = `blogs_${id}`;
           try {
             const cached = localStorage.getItem(cachedKey);
             if (cached) {
               const cachedBlogs = JSON.parse(cached);
               const updated = cachedBlogs.filter(b => b.id !== blogId);
               localStorage.setItem(cachedKey, JSON.stringify(updated));
+              console.log('✅ [LOCAL-FIRST] Removed blog from localStorage');
             }
           } catch (e) {
-            console.warn('Failed to update localStorage:', e);
+            console.warn('[LOCAL-FIRST] Failed to update localStorage:', e);
           }
         }
+        
+        // Update in-memory state
+        setBlogs(blogs.filter(b => b.id !== blogId));
       } else {
         throw new Error('Failed to delete blog');
       }
@@ -171,12 +244,12 @@ export default function BlogPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleSync}
-              disabled={syncing || loading}
+              disabled={syncing || !ENABLE_BLOG_API_SYNC}
               className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              title="Sync blogs from database"
+              title={ENABLE_BLOG_API_SYNC ? "Sync blogs from server" : "API sync is disabled"}
             >
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              Sync
+              {syncing ? 'Syncing...' : 'Sync'}
             </button>
           </div>
         </div>
@@ -211,16 +284,20 @@ export default function BlogPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Existing Blogs</h2>
         </div>
 
-        {loading ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow">
-            <p className="text-gray-600">Loading blogs...</p>
+        {error && (
+          <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800">
+            {error}
           </div>
-        ) : blogs.length === 0 ? (
+        )}
+
+        {blogs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-lg font-semibold text-gray-800 mb-2">No blogs yet</p>
             <p className="text-sm text-gray-500">
-              Create your first blog using one of the options above
+              {ENABLE_BLOG_API_SYNC 
+                ? 'Create your first blog using one of the options above, or click Sync to load from server'
+                : 'Create your first blog using one of the options above'}
             </p>
           </div>
         ) : (

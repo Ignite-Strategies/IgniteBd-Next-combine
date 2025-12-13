@@ -56,22 +56,79 @@ export async function POST(request: Request) {
       );
     }
 
-    if (blogIngest.mode !== 'persona') {
+    // Validate based on mode
+    if (blogIngest.mode === 'persona') {
+      if (!blogIngest.persona || !blogIngest.topic || !blogIngest.problem) {
+        return NextResponse.json(
+          { success: false, error: 'persona, topic, and problem are required for persona mode' },
+          { status: 400 },
+        );
+      }
+    } else if (blogIngest.mode === 'idea') {
+      if (!blogIngest.idea) {
+        return NextResponse.json(
+          { success: false, error: 'idea is required for idea mode' },
+          { status: 400 },
+        );
+      }
+    } else {
       return NextResponse.json(
-        { success: false, error: 'Only persona mode is supported in v1' },
+        { success: false, error: 'mode must be "persona" or "idea"' },
         { status: 400 },
       );
     }
 
-    if (!blogIngest.persona || !blogIngest.topic || !blogIngest.problem) {
-      return NextResponse.json(
-        { success: false, error: 'persona, topic, and problem are required' },
-        { status: 400 },
-      );
-    }
+    // Build the AI prompt based on mode
+    let prompt: string;
+    
+    if (blogIngest.mode === 'idea') {
+      // IDEA MODE: Generate blog from idea with specific requirements
+      prompt = `
+You are a Business Development and Legal Content Strategist for BusinessPoint Law.
 
-    // Build the AI prompt using the specified format
-    const prompt = `
+Your task: 
+Generate a structured BlogDraft JSON object based on the core idea provided.
+
+Return ONLY JSON in the exact BlogDraft format.
+
+=== CORE IDEA ===
+${blogIngest.idea}
+
+=== REQUIREMENTS ===
+
+1. **Length**: MUST be exactly 500 words. Count carefully and ensure the total word count is 500 words.
+
+2. **Structure**:
+   - Start with an introduction section that hooks the reader and sets up the topic
+   - Use the ideas put in the box to infer the content, themes, and direction
+   - Build out 3-5 main body sections that expand on the idea
+   - End with a conclusion and CTA
+
+3. **Content Direction**:
+   - Use the core idea to infer:
+     - What problem or opportunity this addresses
+     - Who the target audience is
+     - What key points and insights should be covered
+     - What actionable takeaways readers should have
+
+4. **Structure Details**:
+   - Title: Compelling, specific to the idea
+   - Subtitle: Optional but helpful context
+   - Outline: 3-5 sections with clear headings and bullet points
+   - Body: Same sections with 2-3 rich paragraphs each (total ~500 words)
+   - CTA: Relating to BusinessPoint Law services
+
+5. **Tone**:
+   - Clear and professional
+   - Practical and actionable
+   - Sharp BD insight
+   - Legal framing when relevant
+
+Output must match the BlogDraft type exactly.
+`;
+    } else {
+      // PERSONA MODE: Original persona-based generation
+      prompt = `
 You are a Business Development and Legal Content Strategist for BusinessPoint Law.
 
 Your task: 
@@ -109,6 +166,7 @@ ${JSON.stringify(blogIngest, null, 2)}
 
 Output must match the BlogDraft type exactly.
 `;
+    }
 
     // Call OpenAI
     const openai = getOpenAIClient();
@@ -116,8 +174,13 @@ Output must match the BlogDraft type exactly.
 
     console.log(`🤖 Calling OpenAI (${model}) for blog generation...`);
     console.log(`Mode: ${blogIngest.mode}`);
-    console.log(`Topic: ${blogIngest.topic}`);
-    console.log(`Target Length: ${blogIngest.targetLength || '500-700'} words`);
+    if (blogIngest.mode === 'idea') {
+      console.log(`Idea: ${blogIngest.idea}`);
+      console.log(`Target Length: 500 words (required for idea mode)`);
+    } else {
+      console.log(`Topic: ${blogIngest.topic}`);
+      console.log(`Target Length: ${blogIngest.targetLength || '500-700'} words`);
+    }
 
     const completion = await openai.chat.completions.create({
       model,
@@ -138,8 +201,12 @@ Output must match the BlogDraft type exactly.
       const parsed = JSON.parse(responseText);
       
       // Ensure BlogDraft structure
+      const defaultTitle = blogIngest.mode === 'idea' 
+        ? (blogIngest.idea || 'Blog Post')
+        : (`${blogIngest.topic || 'Blog'} - Blog Post`);
+      
       blogDraft = {
-        title: parsed.title || `${blogIngest.topic} - Blog Post`,
+        title: parsed.title || defaultTitle,
         subtitle: parsed.subtitle || undefined,
         outline: parsed.outline || {
           sections: [],
