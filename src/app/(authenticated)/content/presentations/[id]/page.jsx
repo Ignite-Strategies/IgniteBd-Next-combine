@@ -12,10 +12,12 @@ import api from '@/lib/api';
 const ENABLE_PRESENTATION_API_FALLBACK = true;
 
 export default function PresentationPage() {
+  // 1. Constants / params / flags
   const params = useParams();
   const router = useRouter();
   const presentationId = params.id;
 
+  // 2. State declarations
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [slides, setSlides] = useState([]);
@@ -31,79 +33,54 @@ export default function PresentationPage() {
   const [showErrorStatus, setShowErrorStatus] = useState(false); // Only show error if user tried to generate
   const [authReady, setAuthReady] = useState(false);
 
-  // Wait for Firebase auth before loading presentation
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setAuthReady(true);
-      } else {
-        // No user - redirect to signin
-        router.replace('/signin');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [router]);
-
-  // 🎯 LOCAL-FIRST: Load presentation from localStorage first, API only as fallback
-  useEffect(() => {
-    if (presentationId && authReady) {
-      loadPresentation();
-    }
-  }, [presentationId, authReady]);
-
-  // Poll for generation status when status is 'generating'
-  useEffect(() => {
-    if (gammaStatus !== 'generating' || !gammaGenerationId || !presentationId) {
-      return;
-    }
-
-    console.log('🔄 Starting polling for generation status:', gammaGenerationId);
+  // 3. Helper functions (must be declared before useEffects that use them)
+  // Helper function to set presentation data from either localStorage or API
+  const setPresentationData = (presentation) => {
+    setTitle(presentation.title || '');
+    setDescription(presentation.description || '');
     
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await api.get(`/api/decks/status/${gammaGenerationId}?presentationId=${presentationId}`);
-        
-        if (response.data?.success) {
-          const status = response.data.status;
-          
-          if (status === 'ready' && response.data.url) {
-            console.log('✅ Generation complete!');
-            setGammaStatus('ready');
-            setGammaDeckUrl(response.data.url);
-            setGammaPptxUrl(response.data.pptxUrl || null);
-            // Reload presentation to get all updated fields
-            await loadPresentation();
-            clearInterval(pollInterval);
-          } else if (status === 'error') {
-            console.error('❌ Generation failed:', response.data.error);
-            setGammaStatus('error');
-            setError(response.data.error || 'PPT generation failed');
-            clearInterval(pollInterval);
+    // Handle slides format - could be { sections: [...] } or array or string
+    let slidesData = [];
+    if (presentation.slides) {
+      if (typeof presentation.slides === 'string') {
+        try {
+          const parsed = JSON.parse(presentation.slides);
+          if (parsed.sections && Array.isArray(parsed.sections)) {
+            // Convert sections format to array format for editing
+            slidesData = parsed.sections.map((section, idx) => ({
+              slideNumber: idx + 1,
+              title: section.title || '',
+              content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
+            }));
+          } else if (Array.isArray(parsed)) {
+            slidesData = parsed;
           }
-          // If still processing, continue polling
+        } catch (e) {
+          console.warn('Failed to parse slides JSON:', e);
         }
-      } catch (err) {
-        console.error('Error polling generation status:', err);
-        // Don't stop polling on error - might be temporary
+      } else if (presentation.slides.sections && Array.isArray(presentation.slides.sections)) {
+        // Convert sections format to array format for editing
+        slidesData = presentation.slides.sections.map((section, idx) => ({
+          slideNumber: idx + 1,
+          title: section.title || '',
+          content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
+        }));
+      } else if (Array.isArray(presentation.slides)) {
+        slidesData = presentation.slides;
       }
-    }, 3000); // Poll every 3 seconds
-
-    // Cleanup: stop polling after 5 minutes (safety timeout)
-    const timeout = setTimeout(() => {
-      console.warn('⏰ Polling timeout after 5 minutes');
-      clearInterval(pollInterval);
-      if (gammaStatus === 'generating') {
-        setGammaStatus('error');
-        setError('PPT generation is taking longer than expected. Please refresh the page.');
-      }
-    }, 5 * 60 * 1000);
-
-    return () => {
-      clearInterval(pollInterval);
-      clearTimeout(timeout);
-    };
-  }, [gammaStatus, gammaGenerationId, presentationId, loadPresentation]);
+    }
+    setSlides(slidesData);
+    
+    setPublished(presentation.published || false);
+    const status = presentation.gammaStatus || null;
+    setGammaStatus(status);
+    setGammaDeckUrl(presentation.gammaDeckUrl || null);
+    setGammaPptxUrl(presentation.gammaPptxUrl || null);
+    setGammaGenerationId(presentation.gammaGenerationId || null);
+    // Only show error status box if status is 'ready' or 'generating' on load
+    // Don't show 'error' status on page load - only show if user tries to generate
+    setShowErrorStatus(status === 'ready' || status === 'generating');
+  };
 
   // 🎯 LOCAL-FIRST: Load from localStorage first, API only as fallback
   const loadPresentation = useCallback(async () => {
@@ -221,54 +198,82 @@ export default function PresentationPage() {
     }
   }, [presentationId]);
 
-  // Helper function to set presentation data from either localStorage or API
-  const setPresentationData = (presentation) => {
-    setTitle(presentation.title || '');
-    setDescription(presentation.description || '');
-    
-    // Handle slides format - could be { sections: [...] } or array or string
-    let slidesData = [];
-    if (presentation.slides) {
-      if (typeof presentation.slides === 'string') {
-        try {
-          const parsed = JSON.parse(presentation.slides);
-          if (parsed.sections && Array.isArray(parsed.sections)) {
-            // Convert sections format to array format for editing
-            slidesData = parsed.sections.map((section, idx) => ({
-              slideNumber: idx + 1,
-              title: section.title || '',
-              content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
-            }));
-          } else if (Array.isArray(parsed)) {
-            slidesData = parsed;
-          }
-        } catch (e) {
-          console.warn('Failed to parse slides JSON:', e);
-        }
-      } else if (presentation.slides.sections && Array.isArray(presentation.slides.sections)) {
-        // Convert sections format to array format for editing
-        slidesData = presentation.slides.sections.map((section, idx) => ({
-          slideNumber: idx + 1,
-          title: section.title || '',
-          content: Array.isArray(section.bullets) ? section.bullets.join('\n') : (section.bullets || ''),
-        }));
-      } else if (Array.isArray(presentation.slides)) {
-        slidesData = presentation.slides;
+  // 4. useEffect hooks
+  // Wait for Firebase auth before loading presentation
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setAuthReady(true);
+      } else {
+        // No user - redirect to signin
+        router.replace('/signin');
       }
-    }
-    setSlides(slidesData);
-    
-    setPublished(presentation.published || false);
-    const status = presentation.gammaStatus || null;
-    setGammaStatus(status);
-    setGammaDeckUrl(presentation.gammaDeckUrl || null);
-    setGammaPptxUrl(presentation.gammaPptxUrl || null);
-    setGammaGenerationId(presentation.gammaGenerationId || null);
-    // Only show error status box if status is 'ready' or 'generating' on load
-    // Don't show 'error' status on page load - only show if user tries to generate
-    setShowErrorStatus(status === 'ready' || status === 'generating');
-  };
+    });
 
+    return () => unsubscribe();
+  }, [router]);
+
+  // 🎯 LOCAL-FIRST: Load presentation from localStorage first, API only as fallback
+  useEffect(() => {
+    if (presentationId && authReady) {
+      loadPresentation();
+    }
+  }, [presentationId, authReady, loadPresentation]);
+
+  // Poll for generation status when status is 'generating'
+  useEffect(() => {
+    if (gammaStatus !== 'generating' || !gammaGenerationId || !presentationId) {
+      return;
+    }
+
+    console.log('🔄 Starting polling for generation status:', gammaGenerationId);
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await api.get(`/api/decks/status/${gammaGenerationId}?presentationId=${presentationId}`);
+        
+        if (response.data?.success) {
+          const status = response.data.status;
+          
+          if (status === 'ready' && response.data.url) {
+            console.log('✅ Generation complete!');
+            setGammaStatus('ready');
+            setGammaDeckUrl(response.data.url);
+            setGammaPptxUrl(response.data.pptxUrl || null);
+            // Reload presentation to get all updated fields
+            await loadPresentation();
+            clearInterval(pollInterval);
+          } else if (status === 'error') {
+            console.error('❌ Generation failed:', response.data.error);
+            setGammaStatus('error');
+            setError(response.data.error || 'PPT generation failed');
+            clearInterval(pollInterval);
+          }
+          // If still processing, continue polling
+        }
+      } catch (err) {
+        console.error('Error polling generation status:', err);
+        // Don't stop polling on error - might be temporary
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Cleanup: stop polling after 5 minutes (safety timeout)
+    const timeout = setTimeout(() => {
+      console.warn('⏰ Polling timeout after 5 minutes');
+      clearInterval(pollInterval);
+      if (gammaStatus === 'generating') {
+        setGammaStatus('error');
+        setError('PPT generation is taking longer than expected. Please refresh the page.');
+      }
+    }, 5 * 60 * 1000);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearTimeout(timeout);
+    };
+  }, [gammaStatus, gammaGenerationId, presentationId, loadPresentation]);
+
+  // 5. Handler functions
   const handleSave = async () => {
     if (!title.trim()) {
       setError('Title is required');
@@ -404,6 +409,7 @@ export default function PresentationPage() {
     }
   };
 
+  // 6. JSX render
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
