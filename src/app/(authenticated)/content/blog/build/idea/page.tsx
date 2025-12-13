@@ -17,6 +17,7 @@ export default function BlogBuildIdeaPage() {
   const [redisKey, setRedisKey] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
+  const [body, setBody] = useState('');
 
   const handleGenerate = async () => {
     if (!idea.trim()) {
@@ -57,17 +58,30 @@ export default function BlogBuildIdeaPage() {
           subtitle: blogDraft.subtitle,
         });
 
+        // Merge body sections into blogText for preview/edit
+        let mergedBody = '';
+        if (blogDraft.body && blogDraft.body.sections && Array.isArray(blogDraft.body.sections)) {
+          mergedBody = blogDraft.body.sections
+            .map((section: any) => {
+              const heading = section.heading ? `## ${section.heading}\n\n` : '';
+              return heading + (section.content || '');
+            })
+            .join('\n\n');
+        }
+
         if (storeResponse.data?.success && storeResponse.data?.redisKey) {
           setRedisKey(storeResponse.data.redisKey);
           setGeneratedBlogDraft(blogDraft);
           setTitle(blogDraft.title || '');
           setSubtitle(blogDraft.subtitle || '');
+          setBody(mergedBody);
         } else {
           // Fallback: store in state only (no Redis)
           console.warn('Failed to store in Redis, using local state only');
           setGeneratedBlogDraft(blogDraft);
           setTitle(blogDraft.title || '');
           setSubtitle(blogDraft.subtitle || '');
+          setBody(mergedBody);
         }
       } else {
         throw new Error(aiResponse.data?.error || 'Failed to generate blog');
@@ -95,17 +109,18 @@ export default function BlogBuildIdeaPage() {
     setError('');
 
     try {
-      // Use edited title/subtitle or fall back to generated
+      // Use edited title/subtitle/body or fall back to generated
       const finalTitle = title.trim() || generatedBlogDraft.title || 'Untitled Blog';
       const finalSubtitle = subtitle.trim() || generatedBlogDraft.subtitle || undefined;
+      const finalBlogText = body.trim() || '';
 
-      // Create blog with generated BlogDraft
-      // The API will merge sections into blogText and store sections separately
+      // Create blog - if user edited body, use that; otherwise use BlogDraft structure
       const createResponse = await api.post('/api/content/blog', {
         companyHQId,
         title: finalTitle,
         subtitle: finalSubtitle,
-        blogDraft: generatedBlogDraft, // Pass BlogDraft for processing
+        blogText: finalBlogText || undefined,
+        blogDraft: finalBlogText ? undefined : generatedBlogDraft, // Only pass draft if body wasn't edited
       });
 
       if (createResponse.data?.success && createResponse.data?.blog) {
@@ -223,41 +238,35 @@ export default function BlogBuildIdeaPage() {
                 </div>
 
                 {/* Subtitle Preview/Edit */}
-                {generatedBlogDraft.subtitle && (
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Subtitle
-                    </label>
-                    <input
-                      type="text"
-                      value={subtitle}
-                      onChange={(e) => setSubtitle(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Subtitle
+                  </label>
+                  <input
+                    type="text"
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder="Optional subtitle"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  />
+                </div>
 
-                {/* Blog Content Preview */}
-                {generatedBlogDraft.body?.sections && generatedBlogDraft.body.sections.length > 0 && (
-                  <div>
-                    <label className="mb-4 block text-sm font-semibold text-gray-700">
-                      Blog Content ({generatedBlogDraft.body.sections.length} sections)
-                    </label>
-                    <div className="space-y-4 max-h-96 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-4">
-                      {generatedBlogDraft.body.sections.map((section, sectionIndex) => (
-                        <div key={sectionIndex} className="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
-                          <h4 className="font-semibold text-gray-900 mb-2">
-                            {section.heading || `Section ${sectionIndex + 1}`}
-                          </h4>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{section.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-xs text-gray-500">
-                      Note: You can edit the full content after saving the blog.
-                    </p>
-                  </div>
-                )}
+                {/* Body/BlogText Preview/Edit */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Body
+                  </label>
+                  <textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    rows={20}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-mono focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    placeholder="Blog content..."
+                  />
+                  <p className="mt-2 text-xs text-gray-500">
+                    Edit the blog body content. You can use markdown formatting.
+                  </p>
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
@@ -267,6 +276,7 @@ export default function BlogBuildIdeaPage() {
                       setRedisKey(null);
                       setTitle('');
                       setSubtitle('');
+                      setBody('');
                       setError('');
                     }}
                     className="rounded border border-gray-300 px-6 py-2 text-sm text-gray-700 hover:bg-gray-50"
