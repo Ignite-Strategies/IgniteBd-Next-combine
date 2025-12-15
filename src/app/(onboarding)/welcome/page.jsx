@@ -1,19 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { useOwner } from '@/hooks/useOwner';
 
 export default function WelcomePage() {
   const router = useRouter();
   const { owner, loading, hydrated, error } = useOwner();
 
-  // Auto-redirect to dashboard once hydrated
-  useEffect(() => {
-    if (hydrated && !loading) {
-      router.replace('/growth-dashboard');
-    }
-  }, [hydrated, loading, router]);
+  // Always go to dashboard - profile changes happen in settings
+  const nextRoute = '/growth-dashboard';
+
+  const handleContinue = () => {
+    router.push(nextRoute);
+  };
 
   // Loading state
   if (loading || !hydrated) {
@@ -46,7 +45,7 @@ export default function WelcomePage() {
     );
   }
 
-  // Welcome screen (brief flash before redirect)
+  // Welcome screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
       <div className="text-center max-w-md mx-auto px-4">
@@ -60,7 +59,18 @@ export default function WelcomePage() {
               ? `Welcome, ${owner.email.split('@')[0]}!`
               : 'Welcome!'}
           </h1>
-          <p className="text-gray-600 mb-6">Redirecting to dashboard...</p>
+          <p className="text-gray-600 mb-6">
+            {owner?.companyHQ?.companyName
+              ? `Ready to manage ${owner.companyHQ.companyName}?`
+              : 'Ready to get started?'}
+          </p>
+
+          <button
+            onClick={handleContinue}
+            className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium text-lg transition-colors shadow-lg"
+          >
+            Continue →
+          </button>
         </div>
       </div>
     </div>
