@@ -23,24 +23,12 @@ export async function GET(request) {
 
     console.log('🚀 OWNER HYDRATE: Finding Owner by Firebase ID:', firebaseId);
 
+    // Get owner - companyHQ comes through the relation automatically
     const owner = await prisma.owners.findUnique({
       where: { firebaseId },
       include: {
-        ownedCompanies: {
-          include: {
-            owner: true,
-            manager: true,
-            // Don't include contacts - can cause schema mismatches
-            contactLists: {
-              take: 5,
-            },
-          },
-        },
-        managedCompanies: {
-          include: {
-            owner: true,
-            manager: true,
-          },
+        company_hqs_company_hqs_ownerIdToowners: {
+          take: 1, // Just get the first one (primary)
         },
       },
     });
@@ -58,32 +46,25 @@ export async function GET(request) {
       );
     }
 
-    // Check if Owner is SuperAdmin
-    const superAdmin = await prisma.superAdmin.findUnique({
-      where: { ownerId: owner.id },
-    });
+    // Get primary companyHQ from relation
+    const primaryCompanyHQ = owner.company_hqs_company_hqs_ownerIdToowners?.[0] || null;
 
-    const isSuperAdmin = !!superAdmin; // If SuperAdmin record exists, they're active
-
-    const primaryCompanyHQ = owner.ownedCompanies?.[0] || null;
-
-    // Build name from firstName/lastName or fallback to name field for backward compatibility
+    // Build name from firstName/lastName or fallback to name field
     const fullName = owner.firstName && owner.lastName
       ? `${owner.firstName} ${owner.lastName}`.trim()
       : owner.firstName || owner.name || null;
 
+    // Return owner with companyHQ nested - full companyHQ hydration happens on dashboard
     const hydratedOwner = {
       id: owner.id,
       firebaseId: owner.firebaseId,
       firstName: owner.firstName,
       lastName: owner.lastName,
-      name: fullName, // Computed full name for backward compatibility
+      name: fullName,
       email: owner.email,
       photoURL: owner.photoURL,
       companyHQId: primaryCompanyHQ?.id || null,
-      companyHQ: primaryCompanyHQ || null,
-      ownedCompanies: owner.ownedCompanies || [],
-      managedCompanies: owner.managedCompanies || [],
+      companyHQ: primaryCompanyHQ || null, // Basic companyHQ - full hydration on dashboard
       createdAt: owner.createdAt,
       updatedAt: owner.updatedAt,
     };
@@ -92,7 +73,6 @@ export async function GET(request) {
       success: true,
       message: 'Owner hydrated successfully',
       owner: hydratedOwner,
-      isSuperAdmin: isSuperAdmin,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

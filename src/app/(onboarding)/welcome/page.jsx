@@ -30,13 +30,15 @@ export default function WelcomePage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Always refresh from API when auth is checked to ensure we have latest data (including name)
+  // Refresh from API once when auth is checked to ensure we have latest data (including name)
+  // Only refresh once per mount, with a delay to avoid race conditions
   useEffect(() => {
     if (authChecked && !loading && !hasRefreshed.current) {
       hasRefreshed.current = true;
+      // Delay refresh to ensure auth and initial state are stable
       const timer = setTimeout(() => {
         refresh();
-      }, 500);
+      }, 1200); // 1.2 second delay to avoid race conditions
       return () => clearTimeout(timer);
     }
   }, [authChecked, loading, refresh]);

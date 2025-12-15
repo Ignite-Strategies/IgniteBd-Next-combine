@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import api from '@/lib/api';
@@ -22,6 +22,7 @@ export function useOwner() {
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState(null);
   const [authInitialized, setAuthInitialized] = useState(false);
+  const isRefreshingRef = useRef(false);
 
   // Wait for Firebase auth to initialize
   useEffect(() => {
@@ -77,7 +78,14 @@ export function useOwner() {
 
   // Refresh from API
   const refresh = useCallback(async () => {
+    // Prevent multiple simultaneous refresh calls
+    if (isRefreshingRef.current) {
+      console.log('⏸️ useOwner: Refresh already in progress, skipping...');
+      return;
+    }
+
     try {
+      isRefreshingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -85,6 +93,7 @@ export function useOwner() {
       if (!authInitialized) {
         console.log('⏳ useOwner: Waiting for auth initialization...');
         setLoading(false);
+        isRefreshingRef.current = false;
         return;
       }
 
@@ -92,6 +101,7 @@ export function useOwner() {
       if (!firebaseUser) {
         setError('No Firebase user found');
         setLoading(false);
+        isRefreshingRef.current = false;
         return;
       }
 
@@ -131,6 +141,8 @@ export function useOwner() {
       console.error('Error refreshing owner:', err);
       setError(err.message || 'Failed to refresh owner data');
       setLoading(false);
+    } finally {
+      isRefreshingRef.current = false;
     }
   }, [authInitialized]);
 
