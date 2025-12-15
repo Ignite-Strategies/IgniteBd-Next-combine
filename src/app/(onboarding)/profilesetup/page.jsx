@@ -17,10 +17,27 @@ export default function ProfileSetupPage() {
   });
   const [loading, setLoading] = useState(false);
 
-  // Profile setup is only for signup flow - if already has data, go to dashboard
+  // Profile setup is only for signup flow - if already has data, go to dashboard immediately
   useEffect(() => {
+    // Check localStorage first (instant check)
+    if (typeof window !== 'undefined') {
+      const storedOwner = localStorage.getItem('owner');
+      if (storedOwner) {
+        try {
+          const parsedOwner = JSON.parse(storedOwner);
+          if (parsedOwner?.firstName && parsedOwner?.lastName) {
+            router.replace('/growth-dashboard');
+            return;
+          }
+        } catch (e) {
+          // Continue to check hydrated data
+        }
+      }
+    }
+    
+    // Also check hydrated owner data
     if (hydrated && owner?.firstName && owner?.lastName) {
-      router.push('/growth-dashboard');
+      router.replace('/growth-dashboard');
     }
   }, [hydrated, owner, router]);
 
