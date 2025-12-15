@@ -5,11 +5,27 @@ import { randomUUID } from 'crypto';
 
 /**
  * POST /api/content/blog
- * Create a new blog
+ * Create a new blog or upsert if id is provided
+ * Requires: ownerId (from Firebase token) - verifies access through companyHQ
  */
 export async function POST(request) {
+  let firebaseUser;
+  let owner;
+  
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
+    
+    // Get owner
+    owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -20,6 +36,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const {
+      id, // Optional - if provided, upsert
       companyHQId,
       title,
       subtitle,
@@ -34,6 +51,21 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, error: 'companyHQId and title are required' },
         { status: 400 },
+      );
+    }
+
+    // Verify companyHQ belongs to owner
+    const companyHQ = await prisma.companyHQ.findFirst({
+      where: {
+        id: companyHQId,
+        ownerId: owner.id,
+      },
+    });
+
+    if (!companyHQ) {
+      return NextResponse.json(
+        { success: false, error: 'CompanyHQ not found or access denied' },
+        { status: 403 },
       );
     }
 
@@ -54,20 +86,35 @@ export async function POST(request) {
       finalSections = blogDraft;
     }
 
-    const blog = await prisma.blogs.create({
-      data: {
-        id: randomUUID(),
-        companyHQId,
-        title: title || null,
-        subtitle: subtitle || null,
-        blogText: finalBlogText || null,
-        sections: finalSections || null,
-        presenter: presenter || null,
-        description: description || null,
-      },
-    });
+    // Upsert: update if id provided, otherwise create
+    const blogData = {
+      companyHQId,
+      title: title || null,
+      subtitle: subtitle || null,
+      blogText: finalBlogText || null,
+      sections: finalSections || null,
+      presenter: presenter || null,
+      description: description || null,
+    };
 
-    console.log('✅ Blog created:', blog.id);
+    let blog;
+    if (id) {
+      // Update existing blog
+      blog = await prisma.blogs.update({
+        where: { id },
+        data: blogData,
+      });
+      console.log('✅ Blog updated:', blog.id);
+    } else {
+      // Create new blog
+      blog = await prisma.blogs.create({
+        data: {
+          id: randomUUID(),
+          ...blogData,
+        },
+      });
+      console.log('✅ Blog created:', blog.id);
+    }
 
     return NextResponse.json({
       success: true,
