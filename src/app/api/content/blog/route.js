@@ -53,7 +53,7 @@ export async function POST(request) {
       finalSections = blogDraft;
     }
 
-    const blog = await prisma.blog.create({
+    const blog = await prisma.blogs.create({
       data: {
         companyHQId,
         title: title || null,
@@ -105,7 +105,7 @@ export async function GET(request) {
     const where = {};
     if (companyHQId) where.companyHQId = companyHQId;
 
-    const blogs = await prisma.blog.findMany({
+    const blogs = await prisma.blogs.findMany({
       where,
       orderBy: {
         createdAt: 'desc',

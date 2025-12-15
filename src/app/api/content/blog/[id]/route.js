@@ -25,7 +25,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const blog = await prisma.blog.findUnique({
+    const blog = await prisma.blogs.findUnique({
       where: { id },
     });
 
@@ -87,7 +87,7 @@ export async function PATCH(request, { params }) {
     if (presenter !== undefined) updateData.presenter = presenter;
     if (description !== undefined) updateData.description = description;
 
-    const blog = await prisma.blog.update({
+    const blog = await prisma.blogs.update({
       where: { id },
       data: updateData,
     });
@@ -134,7 +134,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    await prisma.blog.delete({
+    await prisma.blogs.delete({
       where: { id },
     });
 
