@@ -46,7 +46,7 @@ export async function POST(request) {
         finalBlogText = blogDraft.body.sections
           .map((section) => section.content || '')
           .filter((content) => content && content.trim()) // Remove empty sections
-          .join('\n\n');
+          .join('\n');
       }
       
       // Store sections structure

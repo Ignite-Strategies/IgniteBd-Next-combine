@@ -64,7 +64,7 @@ export default function BlogBuildIdeaPage() {
           mergedBody = blogDraft.body.sections
             .map((section: any) => section.content || '')
             .filter((content: string) => content.trim()) // Remove empty sections
-            .join('\n\n');
+            .join('\n');
         }
 
         if (storeResponse.data?.success && storeResponse.data?.redisKey) {
