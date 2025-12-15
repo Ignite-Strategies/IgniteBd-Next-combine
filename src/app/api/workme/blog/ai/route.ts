@@ -89,42 +89,89 @@ You are a Business Development and Legal Content Strategist for BusinessPoint La
 Your task: 
 Generate a structured BlogDraft JSON object based on the core idea provided.
 
-Return ONLY JSON in the exact BlogDraft format.
+Return ONLY valid JSON in the exact BlogDraft format - no markdown, no code blocks, just pure JSON.
 
 === CORE IDEA ===
 ${blogIngest.idea}
 
 === REQUIREMENTS ===
 
-1. **Length**: MUST be exactly 500 words. Count carefully and ensure the total word count is 500 words.
+1. **Length**: MUST be exactly 500 words in the body content only. Count carefully.
 
-2. **Structure**:
-   - Start with an introduction section that hooks the reader and sets up the topic
-   - Use the ideas put in the box to infer the content, themes, and direction
+2. **JSON Structure - CRITICAL**:
+You MUST return JSON matching this exact structure:
+{
+  "title": "Compelling blog title (ONLY the title, max 100 characters)",
+  "subtitle": "Optional subtitle providing context (max 150 characters)",
+  "outline": {
+    "sections": [
+      {
+        "heading": "Section heading",
+        "bullets": ["bullet point 1", "bullet point 2"]
+      }
+    ]
+  },
+  "body": {
+    "sections": [
+      {
+        "heading": "Section heading",
+        "content": "2-3 rich paragraphs of content for this section"
+      }
+    ]
+  },
+  "summary": "Optional brief summary",
+  "cta": "Call to action text"
+}
+
+3. **Title Rules**:
+   - Title MUST be a short, compelling headline (max 100 characters)
+   - Title MUST NOT contain body content, narrative, or section text
+   - Title should be specific to the idea
+
+4. **Subtitle Rules**:
+   - Subtitle is OPTIONAL but recommended
+   - Provides additional context or hook (max 150 characters)
+   - Should complement the title
+
+5. **Body Structure**:
+   - Start with an introduction section that hooks the reader
    - Build out 3-5 main body sections that expand on the idea
-   - End with a conclusion and CTA
+   - End with a conclusion section
+   - Each section should have a clear heading and 2-3 rich paragraphs
+   - Total body content must be exactly 500 words
 
-3. **Content Direction**:
-   - Use the core idea to infer:
-     - What problem or opportunity this addresses
-     - Who the target audience is
-     - What key points and insights should be covered
-     - What actionable takeaways readers should have
+6. **Content Inference Process - CRITICAL**:
+   Read the core idea and infer the following:
+   
+   a) **Problem/Opportunity**: What specific problem does this idea address? What opportunity does it highlight?
+      - Example: If idea is "NDA negotiation strategies", problem might be "NDAs create friction in deal processes"
+   
+   b) **Target Audience**: Who would benefit from this content? What role/seniority/industry?
+      - Example: Private credit sponsors, deal lawyers, BD professionals
+   
+   c) **Key Points & Insights**: What are the main takeaways from this idea?
+      - What practical insights can you extract?
+      - What common mistakes or pitfalls should be addressed?
+      - What best practices emerge from this idea?
+   
+   d) **Solution/Actionable Content**: What solutions, frameworks, or actionable advice can be provided?
+      - What steps can readers take?
+      - What frameworks or methodologies apply?
+      - What real-world examples illustrate the point?
+   
+   e) **Business Development Angle**: How does this connect to BD strategy and client acquisition?
+      - Why does this matter for BD professionals?
+      - How can this help win business or serve clients better?
+   
+   Use these inferences to structure your blog content. The introduction should hook with the problem, body sections should explore insights and solutions, and conclusion should provide actionable takeaways.
 
-4. **Structure Details**:
-   - Title: Compelling, specific to the idea
-   - Subtitle: Optional but helpful context
-   - Outline: 3-5 sections with clear headings and bullet points
-   - Body: Same sections with 2-3 rich paragraphs each (total ~500 words)
-   - CTA: Relating to BusinessPoint Law services
-
-5. **Tone**:
+7. **Tone**:
    - Clear and professional
    - Practical and actionable
    - Sharp BD insight
    - Legal framing when relevant
 
-Output must match the BlogDraft type exactly.
+CRITICAL: Return ONLY valid JSON. Do not include markdown code blocks, explanations, or any text outside the JSON object.
 `;
     } else {
       // PERSONA MODE: Original persona-based generation
@@ -150,21 +197,52 @@ ${JSON.stringify(blogIngest, null, 2)}
    - desired outcomes
    - decision pressures
 
-4. Structure:
-   - Title
-   - Subtitle
-   - Outline (3–6 sections, bullets per section)
-   - Body (same sections with 2–3 paragraphs each)
+4. JSON Structure - CRITICAL:
+You MUST return JSON matching this exact structure:
+{
+  "title": "Compelling blog title (ONLY the title, max 100 characters)",
+  "subtitle": "Optional subtitle providing context (max 150 characters)",
+  "outline": {
+    "sections": [
+      {
+        "heading": "Section heading",
+        "bullets": ["bullet point 1", "bullet point 2"]
+      }
+    ]
+  },
+  "body": {
+    "sections": [
+      {
+        "heading": "Section heading",
+        "content": "2-3 rich paragraphs of content for this section"
+      }
+    ]
+  },
+  "summary": "Optional brief summary",
+  "cta": "Call to action text"
+}
 
-5. Tone:
-   - Clear
-   - Practical
+5. Title Rules:
+   - Title MUST be a short, compelling headline (max 100 characters)
+   - Title MUST NOT contain body content, narrative, or section text
+
+6. Subtitle Rules:
+   - Subtitle is OPTIONAL but recommended
+   - Provides additional context (max 150 characters)
+
+7. Body Structure:
+   - Outline: 3-6 sections with clear headings and bullet points
+   - Body: Same sections with 2-3 rich paragraphs each (total word count should match target length)
+
+8. Tone:
+   - Clear and professional
+   - Practical and actionable
    - Sharp BD insight
    - Legal framing when relevant
 
-6. Include a CTA relating to BusinessPoint Law at the end.
+9. Include a CTA relating to BusinessPoint Law at the end.
 
-Output must match the BlogDraft type exactly.
+CRITICAL: Return ONLY valid JSON. Do not include markdown code blocks, explanations, or any text outside the JSON object.
 `;
     }
 
@@ -198,16 +276,42 @@ Output must match the BlogDraft type exactly.
 
     let blogDraft: BlogDraft;
     try {
-      const parsed = JSON.parse(responseText);
+      // Clean response text - remove markdown code blocks if present
+      let cleanedText = responseText.trim();
+      if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedText.startsWith('```')) {
+        cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      cleanedText = cleanedText.trim();
       
-      // Ensure BlogDraft structure
+      const parsed = JSON.parse(cleanedText);
+      
+      // Ensure BlogDraft structure with validation
       const defaultTitle = blogIngest.mode === 'idea' 
-        ? (blogIngest.idea || 'Blog Post')
+        ? (blogIngest.idea?.substring(0, 100) || 'Blog Post')
         : (`${blogIngest.topic || 'Blog'} - Blog Post`);
       
+      // Clean title - ensure it's just the title, not mixed with body content
+      let cleanTitle = (parsed.title || defaultTitle).trim();
+      // Remove common issues: remove any content after newlines or colons that look like body content
+      if (cleanTitle.includes('\n')) {
+        cleanTitle = cleanTitle.split('\n')[0].trim();
+      }
+      // Limit title length
+      if (cleanTitle.length > 100) {
+        cleanTitle = cleanTitle.substring(0, 97) + '...';
+      }
+      
+      // Clean subtitle
+      let cleanSubtitle = parsed.subtitle?.trim();
+      if (cleanSubtitle && cleanSubtitle.length > 150) {
+        cleanSubtitle = cleanSubtitle.substring(0, 147) + '...';
+      }
+      
       blogDraft = {
-        title: parsed.title || defaultTitle,
-        subtitle: parsed.subtitle || undefined,
+        title: cleanTitle,
+        subtitle: cleanSubtitle || undefined,
         outline: parsed.outline || {
           sections: [],
         },
@@ -218,13 +322,19 @@ Output must match the BlogDraft type exactly.
         cta: parsed.cta || undefined,
       };
 
-      // Validate structure
+      // Validate and clean structure
       if (!blogDraft.outline.sections || !Array.isArray(blogDraft.outline.sections)) {
         blogDraft.outline.sections = [];
       }
       if (!blogDraft.body.sections || !Array.isArray(blogDraft.body.sections)) {
         blogDraft.body.sections = [];
       }
+      
+      // Validate that body sections have proper structure
+      blogDraft.body.sections = blogDraft.body.sections.map((section: any) => ({
+        heading: section.heading || '',
+        content: section.content || '',
+      }));
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', responseText);
       throw new Error('Invalid JSON response from AI');
