@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { randomUUID } from 'crypto';
 
 /**
  * POST /api/content/blog
@@ -55,6 +56,7 @@ export async function POST(request) {
 
     const blog = await prisma.blogs.create({
       data: {
+        id: randomUUID(),
         companyHQId,
         title: title || null,
         subtitle: subtitle || null,

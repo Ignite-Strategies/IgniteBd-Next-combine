@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
@@ -12,31 +13,100 @@ export default function TemplateSavedPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
+  // 🎯 LOCAL-FIRST: Load ONLY from localStorage on mount - NO API CALLS
   useEffect(() => {
-    if (companyHQId) {
-      fetchTemplates();
+    if (typeof window === 'undefined') return;
+    
+    const id = companyHQId || localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+    
+    if (!id) {
+      setLoading(false);
+      return;
     }
-  }, [companyHQId]);
 
-  const fetchTemplates = async () => {
-    if (!companyHQId) return;
+    // 🎯 LOCAL-FIRST: Load from localStorage - localStorage is authoritative
+    try {
+      let loaded = false;
 
-    setLoading(true);
+      // First try: outreachTemplates_${id}
+      const stored = localStorage.getItem(`outreachTemplates_${id}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTemplates(parsed);
+          loaded = true;
+          console.log('✅ [LOCAL-FIRST] Loaded', parsed.length, 'templates from localStorage');
+        }
+      }
+
+      // Second try: Check hydration data (companyHydration_${id})
+      if (!loaded) {
+        const hydrationKey = `companyHydration_${id}`;
+        const hydrationData = localStorage.getItem(hydrationKey);
+        if (hydrationData) {
+          try {
+            const parsed = JSON.parse(hydrationData);
+            if (parsed?.data?.outreachTemplates && Array.isArray(parsed.data.outreachTemplates)) {
+              setTemplates(parsed.data.outreachTemplates);
+              // Also store in direct key for consistency
+              localStorage.setItem(`outreachTemplates_${id}`, JSON.stringify(parsed.data.outreachTemplates));
+              loaded = true;
+              console.log('✅ [LOCAL-FIRST] Loaded', parsed.data.outreachTemplates.length, 'templates from hydration data');
+            }
+          } catch (e) {
+            console.warn('[LOCAL-FIRST] Failed to parse hydration data:', e);
+          }
+        }
+      }
+
+      // 🎯 LOCAL-FIRST: If nothing loaded, show empty state (NO AUTO-SYNC)
+      if (!loaded) {
+        setTemplates([]);
+        console.log('ℹ️ [LOCAL-FIRST] No templates found in localStorage - click Sync to load from server');
+      }
+    } catch (err) {
+      console.warn('[LOCAL-FIRST] Failed to load templates from localStorage:', err);
+      setTemplates([]);
+    }
+    
+    setLoading(false);
+  }, []); // Empty dependency array - only run on mount
+
+  // 🎯 LOCAL-FIRST: API sync is explicit and optional - only called by user clicking Sync button
+  const handleSync = async () => {
+    const id = companyHQId || (typeof window !== 'undefined'
+      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+      : '');
+    
+    if (!id) {
+      setError('Company ID not found. Cannot sync.');
+      return;
+    }
+
+    setSyncing(true);
     setError(null);
 
     try {
-      const response = await api.get(`/api/template/saved?companyHQId=${encodeURIComponent(companyHQId)}`);
+      const response = await api.get(`/api/template/saved?companyHQId=${encodeURIComponent(id)}`);
 
       if (response.data?.success && response.data?.templates) {
-        setTemplates(response.data.templates);
+        const fetchedTemplates = response.data.templates;
+        setTemplates(fetchedTemplates);
+        // Cache in localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`outreachTemplates_${id}`, JSON.stringify(fetchedTemplates));
+          console.log('✅ Cached', fetchedTemplates.length, 'templates to localStorage');
+        }
+        setError(null);
       } else {
         throw new Error('Failed to fetch templates');
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to fetch templates');
     } finally {
-      setLoading(false);
+      setSyncing(false);
     }
   };
 
@@ -94,13 +164,24 @@ export default function TemplateSavedPage() {
               View and manage your saved outreach templates
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push('/template/build')}
-            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700"
-          >
-            Build New Template
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={syncing || !companyHQId}
+              className="flex items-center gap-2 rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push('/template/build')}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700"
+            >
+              Build New Template
+            </button>
+          </div>
         </div>
 
         {error && (

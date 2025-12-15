@@ -55,10 +55,29 @@ export default function TemplateBuildPage() {
     setError(null);
   };
 
-  // Auto-hydrate preview when form changes (for MANUAL mode)
+  // Auto-hydrate preview when form changes (for MANUAL mode) - client-side only, no API calls
   useEffect(() => {
-    if (mode === 'MANUAL' && templateBaseId) {
-      handleHydrate();
+    if (mode === 'MANUAL' && form.relationship && form.typeOfPerson && form.whyReachingOut.trim()) {
+      // Use client-side hydration for instant preview - no API call needed
+      const tempBase = {
+        relationship: form.relationship,
+        typeOfPerson: form.typeOfPerson,
+        whyReachingOut: form.whyReachingOut.trim(),
+        whatWantFromThem: form.whatWantFromThem?.trim() || null,
+      };
+      const hydrated = hydrateMessage(tempBase);
+      setPreview(hydrated);
+    } else if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
+      // Clear preview if form is incomplete
+      setPreview({
+        content: '',
+        sections: {
+          opening: '',
+          context: '',
+          releaseValve: '',
+          close: '',
+        },
+      });
     }
   }, [form.relationship, form.typeOfPerson, form.whyReachingOut, form.whatWantFromThem, mode]);
 
@@ -102,18 +121,7 @@ export default function TemplateBuildPage() {
   const handleHydrate = async (baseId = null) => {
     const idToUse = baseId || templateBaseId;
     if (!idToUse) {
-      // For manual mode, create a temporary template base for preview
-      if (mode === 'MANUAL' && form.relationship && form.typeOfPerson && form.whyReachingOut.trim()) {
-        // Create temporary preview without saving
-        const tempBase = {
-          relationship: form.relationship,
-          typeOfPerson: form.typeOfPerson,
-          whyReachingOut: form.whyReachingOut.trim(),
-          whatWantFromThem: form.whatWantFromThem?.trim() || null,
-        };
-        const hydrated = hydrateMessage(tempBase);
-        setPreview(hydrated);
-      }
+      // For manual mode, use client-side hydration (already handled in useEffect)
       return;
     }
 
@@ -214,6 +222,20 @@ export default function TemplateBuildPage() {
       });
 
       if (response.data?.success) {
+        // Update localStorage cache
+        if (typeof window !== 'undefined' && companyHQId) {
+          try {
+            const cachedKey = `outreachTemplates_${companyHQId}`;
+            const cached = localStorage.getItem(cachedKey);
+            const existingTemplates = cached ? JSON.parse(cached) : [];
+            const updatedTemplates = [response.data.template, ...existingTemplates];
+            localStorage.setItem(cachedKey, JSON.stringify(updatedTemplates));
+            console.log('✅ Cached saved template to localStorage');
+          } catch (e) {
+            console.warn('Failed to cache template to localStorage:', e);
+          }
+        }
+        
         setSuccess(true);
         setTimeout(() => {
           router.push('/template/saved');
