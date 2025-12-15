@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { useState, useEffect, useRef } from 'react';
 import api from '@/lib/api';
 
 /**
  * useOwner Hook
  * 
  * Manages owner and companyHQId hydration from localStorage and API.
- * Provides surgical hydration point for owner data.
+ * Hydrate uses Firebase ID from token to find owner - that's it.
  * 
- * @returns {Object} { ownerId, owner, companyHQId, companyHQ, loading, hydrated, refresh }
+ * @returns {Object} { ownerId, owner, companyHQId, companyHQ, loading, hydrated, error }
  */
 export function useOwner() {
   const [ownerId, setOwnerId] = useState(null);
@@ -21,25 +19,9 @@ export function useOwner() {
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
-  const isRefreshingRef = useRef(false);
+  const hasHydratedRef = useRef(false);
 
-  // Wait for Firebase auth to initialize
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        console.log('✅ useOwner: Firebase auth initialized, user:', firebaseUser.uid);
-        setAuthInitialized(true);
-      } else {
-        console.log('⚠️ useOwner: No Firebase user');
-        setAuthInitialized(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Load from localStorage on mount
+  // Load from localStorage first (instant)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -53,15 +35,18 @@ export function useOwner() {
     }
     if (storedOwner) {
       try {
-        setOwner(JSON.parse(storedOwner));
+        const parsedOwner = JSON.parse(storedOwner);
+        setOwner(parsedOwner);
+        setCompanyHQId(parsedOwner.companyHQId || storedCompanyHQId || null);
+        setCompanyHQ(parsedOwner.companyHQ || (storedCompanyHQ ? JSON.parse(storedCompanyHQ) : null));
       } catch (error) {
         console.warn('Failed to parse stored owner', error);
       }
     }
-    if (storedCompanyHQId) {
+    if (storedCompanyHQId && !storedOwner) {
       setCompanyHQId(storedCompanyHQId);
     }
-    if (storedCompanyHQ) {
+    if (storedCompanyHQ && !storedOwner) {
       try {
         setCompanyHQ(JSON.parse(storedCompanyHQ));
       } catch (error) {
@@ -69,82 +54,53 @@ export function useOwner() {
       }
     }
 
-    // If we have data in localStorage, mark as hydrated
-    if (storedOwnerId) {
-      setHydrated(true);
-      setLoading(false);
-    }
+    setLoading(false);
   }, []);
 
-  // Refresh from API
-  const refresh = useCallback(async () => {
-    // Prevent multiple simultaneous refresh calls
-    if (isRefreshingRef.current) {
-      console.log('⏸️ useOwner: Refresh already in progress, skipping...');
-      return;
-    }
+  // Hydrate once - uses Firebase ID from token to find owner
+  useEffect(() => {
+    if (hasHydratedRef.current) return;
+    hasHydratedRef.current = true;
 
-    try {
-      isRefreshingRef.current = true;
-      setLoading(true);
-      setError(null);
+    const hydrate = async () => {
+      try {
+        setLoading(true);
+        console.log('🚀 useOwner: Hydrating owner (uses Firebase ID from token)');
+        const response = await api.get('/api/owner/hydrate');
+        
+        if (response.data?.success) {
+          const ownerData = response.data.owner;
+          
+          // Set state from full owner object
+          setOwnerId(ownerData.id);
+          setOwner(ownerData);
+          setCompanyHQId(ownerData.companyHQId || null);
+          setCompanyHQ(ownerData.companyHQ || null);
 
-      // Wait for auth to be initialized
-      if (!authInitialized) {
-        console.log('⏳ useOwner: Waiting for auth initialization...');
+          // Set full owner object to localStorage
+          localStorage.setItem('owner', JSON.stringify(ownerData));
+          localStorage.setItem('ownerId', ownerData.id);
+          if (ownerData.companyHQId) {
+            localStorage.setItem('companyHQId', ownerData.companyHQId);
+          }
+          if (ownerData.companyHQ) {
+            localStorage.setItem('companyHQ', JSON.stringify(ownerData.companyHQ));
+          }
+
+          setHydrated(true);
+        } else {
+          setError(response.data?.error || 'Failed to hydrate owner');
+        }
+      } catch (err) {
+        console.error('Error hydrating owner:', err);
+        setError(err.message || 'Failed to hydrate owner data');
+      } finally {
         setLoading(false);
-        isRefreshingRef.current = false;
-        return;
       }
+    };
 
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        setError('No Firebase user found');
-        setLoading(false);
-        isRefreshingRef.current = false;
-        return;
-      }
-
-      console.log('🚀 useOwner: Calling /api/owner/hydrate');
-      const response = await api.get('/api/owner/hydrate');
-      if (!response.data?.success) {
-        setError(response.data?.error || 'Failed to hydrate owner');
-        setLoading(false);
-        return;
-      }
-
-      const ownerData = response.data.owner;
-
-      // Update state
-      setOwnerId(ownerData.id);
-      setOwner(ownerData);
-      setCompanyHQId(ownerData.companyHQId || null);
-      setCompanyHQ(ownerData.companyHQ || null);
-
-      // Update localStorage
-      localStorage.setItem('ownerId', ownerData.id);
-      localStorage.setItem('owner', JSON.stringify(ownerData));
-      if (ownerData.companyHQId) {
-        localStorage.setItem('companyHQId', ownerData.companyHQId);
-      } else {
-        localStorage.removeItem('companyHQId');
-      }
-      if (ownerData.companyHQ) {
-        localStorage.setItem('companyHQ', JSON.stringify(ownerData.companyHQ));
-      } else {
-        localStorage.removeItem('companyHQ');
-      }
-
-      setHydrated(true);
-      setLoading(false);
-    } catch (err) {
-      console.error('Error refreshing owner:', err);
-      setError(err.message || 'Failed to refresh owner data');
-      setLoading(false);
-    } finally {
-      isRefreshingRef.current = false;
-    }
-  }, [authInitialized]);
+    hydrate();
+  }, []);
 
   return {
     ownerId,
@@ -154,7 +110,5 @@ export function useOwner() {
     loading,
     hydrated,
     error,
-    refresh,
   };
 }
-

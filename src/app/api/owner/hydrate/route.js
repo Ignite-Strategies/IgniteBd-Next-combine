@@ -23,14 +23,9 @@ export async function GET(request) {
 
     console.log('🚀 OWNER HYDRATE: Finding Owner by Firebase ID:', firebaseId);
 
-    // Get owner - companyHQ comes through the relation automatically
+    // Find owner by firebaseId - that's it
     const owner = await prisma.owners.findUnique({
       where: { firebaseId },
-      include: {
-        company_hqs_company_hqs_ownerIdToowners: {
-          take: 1, // Just get the first one (primary)
-        },
-      },
     });
 
     if (!owner) {
@@ -46,33 +41,11 @@ export async function GET(request) {
       );
     }
 
-    // Get primary companyHQ from relation
-    const primaryCompanyHQ = owner.company_hqs_company_hqs_ownerIdToowners?.[0] || null;
-
-    // Build name from firstName/lastName or fallback to name field
-    const fullName = owner.firstName && owner.lastName
-      ? `${owner.firstName} ${owner.lastName}`.trim()
-      : owner.firstName || owner.name || null;
-
-    // Return owner with companyHQ nested - full companyHQ hydration happens on dashboard
-    const hydratedOwner = {
-      id: owner.id,
-      firebaseId: owner.firebaseId,
-      firstName: owner.firstName,
-      lastName: owner.lastName,
-      name: fullName,
-      email: owner.email,
-      photoURL: owner.photoURL,
-      companyHQId: primaryCompanyHQ?.id || null,
-      companyHQ: primaryCompanyHQ || null, // Basic companyHQ - full hydration on dashboard
-      createdAt: owner.createdAt,
-      updatedAt: owner.updatedAt,
-    };
-
+    // Return the full owner object
     return NextResponse.json({
       success: true,
       message: 'Owner hydrated successfully',
-      owner: hydratedOwner,
+      owner: owner,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

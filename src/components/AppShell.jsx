@@ -27,6 +27,7 @@ const ROUTES_WITH_SIDEBAR = [
   '/workpackages',
   '/client-operations/execution',
   '/billing',
+  '/template',
 ];
 
 // Public routes that should NOT show navigation

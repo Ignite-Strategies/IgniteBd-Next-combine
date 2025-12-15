@@ -27,6 +27,7 @@ import {
   Receipt,
   PlayCircle,
   Network,
+  Edit,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -61,6 +62,13 @@ const navigationGroups = [
     hubPath: '/contacts',
     items: [
       { name: 'Contact Hub', path: '/contacts', icon: Users },
+    ],
+  },
+  {
+    name: 'Templates',
+    items: [
+      { name: 'Build', path: '/template/build', icon: Edit },
+      { name: 'Saved', path: '/template/saved', icon: List },
     ],
   },
   {

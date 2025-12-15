@@ -207,6 +207,7 @@ model company_hqs {
   products                                      products[]
   proposals                                     proposals[]
   templates                                     templates[]
+  template_bases                                template_bases[]
 }
 
 model company_memberships {
@@ -1040,4 +1041,49 @@ enum BuyerPerson {
 enum BuyingReadiness {
   READ_BUT_NO_MONEY
   MONEY_AND_READY
+}
+
+enum RelationshipEnum {
+  COLD
+  WARM
+  ESTABLISHED
+  DORMANT
+}
+
+enum TypeOfPersonEnum {
+  CURRENT_CLIENT
+  FORMER_CLIENT
+  FORMER_COWORKER
+  PROSPECT
+  PARTNER
+  FRIEND_OF_FRIEND
+}
+
+model template_bases {
+  id             String              @id @default(uuid())
+  companyHQId    String
+  relationship   RelationshipEnum
+  typeOfPerson   TypeOfPersonEnum
+  whyReachingOut String
+  whatWantFromThem String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  company_hqs    company_hqs         @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  outreach_templates outreach_templates[]
+
+  @@index([companyHQId])
+  @@index([createdAt])
+}
+
+model outreach_templates {
+  id              String          @id @default(uuid())
+  templateBaseId  String
+  content         String
+  mode            String          // 'MANUAL' | 'AI'
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  template_bases  template_bases   @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
+
+  @@index([templateBaseId])
+  @@index([createdAt])
 }

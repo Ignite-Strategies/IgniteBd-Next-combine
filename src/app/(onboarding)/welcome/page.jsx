@@ -1,98 +1,22 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useOwner } from '@/hooks/useOwner';
 
 export default function WelcomePage() {
   const router = useRouter();
-  const { ownerId, owner, companyHQId, companyHQ, loading, hydrated, error, refresh } = useOwner();
-  const [nextRoute, setNextRoute] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const hasRefreshed = useRef(false);
+  const { owner, loading, hydrated, error } = useOwner();
 
-  // Wait for Firebase auth to initialize and check auth state
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!firebaseUser) {
-        // Check if we have ownerId in localStorage (might be from previous session)
-        const storedOwnerId = localStorage.getItem('ownerId') || localStorage.getItem('adminId');
-        if (!storedOwnerId) {
-          router.replace('/signup');
-          return;
-        }
-      }
-      setAuthChecked(true);
-    });
-
-    return () => unsubscribe();
-  }, [router]);
-
-  // Refresh from API once when auth is checked to ensure we have latest data (including name)
-  // Only refresh once per mount, with a delay to avoid race conditions
-  useEffect(() => {
-    if (authChecked && !loading && !hasRefreshed.current) {
-      hasRefreshed.current = true;
-      // Delay refresh to ensure auth and initial state are stable
-      const timer = setTimeout(() => {
-        refresh();
-      }, 1200); // 1.2 second delay to avoid race conditions
-      return () => clearTimeout(timer);
-    }
-  }, [authChecked, loading, refresh]);
-
-  // Ensure company data is in localStorage after hydration
-  useEffect(() => {
-    if (!hydrated || loading) return;
-
-    // Store companyHQId in localStorage if we have it
-    if (companyHQId && typeof window !== 'undefined') {
-      localStorage.setItem('companyHQId', companyHQId);
-      // Also store as companyId for backward compatibility
-      localStorage.setItem('companyId', companyHQId);
-    }
-
-    // Store companyHQ object if we have it
-    if (owner?.companyHQ && typeof window !== 'undefined') {
-      localStorage.setItem('companyHQ', JSON.stringify(owner.companyHQ));
-    } else if (companyHQ && typeof window !== 'undefined') {
-      localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
-    }
-
-    // Store ownerId if we have it
-    if (ownerId && typeof window !== 'undefined') {
-      localStorage.setItem('ownerId', ownerId);
-    }
-
-    // Store owner object if we have it
-    if (owner && typeof window !== 'undefined') {
-      localStorage.setItem('owner', JSON.stringify(owner));
-    }
-  }, [hydrated, loading, companyHQId, owner, companyHQ, ownerId]);
-
-  // Determine next route based on hydration
-  useEffect(() => {
-    if (!authChecked || !hydrated || loading) return;
-
-    // Check if owner has a company
-    const hasCompany = companyHQId || owner?.companyHQId || owner?.ownedCompanies?.length > 0;
-    
-    if (!hasCompany) {
-      setNextRoute('/profilesetup');
-    } else {
-      setNextRoute('/growth-dashboard');
-    }
-  }, [authChecked, hydrated, loading, companyHQId, owner]);
+  // Determine next route
+  const hasCompany = owner?.companyHQId || owner?.companyHQ;
+  const nextRoute = hasCompany ? '/growth-dashboard' : '/profilesetup';
 
   const handleContinue = () => {
-    if (nextRoute) {
-      router.push(nextRoute);
-    }
+    router.push(nextRoute);
   };
 
-  if (!authChecked || loading) {
+  // Loading state
+  if (loading || !hydrated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
         <div className="text-center">
@@ -103,6 +27,7 @@ export default function WelcomePage() {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
@@ -110,10 +35,10 @@ export default function WelcomePage() {
           <div className="bg-white rounded-xl shadow-xl p-8">
             <p className="text-red-600 text-lg mb-4">{error}</p>
             <button
-              onClick={() => refresh()}
+              onClick={() => window.location.reload()}
               className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium"
             >
-              Try Again
+              Reload Page
             </button>
           </div>
         </div>
@@ -121,41 +46,23 @@ export default function WelcomePage() {
     );
   }
 
-  if (!hydrated || !nextRoute) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4" />
-          <p className="text-white text-xl">Setting up your account...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Welcome screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
       <div className="text-center max-w-md mx-auto px-4">
         <div className="bg-white rounded-xl shadow-xl p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {(() => {
-              if (owner?.firstName) {
-                return `Welcome, ${owner.firstName}!`;
-              } else if (owner?.name) {
-                // Fallback to legacy name field
-                const firstName = owner.name.split(' ')[0];
-                return `Welcome, ${firstName}!`;
-              } else if (owner?.email) {
-                const emailName = owner.email.split('@')[0];
-                return `Welcome, ${emailName}!`;
-              }
-              return 'Welcome!';
-            })()}
+            {owner?.firstName
+              ? `Welcome, ${owner.firstName}!`
+              : owner?.name
+              ? `Welcome, ${owner.name.split(' ')[0]}!`
+              : owner?.email
+              ? `Welcome, ${owner.email.split('@')[0]}!`
+              : 'Welcome!'}
           </h1>
           <p className="text-gray-600 mb-6">
             {owner?.companyHQ?.companyName
               ? `Ready to manage ${owner.companyHQ.companyName}?`
-              : owner?.ownedCompanies?.[0]?.companyName
-              ? `Ready to manage ${owner.ownedCompanies[0].companyName}?`
               : 'Ready to get started?'}
           </p>
 
@@ -170,4 +77,3 @@ export default function WelcomePage() {
     </div>
   );
 }
-
