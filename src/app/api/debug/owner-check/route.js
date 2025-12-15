@@ -12,7 +12,7 @@ export async function GET(request) {
     const firebaseUser = await verifyFirebaseToken(request);
     
     // Get Owner by firebaseId
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
       include: {
         managedCompanies: {
@@ -28,7 +28,7 @@ export async function GET(request) {
     });
 
     // Also check if there are ANY owners with similar firebaseId (partial match)
-    const allOwners = await prisma.owner.findMany({
+    const allOwners = await prisma.owners.findMany({
       select: {
         id: true,
         firebaseId: true,

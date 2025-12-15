@@ -40,7 +40,7 @@ export async function POST(request) {
       );
     }
 
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { id: ownerId },
     });
 

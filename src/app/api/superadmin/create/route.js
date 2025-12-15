@@ -26,7 +26,7 @@ export async function POST(request) {
     }
 
     // Step 2: Find Owner by firebaseId
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 

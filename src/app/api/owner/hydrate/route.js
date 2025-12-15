@@ -23,7 +23,7 @@ export async function GET(request) {
 
     console.log('🚀 OWNER HYDRATE: Finding Owner by Firebase ID:', firebaseId);
 
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId },
       include: {
         ownedCompanies: {

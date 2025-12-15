@@ -19,7 +19,7 @@ export async function POST(request) {
       );
     }
 
-    let owner = await prisma.owner.findUnique({
+    let owner = await prisma.owners.findUnique({
       where: { firebaseId },
     });
 
@@ -29,7 +29,7 @@ export async function POST(request) {
         ? `${firstName} ${lastName}`.trim()
         : firstName || email?.split('@')[0] || null;
 
-      owner = await prisma.owner.create({
+      owner = await prisma.owners.create({
         data: {
           firebaseId,
           firstName: firstName || null,

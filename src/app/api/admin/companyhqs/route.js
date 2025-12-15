@@ -17,7 +17,7 @@ export async function GET(request) {
     const firebaseId = firebaseUser.uid;
 
     // Get Owner
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId },
       include: {
         superAdmin: true,

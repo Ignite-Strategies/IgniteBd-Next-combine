@@ -14,13 +14,13 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     
     // Check if Owner exists
-    let owner = await prisma.owner.findUnique({
+    let owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 
     if (owner) {
       // Update existing owner
-      owner = await prisma.owner.update({
+      owner = await prisma.owners.update({
         where: { id: owner.id },
         data: {
           email: body.email || firebaseUser.email || owner.email,
@@ -46,7 +46,7 @@ export async function POST(request) {
       });
     } else {
       // Create new owner
-      owner = await prisma.owner.create({
+      owner = await prisma.owners.create({
         data: {
           firebaseId: firebaseUser.uid,
           email: body.email || firebaseUser.email || null,

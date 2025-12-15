@@ -13,7 +13,7 @@ export async function DELETE(request) {
     const firebaseUser = await verifyFirebaseToken(request);
 
     // Get Owner record
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 
@@ -25,7 +25,7 @@ export async function DELETE(request) {
     }
 
     // Clear Microsoft auth fields from Owner
-    await prisma.owner.update({
+    await prisma.owners.update({
       where: { id: owner.id },
       data: {
         microsoftAccessToken: null,

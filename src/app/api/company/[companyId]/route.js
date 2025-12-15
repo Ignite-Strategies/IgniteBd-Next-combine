@@ -21,7 +21,7 @@ export async function PUT(request, { params }) {
     }
 
     // Get owner to verify ownership
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 

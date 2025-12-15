@@ -15,7 +15,7 @@ export async function POST(request) {
     const firebaseUser = await verifyFirebaseToken(request);
 
     // Get Owner record
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 

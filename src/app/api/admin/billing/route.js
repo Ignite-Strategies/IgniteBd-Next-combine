@@ -21,7 +21,7 @@ export async function GET(request) {
 
   try {
     // Get Owner by firebaseId
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
       include: {
         managedCompanies: {
@@ -42,7 +42,7 @@ export async function GET(request) {
       });
       
       // Check if any owners exist
-      const ownerCount = await prisma.owner.count();
+      const ownerCount = await prisma.owners.count();
       console.error(`Total owners in DB: ${ownerCount}`);
       
       return NextResponse.json(

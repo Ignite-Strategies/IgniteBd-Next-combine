@@ -15,13 +15,13 @@ export async function GET(request) {
     const firebaseUser = await verifyFirebaseToken(request);
     
     // Get or create Owner record
-    let owner = await prisma.owner.findUnique({
+    let owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 
     if (!owner) {
       // Create owner if it doesn't exist
-      owner = await prisma.owner.create({
+      owner = await prisma.owners.create({
         data: {
           firebaseId: firebaseUser.uid,
           email: firebaseUser.email || null,

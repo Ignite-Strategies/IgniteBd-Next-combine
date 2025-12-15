@@ -16,7 +16,7 @@ export async function PUT(request, { params }) {
     }
 
     // Verify owner exists and matches Firebase user
-    const owner = await prisma.owner.findUnique({
+    const owner = await prisma.owners.findUnique({
       where: { id: ownerId },
     });
 
@@ -58,7 +58,7 @@ export async function PUT(request, { params }) {
     if (teamSize !== undefined) updateData.teamSize = teamSize || null;
 
     // Update owner
-    const updatedOwner = await prisma.owner.update({
+    const updatedOwner = await prisma.owners.update({
       where: { id: ownerId },
       data: updateData,
     });

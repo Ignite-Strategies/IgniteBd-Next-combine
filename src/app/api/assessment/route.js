@@ -15,7 +15,7 @@ export async function POST(request) {
     firebaseUser = await verifyFirebaseToken(request);
     
     // Get Owner record
-    owner = await prisma.owner.findUnique({
+    owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 
@@ -150,7 +150,7 @@ export async function GET(request) {
     firebaseUser = await verifyFirebaseToken(request);
     
     // Get Owner record
-    owner = await prisma.owner.findUnique({
+    owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
 

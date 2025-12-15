@@ -128,7 +128,7 @@ export async function GET(req) {
 
     // Store or update tokens directly on Owner model
     // Include tenant ID for tenant-specific token refresh
-    await prisma.owner.update({
+    await prisma.owners.update({
       where: { id: ownerId },
       data: {
         microsoftAccessToken: tokenResponse.accessToken,
