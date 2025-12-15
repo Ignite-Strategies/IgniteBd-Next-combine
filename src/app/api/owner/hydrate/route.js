@@ -23,9 +23,15 @@ export async function GET(request) {
 
     console.log('🚀 OWNER HYDRATE: Finding Owner by Firebase ID:', firebaseId);
 
-    // Find owner by firebaseId
+    // Find owner by firebaseId - get full owner object
     const owner = await prisma.owners.findUnique({
       where: { firebaseId },
+      include: {
+        company_hqs_company_hqs_ownerIdToowners: {
+          take: 1,
+          select: { id: true },
+        },
+      },
     });
 
     if (!owner) {
@@ -41,16 +47,13 @@ export async function GET(request) {
       );
     }
 
-    // Get companyHQId if owner has a company
-    const companyHQ = await prisma.company_hqs.findFirst({
-      where: { ownerId: owner.id },
-      select: { id: true },
-    });
+    // Get companyHQId from the relation
+    const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id || null;
 
-    // Return the full owner object with companyHQId
+    // Return the full owner object with companyHQId added
     const ownerWithCompanyHQId = {
       ...owner,
-      companyHQId: companyHQ?.id || null,
+      companyHQId,
     };
 
     return NextResponse.json({
