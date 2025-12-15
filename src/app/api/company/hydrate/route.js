@@ -213,7 +213,7 @@ export async function GET(request) {
       }).catch(() => []), // Return empty array on error
 
       // Blogs (content)
-      prisma.blog.findMany({
+      prisma.blogs.findMany({
         where: { companyHQId },
         orderBy: { createdAt: 'desc' },
       }).catch(() => []), // Return empty array on error

@@ -25,7 +25,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const blog = await prisma.blog.findUnique({
+    const blog = await prisma.blogs.findUnique({
       where: { id },
     });
 
@@ -88,7 +88,7 @@ export async function PATCH(request, { params }) {
       updateData.publishedAt = published ? new Date() : null;
     }
 
-    const blog = await prisma.blog.update({
+    const blog = await prisma.blogs.update({
       where: { id },
       data: updateData,
     });
@@ -135,7 +135,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    await prisma.blog.delete({
+    await prisma.blogs.delete({
       where: { id },
     });
 

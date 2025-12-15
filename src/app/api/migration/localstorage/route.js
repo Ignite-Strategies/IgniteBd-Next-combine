@@ -377,7 +377,7 @@ export async function POST(request) {
     // 8. Migrate Blogs
     for (const blog of blogs) {
       try {
-        const existing = await prisma.blog.findFirst({
+        const existing = await prisma.blogs.findFirst({
           where: {
             companyHQId,
             title: blog.title || '',
@@ -389,7 +389,7 @@ export async function POST(request) {
           continue;
         }
 
-        await prisma.blog.create({
+        await prisma.blogs.create({
           data: {
             companyHQId,
             title: blog.title || '',
