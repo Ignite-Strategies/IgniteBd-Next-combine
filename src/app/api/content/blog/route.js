@@ -41,13 +41,11 @@ export async function POST(request) {
     let finalSections = sections;
 
     if (blogDraft) {
-      // Merge body sections into blogText
+      // Merge body sections into blogText (paragraphs only, no headings for easy copy/paste)
       if (blogDraft.body && blogDraft.body.sections && Array.isArray(blogDraft.body.sections)) {
         finalBlogText = blogDraft.body.sections
-          .map((section) => {
-            const heading = section.heading ? `## ${section.heading}\n\n` : '';
-            return heading + (section.content || '');
-          })
+          .map((section) => section.content || '')
+          .filter((content) => content && content.trim()) // Remove empty sections
           .join('\n\n');
       }
       

@@ -58,14 +58,12 @@ export default function BlogBuildIdeaPage() {
           subtitle: blogDraft.subtitle,
         });
 
-        // Merge body sections into blogText for preview/edit
+        // Merge body sections into blogText for preview/edit (paragraphs only, no headings)
         let mergedBody = '';
         if (blogDraft.body && blogDraft.body.sections && Array.isArray(blogDraft.body.sections)) {
           mergedBody = blogDraft.body.sections
-            .map((section: any) => {
-              const heading = section.heading ? `## ${section.heading}\n\n` : '';
-              return heading + (section.content || '');
-            })
+            .map((section: any) => section.content || '')
+            .filter((content: string) => content.trim()) // Remove empty sections
             .join('\n\n');
         }
 
