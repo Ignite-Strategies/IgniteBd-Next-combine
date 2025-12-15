@@ -1039,8 +1039,9 @@ enum BuyerPerson {
 }
 
 enum BuyingReadiness {
-  READ_BUT_NO_MONEY
-  MONEY_AND_READY
+  NOT_READY
+  READY_NO_MONEY
+  READY_WITH_MONEY
 }
 
 enum RelationshipEnum {
