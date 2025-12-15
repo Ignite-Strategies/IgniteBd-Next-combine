@@ -50,7 +50,7 @@ export default function SigninPage() {
       });
 
       await persistSession(result, owner);
-      router.push('/profilesetup');
+      router.push('/growth-dashboard');
     } catch (error) {
       console.error('Google sign-in failed:', error);
       alert('Sign-in failed. Please try again.');
@@ -75,7 +75,7 @@ export default function SigninPage() {
       });
 
       await persistSession(result, owner);
-      router.push('/profilesetup');
+      router.push('/growth-dashboard');
     } catch (error) {
       console.error('Email sign-in failed:', error);
       alert('Sign-in failed. Please check your credentials.');

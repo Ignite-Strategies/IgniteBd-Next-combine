@@ -10,16 +10,30 @@ import { useOwner } from '@/hooks/useOwner';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
-  const { owner, companyHQId, refresh } = useOwner();
+  const { owner, companyHQId, hydrated } = useOwner();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
   });
   const [loading, setLoading] = useState(false);
 
+  // Profile setup is only for signup flow - if already has data, go to dashboard
+  useEffect(() => {
+    if (hydrated && owner?.firstName && owner?.lastName) {
+      router.push('/growth-dashboard');
+    }
+  }, [hydrated, owner, router]);
+
   // Pre-fill form if owner data is available
   useEffect(() => {
-    if (owner?.name) {
+    if (owner?.firstName || owner?.lastName) {
+      // Use firstName and lastName directly
+      setFormData({
+        firstName: owner.firstName || '',
+        lastName: owner.lastName || '',
+      });
+    } else if (owner?.name) {
+      // Fallback to parsing name field
       const nameParts = owner.name.split(' ');
       if (nameParts.length >= 2) {
         setFormData({
@@ -67,19 +81,13 @@ export default function ProfileSetupPage() {
         name,
       });
 
-      // Refresh owner data
-      await refresh();
-
-      // Check if company exists (check localStorage after refresh)
+      // Check if company exists
       const existingCompanyId = localStorage.getItem('companyHQId');
       
       if (!existingCompanyId) {
         const firebaseUser = getAuth().currentUser;
-        // Get fresh owner data from localStorage after refresh
-        const storedOwner = localStorage.getItem('owner');
-        const currentOwner = storedOwner ? JSON.parse(storedOwner) : owner;
-        const ownerEmail = currentOwner?.email || firebaseUser?.email;
-        const ownerName = name || currentOwner?.name || '';
+        const ownerEmail = owner?.email || firebaseUser?.email;
+        const ownerName = name || owner?.name || '';
 
         // Infer company name from email if available
         let inferredCompanyName = 'My Company';
@@ -101,20 +109,11 @@ export default function ProfileSetupPage() {
           teamSize: 'just-me',
         };
 
-        const companyResponse = await api.put('/api/company/upsert', companyData);
-        
-        if (companyResponse.data?.success && companyResponse.data?.companyHQ) {
-          const companyHQ = companyResponse.data.companyHQ;
-          localStorage.setItem('companyHQId', companyHQ.id);
-          localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
-        }
+        await api.put('/api/company/upsert', companyData);
       }
 
-      // Refresh owner data one more time
-      await refresh();
-
-      // Redirect to dashboard
-      router.push('/growth-dashboard');
+      // Reload to get fresh data (hook will auto-hydrate)
+      window.location.reload();
     } catch (error) {
       console.error('Profile setup error:', error);
       alert('Profile setup failed. Please try again.');

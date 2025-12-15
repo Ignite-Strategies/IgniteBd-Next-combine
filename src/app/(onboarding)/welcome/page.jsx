@@ -7,9 +7,8 @@ export default function WelcomePage() {
   const router = useRouter();
   const { owner, loading, hydrated, error } = useOwner();
 
-  // Determine next route
-  const hasCompany = owner?.companyHQId || owner?.companyHQ;
-  const nextRoute = hasCompany ? '/growth-dashboard' : '/profilesetup';
+  // Always go to dashboard - profile changes happen in settings
+  const nextRoute = '/growth-dashboard';
 
   const handleContinue = () => {
     router.push(nextRoute);
