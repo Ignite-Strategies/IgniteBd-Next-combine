@@ -30,6 +30,7 @@ export async function GET(request) {
         template_bases: {
           select: {
             id: true,
+            title: true,
             relationship: true,
             typeOfPerson: true,
             whyReachingOut: true,

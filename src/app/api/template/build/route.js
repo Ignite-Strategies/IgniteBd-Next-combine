@@ -18,6 +18,7 @@ export async function POST(request) {
     const body = await request.json();
     const {
       companyHQId,
+      title,
       relationship,
       typeOfPerson,
       whyReachingOut,
@@ -54,9 +55,25 @@ export async function POST(request) {
       );
     }
 
+    // Generate default title if not provided
+    let finalTitle = title?.trim();
+    if (!finalTitle) {
+      const typeLabels = {
+        CURRENT_CLIENT: 'Current Client',
+        FORMER_CLIENT: 'Former Client',
+        FORMER_COWORKER: 'Former Co-worker',
+        PROSPECT: 'Prospect',
+        PARTNER: 'Partner',
+        FRIEND_OF_FRIEND: 'Friend',
+      };
+      const typeLabel = typeLabels[typeOfPerson] || 'Contact';
+      finalTitle = `Outreach to ${typeLabel}`;
+    }
+
     const templateBase = await prisma.template_bases.create({
       data: {
         companyHQId: tenantId,
+        title: finalTitle,
         relationship,
         typeOfPerson,
         whyReachingOut: whyReachingOut.trim(),

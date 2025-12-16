@@ -79,6 +79,7 @@ export default function TemplateBuildPage() {
   const [parsing, setParsing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [form, setForm] = useState({
+    title: '',
     relationship: '',
     typeOfPerson: '',
     whyReachingOut: '',
@@ -99,6 +100,20 @@ export default function TemplateBuildPage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
+  // Generate title from form fields
+  const generateTitle = (typeOfPerson) => {
+    const typeLabels = {
+      CURRENT_CLIENT: 'Current Client',
+      FORMER_CLIENT: 'Former Client',
+      FORMER_COWORKER: 'Former Co-worker',
+      PROSPECT: 'Prospect',
+      PARTNER: 'Partner',
+      FRIEND_OF_FRIEND: 'Friend',
+    };
+    const typeLabel = typeLabels[typeOfPerson] || 'Contact';
+    return `Outreach to ${typeLabel}`;
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({
@@ -115,7 +130,9 @@ export default function TemplateBuildPage() {
   const handleTemplateSelect = (template) => {
     setSelectedTemplate(template.id);
     setMode('TEMPLATE');
+    const autoTitle = generateTitle(template.typeOfPerson);
     setForm({
+      title: autoTitle,
       relationship: template.relationship,
       typeOfPerson: template.typeOfPerson,
       whyReachingOut: template.whyReachingOut,
@@ -147,7 +164,9 @@ export default function TemplateBuildPage() {
 
       if (response.data?.success && response.data?.inferredFields) {
         const inferred = response.data.inferredFields;
+        const autoTitle = generateTitle(inferred.typeOfPerson);
         setForm({
+          title: autoTitle,
           relationship: inferred.relationship,
           typeOfPerson: inferred.typeOfPerson,
           whyReachingOut: inferred.whyReachingOut,
@@ -195,6 +214,17 @@ export default function TemplateBuildPage() {
       setGenerating(false);
     }
   };
+
+  // Auto-generate title when typeOfPerson changes (only if title is empty)
+  useEffect(() => {
+    if (form.typeOfPerson && (!form.title || form.title.startsWith('Outreach to'))) {
+      const autoTitle = generateTitle(form.typeOfPerson);
+      // Only update if current title is empty or is the auto-generated one
+      if (!form.title || form.title === autoTitle || form.title.startsWith('Outreach to')) {
+        setForm((prev) => ({ ...prev, title: autoTitle }));
+      }
+    }
+  }, [form.typeOfPerson]);
 
   // Auto-hydrate preview when form changes - client-side only, no API calls (only for MANUAL mode)
   useEffect(() => {
@@ -245,6 +275,7 @@ export default function TemplateBuildPage() {
     try {
       const response = await api.post('/api/template/build', {
         companyHQId,
+        title: form.title?.trim() || generateTitle(form.typeOfPerson),
         relationship: form.relationship,
         typeOfPerson: form.typeOfPerson,
         whyReachingOut: form.whyReachingOut.trim(),
@@ -368,6 +399,7 @@ export default function TemplateBuildPage() {
       try {
         const buildResponse = await api.post('/api/template/build', {
           companyHQId,
+          title: form.title?.trim() || generateTitle(form.typeOfPerson),
           relationship: form.relationship,
           typeOfPerson: form.typeOfPerson,
           whyReachingOut: form.whyReachingOut.trim(),
@@ -480,7 +512,7 @@ export default function TemplateBuildPage() {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              From Idea
+              Create with AI
             </button>
             <button
               type="button"
@@ -504,9 +536,9 @@ export default function TemplateBuildPage() {
           {/* Left Panel - Builder Inputs */}
           <div className="space-y-6">
             {mode === 'IDEA' ? (
-              /* From Idea Input */
+              /* Create with AI Input */
               <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900">From Idea</h2>
+                <h2 className="mb-4 text-lg font-semibold text-gray-900">Create with AI</h2>
                 <p className="mb-4 text-sm text-gray-600">
                   Describe your outreach idea and AI will infer the structured fields
                 </p>
@@ -524,7 +556,7 @@ export default function TemplateBuildPage() {
                     disabled={parsing || !idea.trim()}
                     className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                   >
-                    {parsing ? 'Parsing...' : 'Parse Idea'}
+                    {parsing ? 'Parsing...' : 'Parse'}
                   </button>
                 </div>
               </div>
@@ -560,7 +592,7 @@ export default function TemplateBuildPage() {
               
               {mode === 'IDEA' && form.whyReachingOut && (
                 <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-                  ✓ Idea parsed - fields are inferred. Edit them if needed, then generate the message.
+                  ✓ Fields inferred. Edit them if needed, then generate the message.
                 </div>
               )}
               {mode === 'TEMPLATE' && selectedTemplate && (
@@ -570,6 +602,24 @@ export default function TemplateBuildPage() {
               )}
 
               <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="title"
+                    value={form.title}
+                    onChange={handleChange}
+                    placeholder="e.g., Outreach to Former Co-worker"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    required
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Name for this template base (auto-generated from type, but you can customize)
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Relationship <span className="text-red-500">*</span>

@@ -218,8 +218,8 @@ export default function TemplateSavedPage() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          {getRelationshipLabel(base.relationship)} • {getTypeOfPersonLabel(base.typeOfPerson)}
+                        <div className="text-sm font-semibold text-gray-900">
+                          {base.title || `${getRelationshipLabel(base.relationship)} • ${getTypeOfPersonLabel(base.typeOfPerson)}`}
                         </div>
                         <span className={`rounded-full px-2 py-1 text-xs font-medium ${
                           template.mode === 'AI'
