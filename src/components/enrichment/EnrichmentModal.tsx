@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Sparkles, Loader2, Save, Building2, User, TrendingUp } from 'lucide-react';
+import { X, Sparkles, Loader2, Save, Building2, User, TrendingUp, Mail } from 'lucide-react';
 import api from '@/lib/api';
 import ScoreCard from './ScoreCard';
 import {
@@ -237,56 +237,148 @@ export default function EnrichmentModal({
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-6">
           {!previewData ? (
-            // Step A: Input LinkedIn URL
+            // Step A: Enrichment Method Selection
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  LinkedIn URL
-                </label>
-                <input
-                  type="url"
-                  value={linkedinUrl}
-                  onChange={(e) => setLinkedinUrl(e.target.value)}
-                  placeholder="https://linkedin.com/in/..."
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  disabled={loading}
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  Enter the LinkedIn profile URL to enrich this contact
-                </p>
-              </div>
+              {contactEmail ? (
+                // Email enrichment available - show as primary option
+                <div className="space-y-4">
+                  <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Mail className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">Enrich by Email</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Enrich this contact using their email address: <strong>{contactEmail}</strong>
+                    </p>
+                    {error && (
+                      <div className="rounded-lg bg-red-50 border border-red-200 p-3 mb-4">
+                        <p className="text-sm text-red-800">{error}</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={handleEnrichByEmail}
+                      disabled={loading}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Enriching...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Enrich by Email
+                        </>
+                      )}
+                    </button>
+                  </div>
 
-              {error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 p-4">
-                  <p className="text-sm text-red-800">{error}</p>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="bg-white px-2 text-gray-500">OR</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Enrich by LinkedIn URL (Alternative)
+                    </label>
+                    <input
+                      type="url"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/..."
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      disabled={loading}
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Enter the LinkedIn profile URL to enrich this contact
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handlePreview}
+                      disabled={loading || !linkedinUrl.trim()}
+                      className="flex items-center gap-2 rounded-lg bg-gray-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Enriching...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Preview from LinkedIn
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleClose}
+                      className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // No email - show LinkedIn input only
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      LinkedIn URL
+                    </label>
+                    <input
+                      type="url"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/..."
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      disabled={loading}
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Enter the LinkedIn profile URL to enrich this contact
+                    </p>
+                  </div>
+
+                  {error && (
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                      <p className="text-sm text-red-800">{error}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handlePreview}
+                      disabled={loading || !linkedinUrl.trim()}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Enriching...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Preview Enrichment
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleClose}
+                      className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handlePreview}
-                  disabled={loading || !linkedinUrl.trim()}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Enriching...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Preview Enrichment
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleClose}
-                  className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
           ) : (
             // Step B: Preview Panel

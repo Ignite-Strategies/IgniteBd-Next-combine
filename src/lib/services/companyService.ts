@@ -42,11 +42,16 @@ export async function findOrCreateCompanyByDomain(
   }
 
   // Create new company
+  const { randomUUID } = await import('crypto');
+  const companyId = randomUUID();
+  
   const newCompany = await prisma.companies.create({
     data: {
+      id: companyId,
       companyHQId,
       companyName: companyName || 'Unknown Company',
       domain: normalizedDomain,
+      updatedAt: new Date(),
     },
   });
 

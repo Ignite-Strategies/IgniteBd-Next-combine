@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/firebaseAdmin';
 
@@ -169,8 +170,12 @@ export async function POST(request) {
     } else {
       // Create new company - simple create, let Prisma handle duplicates
       try {
+        // Generate UUID for company ID
+        const companyId = randomUUID();
+        
         company = await prisma.companies.create({
           data: {
+            id: companyId,
             companyHQId,
             companyName: normalizedCompanyName,
             address: address || null,
@@ -178,6 +183,7 @@ export async function POST(request) {
             website: website || null,
             revenue: revenue || null,
             yearsInBusiness: yearsInBusiness || null,
+            updatedAt: new Date(),
           },
         });
         console.log(`✅ Created new company: ${normalizedCompanyName} (id: ${company.id})`);

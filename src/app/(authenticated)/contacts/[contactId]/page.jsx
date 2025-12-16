@@ -94,14 +94,16 @@ export default function ContactDetailPage({ params }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactId]);
 
-  const [generatingPortal, setGeneratingPortal] = useState(false);
-  const [portalLink, setPortalLink] = useState(null);
   const [showEnrichmentModal, setShowEnrichmentModal] = useState(false);
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [rawJSON, setRawJSON] = useState(null);
   const [editingCompany, setEditingCompany] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [savingCompany, setSavingCompany] = useState(false);
+  const [editingStage, setEditingStage] = useState(false);
+  const [selectedPipeline, setSelectedPipeline] = useState(null);
+  const [selectedStage, setSelectedStage] = useState(null);
+  const [savingStage, setSavingStage] = useState(false);
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
@@ -112,36 +114,6 @@ export default function ContactDetailPage({ params }) {
     );
   }, [contact]);
 
-  const handleGeneratePortalAccess = async () => {
-    if (!contact?.id || !contact?.email) {
-      alert('Contact must have an email address to generate portal access.');
-      return;
-    }
-
-    setGeneratingPortal(true);
-    try {
-      // Let the API interceptor handle the Firebase token automatically
-      const response = await api.post(
-        `/api/contacts/${contact.id}/generate-portal-access`,
-        {}
-      );
-
-      if (response.data?.success && response.data.invite) {
-        const activationLink = response.data.invite.activationLink || response.data.invite.passwordResetLink;
-        setPortalLink(activationLink);
-        // Copy to clipboard
-        navigator.clipboard.writeText(activationLink);
-        alert(`Portal access generated! Activation link copied to clipboard. Send it to ${contact.email}`);
-      } else {
-        alert(response.data?.error || 'Failed to generate portal access');
-      }
-    } catch (error) {
-      console.error('Error generating portal access:', error);
-      alert(error.response?.data?.error || 'Failed to generate portal access');
-    } finally {
-      setGeneratingPortal(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -195,12 +167,132 @@ export default function ContactDetailPage({ params }) {
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600">
-            {contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'Prospect'}
-          </span>
-          <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-600">
-            {contact.pipelines?.stage || contact.pipeline?.stage || 'Unassigned Stage'}
-          </span>
+          {!editingStage ? (
+            <>
+              <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600">
+                {contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'Prospect'}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-600">
+                  {contact.pipelines?.stage || contact.pipeline?.stage || 'Unassigned Stage'}
+                </span>
+                <button
+                  onClick={() => {
+                    const currentPipeline = contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'prospect';
+                    const currentStage = contact.pipelines?.stage || contact.pipeline?.stage || 'interest';
+                    setEditingStage(true);
+                    setSelectedPipeline(currentPipeline);
+                    setSelectedStage(currentStage);
+                  }}
+                  className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                  title="Change stage"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedPipeline}
+                onChange={(e) => {
+                  setSelectedPipeline(e.target.value);
+                  // Reset stage when pipeline changes
+                  setSelectedStage('interest');
+                }}
+                className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-600 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="prospect">Prospect</option>
+                <option value="client">Client</option>
+                <option value="collaborator">Collaborator</option>
+                <option value="institution">Institution</option>
+              </select>
+              <select
+                value={selectedStage}
+                onChange={(e) => setSelectedStage(e.target.value)}
+                className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                {selectedPipeline === 'prospect' && (
+                  <>
+                    <option value="interest">Interest</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="proposal">Proposal</option>
+                    <option value="contract">Contract</option>
+                    <option value="contract-signed">Contract Signed</option>
+                  </>
+                )}
+                {selectedPipeline === 'client' && (
+                  <>
+                    <option value="kickoff">Kickoff</option>
+                    <option value="work-started">Work Started</option>
+                    <option value="work-delivered">Work Delivered</option>
+                    <option value="sustainment">Sustainment</option>
+                    <option value="renewal">Renewal</option>
+                    <option value="terminated-contract">Terminated</option>
+                  </>
+                )}
+                {selectedPipeline === 'collaborator' && (
+                  <>
+                    <option value="interest">Interest</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </>
+                )}
+                {selectedPipeline === 'institution' && (
+                  <>
+                    <option value="interest">Interest</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </>
+                )}
+              </select>
+              <button
+                onClick={async () => {
+                  if (!selectedPipeline || !selectedStage) {
+                    alert('Please select both pipeline and stage');
+                    return;
+                  }
+                  setSavingStage(true);
+                  try {
+                    const response = await api.put(`/api/contacts/${contactId}`, {
+                      pipeline: selectedPipeline,
+                      stage: selectedStage,
+                    });
+                    if (response.data?.success) {
+                      setContact(response.data.contact);
+                      setEditingStage(false);
+                      if (refreshContacts) {
+                        refreshContacts();
+                      }
+                    } else {
+                      alert(response.data?.error || 'Failed to update stage');
+                    }
+                  } catch (error) {
+                    console.error('Error updating stage:', error);
+                    alert(error.response?.data?.error || 'Failed to update stage');
+                  } finally {
+                    setSavingStage(false);
+                  }
+                }}
+                disabled={savingStage}
+                className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Check className="h-3 w-3" />
+                {savingStage ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {
+                  setEditingStage(false);
+                  setSelectedPipeline(null);
+                  setSelectedStage(null);
+                }}
+                disabled={savingStage}
+                className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -284,8 +376,9 @@ export default function ContactDetailPage({ params }) {
                       </dd>
                       <button
                         onClick={() => {
+                          const existingCompany = contact.companies || contact.company || contact.contactCompany || null;
                           setEditingCompany(true);
-                          setSelectedCompany(contact.companies || contact.company || contact.contactCompany || null);
+                          setSelectedCompany(existingCompany);
                         }}
                         className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                         title="Assign company"
@@ -297,8 +390,10 @@ export default function ContactDetailPage({ params }) {
                     <div className="space-y-2">
                       <CompanySelector
                         companyId={contact.companies?.id || contact.company?.id || contact.contactCompany?.id || null}
-                        selectedCompany={selectedCompany}
-                        onCompanySelect={(company) => setSelectedCompany(company)}
+                        selectedCompany={selectedCompany || contact.companies || contact.company || contact.contactCompany || null}
+                        onCompanySelect={(company) => {
+                          setSelectedCompany(company);
+                        }}
                         showLabel={false}
                         placeholder="Search or create company..."
                       />
@@ -382,67 +477,8 @@ export default function ContactDetailPage({ params }) {
             />
           )}
 
-          {/* Client Portal Access - Only for activated contacts or contacts with firebaseUid */}
-          {/* This is a special UX, not for all contacts */}
-          {contact.email && (contact.isActivated || contact.firebaseUid) && (
-            <section className="rounded-2xl bg-white p-6 shadow">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">Client Portal Access</h3>
-              {contact.isActivated ? (
-                <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-                  <p className="text-sm font-semibold text-green-800 mb-2">✅ Portal Activated</p>
-                  <p className="text-xs text-green-700 mb-3">
-                    This contact has activated their client portal.
-                    {contact.activatedAt && ` Activated on ${new Date(contact.activatedAt).toLocaleDateString()}.`}
-                  </p>
-                  <a
-                    href={contact.clientPortalUrl || 'https://clientportal.ignitegrowth.biz'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
-                  >
-                    Open Portal
-                  </a>
-                </div>
-              ) : (
-                <>
-                  <p className="mb-4 text-sm text-gray-600">
-                    Generate portal access for this contact. They'll receive a password reset link to set up their account and access proposals and deliverables.
-                  </p>
-                  {portalLink ? (
-                    <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-                      <p className="text-sm font-semibold text-green-800 mb-2">Portal access generated!</p>
-                      <p className="text-xs text-green-700 mb-3">Password reset link copied to clipboard. Send it to {contact.email}</p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(portalLink);
-                            alert('Link copied to clipboard!');
-                          }}
-                          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
-                        >
-                          Copy Link Again
-                        </button>
-                        <a
-                          href={`mailto:${contact.email}?subject=Client Portal Access&body=Click this link to set up your client portal password: ${portalLink}`}
-                          className="rounded-lg bg-white border border-green-600 px-4 py-2 text-sm font-semibold text-green-600 transition hover:bg-green-50"
-                        >
-                          Email Link
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleGeneratePortalAccess}
-                      disabled={generatingPortal}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {generatingPortal ? 'Generating...' : 'Generate Portal Access'}
-                    </button>
-                  )}
-                </>
-              )}
-            </section>
-          )}
+          {/* Client Portal Access - Removed from contact detail page */}
+          {/* This is a special UX that should be handled in a dedicated client portal management area */}
         </div>
 
         {/* Enrichment Modal */}
@@ -450,6 +486,7 @@ export default function ContactDetailPage({ params }) {
           isOpen={showEnrichmentModal}
           onClose={() => setShowEnrichmentModal(false)}
           contactId={contactId || contact?.id}
+          contactEmail={contact?.email}
           onEnrichmentSaved={() => {
             // Refresh contact data
             if (contactId) {
