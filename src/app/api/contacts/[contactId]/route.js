@@ -29,13 +29,25 @@ export async function GET(request, { params }) {
 
     let contact;
     try {
+      // Hydrate contact with ALL necessary relations
       contact = await prisma.contact.findUnique({
         where: { id: contactId },
         include: {
-          pipelines: true,
+          pipelines: true, // Pipeline relation
           companies: true, // Company relation via contactCompanyId
+          contact_lists: true, // Contact lists relation
         },
       });
+      
+      // Ensure companies relation is always an object (even if null) to prevent undefined errors
+      if (contact && !contact.companies) {
+        contact.companies = null;
+      }
+      
+      // Ensure pipelines relation is always an object (even if null) to prevent undefined errors
+      if (contact && !contact.pipelines) {
+        contact.pipelines = null;
+      }
     } catch (prismaError) {
       console.error('❌ Prisma query error:', prismaError);
       console.error('❌ Prisma error name:', prismaError.name);
@@ -244,14 +256,21 @@ export async function PUT(request, { params }) {
       });
     }
 
-    // Re-fetch contact with pipeline
+    // Re-fetch contact with ALL relations to ensure full hydration
     const updatedContact = await prisma.contact.findUnique({
       where: { id: contactId },
       include: {
         pipelines: true,
-        companies: true, // Company relation via contactCompanyId
+        companies: true,
+        contact_lists: true,
       },
     });
+    
+    // Ensure relations are always objects (even if null) to prevent undefined errors
+    if (updatedContact) {
+      if (!updatedContact.companies) updatedContact.companies = null;
+      if (!updatedContact.pipelines) updatedContact.pipelines = null;
+    }
 
     console.log('✅ Contact updated:', updatedContact.id);
 
