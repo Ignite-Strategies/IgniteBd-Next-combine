@@ -77,14 +77,14 @@ export async function GET(request) {
       prisma.contact.findMany({
         where: { crmId: companyHQId },
         include: {
-          contactCompany: {
+          companies: {
             select: {
               id: true,
               companyName: true,
               industry: true,
             },
           },
-          pipeline: {
+          pipelines: {
             select: {
               id: true,
               pipeline: true,
@@ -103,9 +103,9 @@ export async function GET(request) {
       }).catch(() => []), // Return empty array on error
 
       // Pipelines (from contacts)
-      prisma.pipeline.findMany({
+      prisma.pipelines.findMany({
         where: {
-          contact: {
+          contacts: {
             crmId: companyHQId,
           },
         },

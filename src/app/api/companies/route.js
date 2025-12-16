@@ -32,16 +32,6 @@ export async function GET(request) {
 
     const companies = await prisma.companies.findMany({
       where,
-      include: {
-        contacts: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
       orderBy: { companyName: 'asc' },
     });
 

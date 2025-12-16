@@ -32,9 +32,8 @@ export async function GET(request, { params }) {
       contact = await prisma.contact.findUnique({
         where: { id: contactId },
         include: {
-          pipeline: true,
-          company: true, // Universal company relation
-          contactCompany: true, // Legacy relation for backward compatibility
+          pipelines: true,
+          companies: true, // Company relation via contactCompanyId
         },
       });
     } catch (prismaError) {
@@ -57,8 +56,7 @@ export async function GET(request, { params }) {
     console.log('✅ Contact found, serializing...');
     console.log('✅ Contact ID:', contact.id);
     console.log('✅ Contact has pipeline:', !!contact.pipeline);
-    console.log('✅ Contact has company:', !!contact.company);
-    console.log('✅ Contact has contactCompany:', !!contact.contactCompany);
+    console.log('✅ Contact has companies:', !!contact.companies);
     console.log('✅ Contact has careerTimeline:', !!contact.careerTimeline);
 
     // Safely serialize the contact, handling JSON fields and potential circular references
@@ -212,9 +210,8 @@ export async function PUT(request, { params }) {
       where: { id: contactId },
       data: updateData,
       include: {
-        pipeline: true,
-        company: true, // Universal company relation
-        contactCompany: true, // Legacy relation for backward compatibility
+        pipelines: true,
+        companies: true, // Company relation via contactCompanyId
       },
     });
 
@@ -254,9 +251,8 @@ export async function PUT(request, { params }) {
     const updatedContact = await prisma.contact.findUnique({
       where: { id: contactId },
       include: {
-        pipeline: true,
-        company: true,
-        contactCompany: true,
+        pipelines: true,
+        companies: true, // Company relation via contactCompanyId
       },
     });
 

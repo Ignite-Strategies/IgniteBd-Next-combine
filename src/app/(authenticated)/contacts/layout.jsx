@@ -36,24 +36,36 @@ export default function ContactsLayout({ children }) {
 
   // Step 2: Fetch from API when companyHQId is available
   const refreshContacts = useCallback(async () => {
-    if (!companyHQId) return;
+    if (!companyHQId) {
+      console.warn('⚠️ refreshContacts called without companyHQId');
+      return;
+    }
 
     setHydrating(true);
     try {
+      console.log('🔄 Fetching contacts for companyHQId:', companyHQId);
       const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
-      const fetchedContacts = response.data?.contacts ?? [];
       
-      // Ensure pipeline data is included (audience and stage)
-      // API already includes pipeline: true, so contacts should have pipeline.pipeline and pipeline.stage
-      setContacts(fetchedContacts);
-      
-      // Step 3: Store in localStorage (includes pipeline data)
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('contacts', JSON.stringify(fetchedContacts));
+      if (response.data?.success && Array.isArray(response.data.contacts)) {
+        const fetchedContacts = response.data.contacts;
+        console.log('✅ Fetched contacts:', fetchedContacts.length);
+        setContacts(fetchedContacts);
+        
+        // Step 3: Store in localStorage (includes pipeline data)
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('contacts', JSON.stringify(fetchedContacts));
+        }
+        setHydrated(true);
+      } else {
+        console.warn('⚠️ API response missing success or contacts array:', response.data);
+        const fetchedContacts = response.data?.contacts ?? [];
+        setContacts(fetchedContacts);
+        setHydrated(true);
       }
-      setHydrated(true);
     } catch (error) {
-      console.error('Error fetching contacts:', error);
+      console.error('❌ Error fetching contacts:', error);
+      console.error('❌ Error response:', error.response?.data);
+      // Don't clear contacts on error - keep cached data
     } finally {
       setHydrating(false);
     }

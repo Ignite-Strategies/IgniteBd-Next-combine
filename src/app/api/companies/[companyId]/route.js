@@ -31,14 +31,13 @@ export async function GET(request, { params }) {
     const resolvedParams = typeof params.then === 'function' ? await params : params;
     const finalCompanyId = resolvedParams?.companyId || companyId;
 
-    const company = await prisma.company.findUnique({
+    const company = await prisma.companies.findUnique({
       where: { id: finalCompanyId },
       include: {
         contacts: {
           include: {
-            pipeline: true,
-            company: true,
-            contactCompany: true, // Legacy
+            pipelines: true,
+            companies: true,
           },
           orderBy: { createdAt: 'desc' },
         },

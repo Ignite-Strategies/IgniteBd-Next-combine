@@ -8,3 +8,4 @@
 -- All routes updated to use prisma.contact (singular) instead of prisma.contacts (plural)
 -- This aligns with Prisma convention: model names should be singular, table names plural
 
+

@@ -301,10 +301,9 @@ export async function POST(request: Request) {
       where: { id: contactId },
       data: contactUpdateData,
       include: {
-        company: true,
-        contactCompany: true, // Legacy relation for backward compatibility
-        contactList: true,
-        pipeline: true,
+        companies: true,
+        contact_lists: true,
+        pipelines: true,
       },
     });
 
@@ -318,10 +317,9 @@ export async function POST(request: Request) {
     const contactWithPipeline = await prisma.contact.findUnique({
       where: { id: updatedContact.id },
       include: {
-        company: true,
-        contactCompany: true,
-        contactList: true,
-        pipeline: true,
+        companies: true,
+        contact_lists: true,
+        pipelines: true,
       },
     });
 

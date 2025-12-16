@@ -127,7 +127,9 @@ export default function ContactsViewPage() {
       }`.toLowerCase();
       const email = (contact.email || '').toLowerCase();
       const company = (
-        contact.contactCompany?.companyName || ''
+        contact.companies?.companyName || 
+        contact.contactCompany?.companyName || 
+        ''
       ).toLowerCase();
       return (
         name.includes(search) ||
@@ -564,23 +566,24 @@ export default function ContactsViewPage() {
                       <td className="px-6 py-4 text-sm text-gray-500">
                         <div className="flex items-center gap-2">
                           <span>
-                            {contact.company?.companyName || 
+                            {contact.companies?.companyName || 
+                             contact.company?.companyName || 
                              contact.contactCompany?.companyName || 
                              contact.companyName || 
                              'N/A'}
                           </span>
-                          {contact.company?.companyHealthScore !== null && (
+                          {(contact.companies?.companyHealthScore !== null || contact.company?.companyHealthScore !== null) && (
                             <span
                               className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                contact.company.companyHealthScore >= 75
+                                (contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0) >= 75
                                   ? 'bg-green-100 text-green-800'
-                                  : contact.company.companyHealthScore >= 50
+                                  : (contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0) >= 50
                                   ? 'bg-yellow-100 text-yellow-800'
                                   : 'bg-red-100 text-red-800'
                               }`}
-                              title={`Company Health: ${contact.company.companyHealthScore}/100`}
+                              title={`Company Health: ${contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0}/100`}
                             >
-                              {contact.company.companyHealthScore}
+                              {contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0}
                             </span>
                           )}
                         </div>

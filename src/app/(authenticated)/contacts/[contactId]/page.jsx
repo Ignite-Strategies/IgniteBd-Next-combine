@@ -274,7 +274,7 @@ export default function ContactDetailPage({ params }) {
                 <div>
                   <dt className="text-sm font-semibold text-gray-500">Company</dt>
                   <dd className="mt-1 text-base text-gray-900">
-                    {contact.company?.companyName || contact.contactCompany?.companyName || contact.companyName || '—'}
+                    {contact.companies?.companyName || contact.company?.companyName || contact.contactCompany?.companyName || contact.companyName || '—'}
                   </dd>
                 </div>
               </div>

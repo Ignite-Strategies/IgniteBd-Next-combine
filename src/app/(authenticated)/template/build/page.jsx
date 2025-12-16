@@ -73,8 +73,11 @@ const PREDEFINED_TEMPLATES = [
 export default function TemplateBuildPage() {
   const router = useRouter();
   const { companyHQId } = useCompanyHQ();
-  const [mode, setMode] = useState('MANUAL'); // 'MANUAL' | 'TEMPLATE'
+  const [mode, setMode] = useState('MANUAL'); // 'MANUAL' | 'TEMPLATE' | 'IDEA' | 'IDEA'
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [idea, setIdea] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [form, setForm] = useState({
     relationship: '',
     typeOfPerson: '',
@@ -124,12 +127,79 @@ export default function TemplateBuildPage() {
   const handleSwitchToManual = () => {
     setMode('MANUAL');
     setSelectedTemplate(null);
+    setIdea('');
     // Keep form values, just switch mode
   };
 
-  // Auto-hydrate preview when form changes - client-side only, no API calls
+  const handleParse = async () => {
+    if (!idea.trim()) {
+      setError('Please enter an idea first');
+      return;
+    }
+
+    setError(null);
+    setParsing(true);
+
+    try {
+      const response = await api.post('/api/template/parse', {
+        idea: idea.trim(),
+      });
+
+      if (response.data?.success && response.data?.inferredFields) {
+        const inferred = response.data.inferredFields;
+        setForm({
+          relationship: inferred.relationship,
+          typeOfPerson: inferred.typeOfPerson,
+          whyReachingOut: inferred.whyReachingOut,
+          whatWantFromThem: inferred.whatWantFromThem || '',
+        });
+        setMode('IDEA'); // Switch to idea mode after parsing
+      } else {
+        throw new Error('Failed to parse idea');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to parse idea');
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleGenerateMessage = async () => {
+    if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
+      setError('Please fill in all required fields or parse an idea first');
+      return;
+    }
+
+    setError(null);
+    setGenerating(true);
+
+    try {
+      const response = await api.post('/api/template/generate', {
+        relationship: form.relationship,
+        typeOfPerson: form.typeOfPerson,
+        whyReachingOut: form.whyReachingOut.trim(),
+        whatWantFromThem: form.whatWantFromThem?.trim() || null,
+      });
+
+      if (response.data?.success) {
+        setPreview({
+          content: response.data.message,
+          sections: response.data.sections || {},
+        });
+      } else {
+        throw new Error('Failed to generate message');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to generate message');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Auto-hydrate preview when form changes - client-side only, no API calls (only for MANUAL mode)
   useEffect(() => {
-    if (form.relationship && form.typeOfPerson && form.whyReachingOut.trim()) {
+    // Only auto-hydrate in MANUAL mode - IDEA and TEMPLATE modes use AI generation
+    if (mode === 'MANUAL' && form.relationship && form.typeOfPerson && form.whyReachingOut.trim()) {
       // Use client-side hydration for instant preview - no API call needed
       const tempBase = {
         relationship: form.relationship,
@@ -139,8 +209,8 @@ export default function TemplateBuildPage() {
       };
       const hydrated = hydrateMessage(tempBase);
       setPreview(hydrated);
-    } else if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
-      // Clear preview if form is incomplete
+    } else if (mode === 'MANUAL' && (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim())) {
+      // Clear preview if form is incomplete (only in MANUAL mode)
       setPreview({
         content: '',
         sections: {
@@ -151,7 +221,7 @@ export default function TemplateBuildPage() {
         },
       });
     }
-  }, [form.relationship, form.typeOfPerson, form.whyReachingOut, form.whatWantFromThem]);
+  }, [form.relationship, form.typeOfPerson, form.whyReachingOut, form.whatWantFromThem, mode]);
 
   const handleBuild = async () => {
     if (!companyHQId) {
@@ -161,6 +231,11 @@ export default function TemplateBuildPage() {
 
     if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
       setError('Please fill in all required fields: Relationship, Type of Person, and Why Reaching Out.');
+      return;
+    }
+
+    if (!preview.content.trim()) {
+      setError('Please generate or create a message preview first.');
       return;
     }
 
@@ -178,8 +253,13 @@ export default function TemplateBuildPage() {
 
       if (response.data?.success && response.data?.templateBase) {
         setTemplateBaseId(response.data.templateBase.id);
-        // Auto-hydrate after building
-        await handleHydrate(response.data.templateBase.id);
+        // If we have preview content, save it directly (for AI-generated or manual)
+        if (preview.content.trim()) {
+          await handleSave();
+        } else {
+          // Otherwise hydrate from template base
+          await handleHydrate(response.data.templateBase.id);
+        }
       } else {
         throw new Error('Failed to create template base');
       }
@@ -273,13 +353,40 @@ export default function TemplateBuildPage() {
   };
 
   const handleSave = async () => {
+    // If no templateBaseId yet, create it first
     if (!templateBaseId) {
-      setError('Please build the template first.');
-      return;
+      if (!companyHQId) {
+        setError('Company context is required. Please refresh the page.');
+        return;
+      }
+
+      if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
+        setError('Please fill in all required fields first.');
+        return;
+      }
+
+      try {
+        const buildResponse = await api.post('/api/template/build', {
+          companyHQId,
+          relationship: form.relationship,
+          typeOfPerson: form.typeOfPerson,
+          whyReachingOut: form.whyReachingOut.trim(),
+          whatWantFromThem: form.whatWantFromThem?.trim() || null,
+        });
+
+        if (buildResponse.data?.success && buildResponse.data?.templateBase) {
+          setTemplateBaseId(buildResponse.data.templateBase.id);
+        } else {
+          throw new Error('Failed to create template base');
+        }
+      } catch (err) {
+        setError(err.response?.data?.error || err.message || 'Failed to create template base');
+        return;
+      }
     }
 
     if (!preview.content.trim()) {
-      setError('No content to save. Please hydrate the template first.');
+      setError('No content to save. Please generate or create a message first.');
       return;
     }
 
@@ -287,10 +394,11 @@ export default function TemplateBuildPage() {
     setSaving(true);
 
     try {
+      const finalMode = mode === 'IDEA' ? 'AI' : mode === 'TEMPLATE' ? 'MANUAL' : 'MANUAL';
       const response = await api.post('/api/template/save', {
         templateBaseId,
         content: preview.content,
-        mode,
+        mode: finalMode,
       });
 
       if (response.data?.success) {
@@ -362,7 +470,24 @@ export default function TemplateBuildPage() {
             </button>
             <button
               type="button"
-              onClick={() => setMode('TEMPLATE')}
+              onClick={() => {
+                setMode('IDEA');
+                setSelectedTemplate(null);
+              }}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                mode === 'IDEA'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              From Idea
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('TEMPLATE');
+                setIdea('');
+              }}
               className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                 mode === 'TEMPLATE'
                   ? 'bg-red-600 text-white'
@@ -378,7 +503,32 @@ export default function TemplateBuildPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Left Panel - Builder Inputs */}
           <div className="space-y-6">
-            {mode === 'TEMPLATE' ? (
+            {mode === 'IDEA' ? (
+              /* From Idea Input */
+              <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-lg font-semibold text-gray-900">From Idea</h2>
+                <p className="mb-4 text-sm text-gray-600">
+                  Describe your outreach idea and AI will infer the structured fields
+                </p>
+                <div className="space-y-4">
+                  <textarea
+                    value={idea}
+                    onChange={(e) => setIdea(e.target.value)}
+                    placeholder="e.g., I want to reach out to my old coworker Sarah who I haven't talked to in 2 years. She moved to a new company and I'd love to catch up over coffee."
+                    rows={6}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleParse}
+                    disabled={parsing || !idea.trim()}
+                    className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  >
+                    {parsing ? 'Parsing...' : 'Parse Idea'}
+                  </button>
+                </div>
+              </div>
+            ) : mode === 'TEMPLATE' ? (
               /* Template Selector */
               <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                 <h2 className="mb-4 text-lg font-semibold text-gray-900">Choose a Template</h2>
@@ -408,6 +558,11 @@ export default function TemplateBuildPage() {
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-semibold text-gray-900">Builder Inputs</h2>
               
+              {mode === 'IDEA' && form.whyReachingOut && (
+                <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                  ✓ Idea parsed - fields are inferred. Edit them if needed, then generate the message.
+                </div>
+              )}
               {mode === 'TEMPLATE' && selectedTemplate && (
                 <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
                   ✓ Template selected - fields are auto-filled. Feel free to customize them.
@@ -495,23 +650,46 @@ export default function TemplateBuildPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleBuild}
-                    disabled={saving || !form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()}
-                    className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                  >
-                    {saving ? 'Building...' : 'Build Template'}
-                  </button>
-                  {templateBaseId && (
+                  {mode === 'IDEA' && !preview.content ? (
                     <button
                       type="button"
-                      onClick={() => handleHydrate()}
-                      disabled={hydrating}
-                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                      onClick={handleGenerateMessage}
+                      disabled={generating || !form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()}
+                      className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                     >
-                      {hydrating ? 'Hydrating...' : 'Refresh Preview'}
+                      {generating ? 'Generating...' : 'Generate Message'}
                     </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleBuild}
+                        disabled={saving || !form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()}
+                        className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                      >
+                        {saving ? 'Building...' : 'Build Template'}
+                      </button>
+                      {templateBaseId && (
+                        <button
+                          type="button"
+                          onClick={() => handleHydrate()}
+                          disabled={hydrating}
+                          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                        >
+                          {hydrating ? 'Hydrating...' : 'Refresh Preview'}
+                        </button>
+                      )}
+                      {mode === 'IDEA' && (
+                        <button
+                          type="button"
+                          onClick={handleGenerateMessage}
+                          disabled={generating}
+                          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                        >
+                          {generating ? 'Generating...' : 'Regenerate'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

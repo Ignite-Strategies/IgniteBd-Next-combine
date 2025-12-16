@@ -54,9 +54,8 @@ export async function GET(request) {
     const contacts = await prisma.contact.findMany({
       where,
       include: {
-        pipeline: true,
-        company: true, // Universal company relation
-        contactCompany: true, // Legacy relation for backward compatibility
+        pipelines: true,
+        companies: true, // Company relation via contactCompanyId
       },
       orderBy: {
         createdAt: 'desc',

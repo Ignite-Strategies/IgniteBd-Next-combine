@@ -39,14 +39,13 @@ export async function GET(request) {
 
       let contact;
       try {
-        contact = await prisma.contact.findUnique({
-          where: { id: contactId },
-          include: {
-            pipeline: true,
-            company: true, // Universal company relation
-            contactCompany: true, // Legacy relation for backward compatibility
-          },
-        });
+      contact = await prisma.contact.findUnique({
+        where: { id: contactId },
+        include: {
+          pipelines: true,
+          companies: true, // Company relation via contactCompanyId
+        },
+      });
       } catch (prismaError) {
         console.error('❌ Prisma query error:', prismaError);
         console.error('❌ Prisma error name:', prismaError.name);
@@ -66,9 +65,8 @@ export async function GET(request) {
 
       console.log('✅ Contact found, serializing...');
       console.log('✅ Contact ID:', contact.id);
-      console.log('✅ Contact has pipeline:', !!contact.pipeline);
-      console.log('✅ Contact has company:', !!contact.company);
-      console.log('✅ Contact has contactCompany:', !!contact.contactCompany);
+      console.log('✅ Contact has pipelines:', !!contact.pipelines);
+      console.log('✅ Contact has companies:', !!contact.companies);
       console.log('✅ Contact has careerTimeline:', !!contact.careerTimeline);
 
       // Safely serialize the contact, handling JSON fields and potential circular references
@@ -135,21 +133,20 @@ export async function GET(request) {
     };
 
     if (pipeline || stage) {
-      where.pipeline = {};
+      where.pipelines = {};
       if (pipeline) {
-        where.pipeline.pipeline = pipeline;
+        where.pipelines.pipeline = pipeline;
       }
       if (stage) {
-        where.pipeline.stage = stage;
+        where.pipelines.stage = stage;
       }
     }
 
     const contacts = await prisma.contact.findMany({
       where,
       include: {
-        pipeline: true,
-        company: true, // Universal company relation
-        contactCompany: true, // Legacy relation for backward compatibility
+        pipelines: true,
+        companies: true, // Company relation via contactCompanyId
       },
       orderBy: {
         createdAt: 'desc',
