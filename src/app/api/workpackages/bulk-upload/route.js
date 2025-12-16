@@ -3,13 +3,42 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
+ * Helper: Get owner's companyHQId from Firebase token
+ */
+async function getOwnerCompanyHQId(firebaseUser) {
+  const owner = await prisma.owners.findUnique({
+    where: { firebaseId: firebaseUser.uid },
+    include: {
+      company_hqs_company_hqs_ownerIdToowners: {
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!owner) {
+    throw new Error('Owner not found for Firebase user');
+  }
+
+  const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
+  
+  if (!companyHQId) {
+    throw new Error('Owner has no associated CompanyHQ');
+  }
+
+  return companyHQId;
+}
+
+/**
  * POST /api/workpackages/bulk-upload
  * Bulk upload work package with phases and items
  * Supports CSV upload or multi-row form data
+ * Company-first: requires companyId, workPackageClientId, auto-sets workPackageOwnerId
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -19,11 +48,26 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { contactId, rows } = body;
+    const { 
+      workPackageClientId, // Renamed from contactId
+      companyId,
+      workPackageMemberId, // Optional
+      rows 
+    } = body;
 
-    if (!contactId) {
+    // Support legacy contactId for backward compatibility
+    const clientContactId = workPackageClientId || body.contactId;
+
+    if (!clientContactId) {
       return NextResponse.json(
-        { success: false, error: 'contactId is required' },
+        { success: false, error: 'workPackageClientId (or contactId) is required' },
+        { status: 400 },
+      );
+    }
+
+    if (!companyId) {
+      return NextResponse.json(
+        { success: false, error: 'companyId is required' },
         { status: 400 },
       );
     }
@@ -35,14 +79,47 @@ export async function POST(request) {
       );
     }
 
-    // Verify contact exists
+    // Get owner's companyHQId from Firebase auth
+    const workPackageOwnerId = await getOwnerCompanyHQId(firebaseUser);
+
+    // Verify client contact exists
     const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
+      where: { id: clientContactId },
+      include: {
+        companies: true,
+      },
     });
 
     if (!contact) {
       return NextResponse.json(
-        { success: false, error: 'Contact not found' },
+        { success: false, error: 'Client contact not found' },
+        { status: 404 },
+      );
+    }
+
+    // Auto-populate companyId from contact's company if not provided
+    let finalCompanyId = companyId;
+    if (!finalCompanyId && contact.companies) {
+      finalCompanyId = contact.companies.id;
+    } else if (!finalCompanyId && contact.contactCompanyId) {
+      finalCompanyId = contact.contactCompanyId;
+    }
+
+    if (!finalCompanyId) {
+      return NextResponse.json(
+        { success: false, error: 'companyId is required. Contact has no associated company.' },
+        { status: 400 },
+      );
+    }
+
+    // Verify company exists
+    const company = await prisma.companies.findUnique({
+      where: { id: finalCompanyId },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        { success: false, error: 'Company not found' },
         { status: 404 },
       );
     }
@@ -87,40 +164,69 @@ export async function POST(request) {
     const phases = Array.from(phaseMap.values()).sort((a, b) => a.position - b.position);
 
     // Create WorkPackage
-    const workPackage = await prisma.workPackage.create({
+    const workPackage = await prisma.work_packages.create({
       data: {
-        contactId,
-        phases: {
+        companyId: finalCompanyId,
+        workPackageOwnerId,
+        workPackageClientId: clientContactId,
+        ...(workPackageMemberId && { workPackageMemberId }),
+        title: 'Bulk Uploaded Work Package',
+        work_package_phases: {
           create: phases.map((phase, index) => ({
             name: phase.name,
             position: phase.position || index + 1,
-            timeline: phase.timeline,
-            items: {
+            description: phase.timeline,
+            work_package_items: {
               create: itemsByPhase.get(phase.name).map((item) => ({
-                itemType: item.itemType,
-                itemLabel: item.itemLabel,
-                itemDescription: item.itemDescription,
+                deliverableType: item.itemType,
+                deliverableLabel: item.itemLabel,
+                deliverableDescription: item.itemDescription,
+                itemType: item.itemType, // Legacy field
+                itemLabel: item.itemLabel, // Legacy field
+                itemDescription: item.itemDescription, // Legacy field
                 quantity: item.quantity,
-                status: 'todo',
+                unitOfMeasure: 'item',
+                estimatedHoursEach: 1,
+                status: 'NOT_STARTED',
               })),
             },
           })),
         },
       },
       include: {
-        phases: {
-          include: {
-            items: true,
+        companies: {
+          select: {
+            id: true,
+            companyName: true,
           },
-          orderBy: { position: 'asc' },
         },
-        contact: {
+        workPackageOwner: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageClient: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
             email: true,
           },
+        },
+        workPackageMember: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        work_package_phases: {
+          include: {
+            work_package_items: true,
+          },
+          orderBy: { position: 'asc' },
         },
       },
     });
