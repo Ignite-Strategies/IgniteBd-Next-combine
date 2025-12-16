@@ -21,10 +21,60 @@ const TYPE_OF_PERSON_OPTIONS = [
   { value: 'FRIEND_OF_FRIEND', label: 'Friend of Friend' },
 ];
 
+// Predefined templates that auto-fill form fields
+const PREDEFINED_TEMPLATES = [
+  {
+    id: 'friends-personal',
+    name: 'Friends & Personal Contacts',
+    description: 'For reconnecting with friends and personal contacts',
+    relationship: 'WARM',
+    typeOfPerson: 'FRIEND_OF_FRIEND',
+    whyReachingOut: "Haven't connected in a while and wanted to check in",
+    whatWantFromThem: "Would love to catch up if you're open to it",
+  },
+  {
+    id: 'former-coworkers',
+    name: 'Former Coworkers',
+    description: 'Reconnect with past colleagues',
+    relationship: 'DORMANT',
+    typeOfPerson: 'FORMER_COWORKER',
+    whyReachingOut: "Been thinking about our time working together and wanted to reconnect",
+    whatWantFromThem: "Would be great to grab coffee and catch up",
+  },
+  {
+    id: 'former-clients',
+    name: 'Former Clients',
+    description: 'Maintain relationships with past clients',
+    relationship: 'DORMANT',
+    typeOfPerson: 'FORMER_CLIENT',
+    whyReachingOut: "Haven't touched base in a while and wanted to see how things are going",
+    whatWantFromThem: null,
+  },
+  {
+    id: 'warm-prospects',
+    name: 'Warm Prospects',
+    description: 'Follow up with warm business prospects',
+    relationship: 'WARM',
+    typeOfPerson: 'PROSPECT',
+    whyReachingOut: "Wanted to follow up on our previous conversation",
+    whatWantFromThem: "Would love to continue the conversation if you're interested",
+  },
+  {
+    id: 'current-clients',
+    name: 'Current Clients',
+    description: 'Check in with existing clients',
+    relationship: 'ESTABLISHED',
+    typeOfPerson: 'CURRENT_CLIENT',
+    whyReachingOut: "Wanted to check in and see how everything is going",
+    whatWantFromThem: null,
+  },
+];
+
 export default function TemplateBuildPage() {
   const router = useRouter();
   const { companyHQId } = useCompanyHQ();
-  const [mode, setMode] = useState('MANUAL'); // 'MANUAL' | 'AI'
+  const [mode, setMode] = useState('MANUAL'); // 'MANUAL' | 'TEMPLATE'
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [form, setForm] = useState({
     relationship: '',
     typeOfPerson: '',
@@ -53,6 +103,28 @@ export default function TemplateBuildPage() {
       [name]: value,
     }));
     setError(null);
+    // Clear template selection when manually editing
+    if (selectedTemplate) {
+      setSelectedTemplate(null);
+    }
+  };
+
+  const handleTemplateSelect = (template) => {
+    setSelectedTemplate(template.id);
+    setMode('TEMPLATE');
+    setForm({
+      relationship: template.relationship,
+      typeOfPerson: template.typeOfPerson,
+      whyReachingOut: template.whyReachingOut,
+      whatWantFromThem: template.whatWantFromThem || '',
+    });
+    setError(null);
+  };
+
+  const handleSwitchToManual = () => {
+    setMode('MANUAL');
+    setSelectedTemplate(null);
+    // Keep form values, just switch mode
   };
 
   // Auto-hydrate preview when form changes (for MANUAL mode) - client-side only, no API calls
@@ -273,10 +345,66 @@ export default function TemplateBuildPage() {
           </div>
         )}
 
+        {/* Mode Toggle */}
+        <div className="mb-6 flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4">
+          <span className="text-sm font-medium text-gray-700">Mode:</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSwitchToManual}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                mode === 'MANUAL'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Manual
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('TEMPLATE')}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                mode === 'TEMPLATE'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Use Template
+            </button>
+          </div>
+        </div>
+
         {/* Split Screen Layout */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Left Panel - Builder Inputs */}
           <div className="space-y-6">
+            {mode === 'TEMPLATE' ? (
+              /* Template Selector */
+              <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-lg font-semibold text-gray-900">Choose a Template</h2>
+                <p className="mb-4 text-sm text-gray-600">
+                  Select a template to auto-fill the form fields
+                </p>
+                <div className="space-y-3">
+                  {PREDEFINED_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => handleTemplateSelect(template)}
+                      className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
+                        selectedTemplate === template.id
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-900">{template.name}</div>
+                      <div className="mt-1 text-sm text-gray-600">{template.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-semibold text-gray-900">Builder Inputs</h2>
 
@@ -333,6 +461,7 @@ export default function TemplateBuildPage() {
                     rows={3}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
+                    disabled={mode === 'TEMPLATE' && selectedTemplate}
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     Free-text human observation about why you're reaching out
@@ -350,6 +479,7 @@ export default function TemplateBuildPage() {
                     placeholder="e.g., I'd love to grab coffee, Would be great to catch up, etc."
                     rows={2}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={mode === 'TEMPLATE' && selectedTemplate}
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     Optional and often empty in early outreach

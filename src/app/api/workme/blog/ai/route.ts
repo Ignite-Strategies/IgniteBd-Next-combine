@@ -115,7 +115,7 @@ You MUST return JSON matching this exact structure:
     "sections": [
       {
         "heading": "Section heading",
-        "content": "2-3 rich paragraphs of content for this section"
+        "content": "First paragraph text here.\n\nSecond paragraph text here.\n\nThird paragraph text here."
       }
     ]
   },
@@ -138,6 +138,9 @@ You MUST return JSON matching this exact structure:
    - Build out 3-5 main body sections that expand on the idea
    - End with a conclusion section
    - Each section should have a clear heading and 2-3 rich paragraphs
+   - **CRITICAL**: Within each section's "content" field, separate paragraphs with TWO newline characters (\\n\\n) - this creates proper paragraph breaks
+   - Example: "First paragraph text here.\\n\\nSecond paragraph text here.\\n\\nThird paragraph text here."
+   - Do NOT include markdown headings (##, ###) in the content - only plain text paragraphs
    - Total body content must be exactly 500 words
 
 6. **Content Inference Process - CRITICAL**:
@@ -214,7 +217,7 @@ You MUST return JSON matching this exact structure:
     "sections": [
       {
         "heading": "Section heading",
-        "content": "2-3 rich paragraphs of content for this section"
+        "content": "First paragraph text here.\n\nSecond paragraph text here.\n\nThird paragraph text here."
       }
     ]
   },
@@ -233,6 +236,9 @@ You MUST return JSON matching this exact structure:
 7. Body Structure:
    - Outline: 3-6 sections with clear headings and bullet points
    - Body: Same sections with 2-3 rich paragraphs each (total word count should match target length)
+   - **CRITICAL**: Within each section's "content" field, separate paragraphs with TWO newline characters (\\n\\n) - this creates proper paragraph breaks
+   - Example: "First paragraph text here.\\n\\nSecond paragraph text here.\\n\\nThird paragraph text here."
+   - Do NOT include markdown headings (##, ###) in the content - only plain text paragraphs separated by \\n\\n
 
 8. Tone:
    - Clear and professional
