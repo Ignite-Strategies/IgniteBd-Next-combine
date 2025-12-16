@@ -9,7 +9,10 @@
     "lint": "eslint",
     "prisma": "prisma",
     "postinstall": "prisma generate",
-    "migrate:deploy": "prisma migrate deploy"
+    "migrate:deploy": "prisma migrate deploy",
+    "db:safety-check": "node scripts/check-data-loss-safety.js",
+    "db:push": "./scripts/safe-prisma-push.sh",
+    "db:push:unsafe": "echo '⚠️  WARNING: Using unsafe push. Run npm run db:safety-check first!' && npx prisma db push"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.26.1",

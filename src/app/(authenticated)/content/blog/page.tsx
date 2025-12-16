@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool, Download } from 'lucide-react';
 
 // 🎯 LOCAL-FIRST FLAG: API sync is optional and explicit only
 const ENABLE_BLOG_API_SYNC = true;
@@ -15,6 +15,7 @@ export default function BlogPage() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
+  const [exportingBlogId, setExportingBlogId] = useState(null);
 
   const [companyHQId, setCompanyHQId] = useState('');
 
@@ -153,6 +154,28 @@ export default function BlogPage() {
     } finally {
       setSyncing(false);
       setLoading(false);
+    }
+  };
+
+  const handleExportToGoogleDocs = async (blogId, e) => {
+    e.stopPropagation();
+    
+    try {
+      setExportingBlogId(blogId);
+      const response = await api.post(`/api/content/blog/${blogId}/push-to-google-docs`);
+
+      if (response.data?.success) {
+        const docUrl = response.data.documentUrl;
+        // For export, always open in new tab
+        window.open(docUrl, '_blank');
+      } else {
+        throw new Error(response.data?.error || 'Failed to export to Google Docs');
+      }
+    } catch (err) {
+      console.error('Error exporting to Google Docs:', err);
+      alert(`Failed to export blog to Google Docs: ${err.response?.data?.details || err.message}`);
+    } finally {
+      setExportingBlogId(null);
     }
   };
 
@@ -327,13 +350,21 @@ export default function BlogPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                       <button
                         onClick={() => router.push(`/content/blog/${blog.id}`)}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                       >
                         <Eye className="h-3.5 w-3.5" />
                         View
+                      </button>
+                      <button
+                        onClick={(e) => handleExportToGoogleDocs(blog.id, e)}
+                        disabled={exportingBlogId === blog.id}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                      >
+                        <Download className={`h-3.5 w-3.5 ${exportingBlogId === blog.id ? 'animate-spin' : ''}`} />
+                        {exportingBlogId === blog.id ? 'Exporting...' : 'Export to Google Docs'}
                       </button>
                       <button
                         onClick={() => router.push(`/content/blog/${blog.id}`)}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, ArrowLeft, Trash2 } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Download } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function BlogEditorPage() {
@@ -16,6 +16,8 @@ export default function BlogEditorPage() {
   const [sections, setSections] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [googleDocUrl, setGoogleDocUrl] = useState(null);
 
   useEffect(() => {
     if (blogId) {
@@ -99,6 +101,29 @@ export default function BlogEditorPage() {
     }
   };
 
+
+  const handleExportToGoogleDocs = async () => {
+    try {
+      setExporting(true);
+      setGoogleDocUrl(null);
+
+      const response = await api.post(`/api/content/blog/${blogId}/push-to-google-docs`);
+
+      if (response.data?.success) {
+        const docUrl = response.data.documentUrl;
+        setGoogleDocUrl(docUrl);
+        // For export, automatically open in new tab
+        window.open(docUrl, '_blank');
+      } else {
+        throw new Error(response.data?.error || 'Failed to export to Google Docs');
+      }
+    } catch (err) {
+      console.error('Error exporting to Google Docs:', err);
+      alert(`Failed to export blog to Google Docs: ${err.response?.data?.details || err.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this blog? This action cannot be undone.')) {
@@ -202,6 +227,22 @@ export default function BlogEditorPage() {
               </p>
             </div>
 
+            {googleDocUrl && (
+              <div className="rounded-lg border border-green-300 bg-green-50 p-4 mb-4">
+                <p className="text-sm font-semibold text-green-800 mb-2">
+                  ✅ Blog pushed to Google Docs!
+                </p>
+                <a
+                  href={googleDocUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-green-700 hover:text-green-900 underline"
+                >
+                  Open in Google Docs →
+                </a>
+              </div>
+            )}
+
             <div className="flex items-center justify-between pt-4 border-t">
               <button
                 onClick={handleDelete}
@@ -212,6 +253,14 @@ export default function BlogEditorPage() {
               </button>
               
               <div className="flex items-center gap-4">
+                <button
+                  onClick={handleExportToGoogleDocs}
+                  disabled={exporting || !blogText.trim()}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  {exporting ? 'Exporting...' : 'Export to Google Docs'}
+                </button>
                 <button
                   onClick={handleSave}
                   disabled={saving}
