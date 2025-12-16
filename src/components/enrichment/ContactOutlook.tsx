@@ -212,13 +212,34 @@ export default function ContactOutlook({ contact, onViewRawJSON }: ContactOutloo
                       {contact.companies?.domain || contact.company?.domain || contact.contactCompany?.domain || contact.companyDomain || '—'}
                     </dd>
                   </div>
-                  {((contact.companies?.companyHealthScore !== null && contact.companies?.companyHealthScore !== undefined) ||
-                   (contact.company?.companyHealthScore !== null && contact.company?.companyHealthScore !== undefined) ||
-                   (contact.contactCompany?.companyHealthScore !== null && contact.contactCompany?.companyHealthScore !== undefined)) && (
+                  {/* Always show health score if company exists and score is available */}
+                  {contact.companies && (
                     <div>
                       <dt className="text-xs text-gray-500">Health Score</dt>
                       <dd className="mt-1 text-gray-900">
-                        {contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? contact.contactCompany?.companyHealthScore ?? 0}/100
+                        {contact.companies.companyHealthScore !== null && contact.companies.companyHealthScore !== undefined
+                          ? `${contact.companies.companyHealthScore}/100`
+                          : '—'}
+                      </dd>
+                    </div>
+                  )}
+                  {!contact.companies && contact.company && (
+                    <div>
+                      <dt className="text-xs text-gray-500">Health Score</dt>
+                      <dd className="mt-1 text-gray-900">
+                        {contact.company.companyHealthScore !== null && contact.company.companyHealthScore !== undefined
+                          ? `${contact.company.companyHealthScore}/100`
+                          : '—'}
+                      </dd>
+                    </div>
+                  )}
+                  {!contact.companies && !contact.company && contact.contactCompany && (
+                    <div>
+                      <dt className="text-xs text-gray-500">Health Score</dt>
+                      <dd className="mt-1 text-gray-900">
+                        {contact.contactCompany.companyHealthScore !== null && contact.contactCompany.companyHealthScore !== undefined
+                          ? `${contact.contactCompany.companyHealthScore}/100`
+                          : '—'}
                       </dd>
                     </div>
                   )}
