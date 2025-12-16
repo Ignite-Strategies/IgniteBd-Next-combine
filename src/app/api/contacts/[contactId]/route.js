@@ -217,7 +217,7 @@ export async function PUT(request, { params }) {
 
     // Handle pipeline update/creation
     if (pipeline !== undefined || stage !== undefined) {
-      const currentPipeline = await prisma.pipeline.findUnique({
+      const currentPipeline = await prisma.pipelines.findUnique({
         where: { contactId },
       });
 

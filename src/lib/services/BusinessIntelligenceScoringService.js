@@ -56,7 +56,7 @@ export async function calculateFitScore(contactId, productId, personaId = null) 
       prisma.product.findUnique({
         where: { id: productId },
       }),
-      prisma.pipeline.findUnique({
+      prisma.pipelines.findUnique({
         where: { contactId },
       }),
       personaId

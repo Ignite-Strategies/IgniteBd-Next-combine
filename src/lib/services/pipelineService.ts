@@ -45,7 +45,7 @@ export async function ensureContactPipeline(
   } = options;
 
   // Check if pipeline exists
-  const existing = await prisma.pipeline.findUnique({
+  const existing = await prisma.pipelines.findUnique({
     where: { contactId },
   });
 
@@ -66,7 +66,7 @@ export async function ensureContactPipeline(
       }
 
       // Update pipeline
-      await prisma.pipeline.update({
+      await prisma.pipelines.update({
         where: { contactId },
         data: {
           pipeline: finalPipeline,
@@ -94,7 +94,7 @@ export async function ensureContactPipeline(
   }
 
   // Create pipeline
-  await prisma.pipeline.create({
+  await prisma.pipelines.create({
     data: {
       contactId,
       pipeline: newPipeline,

@@ -31,7 +31,7 @@ export async function checkPipelineTriggers(contactId, newPipeline, newStage) {
 async function convertProspectToClient(contactId) {
   try {
     // Upsert Pipeline to client/kickoff
-    const pipeline = await prisma.pipeline.upsert({
+    const pipeline = await prisma.pipelines.upsert({
       where: { contactId: contactId },
       update: {
         pipeline: 'client',

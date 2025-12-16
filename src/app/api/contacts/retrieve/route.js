@@ -128,6 +128,8 @@ export async function GET(request) {
       );
     }
 
+    console.log('🔍 Fetching contacts for companyHQId:', companyHQId);
+
     const where = {
       crmId: companyHQId,
     };
@@ -143,21 +145,90 @@ export async function GET(request) {
       }
     }
 
-    const contacts = await prisma.contact.findMany({
-      where,
-      include: {
-        pipelines: true,
-        companies: true, // Company relation via contactCompanyId
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    console.log('🔍 Where clause:', JSON.stringify(where, null, 2));
 
-    return NextResponse.json({
-      success: true,
-      contacts,
-    });
+    let contacts;
+    try {
+      console.log('🔍 Executing Prisma query...');
+      contacts = await prisma.contact.findMany({
+        where,
+        include: {
+          pipelines: true,
+          companies: true, // Company relation via contactCompanyId
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+      console.log(`✅ Found ${contacts.length} contacts`);
+    } catch (prismaError) {
+      console.error('❌ Prisma query error:', prismaError);
+      console.error('❌ Prisma error name:', prismaError.name);
+      console.error('❌ Prisma error message:', prismaError.message);
+      console.error('❌ Prisma error code:', prismaError.code);
+      console.error('❌ Prisma error stack:', prismaError.stack);
+      throw prismaError;
+    }
+
+    // Safely serialize contacts, handling JSON fields and potential circular references
+    try {
+      const serializedContacts = JSON.parse(JSON.stringify(contacts, (key, value) => {
+        // Handle Date objects
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        // Handle BigInt (if any)
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        // Handle undefined (convert to null for JSON)
+        if (value === undefined) {
+          return null;
+        }
+        return value;
+      }));
+
+      // Map companies to contactCompany for backward compatibility
+      const mappedContacts = serializedContacts.map(contact => ({
+        ...contact,
+        contactCompany: contact.companies || null,
+      }));
+
+      return NextResponse.json({
+        success: true,
+        contacts: mappedContacts,
+      });
+    } catch (serializeError) {
+      console.error('❌ Serialization error:', serializeError);
+      console.error('❌ Serialization error stack:', serializeError.stack);
+      
+      // Try to return a minimal version without problematic fields
+      try {
+        const minimalContacts = contacts.map(contact => {
+          const { careerTimeline, enrichmentPayload, ...contactWithoutProblematicFields } = contact;
+          const serialized = JSON.parse(JSON.stringify(contactWithoutProblematicFields, (key, value) => {
+            if (value instanceof Date) return value.toISOString();
+            if (typeof value === 'bigint') return value.toString();
+            if (value === undefined) return null;
+            return value;
+          }));
+          // Map companies to contactCompany for backward compatibility
+          return {
+            ...serialized,
+            contactCompany: serialized.companies || null,
+          };
+        });
+        
+        return NextResponse.json({
+          success: true,
+          contacts: minimalContacts,
+          warning: 'Some fields may be missing due to serialization issues',
+        });
+      } catch (fallbackError) {
+        console.error('❌ Fallback serialization also failed:', fallbackError);
+        throw serializeError; // Re-throw original error
+      }
+    }
   } catch (error) {
     console.error('❌ RetrieveContacts error:', error);
     console.error('❌ Error stack:', error.stack);

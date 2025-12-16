@@ -46,6 +46,7 @@ export default function ContactDetailPage({ params }) {
         const cachedContact = contacts.find((item) => item.id === contactId);
         if (cachedContact && isMounted) {
           setContact(cachedContact);
+          setNotesText(cachedContact.notes || '');
           setLoading(false); // Show cached data immediately
         }
 
@@ -56,6 +57,7 @@ export default function ContactDetailPage({ params }) {
           
           if (response.data?.success && response.data.contact) {
             setContact(response.data.contact);
+            setNotesText(response.data.contact.notes || '');
             setLoading(false);
             // Don't call refreshContacts here - it causes infinite loops
             // The contact detail is already fresh, no need to refresh the list
@@ -104,6 +106,9 @@ export default function ContactDetailPage({ params }) {
   const [selectedPipeline, setSelectedPipeline] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
   const [savingStage, setSavingStage] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesText, setNotesText] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
@@ -458,10 +463,82 @@ export default function ContactDetailPage({ params }) {
           </section>
 
           <section className="rounded-2xl bg-white p-6 shadow">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">Notes</h3>
-            <p className="text-sm text-gray-600">
-              {contact.notes || 'Add notes from meetings, emails, and relationship updates.'}
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Notes</h3>
+              {!editingNotes && (
+                <button
+                  onClick={() => {
+                    setEditingNotes(true);
+                    setNotesText(contact.notes || '');
+                  }}
+                  className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                  title="Edit notes"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {!editingNotes ? (
+              <div>
+                {contact.notes ? (
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{contact.notes}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Add notes from meetings, emails, and relationship updates.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <textarea
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  placeholder="Add notes from meetings, emails, and relationship updates..."
+                  className="w-full min-h-[120px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 resize-y"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setSavingNotes(true);
+                      try {
+                        const response = await api.put(`/api/contacts/${contactId}`, {
+                          notes: notesText.trim() || null,
+                        });
+                        if (response.data?.success) {
+                          setContact(response.data.contact);
+                          setEditingNotes(false);
+                          if (refreshContacts) {
+                            refreshContacts();
+                          }
+                        } else {
+                          alert(response.data?.error || 'Failed to save notes');
+                        }
+                      } catch (error) {
+                        console.error('Error saving notes:', error);
+                        alert(error.response?.data?.error || 'Failed to save notes');
+                      } finally {
+                        setSavingNotes(false);
+                      }
+                    }}
+                    disabled={savingNotes}
+                    className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Check className="h-4 w-4" />
+                    {savingNotes ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingNotes(false);
+                      setNotesText(contact.notes || '');
+                    }}
+                    disabled={savingNotes}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <XIcon className="h-4 w-4" />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Contact Outlook Section - Only show if contact has enrichment data */}
