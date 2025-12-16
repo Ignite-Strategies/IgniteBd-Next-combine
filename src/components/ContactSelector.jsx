@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Users } from 'lucide-react';
 import api from '@/lib/api';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 /**
  * ContactSelector Component - SEARCH FIRST
@@ -17,6 +18,7 @@ export default function ContactSelector({
   showLabel = true,
   className = '',
 }) {
+  const { companyHQId, hydrated: companyHydrated, refresh: refreshCompanyHQ } = useCompanyHQ();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contactSearch, setContactSearch] = useState('');
@@ -27,12 +29,40 @@ export default function ContactSelector({
     const fetchContacts = async () => {
       if (typeof window === 'undefined') return;
       
-      const companyHQId = 
-        window.localStorage.getItem('companyHQId') ||
-        window.localStorage.getItem('companyId') ||
-        '';
+      // If companyHQId is not available yet, try to refresh it
+      if (!companyHQId && companyHydrated) {
+        // Company is hydrated but no ID - try refreshing
+        await refreshCompanyHQ();
+        // After refresh, check localStorage again (refreshCompanyHQ updates localStorage)
+        const refreshedId = 
+          window.localStorage.getItem('companyHQId') ||
+          window.localStorage.getItem('companyId') ||
+          '';
+        if (!refreshedId) {
+          console.warn('ContactSelector: No companyHQId available after refresh');
+          setLoading(false);
+          return;
+        }
+        // Continue with refreshedId - the effect will run again when companyHQId updates
+        // But we can proceed with the localStorage value
+      }
       
-      if (!companyHQId) {
+      // Get companyHQId from hook or localStorage
+      let finalCompanyHQId = companyHQId;
+      if (!finalCompanyHQId) {
+        finalCompanyHQId = 
+          window.localStorage.getItem('companyHQId') ||
+          window.localStorage.getItem('companyId') ||
+          '';
+      }
+      
+      if (!finalCompanyHQId) {
+        // Still no companyHQId - if not hydrated yet, wait; otherwise show error
+        if (!companyHydrated) {
+          // Still loading company data, keep loading state
+          return;
+        }
+        console.warn('ContactSelector: No companyHQId available');
         setLoading(false);
         return;
       }
@@ -40,12 +70,14 @@ export default function ContactSelector({
       try {
         setLoading(true);
         
-        // Try localStorage first
+        // Try localStorage first for quick display
         const cached = window.localStorage.getItem('contacts');
+        let cachedContacts = [];
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed)) {
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              cachedContacts = parsed;
               setContacts(parsed);
               setLoading(false);
             }
@@ -54,24 +86,42 @@ export default function ContactSelector({
           }
         }
         
-        // Fetch from API
-        const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+        // Fetch from API to get latest data
+        const response = await api.get(`/api/contacts?companyHQId=${finalCompanyHQId}`);
         if (response.data?.success && response.data.contacts) {
           const fetched = response.data.contacts;
           setContacts(fetched);
           if (typeof window !== 'undefined') {
             window.localStorage.setItem('contacts', JSON.stringify(fetched));
           }
+        } else {
+          console.warn('API response missing contacts:', response.data);
+          // If API fails but we have cached contacts, keep using them
+          if (cachedContacts.length > 0) {
+            setContacts(cachedContacts);
+          }
         }
       } catch (err) {
         console.error('Error fetching contacts:', err);
+        // If API fails but we have cached contacts, keep using them
+        const cached = window.localStorage.getItem('contacts');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setContacts(parsed);
+            }
+          } catch (parseErr) {
+            console.warn('Failed to use cached contacts after API error', parseErr);
+          }
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchContacts();
-  }, []);
+  }, [companyHQId, companyHydrated, refreshCompanyHQ]);
 
   // Initialize from props only
   useEffect(() => {
@@ -168,18 +218,30 @@ export default function ContactSelector({
             type="text"
             value={contactSearch}
             onChange={(e) => setContactSearch(e.target.value)}
-            placeholder="Search contacts by name, email, or company..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+            placeholder={loading ? "Loading contacts..." : "Search contacts by name, email, or company..."}
+            disabled={loading}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
           <div className="absolute left-3 top-1/2 -translate-y-1/2">
-            <Users className="h-5 w-5 text-gray-400" />
+            {loading ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-red-600"></div>
+            ) : (
+              <Users className="h-5 w-5 text-gray-400" />
+            )}
           </div>
-          {selectedContactObj && (
+          {selectedContactObj && !loading && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               <div className="h-2 w-2 rounded-full bg-green-500"></div>
             </div>
           )}
         </div>
+        
+        {/* Show message if no companyHQId */}
+        {!companyHQId && companyHydrated && !loading && (
+          <p className="mt-2 text-xs text-amber-600">
+            Unable to load contacts. Please refresh the page or check your company settings.
+          </p>
+        )}
 
         {/* Dropdown Results - Only shows when searching (like Manage Contacts) */}
         {contactSearch && availableContacts.length > 0 && (
