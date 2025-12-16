@@ -47,16 +47,65 @@ export default function ContactUploadPage() {
       return;
     }
 
+    const companyHQId = typeof window !== 'undefined'
+      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
+      : null;
+
+    if (!companyHQId) {
+      alert('Company context required. Please set your company first.');
+      router.push('/company/create-or-choose');
+      return;
+    }
+
     setUploading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      alert(`✅ Successfully queued ${file.name} for upload (placeholder).`);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('companyHQId', companyHQId);
+
+      const response = await fetch('/api/contacts/batch', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      // Refresh contacts cache
+      try {
+        const refreshResponse = await fetch(
+          `/api/contacts/retrieve?companyHQId=${companyHQId}`
+        );
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          if (refreshData.success && refreshData.contacts) {
+            window.localStorage.setItem(
+              'contacts',
+              JSON.stringify(refreshData.contacts)
+            );
+          }
+        }
+      } catch (refreshError) {
+        console.warn('Unable to refresh contacts cache', refreshError);
+      }
+
+      // Show success message with details
+      const message = result.message || 
+        `✅ Successfully processed ${result.total || 0} contacts!`;
+      const details = result.errors && result.errors.length > 0
+        ? `\n\nErrors:\n${result.errors.slice(0, 5).join('\n')}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`
+        : '';
+      
+      alert(message + details);
       setFile(null);
       router.push('/contacts');
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Upload failed. Please try again.');
+      alert(`Upload failed: ${error.message || 'Please try again.'}`);
     } finally {
       setUploading(false);
     }
@@ -64,7 +113,8 @@ export default function ContactUploadPage() {
 
   const downloadTemplate = () => {
     if (typeof window === 'undefined') return;
-    const template = 'First Name,Last Name,Email,Phone,Company,Title';
+    // Enhanced template with all supported fields
+    const template = 'First Name,Last Name,Email,Phone,Title,Company Name,Company Domain,Pipeline,Stage,Notes,How Met';
     const blob = new Blob([template], { type: 'text/csv' });
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -124,7 +174,7 @@ export default function ContactUploadPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Upload CSV</h2>
               <p className="text-gray-600">
-                Required columns: First Name, Last Name, Email, Phone, Company, Title.
+                Required: First Name, Last Name. Optional: Email, Phone, Title, Company Name, Pipeline, Stage.
               </p>
             </div>
             <button
@@ -193,9 +243,9 @@ export default function ContactUploadPage() {
           )}
 
           <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-            <strong className="font-semibold">Tip:</strong> Map your CSV headers to contact fields
-            (Name, Email, Phone, Company, Title) for best results. Advanced mapping and validation will
-            be available soon.
+            <strong className="font-semibold">💡 Batch Processing:</strong> All contacts, companies, and pipelines are processed in one operation. 
+            Companies are automatically created if they don't exist, and pipelines are set for each contact.
+            Supports flexible column names (e.g., "First Name", "firstName", "first" all work).
           </div>
         </div>
       </div>

@@ -63,7 +63,7 @@ const navigationGroups = [
     items: [
       { name: 'Contact Hub', path: '/contacts', icon: Users },
       { name: 'Templates', path: '/template', icon: FileText },
-      { name: 'Compose Templates', path: '/template/build', icon: Edit },
+      { name: 'Compose', path: '/outreach/compose', icon: MessageSquare },
       { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
