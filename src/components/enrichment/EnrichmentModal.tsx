@@ -34,6 +34,7 @@ interface PreviewData {
   enrichedContact: any;
   rawApolloResponse: any;
   redisKey: string;
+  previewId?: string; // Optional preview ID for inference fields
   intelligenceScores?: {
     seniorityScore: number;
     buyingPowerScore: number;
