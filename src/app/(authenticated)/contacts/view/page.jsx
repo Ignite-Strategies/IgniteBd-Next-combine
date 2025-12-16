@@ -361,9 +361,34 @@ export default function ContactsViewPage() {
               <button
                 type="button"
                 onClick={async () => {
+                  if (!companyHQId) {
+                    alert('Company context required. Please set your company first.');
+                    return;
+                  }
                   setSyncing(true);
-                  await refreshContactsFromAPI(true);
-                  setSyncing(false);
+                  try {
+                    // Use hydrate route for complete refresh
+                    const response = await api.post('/api/contacts/hydrate', {
+                      companyHQId,
+                    });
+                    if (response.data?.success && Array.isArray(response.data.contacts)) {
+                      const hydratedContacts = response.data.contacts;
+                      setContacts(hydratedContacts);
+                      if (typeof window !== 'undefined') {
+                        window.localStorage.setItem('contacts', JSON.stringify(hydratedContacts));
+                      }
+                      console.log(`✅ Synced ${hydratedContacts.length} contacts`);
+                    } else {
+                      // Fallback to regular refresh
+                      await refreshContactsFromAPI(true);
+                    }
+                  } catch (error) {
+                    console.error('Error syncing contacts:', error);
+                    // Fallback to regular refresh
+                    await refreshContactsFromAPI(true);
+                  } finally {
+                    setSyncing(false);
+                  }
                 }}
                 disabled={syncing || !companyHQId}
                 className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-white transition hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -623,16 +648,19 @@ export default function ContactsViewPage() {
                                       companyId: selectedCompanyForAssign.id,
                                     });
                                     if (response.data?.success) {
+                                      const updatedContact = response.data.contact;
                                       // Update local state
                                       const updatedContacts = contacts.map((c) =>
-                                        c.id === contact.id ? response.data.contact : c
+                                        c.id === contact.id ? updatedContact : c
                                       );
                                       setContacts(updatedContacts);
+                                      // Update localStorage immediately
                                       if (typeof window !== 'undefined') {
                                         window.localStorage.setItem('contacts', JSON.stringify(updatedContacts));
                                       }
                                       setAssigningCompanyId(null);
                                       setSelectedCompanyForAssign(null);
+                                      console.log('✅ Company assigned and localStorage updated');
                                     } else {
                                       alert(response.data?.error || 'Failed to assign company');
                                     }

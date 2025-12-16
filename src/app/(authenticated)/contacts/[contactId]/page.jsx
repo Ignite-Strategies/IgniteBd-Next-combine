@@ -417,8 +417,27 @@ export default function ContactDetailPage({ params }) {
                                 companyId: selectedCompany.id,
                               });
                               if (response.data?.success) {
-                                setContact(response.data.contact);
+                                const updatedContact = response.data.contact;
+                                setContact(updatedContact);
                                 setEditingCompany(false);
+                                
+                                // Update localStorage immediately
+                                if (typeof window !== 'undefined') {
+                                  const cachedContacts = window.localStorage.getItem('contacts');
+                                  if (cachedContacts) {
+                                    try {
+                                      const contacts = JSON.parse(cachedContacts);
+                                      const updatedContacts = contacts.map((c) =>
+                                        c.id === contactId ? updatedContact : c
+                                      );
+                                      window.localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+                                    } catch (err) {
+                                      console.warn('Failed to update localStorage:', err);
+                                    }
+                                  }
+                                }
+                                
+                                // Refresh contacts list via context
                                 if (refreshContacts) {
                                   refreshContacts();
                                 }
