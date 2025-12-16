@@ -76,6 +76,7 @@ export async function POST(request) {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Upsert by email
+    const now = new Date();
     const contact = await prisma.contact.upsert({
       where: {
         email: normalizedEmail,
@@ -83,13 +84,14 @@ export async function POST(request) {
       update: {
         firstName,
         lastName,
-        updatedAt: new Date(),
+        updatedAt: now,
       },
       create: {
         crmId,
         firstName,
         lastName,
         email: normalizedEmail,
+        updatedAt: now,
       },
     });
 
