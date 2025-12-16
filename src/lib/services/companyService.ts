@@ -30,7 +30,7 @@ export async function findOrCreateCompanyByDomain(
   const normalizedDomain = domain.toLowerCase().trim().replace(/^www\./, '');
 
   // Try to find existing company by domain
-  const existingCompany = await prisma.company.findFirst({
+  const existingCompany = await prisma.companies.findFirst({
     where: {
       domain: normalizedDomain,
       companyHQId, // Same tenant
@@ -42,7 +42,7 @@ export async function findOrCreateCompanyByDomain(
   }
 
   // Create new company
-  const newCompany = await prisma.company.create({
+  const newCompany = await prisma.companies.create({
     data: {
       companyHQId,
       companyName: companyName || 'Unknown Company',
@@ -67,7 +67,7 @@ export async function findCompanyByDomain(
 
   const normalizedDomain = domain.toLowerCase().trim().replace(/^www\./, '');
 
-  return await prisma.company.findFirst({
+  return await prisma.companies.findFirst({
     where: {
       domain: normalizedDomain,
       companyHQId,

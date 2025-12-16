@@ -190,6 +190,8 @@ export default function ContactManualPage() {
         pipeline: formData.pipeline || null,
         stage: formData.stage || null,
         buyerDecision: formData.buyerDecision || null,
+        buyerPerson: formData.buyerPerson || null,
+        buyingReadiness: formData.buyingReadiness || null,
         howMet: formData.howMet || null,
         notes: formData.notes || null,
       };

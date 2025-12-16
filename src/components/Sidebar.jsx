@@ -62,14 +62,9 @@ const navigationGroups = [
     hubPath: '/contacts',
     items: [
       { name: 'Contact Hub', path: '/contacts', icon: Users },
-      { name: 'Meetings', path: '/meetings', icon: Calendar },
-    ],
-  },
-  {
-    name: 'Templates',
-    hubPath: '/template',
-    items: [
       { name: 'Templates', path: '/template', icon: FileText },
+      { name: 'Compose Templates', path: '/template/build', icon: Edit },
+      { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
   {
