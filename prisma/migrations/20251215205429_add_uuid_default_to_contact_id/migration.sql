@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "contacts" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+

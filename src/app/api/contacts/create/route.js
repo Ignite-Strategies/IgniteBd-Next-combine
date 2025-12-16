@@ -16,8 +16,9 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * - contact: Created or updated contact
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -26,17 +27,37 @@ export async function POST(request) {
   }
 
   try {
-    const body = await request.json();
-    const { crmId, firstName, lastName, email } = body;
+    // Get owner from Firebase user
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      include: {
+        company_hqs_company_hqs_ownerIdToowners: {
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
 
-    // Validate required fields
-    if (!crmId) {
+    if (!owner) {
       return NextResponse.json(
-        { success: false, error: 'crmId is required' },
-        { status: 400 },
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
       );
     }
 
+    // Get companyHQId from owner
+    const crmId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
+    if (!crmId) {
+      return NextResponse.json(
+        { success: false, error: 'CompanyHQ not found for owner' },
+        { status: 404 },
+      );
+    }
+
+    const body = await request.json();
+    const { firstName, lastName, email } = body;
+
+    // Validate required fields
     if (!firstName || !lastName) {
       return NextResponse.json(
         { success: false, error: 'firstName and lastName are required' },
@@ -48,18 +69,6 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, error: 'email is required' },
         { status: 400 },
-      );
-    }
-
-    // Validate companyHQ exists
-    const companyHQ = await prisma.company_hqs.findUnique({
-      where: { id: crmId },
-    });
-
-    if (!companyHQ) {
-      return NextResponse.json(
-        { success: false, error: 'CompanyHQ not found' },
-        { status: 404 },
       );
     }
 
