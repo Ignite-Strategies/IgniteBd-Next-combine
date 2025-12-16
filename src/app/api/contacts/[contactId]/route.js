@@ -215,8 +215,11 @@ export async function PUT(request, { params }) {
       },
     });
 
-    // Handle pipeline update/creation
+    // Pipeline updates should use the dedicated /api/contacts/[contactId]/pipeline route
+    // Don't handle pipeline here - keep contact updates separate from pipeline updates
     if (pipeline !== undefined || stage !== undefined) {
+      console.warn('⚠️ Pipeline update via contact PUT is deprecated. Use PUT /api/contacts/[contactId]/pipeline instead');
+      // Still support it for backward compatibility, but log warning
       const currentPipeline = await prisma.pipelines.findUnique({
         where: { contactId },
       });
@@ -238,12 +241,6 @@ export async function PUT(request, { params }) {
       await ensureContactPipeline(contactId, {
         pipeline: newPipeline,
         stage: newStage,
-      });
-    } else {
-      // Ensure pipeline exists even if not updating (default to prospect/interest)
-      await ensureContactPipeline(contactId, {
-        pipeline: 'prospect',
-        stage: 'interest',
       });
     }
 

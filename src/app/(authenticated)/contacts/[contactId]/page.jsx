@@ -259,7 +259,8 @@ export default function ContactDetailPage({ params }) {
                   }
                   setSavingStage(true);
                   try {
-                    const response = await api.put(`/api/contacts/${contactId}`, {
+                    // Use dedicated pipeline route
+                    const response = await api.put(`/api/contacts/${contactId}/pipeline`, {
                       pipeline: selectedPipeline,
                       stage: selectedStage,
                     });
@@ -270,11 +271,11 @@ export default function ContactDetailPage({ params }) {
                         refreshContacts();
                       }
                     } else {
-                      alert(response.data?.error || 'Failed to update stage');
+                      alert(response.data?.error || 'Failed to update pipeline');
                     }
                   } catch (error) {
-                    console.error('Error updating stage:', error);
-                    alert(error.response?.data?.error || 'Failed to update stage');
+                    console.error('Error updating pipeline:', error);
+                    alert(error.response?.data?.error || 'Failed to update pipeline');
                   } finally {
                     setSavingStage(false);
                   }

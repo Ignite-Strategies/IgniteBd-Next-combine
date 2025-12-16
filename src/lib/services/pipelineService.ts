@@ -93,12 +93,17 @@ export async function ensureContactPipeline(
     throw new Error(`Invalid stage "${newStage}" for pipeline "${newPipeline}"`);
   }
 
-  // Create pipeline
+  // Create pipeline - generate UUID for id field
+  const { randomUUID } = await import('crypto');
+  const pipelineId = randomUUID();
+  
   await prisma.pipelines.create({
     data: {
+      id: pipelineId,
       contactId,
       pipeline: newPipeline,
       stage: newStage,
+      updatedAt: new Date(),
     },
   });
 

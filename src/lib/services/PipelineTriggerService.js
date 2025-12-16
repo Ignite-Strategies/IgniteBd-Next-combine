@@ -31,16 +31,22 @@ export async function checkPipelineTriggers(contactId, newPipeline, newStage) {
 async function convertProspectToClient(contactId) {
   try {
     // Upsert Pipeline to client/kickoff
+    const { randomUUID } = await import('crypto');
+    const pipelineId = randomUUID();
+    
     const pipeline = await prisma.pipelines.upsert({
       where: { contactId: contactId },
       update: {
         pipeline: 'client',
-        stage: 'kickoff'
+        stage: 'kickoff',
+        updatedAt: new Date(),
       },
       create: {
+        id: pipelineId,
         contactId: contactId,
         pipeline: 'client',
-        stage: 'kickoff'
+        stage: 'kickoff',
+        updatedAt: new Date(),
       }
     });
 

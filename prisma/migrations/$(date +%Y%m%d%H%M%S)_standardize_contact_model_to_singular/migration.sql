@@ -9,3 +9,4 @@
 -- This aligns with Prisma convention: model names should be singular, table names plural
 
 
+

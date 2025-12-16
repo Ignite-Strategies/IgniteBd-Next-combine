@@ -482,11 +482,8 @@ export async function POST(request: Request) {
       console.log(`✅ STEP 2: Created new company from enrichment data (no domain) and linked to contact: ${newCompanyId}`);
     }
 
-    // Ensure pipeline exists (default to prospect/interest if not provided)
-    const { ensureContactPipeline } = await import('@/lib/services/pipelineService');
-    await ensureContactPipeline(updatedContact.id, {
-      // Use defaults: prospect/interest
-    });
+    // Pipeline is NOT part of enrichment - it's a separate concern
+    // Don't create/update pipeline during enrichment
 
     // Re-fetch contact with pipeline to ensure it's included
     const contactWithPipeline = await prisma.contact.findUnique({
