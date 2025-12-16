@@ -86,11 +86,6 @@ export async function POST(request) {
           crmId,
           email: normalizedEmail,
         },
-        include: {
-          pipeline: true,
-          company: true,
-          contactCompany: true,
-        },
       });
 
       if (existingContact) {
@@ -111,11 +106,6 @@ export async function POST(request) {
         contact = await prisma.contact.update({
           where: { id: existingContact.id },
           data: updateData,
-          include: {
-            pipeline: true,
-            company: true,
-            contactCompany: true,
-          },
         });
 
         console.log('✅ Contact updated:', contact.id);
@@ -134,11 +124,6 @@ export async function POST(request) {
             contactCompanyId: companyId || null, // Legacy field
             howMet: howMet || null,
             notes: notes || null,
-          },
-          include: {
-            pipeline: true,
-            company: true,
-            contactCompany: true,
           },
         });
 
@@ -159,11 +144,6 @@ export async function POST(request) {
           contactCompanyId: companyId || null, // Legacy field
           howMet: howMet || null,
           notes: notes || null,
-        },
-        include: {
-          pipeline: true,
-          company: true,
-          contactCompany: true,
         },
       });
 
