@@ -4,21 +4,16 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
  * POST /api/contacts/create
- * Create a contact - focused only on contact creation
- * 
- * This route handles ONLY contact creation. Other concerns are handled downstream:
- * - Company association: Use PUT /api/contacts/[contactId] or separate company service
- * - Pipeline setup: Use PUT /api/contacts/[contactId] or pipeline service
- * - Buyer config: Use PUT /api/contacts/[contactId] 
+ * Simple upsert by email - name and email only
  * 
  * Body:
  * - crmId (required) - CompanyHQId
- * - firstName, lastName, goesBy, email, phone, title
- * - companyId (optional) - Existing company ID to associate (no company creation here)
- * - howMet, notes (optional) - Basic metadata
+ * - firstName (required)
+ * - lastName (required)
+ * - email (required) - used for upsert
  * 
  * Returns:
- * - contact: Created contact with basic relations
+ * - contact: Created or updated contact
  */
 export async function POST(request) {
   try {
@@ -32,22 +27,26 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const {
-      crmId,
-      firstName,
-      lastName,
-      goesBy,
-      email,
-      phone,
-      title,
-      companyId, // Accept existing companyId only - no company creation
-      howMet,
-      notes,
-    } = body ?? {};
+    const { crmId, firstName, lastName, email } = body;
 
+    // Validate required fields
     if (!crmId) {
       return NextResponse.json(
-        { success: false, error: 'crmId (CompanyHQId) is required' },
+        { success: false, error: 'crmId is required' },
+        { status: 400 },
+      );
+    }
+
+    if (!firstName || !lastName) {
+      return NextResponse.json(
+        { success: false, error: 'firstName and lastName are required' },
+        { status: 400 },
+      );
+    }
+
+    if (!email) {
+      return NextResponse.json(
+        { success: false, error: 'email is required' },
         { status: 400 },
       );
     }
@@ -64,91 +63,26 @@ export async function POST(request) {
       );
     }
 
-    // Validate companyId if provided (must exist)
-    if (companyId) {
-      const company = await prisma.companies.findUnique({
-        where: { id: companyId },
-      });
-      if (!company || company.companyHQId !== crmId) {
-        return NextResponse.json(
-          { success: false, error: 'Company not found or does not belong to this tenant' },
-          { status: 404 },
-        );
-      }
-    }
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // Check for existing contact by email (if email provided)
-    let contact;
-    if (email) {
-      const normalizedEmail = email.toLowerCase().trim();
-      const existingContact = await prisma.contact.findFirst({
-        where: {
-          crmId,
-          email: normalizedEmail,
-        },
-      });
-
-      if (existingContact) {
-        // Update existing contact with provided fields (only update non-null values)
-        const updateData = {};
-        if (firstName !== undefined) updateData.firstName = firstName;
-        if (lastName !== undefined) updateData.lastName = lastName;
-        if (goesBy !== undefined) updateData.goesBy = goesBy;
-        if (phone !== undefined) updateData.phone = phone;
-        if (title !== undefined) updateData.title = title;
-        if (companyId !== undefined) {
-          updateData.companyId = companyId;
-          updateData.contactCompanyId = companyId; // Legacy field
-        }
-        if (howMet !== undefined) updateData.howMet = howMet;
-        if (notes !== undefined) updateData.notes = notes;
-
-        contact = await prisma.contact.update({
-          where: { id: existingContact.id },
-          data: updateData,
-        });
-
-        console.log('✅ Contact updated:', contact.id);
-      } else {
-        // Create new contact
-        contact = await prisma.contact.create({
-          data: {
-            crmId,
-            firstName: firstName || null,
-            lastName: lastName || null,
-            goesBy: goesBy || null,
-            email: normalizedEmail,
-            phone: phone || null,
-            title: title || null,
-            companyId: companyId || null,
-            contactCompanyId: companyId || null, // Legacy field
-            howMet: howMet || null,
-            notes: notes || null,
-          },
-        });
-
-        console.log('✅ Contact created:', contact.id);
-      }
-    } else {
-      // Create contact without email
-      contact = await prisma.contact.create({
-        data: {
-          crmId,
-          firstName: firstName || null,
-          lastName: lastName || null,
-          goesBy: goesBy || null,
-          email: null,
-          phone: phone || null,
-          title: title || null,
-          companyId: companyId || null,
-          contactCompanyId: companyId || null, // Legacy field
-          howMet: howMet || null,
-          notes: notes || null,
-        },
-      });
-
-      console.log('✅ Contact created (no email):', contact.id);
-    }
+    // Upsert by email
+    const contact = await prisma.contact.upsert({
+      where: {
+        email: normalizedEmail,
+      },
+      update: {
+        firstName,
+        lastName,
+        updatedAt: new Date(),
+      },
+      create: {
+        crmId,
+        firstName,
+        lastName,
+        email: normalizedEmail,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -166,4 +100,3 @@ export async function POST(request) {
     );
   }
 }
-

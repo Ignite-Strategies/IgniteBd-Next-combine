@@ -189,7 +189,7 @@ model company_hqs {
   assessments                                   assessments[]
   blogs                                         blogs[]
   companies                                     companies[]
-  contacts_company_hqs_contactOwnerIdTocontacts Contact?                 @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
+  contacts_company_hqs_contactOwnerIdTocontacts Contact?                  @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                   @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
   owners_company_hqs_ownerIdToowners            owners?                   @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
   company_hqs                                   company_hqs?              @relation("company_hqsTocompany_hqs", fields: [ultraTenantId], references: [id])
@@ -197,7 +197,7 @@ model company_hqs {
   company_memberships                           company_memberships[]
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
-  contacts_contacts_crmIdTocompany_hqs          Contact[]                @relation("contacts_crmIdTocompany_hqs")
+  contacts_contacts_crmIdTocompany_hqs          Contact[]                 @relation("contacts_crmIdTocompany_hqs")
   deliverable_templates                         deliverable_templates[]
   domain_registry                               domain_registry?
   landing_pages                                 landing_pages[]
@@ -244,7 +244,7 @@ model consultant_deliverables {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime
   company_hqs      company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts         Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts         Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   proposals        proposals?  @relation(fields: [proposalId], references: [id])
 
   @@index([companyHQId])
@@ -265,7 +265,7 @@ model contact_lists {
 }
 
 model Contact {
-  id                                               String                    @id
+  id                                               String                    @id @default(uuid())
   crmId                                            String
   firstName                                        String?
   lastName                                         String?
@@ -490,7 +490,7 @@ model invite_tokens {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
-  contacts  Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([email])
@@ -688,7 +688,7 @@ model pipelines {
   stage     String
   createdAt DateTime @default(now())
   updatedAt DateTime
-  contacts  Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
 model Presentation {
@@ -805,7 +805,7 @@ model proposals {
   proposal_phases         proposal_phases[]
   company_hqs             company_hqs               @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   companies               companies                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts                Contact                  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts                Contact                   @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
 model prospect_candidates {
@@ -957,7 +957,7 @@ model work_packages {
   work_package_items  work_package_items[]
   work_package_phases work_package_phases[]
   companies           companies?            @relation(fields: [companyId], references: [id])
-  contacts            Contact              @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts            Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([contactId])
@@ -1062,15 +1062,15 @@ enum TypeOfPersonEnum {
 }
 
 model template_bases {
-  id             String              @id @default(uuid())
-  companyHQId    String
-  relationship   RelationshipEnum
-  typeOfPerson   TypeOfPersonEnum
-  whyReachingOut String
-  whatWantFromThem String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  company_hqs    company_hqs         @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  id                 String               @id @default(uuid())
+  companyHQId        String
+  relationship       RelationshipEnum
+  typeOfPerson       TypeOfPersonEnum
+  whyReachingOut     String
+  whatWantFromThem   String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  company_hqs        company_hqs          @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   outreach_templates outreach_templates[]
 
   @@index([companyHQId])
@@ -1078,13 +1078,13 @@ model template_bases {
 }
 
 model outreach_templates {
-  id              String          @id @default(uuid())
-  templateBaseId  String
-  content         String
-  mode            String          // 'MANUAL' | 'AI'
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  template_bases  template_bases   @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
+  id             String         @id @default(uuid())
+  templateBaseId String
+  content        String
+  mode           String // 'MANUAL' | 'AI'
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  template_bases template_bases @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
 
   @@index([templateBaseId])
   @@index([createdAt])

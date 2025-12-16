@@ -260,36 +260,6 @@ export default function TemplateBuildPage() {
           </p>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="mb-6 flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4">
-          <span className="text-sm font-medium text-gray-700">Mode:</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setMode('MANUAL')}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'MANUAL'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('AI')}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'AI'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              disabled
-              title="AI mode coming soon"
-            >
-              Use AI (Coming Soon)
-            </button>
-          </div>
-        </div>
 
         {error && (
           <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
