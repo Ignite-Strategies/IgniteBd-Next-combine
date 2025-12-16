@@ -87,6 +87,7 @@ export async function POST(request) {
     }
 
     // Upsert: update if id provided, otherwise create
+    const now = new Date();
     const blogData = {
       companyHQId,
       title: title || null,
@@ -95,6 +96,7 @@ export async function POST(request) {
       sections: finalSections || null,
       presenter: presenter || null,
       description: description || null,
+      updatedAt: now,
     };
 
     let blog;

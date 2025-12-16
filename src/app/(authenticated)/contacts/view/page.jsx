@@ -115,7 +115,7 @@ export default function ContactsViewPage() {
     return contacts.filter((contact) => {
       if (
         pipelineFilter &&
-        contact.pipeline?.pipeline !== pipelineFilter
+        (contact.pipelines?.pipeline || contact.pipeline?.pipeline) !== pipelineFilter
       ) {
         return false;
       }
@@ -225,7 +225,8 @@ export default function ContactsViewPage() {
           .join(' ')
       : '';
 
-  const getPipelineBadge = (pipeline) => {
+  const getPipelineBadge = (contact) => {
+    const pipeline = contact.pipelines || contact.pipeline;
     if (!pipeline) return null;
     const colors = {
       prospect: 'bg-blue-100 text-blue-800',
@@ -244,7 +245,8 @@ export default function ContactsViewPage() {
     );
   };
 
-  const getStageBadge = (pipeline) => {
+  const getStageBadge = (contact) => {
+    const pipeline = contact.pipelines || contact.pipeline;
     if (!pipeline?.stage) return null;
     return (
       <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
@@ -616,8 +618,8 @@ export default function ContactsViewPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">{getPipelineBadge(contact.pipeline)}</td>
-                      <td className="px-6 py-4">{getStageBadge(contact.pipeline)}</td>
+                      <td className="px-6 py-4">{getPipelineBadge(contact)}</td>
+                      <td className="px-6 py-4">{getStageBadge(contact)}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <button
