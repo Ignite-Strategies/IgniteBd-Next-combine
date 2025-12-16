@@ -30,7 +30,7 @@ export async function GET(request) {
       };
     }
 
-    const companies = await prisma.company.findMany({
+    const companies = await prisma.companies.findMany({
       where,
       include: {
         contacts: {
@@ -109,7 +109,7 @@ export async function POST(request) {
     }
 
     // Verify tenant exists
-    const companyHQ = await prisma.companyHQ.findUnique({
+    const companyHQ = await prisma.company_hqs.findUnique({
       where: { id: companyHQId },
     });
 
@@ -122,7 +122,7 @@ export async function POST(request) {
 
     // Upsert pattern: find existing or create new
     const normalizedCompanyName = companyName.trim();
-    const allCompanies = await prisma.company.findMany({
+    const allCompanies = await prisma.companies.findMany({
       where: { companyHQId },
     });
 
@@ -135,7 +135,7 @@ export async function POST(request) {
     if (company) {
       // Update existing company if additional data provided
       if (address || industry || website || revenue || yearsInBusiness) {
-        company = await prisma.company.update({
+        company = await prisma.companies.update({
           where: { id: company.id },
           data: {
             address: address || company.address,
@@ -149,7 +149,7 @@ export async function POST(request) {
       console.log(`✅ Found existing company: ${company.companyName} (id: ${company.id})`);
     } else {
       // Create new company
-      company = await prisma.company.create({
+      company = await prisma.companies.create({
         data: {
           companyHQId,
           companyName: normalizedCompanyName,
