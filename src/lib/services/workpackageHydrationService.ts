@@ -30,7 +30,7 @@ export async function upsertWorkPackage(params: {
 }): Promise<string> {
   const { workPackageId, title, description, totalCost, effectiveStartDate } = params;
 
-  const workPackage = await prisma.workPackage.update({
+  const workPackage = await prisma.work_packages.update({
     where: { id: workPackageId },
     data: {
       ...(title && { title }),
@@ -46,25 +46,48 @@ export async function upsertWorkPackage(params: {
 
 /**
  * Create WorkPackage (no upsert - always create new)
+ * Company-first: requires companyId, workPackageClientId, workPackageOwnerId
  */
 export async function createWorkPackage(params: {
-  contactId: string;
-  companyId?: string;
+  workPackageClientId: string;  // Required - client contact
+  companyId: string;            // Required - client company
+  workPackageOwnerId: string;   // Required - IgniteBD owner (CompanyHQ.id)
+  workPackageMemberId?: string; // Optional - member contact
   title: string;
   description?: string;
   totalCost?: number;
   effectiveStartDate?: Date;
+  status?: string;
+  metadata?: any;
+  tags?: string[];
 }): Promise<string> {
-  const { contactId, companyId, title, description, totalCost, effectiveStartDate } = params;
+  const { 
+    workPackageClientId, 
+    companyId, 
+    workPackageOwnerId,
+    workPackageMemberId,
+    title, 
+    description, 
+    totalCost, 
+    effectiveStartDate,
+    status,
+    metadata,
+    tags,
+  } = params;
 
-  const workPackage = await prisma.workPackage.create({
+  const workPackage = await prisma.work_packages.create({
     data: {
-      contactId,
-      companyId: companyId || null,
+      workPackageClientId,
+      companyId,
+      workPackageOwnerId,
+      ...(workPackageMemberId && { workPackageMemberId }),
       title,
-      description,
-      totalCost,
-      effectiveStartDate,
+      ...(description !== undefined && { description }),
+      ...(totalCost !== undefined && { totalCost }),
+      ...(effectiveStartDate && { effectiveStartDate }),
+      ...(status && { status }),
+      ...(metadata && { metadata }),
+      ...(tags && { tags }),
     },
   });
 
@@ -83,7 +106,7 @@ export async function upsertPhase(params: {
   const { workPackageId, name, position, description } = params;
 
   // Check if phase exists
-  const existing = await prisma.workPackagePhase.findFirst({
+  const existing = await prisma.work_package_phases.findFirst({
     where: {
       workPackageId,
       name,
@@ -93,7 +116,7 @@ export async function upsertPhase(params: {
 
   if (existing) {
     // Update existing
-    const updated = await prisma.workPackagePhase.update({
+    const updated = await prisma.work_package_phases.update({
       where: { id: existing.id },
       data: {
         description,
@@ -104,7 +127,7 @@ export async function upsertPhase(params: {
   }
 
   // Create new
-  const created = await prisma.workPackagePhase.create({
+  const created = await prisma.work_package_phases.create({
     data: {
       workPackageId,
       name,
@@ -143,7 +166,7 @@ export async function upsertItem(params: {
   } = params;
 
   // Check if item exists
-  const existing = await prisma.workPackageItem.findFirst({
+  const existing = await prisma.work_package_items.findFirst({
     where: {
       workPackageId,
       workPackagePhaseId,
@@ -173,7 +196,7 @@ export async function upsertItem(params: {
 
   if (existing) {
     // Update existing
-    const updated = await prisma.workPackageItem.update({
+    const updated = await prisma.work_package_items.update({
       where: { id: existing.id },
       data,
     });
@@ -181,7 +204,7 @@ export async function upsertItem(params: {
   }
 
   // Create new
-  const created = await prisma.workPackageItem.create({
+  const created = await prisma.work_package_items.create({
     data,
   });
 
@@ -192,7 +215,7 @@ export async function upsertItem(params: {
  * Calculate total estimated hours for a phase
  */
 export async function calculatePhaseHours(phaseId: string): Promise<number> {
-  const items = await prisma.workPackageItem.findMany({
+  const items = await prisma.work_package_items.findMany({
     where: { workPackagePhaseId: phaseId },
   });
 
@@ -205,7 +228,7 @@ export async function calculatePhaseHours(phaseId: string): Promise<number> {
  * Calculate total estimated hours for a work package
  */
 export async function calculatePackageHours(workPackageId: string): Promise<number> {
-  const items = await prisma.workPackageItem.findMany({
+  const items = await prisma.work_package_items.findMany({
     where: { workPackageId },
   });
 
@@ -220,7 +243,7 @@ export async function calculatePackageHours(workPackageId: string): Promise<numb
 export async function updatePhaseTotalHours(phaseId: string): Promise<void> {
   const totalHours = await calculatePhaseHours(phaseId);
   
-  await prisma.workPackagePhase.update({
+  await prisma.work_package_phases.update({
     where: { id: phaseId },
     data: { totalEstimatedHours: totalHours },
   });
@@ -230,12 +253,14 @@ export async function updatePhaseTotalHours(phaseId: string): Promise<void> {
  * Full hydration from CSV rows
  */
 export async function hydrateWorkPackageFromCSV(params: {
-  contactId: string;
-  companyId?: string;
+  workPackageClientId: string;  // Required - client contact
+  companyId: string;            // Required - client company
+  workPackageOwnerId: string;   // Required - IgniteBD owner (CompanyHQ.id)
+  workPackageMemberId?: string; // Optional - member contact
   title: string;
   rows: WorkPackageCSVRow[];
 }): Promise<HydrationResult> {
-  const { contactId, companyId, title, rows } = params;
+  const { workPackageClientId, companyId, workPackageOwnerId, workPackageMemberId, title, rows } = params;
 
   if (rows.length === 0) {
     throw new Error('No rows provided for hydration');
@@ -248,8 +273,10 @@ export async function hydrateWorkPackageFromCSV(params: {
 
   // Create WorkPackage
   const workPackageId = await createWorkPackage({
-    contactId,
+    workPackageClientId,
     companyId,
+    workPackageOwnerId,
+    ...(workPackageMemberId && { workPackageMemberId }),
     title,
     description,
     totalCost,
@@ -269,7 +296,7 @@ export async function hydrateWorkPackageFromCSV(params: {
     let phaseId = phaseMap.get(phaseKey);
 
     if (!phaseId) {
-      const existingPhase = await prisma.workPackagePhase.findFirst({
+      const existingPhase = await prisma.work_package_phases.findFirst({
         where: {
           workPackageId,
           name: row.phaseName,
@@ -293,7 +320,7 @@ export async function hydrateWorkPackageFromCSV(params: {
     }
 
     // Upsert item
-    const existingItem = await prisma.workPackageItem.findFirst({
+    const existingItem = await prisma.work_package_items.findFirst({
       where: {
         workPackageId,
         workPackagePhaseId: phaseId,

@@ -28,16 +28,29 @@ export async function GET(request, { params }) {
       );
     }
 
-    const workPackage = await prisma.workPackage.findUnique({
+    const workPackage = await prisma.work_packages.findUnique({
       where: { id },
       include: {
-        contact: {
+        companies: {
+          select: {
+            id: true,
+            companyName: true,
+            companyHQId: true,
+          },
+        },
+        workPackageOwner: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageClient: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
             email: true,
-            contactCompany: {
+            companies: {
               select: {
                 id: true,
                 companyName: true,
@@ -45,13 +58,15 @@ export async function GET(request, { params }) {
             },
           },
         },
-        company: {
+        workPackageMember: {
           select: {
             id: true,
-            companyName: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
-        phases: {
+        work_package_phases: {
           select: {
             id: true,
             name: true,
@@ -65,15 +80,12 @@ export async function GET(request, { params }) {
             status: true,             // not_started | in_progress | completed
             createdAt: true,
             updatedAt: true,
-            items: {
+            work_package_items: {
               orderBy: { createdAt: 'asc' },
             },
           },
           orderBy: { position: 'asc' },
         },
-            items: {
-              orderBy: { createdAt: 'asc' },
-            },
       },
     });
 
@@ -146,53 +158,50 @@ export async function PATCH(request, { params }) {
     const wasEffectiveStartDateUpdated = effectiveStartDate !== undefined;
 
     // Update the work package
-    let workPackage = await prisma.workPackage.update({
+    let workPackage = await prisma.work_packages.update({
       where: { id },
       data: updateData,
       include: {
-        contact: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            contactCompany: {
-              select: {
-                id: true,
-                companyName: true,
-              },
-            },
-          },
-        },
-        company: {
+        companies: {
           select: {
             id: true,
             companyName: true,
           },
         },
-        phases: {
+        workPackageOwner: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageClient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        work_package_phases: {
           select: {
             id: true,
             name: true,
             position: true,
             description: true,
             totalEstimatedHours: true,
-            estimatedStartDate: true, // Calculated: WorkPackage start + previous phases
-            estimatedEndDate: true,   // Calculated: estimatedStartDate + (totalEstimatedHours / 8)
-            actualStartDate: true,    // Set when phase status → "in_progress"
-            actualEndDate: true,      // Set when phase status → "completed"
-            status: true,             // not_started | in_progress | completed
+            estimatedStartDate: true,
+            estimatedEndDate: true,
+            actualStartDate: true,
+            actualEndDate: true,
+            status: true,
             createdAt: true,
             updatedAt: true,
-            items: {
+            work_package_items: {
               orderBy: { createdAt: 'asc' },
             },
           },
           orderBy: { position: 'asc' },
         },
-            items: {
-              orderBy: { createdAt: 'asc' },
-            },
       },
     });
 
@@ -201,30 +210,30 @@ export async function PATCH(request, { params }) {
       try {
         await upsertWorkPackageEffectiveDate(id, effectiveStartDate);
         // Reload work package to get updated phase dates
-        const updatedWorkPackage = await prisma.workPackage.findUnique({
+        const updatedWorkPackage = await prisma.work_packages.findUnique({
           where: { id },
           include: {
-            contact: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                contactCompany: {
-                  select: {
-                    id: true,
-                    companyName: true,
-                  },
-                },
-              },
-            },
-            company: {
+            companies: {
               select: {
                 id: true,
                 companyName: true,
               },
             },
-            phases: {
+            workPackageOwner: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
+            workPackageClient: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            work_package_phases: {
               select: {
                 id: true,
                 name: true,
@@ -239,14 +248,11 @@ export async function PATCH(request, { params }) {
                 status: true,
                 createdAt: true,
                 updatedAt: true,
-                items: {
+                work_package_items: {
                   orderBy: { createdAt: 'asc' },
                 },
               },
               orderBy: { position: 'asc' },
-            },
-            items: {
-              orderBy: { createdAt: 'asc' },
             },
           },
         });

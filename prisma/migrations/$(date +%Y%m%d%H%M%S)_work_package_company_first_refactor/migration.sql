@@ -15,22 +15,10 @@ ALTER TABLE "work_packages"
   ADD COLUMN IF NOT EXISTS "metadata" JSONB,
   ADD COLUMN IF NOT EXISTS "tags" TEXT[] DEFAULT '{}';
 
--- Step 2: Migrate data - copy contactId to workPackageClientId (if contactId column exists)
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'work_packages' AND column_name = 'contactId'
-  ) THEN
-    UPDATE "work_packages" 
-    SET "workPackageClientId" = "contactId"
-    WHERE "workPackageClientId" IS NULL AND "contactId" IS NOT NULL;
-    
-    RAISE NOTICE 'Migrated contactId to workPackageClientId';
-  ELSE
-    RAISE NOTICE 'contactId column does not exist, skipping migration (already migrated or schema already updated)';
-  END IF;
-END $$;
+-- Step 2: Migrate data - copy contactId to workPackageClientId
+UPDATE "work_packages" 
+SET "workPackageClientId" = "contactId"
+WHERE "workPackageClientId" IS NULL;
 
 -- Step 3: Auto-populate companyId from contact's company where missing
 UPDATE "work_packages" wp

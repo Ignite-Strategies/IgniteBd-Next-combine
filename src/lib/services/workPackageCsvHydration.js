@@ -17,11 +17,14 @@ const upsertItem = upsertI;
 
 /**
  * Hydrate WorkPackage from mapped CSV data
+ * Company-first: requires companyId, workPackageClientId, workPackageOwnerId
  */
 export async function hydrateFromMappedCSV(params) {
   const {
-    contactId,
-    companyId,
+    workPackageClientId, // Required - client contact (renamed from contactId)
+    companyId,           // Required - client company
+    workPackageOwnerId,  // Required - IgniteBD owner (CompanyHQ.id)
+    workPackageMemberId, // Optional - member contact
     workPackage,
     phases,
     transformedRows,
@@ -29,8 +32,10 @@ export async function hydrateFromMappedCSV(params) {
 
   // Create WorkPackage
   const workPackageId = await createWorkPackage({
-    contactId,
+    workPackageClientId,
     companyId,
+    workPackageOwnerId,
+    workPackageMemberId: workPackageMemberId || null,
     title: workPackage.title,
     description: workPackage.description,
     totalCost: workPackage.totalCost,
@@ -51,7 +56,7 @@ export async function hydrateFromMappedCSV(params) {
     const phaseKey = `${phase.name}-${phase.position}`;
     
     // Check if phase exists
-    const existingPhase = await prisma.workPackagePhase.findFirst({
+    const existingPhase = await prisma.work_package_phases.findFirst({
       where: {
         workPackageId,
         name: phase.name,
@@ -65,7 +70,7 @@ export async function hydrateFromMappedCSV(params) {
       phasesUpdated++;
       
       // Update phase
-      await prisma.workPackagePhase.update({
+      await prisma.work_package_phases.update({
         where: { id: phaseId },
         data: {
           description: phase.description,
@@ -87,7 +92,7 @@ export async function hydrateFromMappedCSV(params) {
     // Process items in phase
     for (const item of phase.items) {
       // Check if item exists
-      const existingItem = await prisma.workPackageItem.findFirst({
+      const existingItem = await prisma.work_package_items.findFirst({
         where: {
           workPackageId,
           workPackagePhaseId: phaseId,
@@ -97,7 +102,7 @@ export async function hydrateFromMappedCSV(params) {
 
       if (existingItem) {
         // Update item
-        await prisma.workPackageItem.update({
+        await prisma.work_package_items.update({
           where: { id: existingItem.id },
           data: {
             deliverableType: item.deliverableType,
@@ -133,7 +138,7 @@ export async function hydrateFromMappedCSV(params) {
 
   // Update phase total hours
   for (const phaseId of phaseMap.values()) {
-    const items = await prisma.workPackageItem.findMany({
+    const items = await prisma.work_package_items.findMany({
       where: { workPackagePhaseId: phaseId },
     });
     
@@ -141,17 +146,29 @@ export async function hydrateFromMappedCSV(params) {
       return sum + (item.quantity * item.estimatedHoursEach);
     }, 0);
     
-    await prisma.workPackagePhase.update({
+    await prisma.work_package_phases.update({
       where: { id: phaseId },
       data: { totalEstimatedHours: totalHours },
     });
   }
 
   // Get created work package
-  const created = await prisma.workPackage.findUnique({
+  const created = await prisma.work_packages.findUnique({
     where: { id: workPackageId },
     include: {
-      contact: {
+      companies: {
+        select: {
+          id: true,
+          companyName: true,
+        },
+      },
+      workPackageOwner: {
+        select: {
+          id: true,
+          companyName: true,
+        },
+      },
+      workPackageClient: {
         select: {
           id: true,
           firstName: true,
@@ -159,13 +176,20 @@ export async function hydrateFromMappedCSV(params) {
           email: true,
         },
       },
-      phases: {
+      workPackageMember: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      work_package_phases: {
         include: {
-          items: true,
+          work_package_items: true,
         },
         orderBy: { position: 'asc' },
       },
-      items: true,
     },
   });
 

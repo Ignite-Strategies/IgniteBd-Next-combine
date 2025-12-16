@@ -5,12 +5,41 @@ import { parseCSV, normalizeWorkPackageCSVRow } from '@/lib/utils/csv';
 import { hydrateWorkPackageFromCSV } from '@/lib/services/workpackageHydrationService';
 
 /**
+ * Helper: Get owner's companyHQId from Firebase token
+ */
+async function getOwnerCompanyHQId(firebaseUser) {
+  const owner = await prisma.owners.findUnique({
+    where: { firebaseId: firebaseUser.uid },
+    include: {
+      company_hqs_company_hqs_ownerIdToowners: {
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!owner) {
+    throw new Error('Owner not found for Firebase user');
+  }
+
+  const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
+  
+  if (!companyHQId) {
+    throw new Error('Owner has no associated CompanyHQ');
+  }
+
+  return companyHQId;
+}
+
+/**
  * POST /api/workpackages/import/one-shot
  * One-shot CSV import - fully hydrates WorkPackage with phases and items
+ * Company-first: requires companyId, workPackageClientId, auto-sets workPackageOwnerId
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -21,8 +50,9 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
-    const contactId = formData.get('contactId');
+    const workPackageClientId = formData.get('workPackageClientId') || formData.get('contactId'); // Support legacy
     const companyId = formData.get('companyId');
+    const workPackageMemberId = formData.get('workPackageMemberId');
     const title = formData.get('title') || 'Imported Work Package';
 
     if (!file) {
@@ -32,21 +62,54 @@ export async function POST(request) {
       );
     }
 
-    if (!contactId) {
+    if (!workPackageClientId) {
       return NextResponse.json(
-        { success: false, error: 'contactId is required' },
+        { success: false, error: 'workPackageClientId (or contactId) is required' },
         { status: 400 },
       );
     }
 
-    // Verify contact exists
+    // Get owner's companyHQId from Firebase auth
+    const workPackageOwnerId = await getOwnerCompanyHQId(firebaseUser);
+
+    // Verify client contact exists
     const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
+      where: { id: workPackageClientId },
+      include: {
+        companies: true,
+      },
     });
 
     if (!contact) {
       return NextResponse.json(
-        { success: false, error: 'Contact not found' },
+        { success: false, error: 'Client contact not found' },
+        { status: 404 },
+      );
+    }
+
+    // Auto-populate companyId from contact's company if not provided
+    let finalCompanyId = companyId;
+    if (!finalCompanyId && contact.companies) {
+      finalCompanyId = contact.companies.id;
+    } else if (!finalCompanyId && contact.contactCompanyId) {
+      finalCompanyId = contact.contactCompanyId;
+    }
+
+    if (!finalCompanyId) {
+      return NextResponse.json(
+        { success: false, error: 'companyId is required. Contact has no associated company.' },
+        { status: 400 },
+      );
+    }
+
+    // Verify company exists
+    const company = await prisma.companies.findUnique({
+      where: { id: finalCompanyId },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        { success: false, error: 'Company not found' },
         { status: 404 },
       );
     }
@@ -104,23 +167,31 @@ export async function POST(request) {
 
     // Hydrate WorkPackage
     const result = await hydrateWorkPackageFromCSV({
-      contactId,
-      companyId: companyId || null,
+      workPackageClientId,
+      companyId: finalCompanyId,
+      workPackageOwnerId,
+      ...(workPackageMemberId && { workPackageMemberId }),
       title: proposalTitle,
       rows: normalizedRows,
     });
 
     // Fetch created work package with relations
-    const workPackage = await prisma.workPackage.findUnique({
+    const workPackage = await prisma.work_packages.findUnique({
       where: { id: result.workPackageId },
       include: {
-        phases: {
-          include: {
-            items: true,
+        companies: {
+          select: {
+            id: true,
+            companyName: true,
           },
-          orderBy: { position: 'asc' },
         },
-        contact: {
+        workPackageOwner: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageClient: {
           select: {
             id: true,
             firstName: true,
@@ -128,11 +199,19 @@ export async function POST(request) {
             email: true,
           },
         },
-        company: {
+        workPackageMember: {
           select: {
             id: true,
-            companyName: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
+        },
+        work_package_phases: {
+          include: {
+            work_package_items: true,
+          },
+          orderBy: { position: 'asc' },
         },
       },
     });

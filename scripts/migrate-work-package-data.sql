@@ -2,6 +2,7 @@
 -- Run this AFTER the schema has been pushed to migrate existing data
 
 -- Step 1: Migrate data - copy contactId to workPackageClientId (if column still exists)
+-- Note: This is safe to run multiple times - it only updates NULL values
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns 
@@ -12,7 +13,7 @@ BEGIN
     
     RAISE NOTICE 'Migrated contactId to workPackageClientId';
   ELSE
-    RAISE NOTICE 'contactId column does not exist, skipping migration';
+    RAISE NOTICE 'contactId column does not exist - schema already updated or data already migrated';
   END IF;
 END $$;
 

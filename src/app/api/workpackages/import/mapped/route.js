@@ -4,12 +4,41 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { hydrateFromMappedCSV } from '@/lib/services/workPackageCsvHydration';
 
 /**
+ * Helper: Get owner's companyHQId from Firebase token
+ */
+async function getOwnerCompanyHQId(firebaseUser) {
+  const owner = await prisma.owners.findUnique({
+    where: { firebaseId: firebaseUser.uid },
+    include: {
+      company_hqs_company_hqs_ownerIdToowners: {
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!owner) {
+    throw new Error('Owner not found for Firebase user');
+  }
+
+  const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
+  
+  if (!companyHQId) {
+    throw new Error('Owner has no associated CompanyHQ');
+  }
+
+  return companyHQId;
+}
+
+/**
  * POST /api/workpackages/import/mapped
  * Import WorkPackage from CSV using mapped fields
+ * Company-first: requires companyId, workPackageClientId, auto-sets workPackageOwnerId
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -20,17 +49,21 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const {
-      contactId,
-      companyId,
+      workPackageClientId, // Required - client contact (renamed from contactId)
+      companyId,           // Required - client company
+      workPackageMemberId, // Optional - member contact
       workPackage,
       phases,
       transformedRows,
       mappings,
     } = body;
 
-    if (!contactId) {
+    // Support legacy contactId for backward compatibility
+    const clientContactId = workPackageClientId || body.contactId;
+
+    if (!clientContactId) {
       return NextResponse.json(
-        { success: false, error: 'contactId is required' },
+        { success: false, error: 'workPackageClientId (or contactId) is required' },
         { status: 400 },
       );
     }
@@ -42,9 +75,12 @@ export async function POST(request) {
       );
     }
 
-    // Verify contact exists and get company info
+    // Get owner's companyHQId from Firebase auth
+    const workPackageOwnerId = await getOwnerCompanyHQId(firebaseUser);
+
+    // Verify client contact exists and get company info
     const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
+      where: { id: clientContactId },
       include: {
         companies: true, // Get the contact's company
       },
@@ -52,7 +88,7 @@ export async function POST(request) {
 
     if (!contact) {
       return NextResponse.json(
-        { success: false, error: 'Contact not found' },
+        { success: false, error: 'Client contact not found' },
         { status: 404 },
       );
     }
@@ -70,13 +106,30 @@ export async function POST(request) {
     }
 
     if (!finalCompanyId) {
-      console.warn('⚠️ Work package created without companyId - contact has no associated company');
+      return NextResponse.json(
+        { success: false, error: 'companyId is required. Contact has no associated company.' },
+        { status: 400 },
+      );
+    }
+
+    // Verify company exists
+    const company = await prisma.companies.findUnique({
+      where: { id: finalCompanyId },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        { success: false, error: 'Company not found' },
+        { status: 404 },
+      );
     }
 
     // Hydrate WorkPackage from mapped data
     const result = await hydrateFromMappedCSV({
-      contactId,
-      companyId: finalCompanyId || null,
+      workPackageClientId: clientContactId,
+      companyId: finalCompanyId,
+      workPackageOwnerId,
+      workPackageMemberId: workPackageMemberId || null,
       workPackage,
       phases,
       transformedRows,

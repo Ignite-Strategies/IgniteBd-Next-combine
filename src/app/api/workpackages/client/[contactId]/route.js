@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const { contactId } = params || {};
+    const { contactId } = await params || {};
     if (!contactId) {
       return NextResponse.json(
         { success: false, error: 'Contact ID is required' },
@@ -29,13 +29,31 @@ export async function GET(request, { params }) {
     const { searchParams } = request.nextUrl;
     const workPackageId = searchParams.get('workPackageId');
 
-    const where = { contactId };
+    // Filter by workPackageClientId (client contact) or workPackageMemberId (if they're a member)
+    const where = {
+      OR: [
+        { workPackageClientId: contactId },
+        { workPackageMemberId: contactId },
+      ],
+    };
     if (workPackageId) where.id = workPackageId;
 
-    const workPackages = await prisma.workPackage.findMany({
+    const workPackages = await prisma.work_packages.findMany({
       where,
       include: {
-        contact: {
+        companies: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageOwner: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageClient: {
           select: {
             id: true,
             firstName: true,
@@ -43,14 +61,21 @@ export async function GET(request, { params }) {
             email: true,
           },
         },
-        contactCompany: {
+        workPackageMember: {
           select: {
             id: true,
-            companyName: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
-        items: {
-          orderBy: { createdAt: 'asc' },
+        work_package_phases: {
+          include: {
+            work_package_items: {
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+          orderBy: { position: 'asc' },
         },
       },
       orderBy: {
