@@ -1,0 +1,180 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+
+/**
+ * GET /api/contacts/retrieve
+ * Retrieve contacts - supports both list and single contact retrieval
+ * 
+ * Query params:
+ * - companyHQId (required for list) - Get all contacts for a companyHQ
+ * - contactId (optional) - Get single contact by ID
+ * - pipeline (optional) - Filter by pipeline
+ * - stage (optional) - Filter by stage
+ * 
+ * Returns:
+ * - For list: { success: true, contacts: [...] }
+ * - For single: { success: true, contact: {...} }
+ */
+export async function GET(request) {
+  try {
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 },
+    );
+  }
+
+  try {
+    const { searchParams } = request.nextUrl;
+    const companyHQId = searchParams.get('companyHQId');
+    const contactId = searchParams.get('contactId');
+    const pipeline = searchParams.get('pipeline');
+    const stage = searchParams.get('stage');
+
+    // Single contact retrieval by ID
+    if (contactId) {
+      console.log('🔍 Fetching contact:', contactId);
+
+      let contact;
+      try {
+        contact = await prisma.contact.findUnique({
+          where: { id: contactId },
+          include: {
+            pipeline: true,
+            company: true, // Universal company relation
+            contactCompany: true, // Legacy relation for backward compatibility
+          },
+        });
+      } catch (prismaError) {
+        console.error('❌ Prisma query error:', prismaError);
+        console.error('❌ Prisma error name:', prismaError.name);
+        console.error('❌ Prisma error message:', prismaError.message);
+        console.error('❌ Prisma error code:', prismaError.code);
+        console.error('❌ Prisma error stack:', prismaError.stack);
+        throw prismaError;
+      }
+
+      if (!contact) {
+        console.log('❌ Contact not found:', contactId);
+        return NextResponse.json(
+          { success: false, error: 'Contact not found' },
+          { status: 404 },
+        );
+      }
+
+      console.log('✅ Contact found, serializing...');
+      console.log('✅ Contact ID:', contact.id);
+      console.log('✅ Contact has pipeline:', !!contact.pipeline);
+      console.log('✅ Contact has company:', !!contact.company);
+      console.log('✅ Contact has contactCompany:', !!contact.contactCompany);
+      console.log('✅ Contact has careerTimeline:', !!contact.careerTimeline);
+
+      // Safely serialize the contact, handling JSON fields and potential circular references
+      try {
+        // Use JSON.parse/stringify to ensure clean serialization
+        // This handles any potential circular references or non-serializable values
+        const serializedContact = JSON.parse(JSON.stringify(contact, (key, value) => {
+          // Handle Date objects
+          if (value instanceof Date) {
+            return value.toISOString();
+          }
+          // Handle BigInt (if any)
+          if (typeof value === 'bigint') {
+            return value.toString();
+          }
+          // Handle undefined (convert to null for JSON)
+          if (value === undefined) {
+            return null;
+          }
+          return value;
+        }));
+
+        return NextResponse.json({
+          success: true,
+          contact: serializedContact,
+        });
+      } catch (serializeError) {
+        console.error('❌ Serialization error:', serializeError);
+        console.error('❌ Serialization error stack:', serializeError.stack);
+        console.error('❌ Contact keys:', Object.keys(contact || {}));
+        
+        // Try to return a minimal version without problematic fields
+        try {
+          const { careerTimeline, ...contactWithoutTimeline } = contact;
+          const minimalContact = JSON.parse(JSON.stringify(contactWithoutTimeline, (key, value) => {
+            if (value instanceof Date) return value.toISOString();
+            if (typeof value === 'bigint') return value.toString();
+            if (value === undefined) return null;
+            return value;
+          }));
+          
+          return NextResponse.json({
+            success: true,
+            contact: minimalContact,
+            warning: 'Some fields may be missing due to serialization issues',
+          });
+        } catch (fallbackError) {
+          console.error('❌ Fallback serialization also failed:', fallbackError);
+          throw serializeError; // Re-throw original error
+        }
+      }
+    }
+
+    // List contacts retrieval
+    if (!companyHQId) {
+      return NextResponse.json(
+        { success: false, error: 'companyHQId is required for list retrieval' },
+        { status: 400 },
+      );
+    }
+
+    const where = {
+      crmId: companyHQId,
+    };
+
+    if (pipeline || stage) {
+      where.pipeline = {};
+      if (pipeline) {
+        where.pipeline.pipeline = pipeline;
+      }
+      if (stage) {
+        where.pipeline.stage = stage;
+      }
+    }
+
+    const contacts = await prisma.contact.findMany({
+      where,
+      include: {
+        pipeline: true,
+        company: true, // Universal company relation
+        contactCompany: true, // Legacy relation for backward compatibility
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      contacts,
+    });
+  } catch (error) {
+    console.error('❌ RetrieveContacts error:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ Error message:', error.message);
+    
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to retrieve contacts',
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      },
+      { status: 500 },
+    );
+  }
+}
+
