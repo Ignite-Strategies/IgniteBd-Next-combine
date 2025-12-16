@@ -46,7 +46,8 @@ export default function DealPipelinesPage() {
 
   const contactsByPipeline = useMemo(() => {
     return contacts.reduce((acc, contact) => {
-      const pipelineId = slugify(contact.pipeline?.pipeline);
+      const pipeline = contact.pipelines || contact.pipeline;
+      const pipelineId = slugify(pipeline?.pipeline);
       if (!pipelineId) return acc;
       const list = acc.get(pipelineId) ?? [];
       list.push(contact);
@@ -64,7 +65,8 @@ export default function DealPipelinesPage() {
       return allActiveContacts;
     }
     const filtered = allActiveContacts.filter((contact) => {
-      const contactStage = slugify(contact.pipeline?.stage);
+      const pipeline = contact.pipelines || contact.pipeline;
+      const contactStage = slugify(pipeline?.stage);
       const matches = contactStage === selectedStage;
       return matches;
     });
@@ -72,11 +74,14 @@ export default function DealPipelinesPage() {
       selectedStage,
       totalContacts: allActiveContacts.length,
       filteredCount: filtered.length,
-      sampleStages: allActiveContacts.slice(0, 3).map(c => ({
-        id: c.id,
-        stage: c.pipeline?.stage,
-        slugified: slugify(c.pipeline?.stage)
-      }))
+      sampleStages: allActiveContacts.slice(0, 3).map(c => {
+        const p = c.pipelines || c.pipeline;
+        return {
+          id: c.id,
+          stage: p?.stage,
+          slugified: slugify(p?.stage)
+        };
+      })
     });
     return filtered;
   }, [allActiveContacts, selectedStage]);
