@@ -42,7 +42,7 @@ export async function GET(request) {
       }
     }
 
-    const contacts = await prisma.contacts.findMany({
+    const contacts = await prisma.contact.findMany({
       where,
       include: {
         pipeline: true,
@@ -96,6 +96,8 @@ export async function POST(request) {
       pipeline,
       stage,
       buyerDecision,
+      buyerPerson,
+      buyingReadiness,
       howMet,
       notes,
     } = body ?? {};
@@ -185,7 +187,7 @@ export async function POST(request) {
 
     let contact;
     if (email) {
-      const existingContact = await prisma.contacts.findFirst({
+      const existingContact = await prisma.contact.findFirst({
         where: {
           crmId,
           email,
@@ -197,7 +199,7 @@ export async function POST(request) {
       });
 
       if (existingContact) {
-        contact = await prisma.contacts.update({
+        contact = await prisma.contact.update({
           where: { id: existingContact.id },
           data: {
             firstName: firstName || existingContact.firstName,
@@ -208,6 +210,8 @@ export async function POST(request) {
             companyId: finalCompanyId || existingContact.companyId,
             contactCompanyId: finalContactCompanyId || existingContact.contactCompanyId, // Legacy field
             buyerDecision: buyerDecision || existingContact.buyerDecision,
+            buyerPerson: buyerPerson !== undefined ? buyerPerson : existingContact.buyerPerson,
+            buyingReadiness: buyingReadiness !== undefined ? buyingReadiness : existingContact.buyingReadiness,
             howMet: howMet || existingContact.howMet,
             notes: notes || existingContact.notes,
           },
@@ -225,7 +229,7 @@ export async function POST(request) {
         });
 
         // Re-fetch contact with pipeline
-        contact = await prisma.contacts.findUnique({
+        contact = await prisma.contact.findUnique({
           where: { id: contact.id },
           include: {
             pipeline: true,
@@ -236,7 +240,7 @@ export async function POST(request) {
 
         console.log('✅ Contact updated:', contact.id);
       } else {
-        contact = await prisma.contacts.create({
+        contact = await prisma.contact.create({
           data: {
             crmId,
             firstName: firstName || null,
@@ -248,6 +252,8 @@ export async function POST(request) {
             companyId: finalCompanyId || null,
             contactCompanyId: finalContactCompanyId || null, // Legacy field
             buyerDecision: buyerDecision || null,
+            buyerPerson: buyerPerson || null,
+            buyingReadiness: buyingReadiness || null,
             howMet: howMet || null,
             notes: notes || null,
           },
@@ -265,7 +271,7 @@ export async function POST(request) {
         });
 
         // Re-fetch contact with pipeline
-        contact = await prisma.contacts.findUnique({
+        contact = await prisma.contact.findUnique({
           where: { id: contact.id },
           include: {
             pipeline: true,
@@ -277,7 +283,7 @@ export async function POST(request) {
         console.log('✅ Contact created:', contact.id);
       }
     } else {
-      contact = await prisma.contacts.create({
+      contact = await prisma.contact.create({
         data: {
           crmId,
           firstName: firstName || null,
@@ -288,6 +294,8 @@ export async function POST(request) {
           title: title || null,
           contactCompanyId: finalContactCompanyId || null,
           buyerDecision: buyerDecision || null,
+          buyerPerson: buyerPerson || null,
+          buyingReadiness: buyingReadiness || null,
           howMet: howMet || null,
           notes: notes || null,
         },
