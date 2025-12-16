@@ -565,14 +565,47 @@ export default function ContactDetailPage({ params }) {
           onClose={() => setShowEnrichmentModal(false)}
           contactId={contactId || contact?.id}
           contactEmail={contact?.email}
-          onEnrichmentSaved={() => {
-            // Refresh contact data
-            if (contactId) {
-              api.get(`/api/contacts/${contactId}`).then((response) => {
-                if (response.data?.success && response.data.contact) {
-                  setContact(response.data.contact);
+          onEnrichmentSaved={(updatedContact) => {
+            try {
+              // Use the contact data from the save response if available
+              if (updatedContact && typeof updatedContact === 'object') {
+                setContact(updatedContact);
+                setNotesText(updatedContact.notes || '');
+                // Refresh contacts list to show updated data
+                if (refreshContacts) {
+                  refreshContacts();
                 }
-              });
+              } else if (contactId) {
+                // Fallback: refresh from API if no contact data provided
+                api.get(`/api/contacts/${contactId}`)
+                  .then((response) => {
+                    if (response.data?.success && response.data.contact) {
+                      setContact(response.data.contact);
+                      setNotesText(response.data.contact.notes || '');
+                      if (refreshContacts) {
+                        refreshContacts();
+                      }
+                    }
+                  })
+                  .catch((err) => {
+                    console.error('Error refreshing contact after enrichment:', err);
+                  });
+              }
+            } catch (error) {
+              console.error('Error handling enrichment save callback:', error);
+              // Still try to refresh from API as fallback
+              if (contactId) {
+                api.get(`/api/contacts/${contactId}`)
+                  .then((response) => {
+                    if (response.data?.success && response.data.contact) {
+                      setContact(response.data.contact);
+                      setNotesText(response.data.contact.notes || '');
+                    }
+                  })
+                  .catch((err) => {
+                    console.error('Error refreshing contact after enrichment (fallback):', err);
+                  });
+              }
             }
           }}
         />

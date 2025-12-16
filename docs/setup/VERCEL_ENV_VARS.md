@@ -20,12 +20,6 @@ This document lists all environment variables that need to be configured in Verc
   - Required for server-side Firebase auth verification
   - Format: JSON string of the service account key
 
-### Google Docs Integration
-- `GOOGLE_SERVICE_ACCOUNT_JSON` - Google service account JSON (as string)
-  - Required for Google Docs API access
-  - Format: JSON string of the service account key
-  - Service account email: `ignitebd-docs@ignitebd.iam.gserviceaccount.com`
-
 ---
 
 ## 🟡 Important - Required for Features
@@ -98,9 +92,6 @@ DATABASE_URL=postgresql://...
 # Firebase
 FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
 
-# Google Docs Integration
-GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
-
 # Microsoft/Azure
 AZURE_CLIENT_ID=c94ab2b5-daf8-4fab-970a-f42358bbae34
 AZURE_CLIENT_SECRET=...
@@ -146,7 +137,6 @@ OPENAI_MODEL=gpt-4o
    - ❌ Microsoft OAuth fails: Missing `AZURE_CLIENT_SECRET` or `AZURE_TENANT_ID`
    - ❌ Email fails: Missing `SENDGRID_API_KEY`
    - ❌ Firebase auth fails: Missing `FIREBASE_SERVICE_ACCOUNT_KEY`
-   - ❌ Google Docs API fails: Missing `GOOGLE_SERVICE_ACCOUNT_JSON`
 
 ---
 
@@ -155,7 +145,6 @@ OPENAI_MODEL=gpt-4o
 - **NEXT_PUBLIC_*** variables are exposed to the browser - don't put secrets here
 - **Redis variables** are NOT required (Redis is temporarily disabled in code)
 - **Firebase Service Account Key** must be a JSON string, not a file path
-- **Google Service Account JSON** must be a JSON string, not a file path
 - **Azure Tenant ID** is recommended but not required (will default to 'common')
 - After adding/updating variables in Vercel, **redeploy** the application
 

@@ -27,7 +27,7 @@ interface EnrichmentModalProps {
   onClose: () => void;
   contactId: string;
   contactEmail?: string; // Optional - if provided, can enrich by email
-  onEnrichmentSaved?: () => void;
+  onEnrichmentSaved?: (updatedContact?: any) => void;
 }
 
 interface PreviewData {
@@ -189,11 +189,13 @@ export default function EnrichmentModal({
       const response = await api.post('/api/contacts/enrich/save', {
         contactId,
         redisKey: previewData.redisKey,
+        previewId: previewData.previewId, // Pass previewId if available for inference fields
       });
 
       if (response.data?.success) {
+        // Pass the updated contact data to the callback
         if (onEnrichmentSaved) {
-          onEnrichmentSaved();
+          onEnrichmentSaved(response.data.contact);
         }
         handleClose();
       } else {
