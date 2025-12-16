@@ -312,7 +312,7 @@ export async function POST(request) {
       });
 
       // Re-fetch contact with pipeline
-      contact = await prisma.contacts.findUnique({
+      contact = await prisma.contact.findUnique({
         where: { id: contact.id },
         include: {
           pipeline: true,
