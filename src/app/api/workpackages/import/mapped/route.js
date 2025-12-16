@@ -42,9 +42,12 @@ export async function POST(request) {
       );
     }
 
-    // Verify contact exists
+    // Verify contact exists and get company info
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
+      include: {
+        companies: true, // Get the contact's company
+      },
     });
 
     if (!contact) {
@@ -54,10 +57,26 @@ export async function POST(request) {
       );
     }
 
+    // Auto-populate companyId from contact's company if not provided
+    // Work packages should be assigned to companies, not just contacts
+    let finalCompanyId = companyId;
+    if (!finalCompanyId && contact.companies) {
+      finalCompanyId = contact.companies.id;
+      console.log(`📦 Auto-assigned companyId from contact: ${finalCompanyId}`);
+    } else if (!finalCompanyId && contact.contactCompanyId) {
+      // Fallback: use contactCompanyId if companies relation didn't load
+      finalCompanyId = contact.contactCompanyId;
+      console.log(`📦 Auto-assigned companyId from contactCompanyId: ${finalCompanyId}`);
+    }
+
+    if (!finalCompanyId) {
+      console.warn('⚠️ Work package created without companyId - contact has no associated company');
+    }
+
     // Hydrate WorkPackage from mapped data
     const result = await hydrateFromMappedCSV({
       contactId,
-      companyId: companyId || null,
+      companyId: finalCompanyId || null,
       workPackage,
       phases,
       transformedRows,

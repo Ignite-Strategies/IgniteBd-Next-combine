@@ -1,11 +1,19 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOwner } from '@/hooks/useOwner';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import api from '@/lib/api';
+import { RefreshCw } from 'lucide-react';
 
 export default function WelcomePage() {
   const router = useRouter();
   const { owner, loading, hydrated, error } = useOwner();
+  const { companyHQId } = useCompanyHQ();
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const [syncSuccess, setSyncSuccess] = useState(false);
 
   // Always go to dashboard - profile changes happen in settings
   const nextRoute = '/growth-dashboard';
@@ -13,6 +21,42 @@ export default function WelcomePage() {
   const handleContinue = () => {
     router.push(nextRoute);
   };
+
+  const handleSyncContacts = useCallback(async () => {
+    if (!companyHQId) {
+      setSyncError('Company ID not available. Please refresh the page.');
+      return;
+    }
+
+    setSyncing(true);
+    setSyncError('');
+    setSyncSuccess(false);
+
+    try {
+      console.log('🔄 Syncing contacts for companyHQId:', companyHQId);
+      const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+      
+      if (response.data?.success && Array.isArray(response.data.contacts)) {
+        const fetchedContacts = response.data.contacts;
+        console.log('✅ Synced contacts:', fetchedContacts.length);
+        
+        // Store in localStorage
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('contacts', JSON.stringify(fetchedContacts));
+        }
+        
+        setSyncSuccess(true);
+        setTimeout(() => setSyncSuccess(false), 3000);
+      } else {
+        setSyncError('Failed to sync contacts. Please try again.');
+      }
+    } catch (err) {
+      console.error('❌ Error syncing contacts:', err);
+      setSyncError(err.response?.data?.error || err.message || 'Failed to sync contacts');
+    } finally {
+      setSyncing(false);
+    }
+  }, [companyHQId]);
 
   // Loading state
   if (loading || !hydrated) {
@@ -64,6 +108,30 @@ export default function WelcomePage() {
               ? `Ready to manage ${owner.companyHQ.companyName}?`
               : 'Ready to get started?'}
           </p>
+
+          {/* Sync Contacts Button */}
+          <div className="mb-4">
+            <button
+              onClick={handleSyncContacts}
+              disabled={syncing || !companyHQId}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                syncing || !companyHQId
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing Contacts...' : 'Sync Contacts'}
+            </button>
+            {syncError && (
+              <p className="mt-2 text-sm text-red-600 text-center">{syncError}</p>
+            )}
+            {syncSuccess && (
+              <p className="mt-2 text-sm text-green-600 text-center">
+                ✓ Contacts synced successfully!
+              </p>
+            )}
+          </div>
 
           <button
             onClick={handleContinue}

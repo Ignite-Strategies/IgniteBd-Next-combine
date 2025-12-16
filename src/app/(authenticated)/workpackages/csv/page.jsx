@@ -218,6 +218,13 @@ function WorkPackageCSVUploadContent() {
                 }}
                 selectedContact={selectedContact}
               />
+              {selectedContact && !companyId && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm text-amber-800">
+                    ⚠️ <strong>Note:</strong> This contact has no associated company. The work package will be created without a company assignment.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -268,6 +275,13 @@ function WorkPackageCSVUploadContent() {
               }}
               selectedContact={selectedContact}
             />
+            {selectedContact && !companyId && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-sm text-amber-800">
+                  ⚠️ <strong>Note:</strong> This contact has no associated company. The work package will be created without a company assignment.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
