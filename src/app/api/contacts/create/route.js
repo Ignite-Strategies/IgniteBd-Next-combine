@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { randomUUID } from 'crypto';
 
 /**
  * POST /api/contacts/create
@@ -113,6 +114,7 @@ export async function POST(request) {
         // Create new contact
         contact = await prisma.contact.create({
           data: {
+            id: randomUUID(),
             crmId,
             firstName: firstName || null,
             lastName: lastName || null,
@@ -133,6 +135,7 @@ export async function POST(request) {
       // Create contact without email
       contact = await prisma.contact.create({
         data: {
+          id: randomUUID(),
           crmId,
           firstName: firstName || null,
           lastName: lastName || null,
