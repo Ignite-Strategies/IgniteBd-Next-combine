@@ -45,6 +45,7 @@ export async function POST(request) {
       presenter,
       description,
       blogDraft, // Accept BlogDraft from AI generation
+      googleDocUrl, // Google Doc URL
     } = body ?? {};
 
     if (!companyHQId || !title) {
@@ -96,6 +97,7 @@ export async function POST(request) {
       sections: finalSections || null,
       presenter: presenter || null,
       description: description || null,
+      googleDocUrl: googleDocUrl || null,
       updatedAt: now,
     };
 

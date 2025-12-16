@@ -3,12 +3,41 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
+ * Helper: Get owner's companyHQId from Firebase token
+ */
+async function getOwnerCompanyHQId(firebaseUser) {
+  const owner = await prisma.owners.findUnique({
+    where: { firebaseId: firebaseUser.uid },
+    include: {
+      company_hqs_company_hqs_ownerIdToowners: {
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!owner) {
+    throw new Error('Owner not found for Firebase user');
+  }
+
+  const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
+  
+  if (!companyHQId) {
+    throw new Error('Owner has no associated CompanyHQ');
+  }
+
+  return companyHQId;
+}
+
+/**
  * POST /api/workpackages/bulk-upload/csv
  * Parse CSV and create work package with phases and items
+ * Company-first: requires companyId, workPackageClientId, auto-sets workPackageOwnerId
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -19,14 +48,26 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
-    const contactId = formData.get('contactId');
+    const workPackageClientId = formData.get('workPackageClientId') || formData.get('contactId'); // Support legacy
+    const companyId = formData.get('companyId');
+    const workPackageMemberId = formData.get('workPackageMemberId');
 
-    if (!contactId) {
+    if (!workPackageClientId) {
       return NextResponse.json(
-        { success: false, error: 'contactId is required' },
+        { success: false, error: 'workPackageClientId (or contactId) is required' },
         { status: 400 },
       );
     }
+
+    if (!companyId) {
+      return NextResponse.json(
+        { success: false, error: 'companyId is required' },
+        { status: 400 },
+      );
+    }
+
+    // Get owner's companyHQId from Firebase auth
+    const workPackageOwnerId = await getOwnerCompanyHQId(firebaseUser);
 
     if (!file) {
       return NextResponse.json(
