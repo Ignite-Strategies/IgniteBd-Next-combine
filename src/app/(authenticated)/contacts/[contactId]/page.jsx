@@ -196,10 +196,10 @@ export default function ContactDetailPage({ params }) {
             Back
           </button>
           <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600">
-            {contact.pipeline?.pipeline || 'Prospect'}
+            {contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'Prospect'}
           </span>
           <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-600">
-            {contact.pipeline?.stage || 'Unassigned Stage'}
+            {contact.pipelines?.stage || contact.pipeline?.stage || 'Unassigned Stage'}
           </span>
         </div>
 

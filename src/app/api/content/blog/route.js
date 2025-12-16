@@ -55,7 +55,7 @@ export async function POST(request) {
     }
 
     // Verify companyHQ belongs to owner
-    const companyHQ = await prisma.companyHQ.findFirst({
+    const companyHQ = await prisma.company_hqs.findFirst({
       where: {
         id: companyHQId,
         ownerId: owner.id,
