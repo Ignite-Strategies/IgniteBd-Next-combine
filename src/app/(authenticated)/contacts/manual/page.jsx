@@ -155,19 +155,33 @@ export default function ContactManualPage() {
   };
 
   // Step 2: Search Companies
-  const handleSearchCompanies = async () => {
-    if (!companySearchQuery.trim() || !companyHQId) return;
+  const [searchingCompanies, setSearchingCompanies] = useState(false);
+  const [showCreatePrompt, setShowCreatePrompt] = useState(false);
 
+  const handleSearchCompanies = async () => {
+    if (!companySearchQuery.trim() || !companyHQId) {
+      setCompanySearchResults([]);
+      setShowCreatePrompt(false);
+      return;
+    }
+
+    setSearchingCompanies(true);
     try {
       const response = await api.get(
         `/api/companies?companyHQId=${companyHQId}&query=${encodeURIComponent(companySearchQuery)}`
       );
       if (response.data?.success) {
-        setCompanySearchResults(response.data.companies || []);
+        const results = response.data.companies || [];
+        setCompanySearchResults(results);
+        // Show create prompt if no results and user has typed something
+        setShowCreatePrompt(results.length === 0 && companySearchQuery.trim().length > 0);
       }
     } catch (error) {
       console.error('Failed to search companies:', error);
       setCompanySearchResults([]);
+      setShowCreatePrompt(false);
+    } finally {
+      setSearchingCompanies(false);
     }
   };
 
@@ -179,18 +193,20 @@ export default function ContactManualPage() {
       return () => clearTimeout(timeoutId);
     } else {
       setCompanySearchResults([]);
+      setShowCreatePrompt(false);
     }
   }, [companySearchQuery]);
 
-  // Step 2: Create New Company
-  const handleCreateCompany = async () => {
-    if (!newCompanyName.trim() || !companyHQId) return;
+  // Step 2: Create New Company (from search query or manual input)
+  const handleCreateCompany = async (companyNameToCreate = null) => {
+    const nameToCreate = companyNameToCreate || newCompanyName.trim();
+    if (!nameToCreate || !companyHQId) return;
 
     setCreatingCompany(true);
     try {
       const response = await api.post('/api/companies', {
         companyHQId,
-        companyName: newCompanyName.trim(),
+        companyName: nameToCreate,
       });
 
       if (response.data?.success && response.data.company) {
@@ -198,6 +214,8 @@ export default function ContactManualPage() {
         setSelectedCompany(response.data.company);
         setNewCompanyName('');
         setCompanySearchQuery('');
+        setShowCreatePrompt(false);
+        setCompanySearchResults([]);
       }
     } catch (error) {
       console.error('Failed to create company:', error);
@@ -598,14 +616,23 @@ export default function ContactManualPage() {
                   <Building2 className="mr-1 inline h-4 w-4" />
                   Search Companies
                 </label>
-                <input
-                  type="text"
-                  value={companySearchQuery}
-                  onChange={(e) => setCompanySearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                  placeholder="Type company name to search..."
-                />
-                {companySearchResults.length > 0 && (
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={companySearchQuery}
+                    onChange={(e) => setCompanySearchQuery(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    placeholder="Type company name to search..."
+                  />
+                  {searchingCompanies && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Search Results */}
+                {!searchingCompanies && companySearchResults.length > 0 && (
                   <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                     {companySearchResults.map((company) => (
                       <button
@@ -620,6 +647,30 @@ export default function ContactManualPage() {
                         )}
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {/* Create Prompt - Show when no results and user has typed something */}
+                {!searchingCompanies && showCreatePrompt && companySearchQuery.trim() && (
+                  <div className="mt-2 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">
+                          No company found matching "{companySearchQuery}"
+                        </p>
+                        <p className="mt-1 text-xs text-blue-700">
+                          Create a new company with this name?
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateCompany(companySearchQuery.trim())}
+                        disabled={creatingCompany}
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {creatingCompany ? 'Creating...' : `Create "${companySearchQuery.trim()}"`}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -647,28 +698,30 @@ export default function ContactManualPage() {
                 </div>
               )}
 
-              <div className="border-t pt-4">
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Or Create New Company
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newCompanyName}
-                    onChange={(e) => setNewCompanyName(e.target.value)}
-                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter company name..."
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCreateCompany}
-                    disabled={!newCompanyName.trim() || creatingCompany}
-                    className="rounded-lg bg-gray-600 px-4 py-2 font-medium text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {creatingCompany ? 'Creating...' : 'Create'}
-                  </button>
+              {!showCreatePrompt && (
+                <div className="border-t pt-4">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Or Create New Company Manually
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newCompanyName}
+                      onChange={(e) => setNewCompanyName(e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter company name..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleCreateCompany()}
+                      disabled={!newCompanyName.trim() || creatingCompany}
+                      className="rounded-lg bg-gray-600 px-4 py-2 font-medium text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {creatingCompany ? 'Creating...' : 'Create'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="flex gap-3 border-t pt-6">

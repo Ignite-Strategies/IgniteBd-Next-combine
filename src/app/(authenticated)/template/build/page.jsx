@@ -127,9 +127,9 @@ export default function TemplateBuildPage() {
     // Keep form values, just switch mode
   };
 
-  // Auto-hydrate preview when form changes (for MANUAL mode) - client-side only, no API calls
+  // Auto-hydrate preview when form changes - client-side only, no API calls
   useEffect(() => {
-    if (mode === 'MANUAL' && form.relationship && form.typeOfPerson && form.whyReachingOut.trim()) {
+    if (form.relationship && form.typeOfPerson && form.whyReachingOut.trim()) {
       // Use client-side hydration for instant preview - no API call needed
       const tempBase = {
         relationship: form.relationship,
@@ -151,7 +151,7 @@ export default function TemplateBuildPage() {
         },
       });
     }
-  }, [form.relationship, form.typeOfPerson, form.whyReachingOut, form.whatWantFromThem, mode]);
+  }, [form.relationship, form.typeOfPerson, form.whyReachingOut, form.whatWantFromThem]);
 
   const handleBuild = async () => {
     if (!companyHQId) {
@@ -407,6 +407,12 @@ export default function TemplateBuildPage() {
 
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-semibold text-gray-900">Builder Inputs</h2>
+              
+              {mode === 'TEMPLATE' && selectedTemplate && (
+                <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                  ✓ Template selected - fields are auto-filled. Feel free to customize them.
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div>
@@ -419,6 +425,7 @@ export default function TemplateBuildPage() {
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
+                    disabled={false}
                   >
                     <option value="">Select relationship</option>
                     {RELATIONSHIP_OPTIONS.map((opt) => (
@@ -439,6 +446,7 @@ export default function TemplateBuildPage() {
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
+                    disabled={false}
                   >
                     <option value="">Select type</option>
                     {TYPE_OF_PERSON_OPTIONS.map((opt) => (
@@ -461,7 +469,7 @@ export default function TemplateBuildPage() {
                     rows={3}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
-                    disabled={mode === 'TEMPLATE' && selectedTemplate}
+                    disabled={false}
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     Free-text human observation about why you're reaching out
@@ -479,7 +487,7 @@ export default function TemplateBuildPage() {
                     placeholder="e.g., I'd love to grab coffee, Would be great to catch up, etc."
                     rows={2}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    disabled={mode === 'TEMPLATE' && selectedTemplate}
+                    disabled={false}
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     Optional and often empty in early outreach
