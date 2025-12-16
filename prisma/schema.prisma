@@ -99,17 +99,18 @@ model bdos_scores {
 }
 
 model blogs {
-  id          String      @id
-  companyHQId String
-  title       String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime
-  blogText    String?
-  description String?
-  presenter   String?
-  sections    Json?
-  subtitle    String?
-  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  id           String      @id
+  companyHQId  String
+  title        String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime
+  blogText     String?
+  description  String?
+  presenter    String?
+  sections     Json?
+  subtitle     String?
+  googleDocUrl String?
+  company_hqs  company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@index([companyHQId])
 }

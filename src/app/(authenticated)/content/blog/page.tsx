@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool, Download } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool, Download, ExternalLink } from 'lucide-react';
 
 // 🎯 LOCAL-FIRST FLAG: API sync is optional and explicit only
 const ENABLE_BLOG_API_SYNC = true;
@@ -348,6 +348,18 @@ export default function BlogPage() {
                         <p className="text-xs text-gray-500">
                           Created {formatDate(blog.createdAt)}
                         </p>
+                        {blog.googleDocUrl && (
+                          <a
+                            href={blog.googleDocUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View Google Doc
+                          </a>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">

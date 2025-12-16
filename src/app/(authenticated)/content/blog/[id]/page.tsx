@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, ArrowLeft, Trash2, Download } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Download, ExternalLink } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function BlogEditorPage() {
@@ -18,6 +18,7 @@ export default function BlogEditorPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [googleDocUrl, setGoogleDocUrl] = useState(null);
+  const [savedGoogleDocUrl, setSavedGoogleDocUrl] = useState(null);
 
   useEffect(() => {
     if (blogId) {
@@ -37,6 +38,7 @@ export default function BlogEditorPage() {
         setSubtitle(blog.subtitle || '');
         setBlogText(blog.blogText || '');
         setSections(blog.sections || null);
+        setSavedGoogleDocUrl(blog.googleDocUrl || null);
       } else {
         console.error('Failed to load blog:', response.data);
         alert('Failed to load blog');
@@ -112,6 +114,7 @@ export default function BlogEditorPage() {
       if (response.data?.success) {
         const docUrl = response.data.documentUrl;
         setGoogleDocUrl(docUrl);
+        setSavedGoogleDocUrl(docUrl); // Update saved URL
         // For export, automatically open in new tab
         window.open(docUrl, '_blank');
       } else {
@@ -227,18 +230,19 @@ export default function BlogEditorPage() {
               </p>
             </div>
 
-            {googleDocUrl && (
+            {(googleDocUrl || savedGoogleDocUrl) && (
               <div className="rounded-lg border border-green-300 bg-green-50 p-4 mb-4">
                 <p className="text-sm font-semibold text-green-800 mb-2">
-                  ✅ Blog pushed to Google Docs!
+                  ✅ Google Doc Available
                 </p>
                 <a
-                  href={googleDocUrl}
+                  href={googleDocUrl || savedGoogleDocUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-green-700 hover:text-green-900 underline"
+                  className="flex items-center gap-2 text-sm text-green-700 hover:text-green-900 underline"
                 >
-                  Open in Google Docs →
+                  <ExternalLink className="h-4 w-4" />
+                  Open in Google Docs
                 </a>
               </div>
             )}

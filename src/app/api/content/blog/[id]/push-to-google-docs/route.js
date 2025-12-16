@@ -178,6 +178,12 @@ export async function POST(request, { params }) {
     // Get the document URL
     const documentUrl = `https://docs.google.com/document/d/${documentId}/edit`;
 
+    // Save the Google Doc URL to the blog record
+    await prisma.blogs.update({
+      where: { id },
+      data: { googleDocUrl: documentUrl },
+    });
+
     return NextResponse.json({
       success: true,
       documentId,
