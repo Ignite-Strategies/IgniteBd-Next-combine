@@ -359,12 +359,15 @@ export default function BlogPage() {
                         View
                       </button>
                       <button
-                        onClick={(e) => handleExportToGoogleDocs(blog.id, e)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExportToGoogleDocs(blog.id, e);
+                        }}
                         disabled={exportingBlogId === blog.id}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Download className={`h-3.5 w-3.5 ${exportingBlogId === blog.id ? 'animate-spin' : ''}`} />
-                        {exportingBlogId === blog.id ? 'Exporting...' : 'Export to Google Docs'}
+                        <span>{exportingBlogId === blog.id ? 'Exporting...' : 'Export to Google Docs'}</span>
                       </button>
                       <button
                         onClick={() => router.push(`/content/blog/${blog.id}`)}
