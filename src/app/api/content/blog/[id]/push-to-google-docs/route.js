@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { getGoogleDocsClient, initializeGoogleAuth } from '@/lib/googleServiceAccount';
+import { getGoogleDocsClient, getGoogleDriveClient, initializeGoogleAuth } from '@/lib/googleServiceAccount';
 
 /**
  * POST /api/content/blog/[id]/push-to-google-docs
@@ -69,7 +69,8 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Get Google Docs client
+    // Get Google Drive and Docs clients
+    const drive = getGoogleDriveClient();
     const docs = getGoogleDocsClient();
 
     // Prepare document content
@@ -101,14 +102,25 @@ export async function POST(request, { params }) {
       fullText += blogText;
     }
 
-    // Create the document
-    const createResponse = await docs.documents.create({
+    // Create the document using Drive API (service accounts can create files they own)
+    const createResponse = await drive.files.create({
       requestBody: {
-        title: documentTitle,
+        name: documentTitle,
+        mimeType: 'application/vnd.google-apps.document',
       },
+      fields: 'id',
     });
 
-    const documentId = createResponse.data.documentId;
+    const documentId = createResponse.data.id;
+
+    // Make the document accessible (anyone with the link can view)
+    await drive.permissions.create({
+      fileId: documentId,
+      requestBody: {
+        role: 'writer',
+        type: 'anyone',
+      },
+    });
 
     // Build batch update requests
     const requests = [];
