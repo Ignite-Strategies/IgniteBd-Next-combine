@@ -193,7 +193,7 @@ export default function ContactOutlook({ contact, onViewRawJSON }: ContactOutloo
             )}
 
             {/* Company Snapshot */}
-            {(contact.companyName || contact.companyDomain || contact.company?.companyName) && (
+            {(contact.companyName || contact.companyDomain || contact.company?.companyName || contact.companies?.companyName || contact.contactCompany?.companyName) && (
               <div className="rounded-lg border border-gray-200 bg-blue-50 p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Building2 className="h-4 w-4 text-blue-600" />
@@ -203,21 +203,25 @@ export default function ContactOutlook({ contact, onViewRawJSON }: ContactOutloo
                   <div>
                     <dt className="text-xs text-gray-500">Name</dt>
                     <dd className="mt-1 text-gray-900">
-                      {contact.company?.companyName || contact.companyName || '—'}
+                      {contact.companies?.companyName || contact.company?.companyName || contact.contactCompany?.companyName || contact.companyName || '—'}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-xs text-gray-500">Domain</dt>
                     <dd className="mt-1 text-gray-900">
-                      {contact.company?.domain || contact.companyDomain || '—'}
+                      {contact.companies?.domain || contact.company?.domain || contact.contactCompany?.domain || contact.companyDomain || '—'}
                     </dd>
                   </div>
-                  {contact.company?.companyHealthScore !== null && (
+                  {(contact.companies?.companyHealthScore !== null && contact.companies?.companyHealthScore !== undefined) ||
+                   (contact.company?.companyHealthScore !== null && contact.company?.companyHealthScore !== undefined) ||
+                   (contact.contactCompany?.companyHealthScore !== null && contact.contactCompany?.companyHealthScore !== undefined) ? (
                     <div>
                       <dt className="text-xs text-gray-500">Health Score</dt>
-                      <dd className="mt-1 text-gray-900">{contact.company.companyHealthScore}/100</dd>
+                      <dd className="mt-1 text-gray-900">
+                        {contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? contact.contactCompany?.companyHealthScore ?? '—'}/100
+                      </dd>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}
