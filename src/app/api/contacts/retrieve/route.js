@@ -132,6 +132,7 @@ export async function GET(request) {
       crmId: companyHQId,
     };
 
+    // Filter by pipeline/stage if provided
     if (pipeline || stage) {
       where.pipelines = {};
       if (pipeline) {

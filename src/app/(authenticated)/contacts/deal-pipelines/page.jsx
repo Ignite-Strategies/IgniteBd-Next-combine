@@ -165,7 +165,10 @@ export default function DealPipelinesPage() {
               {activeStages.map((stageId) => {
                 const isSelected = selectedStage === stageId;
                 const stageCount = allActiveContacts.filter(
-                  (contact) => slugify(contact.pipeline?.stage) === stageId
+                  (contact) => {
+                    const pipeline = contact.pipelines || contact.pipeline;
+                    return slugify(pipeline?.stage) === stageId;
+                  }
                 ).length;
                 return (
                   <button
@@ -220,7 +223,8 @@ export default function DealPipelinesPage() {
                   </tr>
                 ) : (
                   activeContacts.map((contact) => {
-                    const contactStage = slugify(contact.pipeline?.stage);
+                    const pipeline = contact.pipelines || contact.pipeline;
+                    const contactStage = slugify(pipeline?.stage);
                     const displayName = contact.goesBy ||
                       [contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
                       'Unnamed Contact';
@@ -241,7 +245,7 @@ export default function DealPipelinesPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 group-hover:text-gray-700 transition-colors">
-                          {contact.contactCompany?.companyName || '—'}
+                          {contact.companies?.companyName || contact.contactCompany?.companyName || '—'}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <span
@@ -251,7 +255,7 @@ export default function DealPipelinesPage() {
                                 : 'bg-gray-100 text-gray-800'
                             }`}
                           >
-                            {formatLabel(contact.pipeline?.stage) || 'Unassigned'}
+                            {formatLabel(pipeline?.stage) || 'Unassigned'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">

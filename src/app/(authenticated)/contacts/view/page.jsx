@@ -12,9 +12,13 @@ import {
   Trash2,
   RefreshCw,
   Sparkles,
+  Building2,
+  X,
+  Check,
 } from 'lucide-react';
 import api from '@/lib/api';
 import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
+import CompanySelector from '@/components/CompanySelector';
 
 export default function ContactsViewPage() {
   const router = useRouter();
@@ -32,6 +36,9 @@ export default function ContactsViewPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [enrichmentModalContactId, setEnrichmentModalContactId] = useState(null);
+  const [assigningCompanyId, setAssigningCompanyId] = useState(null);
+  const [selectedCompanyForAssign, setSelectedCompanyForAssign] = useState(null);
+  const [savingCompanyAssignment, setSavingCompanyAssignment] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -587,6 +594,84 @@ export default function ContactsViewPage() {
                             >
                               {contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0}
                             </span>
+                          )}
+                          {assigningCompanyId === contact.id ? (
+                            <div className="flex items-center gap-1">
+                              <CompanySelector
+                                companyId={contact.companies?.id || contact.company?.id || contact.contactCompany?.id || null}
+                                selectedCompany={selectedCompanyForAssign}
+                                onCompanySelect={(company) => setSelectedCompanyForAssign(company)}
+                                showLabel={false}
+                                className="w-48"
+                                placeholder="Search company..."
+                              />
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!selectedCompanyForAssign) {
+                                    alert('Please select a company');
+                                    return;
+                                  }
+                                  setSavingCompanyAssignment(true);
+                                  try {
+                                    const response = await api.put(`/api/contacts/${contact.id}`, {
+                                      contactCompanyId: selectedCompanyForAssign.id,
+                                      companyId: selectedCompanyForAssign.id,
+                                    });
+                                    if (response.data?.success) {
+                                      // Update local state
+                                      const updatedContacts = contacts.map((c) =>
+                                        c.id === contact.id ? response.data.contact : c
+                                      );
+                                      setContacts(updatedContacts);
+                                      if (typeof window !== 'undefined') {
+                                        window.localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+                                      }
+                                      setAssigningCompanyId(null);
+                                      setSelectedCompanyForAssign(null);
+                                    } else {
+                                      alert(response.data?.error || 'Failed to assign company');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error assigning company:', error);
+                                    alert(error.response?.data?.error || 'Failed to assign company');
+                                  } finally {
+                                    setSavingCompanyAssignment(false);
+                                  }
+                                }}
+                                disabled={savingCompanyAssignment || !selectedCompanyForAssign}
+                                className="rounded-lg p-1 bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50"
+                                title="Save"
+                              >
+                                <Check className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAssigningCompanyId(null);
+                                  setSelectedCompanyForAssign(null);
+                                }}
+                                className="rounded-lg p-1 bg-gray-200 text-gray-600 hover:bg-gray-300 transition"
+                                title="Cancel"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAssigningCompanyId(contact.id);
+                                setSelectedCompanyForAssign(contact.companies || contact.company || contact.contactCompany || null);
+                              }}
+                              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition"
+                              title="Assign company"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
                           )}
                         </div>
                       </td>
