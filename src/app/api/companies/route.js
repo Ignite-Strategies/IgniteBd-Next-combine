@@ -112,45 +112,110 @@ export async function POST(request) {
 
     // Upsert pattern: find existing or create new
     const normalizedCompanyName = companyName.trim();
-    const allCompanies = await prisma.companies.findMany({
-      where: { companyHQId },
+    
+    if (!normalizedCompanyName) {
+      return NextResponse.json(
+        { success: false, error: 'Company name cannot be empty' },
+        { status: 400 },
+      );
+    }
+
+    // Use a transaction-like approach: try to find, then create if not found
+    // First try exact match (fastest)
+    let company = await prisma.companies.findFirst({
+      where: {
+        companyHQId,
+        companyName: normalizedCompanyName,
+      },
     });
 
-    let company = allCompanies.find(
-      (c) =>
-        c.companyName &&
-        c.companyName.trim().toLowerCase() === normalizedCompanyName.toLowerCase(),
-    );
+    // If not found, try case-insensitive match using a more efficient query
+    if (!company) {
+      // Get all companies for this tenant (unavoidable for case-insensitive match)
+      // But we'll optimize by only selecting what we need
+      const allCompanies = await prisma.companies.findMany({
+        where: { companyHQId },
+        select: { id: true, companyName: true },
+      });
+
+      const normalizedSearch = normalizedCompanyName.toLowerCase().trim();
+      const found = allCompanies.find(
+        (c) => c.companyName && c.companyName.trim().toLowerCase() === normalizedSearch
+      );
+      
+      if (found) {
+        company = await prisma.companies.findUnique({
+          where: { id: found.id },
+        });
+      }
+    }
 
     if (company) {
       // Update existing company if additional data provided
-      if (address || industry || website || revenue || yearsInBusiness) {
+      const updateData = {};
+      if (address !== undefined) updateData.address = address;
+      if (industry !== undefined) updateData.industry = industry;
+      if (website !== undefined) updateData.website = website;
+      if (revenue !== undefined) updateData.revenue = revenue;
+      if (yearsInBusiness !== undefined) updateData.yearsInBusiness = yearsInBusiness;
+
+      if (Object.keys(updateData).length > 0) {
         company = await prisma.companies.update({
           where: { id: company.id },
-          data: {
-            address: address || company.address,
-            industry: industry || company.industry,
-            website: website || company.website,
-            revenue: revenue || company.revenue,
-            yearsInBusiness: yearsInBusiness || company.yearsInBusiness,
-          },
+          data: updateData,
         });
       }
       console.log(`✅ Found existing company: ${company.companyName} (id: ${company.id})`);
     } else {
-      // Create new company
-      company = await prisma.companies.create({
-        data: {
-          companyHQId,
-          companyName: normalizedCompanyName,
-          address: address || null,
-          industry: industry || null,
-          website: website || null,
-          revenue: revenue || null,
-          yearsInBusiness: yearsInBusiness || null,
-        },
-      });
-      console.log(`✅ Created new company: ${normalizedCompanyName} for companyHQId: ${companyHQId}`);
+      // Create new company - simple create, let Prisma handle duplicates
+      try {
+        company = await prisma.companies.create({
+          data: {
+            companyHQId,
+            companyName: normalizedCompanyName,
+            address: address || null,
+            industry: industry || null,
+            website: website || null,
+            revenue: revenue || null,
+            yearsInBusiness: yearsInBusiness || null,
+          },
+        });
+        console.log(`✅ Created new company: ${normalizedCompanyName} (id: ${company.id})`);
+      } catch (createError) {
+        console.error('❌ Create company error:', createError);
+        // If it's a unique constraint error, try to find the existing one
+        if (createError.code === 'P2002') {
+          console.log('⚠️ Unique constraint violation, searching for existing company...');
+          // One more search attempt
+          const retryCompanies = await prisma.companies.findMany({
+            where: { companyHQId },
+            select: { id: true, companyName: true },
+          });
+          const normalizedSearch = normalizedCompanyName.toLowerCase().trim();
+          const found = retryCompanies.find(
+            (c) => c.companyName && c.companyName.trim().toLowerCase() === normalizedSearch
+          );
+          if (found) {
+            company = await prisma.companies.findUnique({
+              where: { id: found.id },
+            });
+            console.log(`✅ Found existing company after error: ${company.companyName} (id: ${company.id})`);
+          } else {
+            // Re-throw with better error message
+            return NextResponse.json(
+              {
+                success: false,
+                error: 'Failed to create company - duplicate detected but not found',
+                details: createError.message,
+              },
+              { status: 500 },
+            );
+          }
+        } else {
+          // Re-throw other errors
+          throw createError;
+        }
+      }
     }
 
     return NextResponse.json({

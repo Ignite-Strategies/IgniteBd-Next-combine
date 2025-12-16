@@ -153,7 +153,10 @@ export default function CompanySelector({
   };
 
   return (
-    <div className={`relative ${className}`}>
+    <div 
+      className={`relative ${className}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       {showLabel && (
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Company
@@ -165,7 +168,11 @@ export default function CompanySelector({
         <input
           type="text"
           value={companySearch}
-          onChange={(e) => setCompanySearch(e.target.value)}
+          onChange={(e) => {
+            e.stopPropagation();
+            setCompanySearch(e.target.value);
+          }}
+          onClick={(e) => e.stopPropagation()}
           placeholder={placeholder}
           className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
         />
@@ -173,11 +180,17 @@ export default function CompanySelector({
 
       {/* Dropdown Results */}
       {companySearch.length >= 1 && availableCompanies.length > 0 && (
-        <div className="absolute z-10 mt-1 max-h-60 w-full space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div 
+          className="absolute z-10 mt-1 max-h-60 w-full space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
           {availableCompanies.map((company) => (
             <button
               key={company.id}
-              onClick={() => handleSelectCompany(company)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelectCompany(company);
+              }}
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
             >
               <div className="font-medium">{company.companyName}</div>
@@ -195,12 +208,18 @@ export default function CompanySelector({
        !loading && 
        allowCreate && 
        !showCreateForm && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+        <div 
+          className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="text-sm text-gray-500 mb-2">
             No companies found matching "{companySearch}"
           </div>
           <button
-            onClick={() => setShowCreateForm(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowCreateForm(true);
+            }}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
           >
             <Plus className="h-4 w-4" />
@@ -211,7 +230,10 @@ export default function CompanySelector({
 
       {/* Create Form */}
       {showCreateForm && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+        <div 
+          className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="mb-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Company Name
@@ -219,7 +241,11 @@ export default function CompanySelector({
             <input
               type="text"
               value={newCompanyName}
-              onChange={(e) => setNewCompanyName(e.target.value)}
+              onChange={(e) => {
+                e.stopPropagation();
+                setNewCompanyName(e.target.value);
+              }}
+              onClick={(e) => e.stopPropagation()}
               placeholder="Enter company name"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               autoFocus
@@ -227,14 +253,18 @@ export default function CompanySelector({
           </div>
           <div className="flex gap-2">
             <button
-              onClick={handleCreateCompany}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCreateCompany();
+              }}
               disabled={creating || !newCompanyName.trim()}
               className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? 'Creating...' : 'Create Company'}
             </button>
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 setShowCreateForm(false);
                 setNewCompanyName('');
               }}

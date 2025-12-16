@@ -26,6 +26,7 @@ interface EnrichmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   contactId: string;
+  contactEmail?: string; // Optional - if provided, can enrich by email
   onEnrichmentSaved?: () => void;
 }
 
@@ -56,6 +57,7 @@ export default function EnrichmentModal({
   isOpen,
   onClose,
   contactId,
+  contactEmail,
   onEnrichmentSaved,
 }: EnrichmentModalProps) {
   const [linkedinUrl, setLinkedinUrl] = useState('');
@@ -63,8 +65,63 @@ export default function EnrichmentModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [enrichmentMethod, setEnrichmentMethod] = useState<'email' | 'linkedin'>(
+    contactEmail ? 'email' : 'linkedin'
+  );
 
   if (!isOpen) return null;
+
+  const handleEnrichByEmail = async () => {
+    if (!contactEmail) {
+      setError('Contact does not have an email address');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setPreviewData(null);
+
+    try {
+      const response = await api.post('/api/contacts/enrich/by-email', {
+        contactId,
+      });
+
+      if (response.data?.success) {
+        const rawResponse = response.data.rawApolloResponse;
+        
+        // Compute intelligence scores client-side for preview
+        const apolloPayload = rawResponse as ApolloEnrichmentPayload;
+        
+        const intelligenceScores = {
+          seniorityScore: extractSeniorityScore(apolloPayload),
+          buyingPowerScore: extractBuyingPowerScore(apolloPayload),
+          urgencyScore: extractUrgencyScore(apolloPayload),
+          rolePowerScore: extractRolePowerScore(apolloPayload),
+          buyerLikelihoodScore: extractBuyerLikelihoodScore(apolloPayload),
+          readinessToBuyScore: extractReadinessToBuyScore(apolloPayload),
+          careerMomentumScore: extractCareerMomentumScore(apolloPayload),
+          careerStabilityScore: extractCareerStabilityScore(apolloPayload),
+        };
+
+        const companyIntelligence = extractCompanyIntelligenceScores(apolloPayload);
+
+        setPreviewData({
+          enrichedContact: response.data.enrichedContact,
+          rawApolloResponse: rawResponse,
+          redisKey: response.data.redisKey,
+          intelligenceScores,
+          companyIntelligence,
+        });
+      } else {
+        setError(response.data?.error || 'Failed to enrich contact by email');
+      }
+    } catch (err: any) {
+      console.error('Enrichment error:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to enrich contact by email');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePreview = async () => {
     if (!linkedinUrl.trim()) {

@@ -57,10 +57,8 @@ export default function ContactDetailPage({ params }) {
           if (response.data?.success && response.data.contact) {
             setContact(response.data.contact);
             setLoading(false);
-            // Update the contact in the contacts list cache
-            if (refreshContacts) {
-              refreshContacts();
-            }
+            // Don't call refreshContacts here - it causes infinite loops
+            // The contact detail is already fresh, no need to refresh the list
           } else {
             if (!cachedContact && isMounted) {
               setError(response.data?.error || 'Contact not found.');
@@ -92,7 +90,9 @@ export default function ContactDetailPage({ params }) {
     return () => {
       isMounted = false;
     };
-  }, [contactId, contacts, refreshContacts]);
+    // Only depend on contactId - remove contacts and refreshContacts to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactId]);
 
   const [generatingPortal, setGeneratingPortal] = useState(false);
   const [portalLink, setPortalLink] = useState(null);
@@ -369,52 +369,77 @@ export default function ContactDetailPage({ params }) {
             </p>
           </section>
 
-          {/* Contact Outlook Section */}
-          <ContactOutlook 
-            contact={contact} 
-            onViewRawJSON={(json) => {
-              setRawJSON(json);
-              setShowRawJSON(true);
-            }}
-          />
+          {/* Contact Outlook Section - Only show if contact has enrichment data */}
+          {/* This is a "clue" during enrichment, not a persistent thing on all contacts */}
+          {(contact.enrichmentSource || contact.enrichmentRedisKey || 
+            contact.seniorityScore !== null || contact.buyingPowerScore !== null) && (
+            <ContactOutlook 
+              contact={contact} 
+              onViewRawJSON={(json) => {
+                setRawJSON(json);
+                setShowRawJSON(true);
+              }}
+            />
+          )}
 
-          {/* Client Portal Access */}
-          {contact.email && (
+          {/* Client Portal Access - Only for activated contacts or contacts with firebaseUid */}
+          {/* This is a special UX, not for all contacts */}
+          {contact.email && (contact.isActivated || contact.firebaseUid) && (
             <section className="rounded-2xl bg-white p-6 shadow">
               <h3 className="mb-4 text-lg font-semibold text-gray-900">Client Portal Access</h3>
-              <p className="mb-4 text-sm text-gray-600">
-                Generate portal access for this contact. They'll receive a password reset link to set up their account and access proposals and deliverables.
-              </p>
-              {portalLink ? (
+              {contact.isActivated ? (
                 <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-                  <p className="text-sm font-semibold text-green-800 mb-2">Portal access generated!</p>
-                  <p className="text-xs text-green-700 mb-3">Password reset link copied to clipboard. Send it to {contact.email}</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(portalLink);
-                        alert('Link copied to clipboard!');
-                      }}
-                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
-                    >
-                      Copy Link Again
-                    </button>
-                    <a
-                      href={`mailto:${contact.email}?subject=Client Portal Access&body=Click this link to set up your client portal password: ${portalLink}`}
-                      className="rounded-lg bg-white border border-green-600 px-4 py-2 text-sm font-semibold text-green-600 transition hover:bg-green-50"
-                    >
-                      Email Link
-                    </a>
-                  </div>
+                  <p className="text-sm font-semibold text-green-800 mb-2">✅ Portal Activated</p>
+                  <p className="text-xs text-green-700 mb-3">
+                    This contact has activated their client portal.
+                    {contact.activatedAt && ` Activated on ${new Date(contact.activatedAt).toLocaleDateString()}.`}
+                  </p>
+                  <a
+                    href={contact.clientPortalUrl || 'https://clientportal.ignitegrowth.biz'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
+                  >
+                    Open Portal
+                  </a>
                 </div>
               ) : (
-                <button
-                  onClick={handleGeneratePortalAccess}
-                  disabled={generatingPortal}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {generatingPortal ? 'Generating...' : 'Generate Portal Access'}
-                </button>
+                <>
+                  <p className="mb-4 text-sm text-gray-600">
+                    Generate portal access for this contact. They'll receive a password reset link to set up their account and access proposals and deliverables.
+                  </p>
+                  {portalLink ? (
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                      <p className="text-sm font-semibold text-green-800 mb-2">Portal access generated!</p>
+                      <p className="text-xs text-green-700 mb-3">Password reset link copied to clipboard. Send it to {contact.email}</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(portalLink);
+                            alert('Link copied to clipboard!');
+                          }}
+                          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
+                        >
+                          Copy Link Again
+                        </button>
+                        <a
+                          href={`mailto:${contact.email}?subject=Client Portal Access&body=Click this link to set up your client portal password: ${portalLink}`}
+                          className="rounded-lg bg-white border border-green-600 px-4 py-2 text-sm font-semibold text-green-600 transition hover:bg-green-50"
+                        >
+                          Email Link
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleGeneratePortalAccess}
+                      disabled={generatingPortal}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {generatingPortal ? 'Generating...' : 'Generate Portal Access'}
+                    </button>
+                  )}
+                </>
               )}
             </section>
           )}

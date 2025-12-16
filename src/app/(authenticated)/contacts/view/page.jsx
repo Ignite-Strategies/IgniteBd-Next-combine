@@ -572,7 +572,10 @@ export default function ContactsViewPage() {
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {contact.phone || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td 
+                        className="px-6 py-4 text-sm text-gray-500"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center gap-2">
                           <span>
                             {contact.companies?.companyName || 
