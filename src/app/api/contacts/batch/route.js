@@ -175,15 +175,33 @@ export async function POST(request) {
         // Step 1: Create or update contact
         let contact;
         if (contactData.email) {
-          // Check for existing contact by email
-          const existingContact = await prisma.contact.findFirst({
-            where: {
-              crmId: companyHQId,
-              email: contactData.email,
-            },
-          });
+          // Email is globally unique, so use findUnique
+          const normalizedEmail = contactData.email.toLowerCase().trim();
+          let existingContact = null;
+          
+          try {
+            existingContact = await prisma.contact.findUnique({
+              where: {
+                email: normalizedEmail,
+              },
+            });
+          } catch (error) {
+            // findUnique throws P2025 if not found, which is fine
+            if (error.code !== 'P2025') {
+              throw error;
+            }
+          }
 
           if (existingContact) {
+            // Verify it's in the same tenant
+            if (existingContact.crmId !== companyHQId) {
+              // Email exists in different tenant - this shouldn't happen but handle gracefully
+              console.warn(`⚠️ Email ${normalizedEmail} exists in different tenant (${existingContact.crmId} vs ${companyHQId})`);
+              // Can't create with same email - skip this row
+              results.errors.push(`Row ${rowNum}: Email ${normalizedEmail} already exists in another tenant`);
+              continue;
+            }
+            
             // Update existing contact
             contact = await prisma.contact.update({
               where: { id: existingContact.id },
@@ -199,14 +217,49 @@ export async function POST(request) {
             });
             results.updated++;
           } else {
-            // Create new contact
-            contact = await prisma.contact.create({
-              data: {
-                crmId: companyHQId,
-                ...contactData,
-              },
-            });
-            results.created++;
+            // Create new contact - email is unique so this should work
+            try {
+              contact = await prisma.contact.create({
+                data: {
+                  crmId: companyHQId,
+                  ...contactData,
+                  email: normalizedEmail, // Ensure normalized email
+                },
+              });
+              results.created++;
+            } catch (createError) {
+              // Handle unique constraint violation (race condition)
+              if (createError.code === 'P2002' && createError.meta?.target?.includes('email')) {
+                // Email was created between our check and create - try to find it
+                try {
+                  const raceContact = await prisma.contact.findUnique({
+                    where: { email: normalizedEmail },
+                  });
+                  if (raceContact && raceContact.crmId === companyHQId) {
+                    // Found it, update instead
+                    contact = await prisma.contact.update({
+                      where: { id: raceContact.id },
+                      data: {
+                        firstName: contactData.firstName,
+                        lastName: contactData.lastName,
+                        goesBy: contactData.goesBy,
+                        phone: contactData.phone,
+                        title: contactData.title,
+                        notes: contactData.notes,
+                        howMet: contactData.howMet,
+                      },
+                    });
+                    results.updated++;
+                  } else {
+                    throw createError; // Re-throw if tenant mismatch
+                  }
+                } catch (findError) {
+                  throw createError; // Re-throw original error
+                }
+              } else {
+                throw createError;
+              }
+            }
           }
         } else {
           // Create contact without email
