@@ -199,6 +199,7 @@ model company_hqs {
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
   contacts_contacts_crmIdTocompany_hqs          Contact[]                 @relation("contacts_crmIdTocompany_hqs")
+  ownedWorkPackages                             work_packages[]           @relation("WorkPackageOwner")
   deliverable_templates                         deliverable_templates[]
   domain_registry                               domain_registry?
   landing_pages                                 landing_pages[]
@@ -344,8 +345,8 @@ model Contact {
   invite_tokens                                    invite_tokens[]
   pipelines                                        pipelines?
   proposals                                        proposals[]
-  workPackagesOwned                                work_packages[]            @relation("WorkPackageOwner")
-  workPackagesAsMember                             work_packages[]            @relation("WorkPackageMember")
+  workPackagesAsClient                             work_packages[]           @relation("WorkPackageClient")
+  workPackagesAsMember                             work_packages[]           @relation("WorkPackageMember")
 
   @@index([companyDomain])
   @@index([companyId])
@@ -946,28 +947,31 @@ model work_package_phases {
 
 model work_packages {
   id                  String                @id
-  companyId           String                // ✅ Required - company-first
-  workPackageOwnerId  String                // ✅ Required - owner contact (renamed from contactId)
-  workPackageMemberId String?               // ✅ Optional - member contact (1-to-1 for now, can expand later)
+  companyId           String // ✅ Required - company-first (client company)
+  workPackageOwnerId  String // ✅ Required - IgniteBD owner/creator (CompanyHQ.id - has editing permissions)
+  workPackageClientId String // ✅ Required - client contact (renamed from workPackageOwnerId)
+  workPackageMemberId String? // ✅ Optional - member contact (1-to-1 for now, can expand later)
   title               String
   description         String?
   prioritySummary     String?
   totalCost           Float?
   effectiveStartDate  DateTime?
-  status              WorkPackageStatus    @default(ACTIVE)
+  status              WorkPackageStatus     @default(ACTIVE)
   createdAt           DateTime              @default(now())
   updatedAt           DateTime
-  metadata            Json?                 // Bolt-on capability for extensibility
+  metadata            Json? // Bolt-on capability for extensibility
   tags                String[]              @default([])
   invoices            invoices[]
   work_package_items  work_package_items[]
   work_package_phases work_package_phases[]
   companies           companies             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  workPackageOwner    Contact               @relation("WorkPackageOwner", fields: [workPackageOwnerId], references: [id], onDelete: Restrict)
+  workPackageOwner    company_hqs           @relation("WorkPackageOwner", fields: [workPackageOwnerId], references: [id], onDelete: Restrict)
+  workPackageClient   Contact               @relation("WorkPackageClient", fields: [workPackageClientId], references: [id], onDelete: Restrict)
   workPackageMember   Contact?              @relation("WorkPackageMember", fields: [workPackageMemberId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([workPackageOwnerId])
+  @@index([workPackageClientId])
   @@index([workPackageMemberId])
   @@index([status])
 }

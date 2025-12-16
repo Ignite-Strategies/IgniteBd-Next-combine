@@ -3,17 +3,48 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
- * WorkPackage Route - Simple container for name/strings
- * Artifacts attach via their own models (clientBlogId, etc.)
+ * WorkPackage Route - Company-First Architecture
+ * Work packages belong to companies, with owner (IgniteBD) and client (Contact) relationships
  */
 
 /**
+ * Helper: Get owner's companyHQId from Firebase token
+ */
+async function getOwnerCompanyHQId(firebaseUser) {
+  // Find owner by firebaseId
+  const owner = await prisma.owners.findUnique({
+    where: { firebaseId: firebaseUser.uid },
+    include: {
+      company_hqs_company_hqs_ownerIdToowners: {
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!owner) {
+    throw new Error('Owner not found for Firebase user');
+  }
+
+  // Get companyHQId from the relation
+  const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
+  
+  if (!companyHQId) {
+    throw new Error('Owner has no associated CompanyHQ');
+  }
+
+  return companyHQId;
+}
+
+/**
  * POST /api/workpackages
- * Create or update WorkPackage (upsert)
+ * Create or update WorkPackage (upsert by companyId + title)
+ * Company-first: requires companyId, workPackageClientId, and auto-sets workPackageOwnerId from Firebase auth
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -23,50 +54,182 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { contactId } = body ?? {};
+    const { 
+      companyId,           // Required - client company
+      workPackageClientId, // Required - client contact (renamed from contactId)
+      workPackageMemberId, // Optional - member contact
+      title,               // Required for upsert
+      description,
+      prioritySummary,
+      totalCost,
+      effectiveStartDate,
+      status,
+      metadata,
+      tags,
+    } = body ?? {};
 
-    if (!contactId) {
+    // Validate required fields
+    if (!companyId) {
       return NextResponse.json(
-        { success: false, error: 'contactId is required' },
+        { success: false, error: 'companyId is required' },
         { status: 400 },
       );
     }
 
-    // Verify contact exists
-    const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
+    if (!workPackageClientId) {
+      return NextResponse.json(
+        { success: false, error: 'workPackageClientId is required' },
+        { status: 400 },
+      );
+    }
+
+    // Get owner's companyHQId from Firebase auth
+    const workPackageOwnerId = await getOwnerCompanyHQId(firebaseUser);
+
+    // Verify company exists
+    const company = await prisma.companies.findUnique({
+      where: { id: companyId },
     });
 
-    if (!contact) {
+    if (!company) {
       return NextResponse.json(
-        { success: false, error: 'Contact not found' },
+        { success: false, error: 'Company not found' },
         { status: 404 },
       );
     }
 
-    // Create WorkPackage (simple container)
-    const workPackage = await prisma.workPackage.create({
-      data: {
-        contactId,
-      },
+    // Verify client contact exists
+    const clientContact = await prisma.contact.findUnique({
+      where: { id: workPackageClientId },
       include: {
-        contact: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        phases: {
-          include: {
-            items: true,
-          },
-          orderBy: { position: 'asc' },
-        },
-        items: true,
+        companies: true, // Get contact's company
       },
     });
+
+    if (!clientContact) {
+      return NextResponse.json(
+        { success: false, error: 'Client contact not found' },
+        { status: 404 },
+      );
+    }
+
+    // Verify member contact if provided
+    if (workPackageMemberId) {
+      const memberContact = await prisma.contact.findUnique({
+        where: { id: workPackageMemberId },
+      });
+
+      if (!memberContact) {
+        return NextResponse.json(
+          { success: false, error: 'Member contact not found' },
+          { status: 404 },
+        );
+      }
+    }
+
+    // Prepare data for create/update
+    const workPackageData = {
+      companyId,
+      workPackageOwnerId,
+      workPackageClientId,
+      ...(workPackageMemberId && { workPackageMemberId }),
+      ...(title && { title }),
+      ...(description !== undefined && { description }),
+      ...(prioritySummary !== undefined && { prioritySummary }),
+      ...(totalCost !== undefined && { totalCost }),
+      ...(effectiveStartDate && { effectiveStartDate: new Date(effectiveStartDate) }),
+      ...(status && { status }),
+      ...(metadata && { metadata }),
+      ...(tags && { tags }),
+    };
+
+    // Upsert logic: If ID provided, update; otherwise create new
+    let workPackage;
+    
+    if (body.id) {
+      // Update existing work package
+      workPackage = await prisma.work_packages.update({
+        where: { id: body.id },
+        data: workPackageData,
+        include: {
+          companies: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+          workPackageOwner: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+          workPackageClient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          workPackageMember: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          work_package_phases: {
+            include: {
+              work_package_items: true,
+            },
+            orderBy: { position: 'asc' },
+          },
+        },
+      });
+    } else {
+      // Create new work package
+      workPackage = await prisma.work_packages.create({
+        data: workPackageData,
+        include: {
+          companies: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+          workPackageOwner: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+          workPackageClient: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          workPackageMember: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          work_package_phases: {
+            include: {
+              work_package_items: true,
+            },
+            orderBy: { position: 'asc' },
+          },
+        },
+      });
+    }
 
     console.log('✅ WorkPackage saved:', workPackage.id);
 
@@ -88,8 +251,8 @@ export async function POST(request) {
 }
 
 /**
- * GET /api/workpackages?id=xxx OR ?contactId=xxx
- * Get WorkPackage(s) - simple container data
+ * GET /api/workpackages?id=xxx OR ?companyId=xxx OR ?workPackageClientId=xxx
+ * Get WorkPackage(s) - company-first filtering
  */
 export async function GET(request) {
   try {
@@ -104,39 +267,51 @@ export async function GET(request) {
   try {
     const { searchParams } = request.nextUrl;
     const id = searchParams.get('id');
-    const contactId = searchParams.get('contactId');
-    const companyHQId = searchParams.get('companyHQId');
-    const contactCompanyId = searchParams.get('contactCompanyId');
+    const companyId = searchParams.get('companyId');
+    const workPackageClientId = searchParams.get('workPackageClientId');
+    const workPackageOwnerId = searchParams.get('workPackageOwnerId');
     const search = searchParams.get('search');
 
     if (id) {
       // Get single WorkPackage
-      const workPackage = await prisma.workPackage.findUnique({
+      const workPackage = await prisma.work_packages.findUnique({
         where: { id },
         include: {
-          contact: {
+          companies: {
+            select: {
+              id: true,
+              companyName: true,
+              companyHQId: true,
+            },
+          },
+          workPackageOwner: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+          workPackageClient: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
               email: true,
-              crmId: true, // Include crmId (companyHQId) for hydration
-              contactCompany: {
-                select: {
-                  id: true,
-                  companyName: true,
-                },
-              },
             },
           },
-          company: {
+          workPackageMember: {
             select: {
               id: true,
-              companyName: true,
-              companyHQId: true, // Include companyHQId
+              firstName: true,
+              lastName: true,
+              email: true,
             },
           },
-          items: true,
+          work_package_phases: {
+            include: {
+              work_package_items: true,
+            },
+            orderBy: { position: 'asc' },
+          },
         },
       });
 
@@ -153,21 +328,24 @@ export async function GET(request) {
       });
     }
 
-    // List WorkPackages
+    // List WorkPackages - company-first filtering
     const where = {};
-    if (contactId) {
-      where.contactId = contactId;
+    
+    // Filter by companyId (direct - company-first!)
+    if (companyId) {
+      where.companyId = companyId;
     }
-    // Filter by companyHQId and/or contactCompanyId through contact relationship
-    if (companyHQId || contactCompanyId) {
-      where.contact = {};
-      if (companyHQId) {
-        where.contact.crmId = companyHQId;
-      }
-      if (contactCompanyId) {
-        where.contact.contactCompanyId = contactCompanyId;
-      }
+    
+    // Filter by client contact
+    if (workPackageClientId) {
+      where.workPackageClientId = workPackageClientId;
     }
+    
+    // Filter by owner (IgniteBD owner)
+    if (workPackageOwnerId) {
+      where.workPackageOwnerId = workPackageOwnerId;
+    }
+    
     // Search by workpackage title
     if (search) {
       where.title = {
@@ -176,9 +354,8 @@ export async function GET(request) {
       };
     }
 
-    // For list view, return minimal data (IDs only) to reduce payload
-    // Full hydration happens on detail page
-    const workPackages = await prisma.workPackage.findMany({
+    // For list view, return minimal data
+    const workPackages = await prisma.work_packages.findMany({
       where,
       select: {
         id: true,
@@ -186,28 +363,34 @@ export async function GET(request) {
         description: true,
         totalCost: true,
         effectiveStartDate: true,
+        status: true,
         createdAt: true,
         updatedAt: true,
-        contact: {
+        companies: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageOwner: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        workPackageClient: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
             email: true,
-            crmId: true, // Include crmId (companyHQId) for filtering/hydration
-            contactCompany: {
-              select: {
-                id: true,
-                companyName: true,
-              },
-            },
           },
         },
         // Only include counts, not full objects
         _count: {
           select: {
-            phases: true,
-            items: true,
+            work_package_phases: true,
+            work_package_items: true,
           },
         },
       },
