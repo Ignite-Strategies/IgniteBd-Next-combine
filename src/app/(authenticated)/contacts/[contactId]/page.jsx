@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
 import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
 import ContactOutlook from '@/components/enrichment/ContactOutlook';
+import CompanySelector from '@/components/CompanySelector';
 
 export default function ContactDetailPage({ params }) {
   const router = useRouter();
@@ -98,6 +99,9 @@ export default function ContactDetailPage({ params }) {
   const [showEnrichmentModal, setShowEnrichmentModal] = useState(false);
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [rawJSON, setRawJSON] = useState(null);
+  const [editingCompany, setEditingCompany] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [savingCompany, setSavingCompany] = useState(false);
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
@@ -271,11 +275,82 @@ export default function ContactDetailPage({ params }) {
               </div>
               <div className="flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-gray-400" />
-                <div>
-                  <dt className="text-sm font-semibold text-gray-500">Company</dt>
-                  <dd className="mt-1 text-base text-gray-900">
-                    {contact.companies?.companyName || contact.company?.companyName || contact.contactCompany?.companyName || contact.companyName || '—'}
-                  </dd>
+                <div className="flex-1">
+                  <dt className="text-sm font-semibold text-gray-500 mb-1">Company</dt>
+                  {!editingCompany ? (
+                    <div className="flex items-center gap-2">
+                      <dd className="text-base text-gray-900">
+                        {contact.companies?.companyName || contact.company?.companyName || contact.contactCompany?.companyName || contact.companyName || 'No company assigned'}
+                      </dd>
+                      <button
+                        onClick={() => {
+                          setEditingCompany(true);
+                          setSelectedCompany(contact.companies || contact.company || contact.contactCompany || null);
+                        }}
+                        className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                        title="Assign company"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <CompanySelector
+                        companyId={contact.companies?.id || contact.company?.id || contact.contactCompany?.id || null}
+                        selectedCompany={selectedCompany}
+                        onCompanySelect={(company) => setSelectedCompany(company)}
+                        showLabel={false}
+                        placeholder="Search or create company..."
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            if (!selectedCompany) {
+                              alert('Please select or create a company');
+                              return;
+                            }
+                            setSavingCompany(true);
+                            try {
+                              const response = await api.put(`/api/contacts/${contactId}`, {
+                                contactCompanyId: selectedCompany.id,
+                                companyId: selectedCompany.id,
+                              });
+                              if (response.data?.success) {
+                                setContact(response.data.contact);
+                                setEditingCompany(false);
+                                if (refreshContacts) {
+                                  refreshContacts();
+                                }
+                              } else {
+                                alert(response.data?.error || 'Failed to assign company');
+                              }
+                            } catch (error) {
+                              console.error('Error assigning company:', error);
+                              alert(error.response?.data?.error || 'Failed to assign company');
+                            } finally {
+                              setSavingCompany(false);
+                            }
+                          }}
+                          disabled={savingCompany || !selectedCompany}
+                          className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Check className="h-4 w-4" />
+                          {savingCompany ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingCompany(false);
+                            setSelectedCompany(null);
+                          }}
+                          disabled={savingCompany}
+                          className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <XIcon className="h-4 w-4" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
