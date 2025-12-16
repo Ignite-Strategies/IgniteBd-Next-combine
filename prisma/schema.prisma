@@ -344,7 +344,8 @@ model Contact {
   invite_tokens                                    invite_tokens[]
   pipelines                                        pipelines?
   proposals                                        proposals[]
-  work_packages                                    work_packages[]
+  workPackagesOwned                                work_packages[]            @relation("WorkPackageOwner")
+  workPackagesAsMember                             work_packages[]            @relation("WorkPackageMember")
 
   @@index([companyDomain])
   @@index([companyId])
@@ -945,23 +946,30 @@ model work_package_phases {
 
 model work_packages {
   id                  String                @id
-  contactId           String
-  companyId           String?
+  companyId           String                // ✅ Required - company-first
+  workPackageOwnerId  String                // ✅ Required - owner contact (renamed from contactId)
+  workPackageMemberId String?               // ✅ Optional - member contact (1-to-1 for now, can expand later)
   title               String
   description         String?
   prioritySummary     String?
   totalCost           Float?
   effectiveStartDate  DateTime?
+  status              WorkPackageStatus    @default(ACTIVE)
   createdAt           DateTime              @default(now())
   updatedAt           DateTime
+  metadata            Json?                 // Bolt-on capability for extensibility
+  tags                String[]              @default([])
   invoices            invoices[]
   work_package_items  work_package_items[]
   work_package_phases work_package_phases[]
-  companies           companies?            @relation(fields: [companyId], references: [id])
-  contacts            Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companies           companies             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workPackageOwner    Contact               @relation("WorkPackageOwner", fields: [workPackageOwnerId], references: [id], onDelete: Restrict)
+  workPackageMember   Contact?              @relation("WorkPackageMember", fields: [workPackageMemberId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
-  @@index([contactId])
+  @@index([workPackageOwnerId])
+  @@index([workPackageMemberId])
+  @@index([status])
 }
 
 enum EventOppStatus {

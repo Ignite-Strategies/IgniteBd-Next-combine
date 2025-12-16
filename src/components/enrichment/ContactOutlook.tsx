@@ -212,16 +212,16 @@ export default function ContactOutlook({ contact, onViewRawJSON }: ContactOutloo
                       {contact.companies?.domain || contact.company?.domain || contact.contactCompany?.domain || contact.companyDomain || '—'}
                     </dd>
                   </div>
-                  {(contact.companies?.companyHealthScore !== null && contact.companies?.companyHealthScore !== undefined) ||
+                  {((contact.companies?.companyHealthScore !== null && contact.companies?.companyHealthScore !== undefined) ||
                    (contact.company?.companyHealthScore !== null && contact.company?.companyHealthScore !== undefined) ||
-                   (contact.contactCompany?.companyHealthScore !== null && contact.contactCompany?.companyHealthScore !== undefined) ? (
+                   (contact.contactCompany?.companyHealthScore !== null && contact.contactCompany?.companyHealthScore !== undefined)) && (
                     <div>
                       <dt className="text-xs text-gray-500">Health Score</dt>
                       <dd className="mt-1 text-gray-900">
-                        {contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? contact.contactCompany?.companyHealthScore ?? '—'}/100
+                        {contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? contact.contactCompany?.companyHealthScore ?? 0}/100
                       </dd>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               </div>
             )}
