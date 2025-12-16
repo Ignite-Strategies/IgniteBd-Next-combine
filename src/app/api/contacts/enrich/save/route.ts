@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     
     if (normalizedCompany.domain) {
       // Try to find existing company by domain
-      const existingCompany = await prisma.company.findFirst({
+      const existingCompany = await prisma.companies.findFirst({
         where: {
           domain: normalizedCompany.domain,
           companyHQId: existingContact.crmId, // Same tenant
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
         finalCompanyId = existingCompany.id;
         
         // Update company with normalized fields and intelligence
-        await prisma.company.update({
+        await prisma.companies.update({
           where: { id: existingCompany.id },
           data: {
             companyName: normalizedCompany.companyName || existingCompany.companyName,
@@ -183,8 +183,12 @@ export async function POST(request: Request) {
         });
       } else {
         // Create new company
-        const newCompany = await prisma.company.create({
+        const { randomUUID } = await import('crypto');
+        const companyId = randomUUID();
+        
+        const newCompany = await prisma.companies.create({
           data: {
+            id: companyId,
             companyHQId: existingContact.crmId,
             companyName: normalizedCompany.companyName || 'Unknown Company',
             domain: normalizedCompany.domain,
@@ -210,6 +214,7 @@ export async function POST(request: Request) {
             headcountTier: companyPositioning.headcountTier,
             normalizedIndustry: companyPositioning.normalizedIndustry,
             competitors: companyPositioning.competitors || [],
+            updatedAt: new Date(),
           },
         });
         finalCompanyId = newCompany.id;
