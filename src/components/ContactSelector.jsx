@@ -96,11 +96,46 @@ export default function ContactSelector({
           
           // Filter by companyId if provided
           if (companyId) {
-            fetched = fetched.filter(contact => {
-              return contact.contactCompanyId === companyId || 
+            console.log('🔍 Filtering contacts by companyId:', companyId);
+            console.log('🔍 Total contacts before filter:', fetched.length);
+            
+            const filtered = fetched.filter(contact => {
+              const matches = contact.contactCompanyId === companyId || 
                      contact.contactCompany?.id === companyId ||
                      contact.companies?.id === companyId;
+              
+              // Debug: log first few contacts to see their company associations
+              if (fetched.indexOf(contact) < 3) {
+                console.log('📋 Sample contact:', {
+                  name: `${contact.firstName} ${contact.lastName}`,
+                  contactCompanyId: contact.contactCompanyId,
+                  contactCompanyId: contact.contactCompany?.id,
+                  companiesId: contact.companies?.id,
+                  companyName: contact.contactCompany?.companyName || contact.companies?.companyName,
+                  matches
+                });
+              }
+              
+              return matches;
             });
+            
+            console.log('🔍 Total contacts after filter:', filtered.length);
+            
+            // If filtering returns 0 results, show warning but still use empty array
+            // (don't fall back to all contacts - user needs to select correct company)
+            if (filtered.length === 0 && fetched.length > 0) {
+              console.warn('⚠️ No contacts found for companyId:', companyId);
+              console.warn('⚠️ Sample contacts have these companyIds:', 
+                fetched.slice(0, 5).map(c => ({
+                  name: `${c.firstName} ${c.lastName}`,
+                  contactCompanyId: c.contactCompanyId,
+                  contactCompanyId: c.contactCompany?.id,
+                  companiesId: c.companies?.id
+                }))
+              );
+            }
+            
+            fetched = filtered;
           }
           
           setContacts(fetched);
@@ -174,7 +209,7 @@ export default function ContactSelector({
     return contacts.find((c) => c.id === selectedContactId);
   }, [contacts, selectedContactId]);
 
-  // Filter contacts based on search query - exclude already selected contact
+    // Filter contacts based on search query - exclude already selected contact
   const availableContacts = useMemo(() => {
     if (!contactSearch || !contactSearch.trim()) {
       return [];
@@ -193,7 +228,7 @@ export default function ContactSelector({
     }
     
     const searchLower = contactSearch.toLowerCase();
-    return contacts
+    const filtered = contacts
       .filter((contact) => {
         // Exclude already selected contact from results
         if (selectedContactId && contact.id === selectedContactId) {
@@ -202,11 +237,37 @@ export default function ContactSelector({
         
         const name = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
         const email = (contact.email || '').toLowerCase();
-        const company = (contact.contactCompany?.companyName || '').toLowerCase();
+        const company = (contact.contactCompany?.companyName || contact.companies?.companyName || '').toLowerCase();
         
-        return name.includes(searchLower) || email.includes(searchLower) || company.includes(searchLower);
+        const matches = name.includes(searchLower) || email.includes(searchLower) || company.includes(searchLower);
+        
+        if (matches && contactSearch.length >= 2) {
+          console.log('🔍 Contact matches search:', {
+            name: `${contact.firstName} ${contact.lastName}`,
+            email: contact.email,
+            company: contact.contactCompany?.companyName || contact.companies?.companyName,
+            contactCompanyId: contact.contactCompanyId,
+            contactCompanyId: contact.contactCompany?.id,
+            companiesId: contact.companies?.id
+          });
+        }
+        
+        return matches;
       })
       .slice(0, 20);
+    
+    if (contactSearch.length >= 2 && filtered.length === 0 && contacts.length > 0) {
+      console.log('⚠️ No contacts match search, but contacts exist:', {
+        searchTerm: contactSearch,
+        totalContacts: contacts.length,
+        sampleContact: contacts[0] ? {
+          name: `${contacts[0].firstName} ${contacts[0].lastName}`,
+          company: contacts[0].contactCompany?.companyName || contacts[0].companies?.companyName
+        } : null
+      });
+    }
+    
+    return filtered;
   }, [contacts, contactSearch, selectedContactId, selectedContactObj]);
 
   // Handle contact selection
