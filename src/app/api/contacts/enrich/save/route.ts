@@ -186,7 +186,7 @@ export async function POST(request: Request) {
       companySize: normalizedContact.companySize,
       companyIndustry: normalizedContact.companyIndustry,
       
-      // Don't set companyId here - we'll handle that in STEP 2
+      // Don't set contactCompanyId here - we'll handle that in STEP 2 after finding/creating company
     };
 
     // Only update fields that have values
@@ -236,7 +236,8 @@ export async function POST(request: Request) {
     // ============================================
     // STEP 2: Update Company with enrichment data (if exists)
     // ============================================
-    let finalCompanyId = companyId || updatedContact.companyId || updatedContact.contactCompanyId || null;
+    // Use contactCompanyId (FK) as primary, fallback to companyId param or enrichment companyId field
+    let finalCompanyId = companyId || updatedContact.contactCompanyId || updatedContact.companyId || null;
     
     // If contact has a company, update it with enrichment data
     if (finalCompanyId) {
@@ -299,12 +300,11 @@ export async function POST(request: Request) {
         // Found company by domain - link it and update with enrichment data
         finalCompanyId = companyByDomain.id;
         
-        // Update contact to link to this company
+        // Update contact to link to this company (ONLY set contactCompanyId - the FK)
         await prisma.contact.update({
           where: { id: contactId },
           data: {
-            companyId: companyByDomain.id,
-            contactCompanyId: companyByDomain.id,
+            contactCompanyId: companyByDomain.id, // Only set the FK, not companyId (enrichment field)
           },
         });
         
@@ -374,12 +374,11 @@ export async function POST(request: Request) {
           },
         });
         
-        // Link the new company to the contact
+        // Link the new company to the contact (ONLY set contactCompanyId - the FK)
         await prisma.contact.update({
           where: { id: contactId },
           data: {
-            companyId: newCompanyId,
-            contactCompanyId: newCompanyId,
+            contactCompanyId: newCompanyId, // Only set the FK, not companyId (enrichment field)
           },
         });
         
