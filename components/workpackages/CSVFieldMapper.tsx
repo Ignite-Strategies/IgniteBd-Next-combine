@@ -140,7 +140,8 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   };
 
   useEffect(() => {
-    if (!initialMappings && csvHeaders.length > 0) {
+    // Always auto-generate if we have headers and no mappings set yet
+    if (csvHeaders.length > 0 && Object.keys(mappings).length === 0) {
       // Direct hardcoded mappings - CSV headers are exact matches
       const autoMappings: Record<string, string> = {};
       
