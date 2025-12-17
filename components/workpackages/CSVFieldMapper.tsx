@@ -33,10 +33,126 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   
   const systemFields = getAllSystemFields() as SystemField[];
 
+  // Hardcoded mappings for common CSV column names
+  const getHardcodedMapping = (csvHeader: string): string | null => {
+    const normalized = csvHeader.toLowerCase().trim();
+    
+    // Direct mappings based on exact CSV column names
+    const hardcodedMappings: Record<string, string> = {
+      // Work Package fields
+      'proposaltitle': 'title',
+      'proposal_title': 'title',
+      'proposal-title': 'title',
+      'workpackagetitle': 'title',
+      'work_package_title': 'title',
+      
+      'proposaldescription': 'description',
+      'proposal_description': 'description',
+      'proposal-description': 'description',
+      'workpackagedescription': 'description',
+      'work_package_description': 'description',
+      'proposalnotes': 'description',
+      'proposal_notes': 'description',
+      'proposal-notes': 'description',
+      
+      'proposaltotalcost': 'totalCost',
+      'proposal_total_cost': 'totalCost',
+      'proposal-total-cost': 'totalCost',
+      'totalcost': 'totalCost',
+      'total_cost': 'totalCost',
+      'cost': 'totalCost',
+      
+      'effectivestartdate': 'effectiveStartDate',
+      'effective_start_date': 'effectiveStartDate',
+      'startdate': 'effectiveStartDate',
+      'start_date': 'effectiveStartDate',
+      
+      // Phase fields
+      'phasename': 'name',
+      'phase_name': 'name',
+      'phase-name': 'name',
+      'phase': 'name',
+      
+      'phaseposition': 'position',
+      'phase_position': 'position',
+      'phase-position': 'position',
+      'position': 'position',
+      
+      'phasedescription': 'phaseDescription',
+      'phase_description': 'phaseDescription',
+      'phase-description': 'phaseDescription',
+      
+      // Item/Deliverable fields
+      'deliverablelabel': 'deliverableLabel',
+      'deliverable_label': 'deliverableLabel',
+      'deliverable-label': 'deliverableLabel',
+      'deliverablename': 'deliverableLabel',
+      'itemlabel': 'deliverableLabel',
+      'item_label': 'deliverableLabel',
+      'itemname': 'deliverableLabel',
+      'item_name': 'deliverableLabel',
+      
+      'deliverabletype': 'deliverableType',
+      'deliverable_type': 'deliverableType',
+      'deliverable-type': 'deliverableType',
+      'itemtype': 'deliverableType',
+      'item_type': 'deliverableType',
+      
+      'deliverabledescription': 'deliverableDescription',
+      'deliverable_description': 'deliverableDescription',
+      'deliverable-description': 'deliverableDescription',
+      'itemdescription': 'deliverableDescription',
+      'item_description': 'deliverableDescription',
+      
+      'quantity': 'quantity',
+      'qty': 'quantity',
+      'amount': 'quantity',
+      
+      'estimatedhourseach': 'estimatedHoursEach',
+      'estimated_hours_each': 'estimatedHoursEach',
+      'estimated-hours-each': 'estimatedHoursEach',
+      'hours': 'estimatedHoursEach',
+      'hourseach': 'estimatedHoursEach',
+      
+      'unitofmeasure': 'unitOfMeasure',
+      'unit_of_measure': 'unitOfMeasure',
+      'unit-of-measure': 'unitOfMeasure',
+      'unit': 'unitOfMeasure',
+      'uom': 'unitOfMeasure',
+      
+      'status': 'status',
+    };
+    
+    // Check exact match first
+    if (hardcodedMappings[normalized]) {
+      return hardcodedMappings[normalized];
+    }
+    
+    // Check normalized (remove dashes, underscores, spaces)
+    const normalizedKey = normalized.replace(/[-_\s]/g, '');
+    if (hardcodedMappings[normalizedKey]) {
+      return hardcodedMappings[normalizedKey];
+    }
+    
+    return null;
+  };
+
   useEffect(() => {
     if (!initialMappings && csvHeaders.length > 0) {
-      // Auto-generate initial mappings
-      const autoMappings: Record<string, string> = generateMappings(csvHeaders) as Record<string, string>;
+      // Use hardcoded mappings first, fallback to generateMappings
+      const autoMappings: Record<string, string> = {};
+      
+      csvHeaders.forEach((header) => {
+        const hardcoded = getHardcodedMapping(header);
+        if (hardcoded) {
+          autoMappings[header] = hardcoded;
+        } else {
+          // Fallback to fuzzy matching if no hardcoded match
+          const matched = generateMappings([header]) as Record<string, string>;
+          autoMappings[header] = matched[header] || 'unmapped';
+        }
+      });
+      
       setMappings(autoMappings);
       if (onMappingsChange) {
         onMappingsChange(autoMappings);
