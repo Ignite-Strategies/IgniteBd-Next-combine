@@ -274,6 +274,7 @@ function WorkPackageCSVUploadContent() {
               </div>
               <div className="max-w-md">
                 <ContactSelector
+                  contactId={contactId}
                   companyId={companyId}
                   onContactSelect={(contact: Contact | null, company?: Company | null) => {
                     setSelectedContact(contact);
@@ -283,6 +284,12 @@ function WorkPackageCSVUploadContent() {
                     // Ensure companyId is set (should already be set from step 1)
                     if (company?.id) {
                       setCompanyId(company.id);
+                    }
+                  }}
+                  onContactChange={(contact: Contact | null) => {
+                    setSelectedContact(contact);
+                    if (contact) {
+                      setContactId(contact.id);
                     }
                   }}
                   selectedContact={selectedContact}
@@ -383,6 +390,7 @@ function WorkPackageCSVUploadContent() {
             </div>
             <div className="max-w-md">
               <ContactSelector
+                contactId={contactId}
                 companyId={companyId}
                 onContactSelect={(contact: Contact | null, company?: Company | null) => {
                   setSelectedContact(contact);
@@ -392,6 +400,12 @@ function WorkPackageCSVUploadContent() {
                   // Ensure companyId is set (should already be set from step 1)
                   if (company?.id) {
                     setCompanyId(company.id);
+                  }
+                }}
+                onContactChange={(contact: Contact | null) => {
+                  setSelectedContact(contact);
+                  if (contact) {
+                    setContactId(contact.id);
                   }
                 }}
                 selectedContact={selectedContact}
