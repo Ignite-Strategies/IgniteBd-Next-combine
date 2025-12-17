@@ -140,25 +140,34 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   };
 
   useEffect(() => {
-    // Always auto-generate if we have headers and no mappings set yet
-    if (csvHeaders.length > 0 && Object.keys(mappings).length === 0) {
-      // Use the existing fuzzyMatchHeader function from workPackageCsvMapper
-      const autoMappings: Record<string, string> = {};
+    // Auto-generate mappings when we have headers and mappings haven't been generated yet
+    if (csvHeaders.length > 0) {
+      // Check if we need to generate mappings (empty or missing headers)
+      const needsMapping = Object.keys(mappings).length === 0 || 
+        csvHeaders.some(header => !mappings[header]);
       
-      csvHeaders.forEach((header) => {
-        // Use the existing mapper's fuzzyMatchHeader function directly
-        const matched = fuzzyMatchHeader(header);
-        autoMappings[header] = matched || 'unmapped';
-        console.log(`🔍 Mapped "${header}" → "${matched || 'unmapped'}"`);
-      });
-      
-      console.log('✅ Final auto-generated mappings:', autoMappings);
-      setMappings(autoMappings);
-      if (onMappingsChange) {
-        onMappingsChange(autoMappings);
+      if (needsMapping) {
+        // Use the existing fuzzyMatchHeader function from workPackageCsvMapper
+        const autoMappings: Record<string, string> = { ...mappings };
+        
+        csvHeaders.forEach((header) => {
+          // Only map if not already mapped
+          if (!autoMappings[header]) {
+            // Use the existing mapper's fuzzyMatchHeader function directly
+            const matched = fuzzyMatchHeader(header);
+            autoMappings[header] = matched || 'unmapped';
+            console.log(`🔍 Mapped "${header}" → "${matched || 'unmapped'}"`);
+          }
+        });
+        
+        console.log('✅ Final auto-generated mappings:', autoMappings);
+        setMappings(autoMappings);
+        if (onMappingsChange) {
+          onMappingsChange(autoMappings);
+        }
       }
     }
-  }, [csvHeaders, mappings, onMappingsChange]);
+  }, [csvHeaders]); // Only depend on csvHeaders, not mappings to avoid loops
 
   useEffect(() => {
     if (Object.keys(mappings).length > 0) {
