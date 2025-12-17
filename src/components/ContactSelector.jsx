@@ -17,6 +17,7 @@ export default function ContactSelector({
   selectedContact,
   showLabel = true,
   className = '',
+  companyId, // Optional: filter contacts by company
 }) {
   const { companyHQId, hydrated: companyHydrated, refresh: refreshCompanyHQ } = useCompanyHQ();
   const [contacts, setContacts] = useState([]);
@@ -87,9 +88,21 @@ export default function ContactSelector({
         }
         
         // Fetch from API to get latest data
-        const response = await api.get(`/api/contacts?companyHQId=${finalCompanyHQId}`);
+        // If companyId is provided, filter contacts by that company
+        let apiUrl = `/api/contacts?companyHQId=${finalCompanyHQId}`;
+        const response = await api.get(apiUrl);
         if (response.data?.success && response.data.contacts) {
-          const fetched = response.data.contacts;
+          let fetched = response.data.contacts;
+          
+          // Filter by companyId if provided
+          if (companyId) {
+            fetched = fetched.filter(contact => {
+              return contact.contactCompanyId === companyId || 
+                     contact.contactCompany?.id === companyId ||
+                     contact.companies?.id === companyId;
+            });
+          }
+          
           setContacts(fetched);
           if (typeof window !== 'undefined') {
             window.localStorage.setItem('contacts', JSON.stringify(fetched));
@@ -98,7 +111,16 @@ export default function ContactSelector({
           console.warn('API response missing contacts:', response.data);
           // If API fails but we have cached contacts, keep using them
           if (cachedContacts.length > 0) {
-            setContacts(cachedContacts);
+            let filtered = cachedContacts;
+            // Filter cached contacts by companyId if provided
+            if (companyId) {
+              filtered = cachedContacts.filter(contact => {
+                return contact.contactCompanyId === companyId || 
+                       contact.contactCompany?.id === companyId ||
+                       contact.companies?.id === companyId;
+              });
+            }
+            setContacts(filtered);
           }
         }
       } catch (err) {
@@ -121,7 +143,7 @@ export default function ContactSelector({
     };
 
     fetchContacts();
-  }, [companyHQId, companyHydrated, refreshCompanyHQ]);
+  }, [companyHQId, companyHydrated, refreshCompanyHQ, companyId]);
 
   // Initialize from props only
   useEffect(() => {
@@ -218,7 +240,7 @@ export default function ContactSelector({
             type="text"
             value={contactSearch}
             onChange={(e) => setContactSearch(e.target.value)}
-            placeholder={loading ? "Loading contacts..." : "Search contacts by name, email, or company..."}
+            placeholder={loading ? "Loading contacts..." : companyId ? "Search contacts from this company..." : "Search contacts by name, email, or company..."}
             disabled={loading}
             className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />

@@ -3,9 +3,10 @@
 import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
+import CompanySelector from '@/components/CompanySelector.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import CSVImportWizard from '@/components/workpackages/CSVImportWizard';
-import { Upload, FileText, CheckCircle, AlertCircle, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Download, Building2, Users } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
@@ -21,6 +22,7 @@ function WorkPackageCSVUploadContent() {
   const [error, setError] = useState('');
   const [contactId, setContactId] = useState('');
   const [companyId, setCompanyId] = useState('');
+  const [selectedCompany, setSelectedCompany] = useState(null);
   const [selectedContact, setSelectedContact] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
 
@@ -100,7 +102,12 @@ function WorkPackageCSVUploadContent() {
   // Handle wizard completion
   const handleWizardComplete = async (data) => {
     if (!contactId) {
-      setError('Please select a contact first');
+      setError('Please select a client contact first');
+      return;
+    }
+
+    if (!companyId) {
+      setError('Please select a company first');
       return;
     }
 
@@ -108,10 +115,10 @@ function WorkPackageCSVUploadContent() {
       setLoading(true);
       setError('');
 
-      // Send to API with mapped data
+      // Send to API with mapped data - use new company-first field names
       const response = await api.post('/api/workpackages/import/mapped', {
-        contactId,
-        companyId: companyId || null,
+        workPackageClientId: contactId, // New field name
+        companyId: companyId,
         workPackage: data.workPackage,
         phases: data.phases,
         transformedRows: data.transformedRows,
@@ -206,38 +213,87 @@ function WorkPackageCSVUploadContent() {
             </div>
           )}
 
-          {/* Contact Selection */}
+          {/* Company Selection (Step 1) */}
           <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Contact</h3>
+            <div className="mb-4 flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Step 1: Select Company</h3>
+            </div>
             <div className="max-w-md">
-              <ContactSelector
-                onContactSelect={(contact, company) => {
-                  setSelectedContact(contact);
-                  setContactId(contact.id);
+              <CompanySelector
+                onCompanySelect={(company) => {
+                  setSelectedCompany(company);
                   setCompanyId(company?.id || '');
+                  // Clear contact selection when company changes
+                  setSelectedContact(null);
+                  setContactId('');
                 }}
-                selectedContact={selectedContact}
+                selectedCompany={selectedCompany}
+                placeholder="Search companies by name..."
               />
-              {selectedContact && !companyId && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-sm text-amber-800">
-                    ⚠️ <strong>Note:</strong> This contact has no associated company. The work package will be created without a company assignment.
+              {selectedCompany && (
+                <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                  <p className="text-sm text-green-800">
+                    ✓ <strong>Selected:</strong> {selectedCompany.companyName}
                   </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Wizard */}
-          <div className="mt-6">
-            <CSVImportWizard
-              csvHeaders={csvHeaders}
-              csvRows={csvRows}
-              onComplete={handleWizardComplete}
-              contactId={contactId}
-              companyId={companyId}
-            />
-          </div>
+          {/* Contact Selection (Step 2) - Only shown after company is selected */}
+          {selectedCompany && (
+            <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <Users className="h-5 w-5 text-gray-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Step 2: Select Client Contact</h3>
+                <span className="text-xs text-gray-500">(from {selectedCompany.companyName})</span>
+              </div>
+              <div className="max-w-md">
+                <ContactSelector
+                  companyId={companyId}
+                  onContactSelect={(contact, company) => {
+                    setSelectedContact(contact);
+                    setContactId(contact.id);
+                    // Ensure companyId is set (should already be set from step 1)
+                    if (company?.id) {
+                      setCompanyId(company.id);
+                    }
+                  }}
+                  selectedContact={selectedContact}
+                />
+                {selectedContact && (
+                  <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                    <p className="text-sm text-green-800">
+                      ✓ <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
+                      {selectedContact.email && <span> • {selectedContact.email}</span>}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Wizard - Only show if both company and contact are selected */}
+          {selectedCompany && selectedContact && (
+            <div className="mt-6">
+              <CSVImportWizard
+                csvHeaders={csvHeaders}
+                csvRows={csvRows}
+                onComplete={handleWizardComplete}
+                contactId={contactId}
+                companyId={companyId}
+              />
+            </div>
+          )}
+          
+          {(!selectedCompany || !selectedContact) && (
+            <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm text-amber-800">
+                ⚠️ Please complete both steps above (Select Company and Select Client Contact) before proceeding with the CSV import.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -263,27 +319,66 @@ function WorkPackageCSVUploadContent() {
           </div>
         )}
 
-        {/* Contact Selection */}
+        {/* Company Selection (Step 1) */}
         <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Contact</h3>
+          <div className="mb-4 flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-gray-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Step 1: Select Company</h3>
+          </div>
           <div className="max-w-md">
-            <ContactSelector
-              onContactSelect={(contact, company) => {
-                setSelectedContact(contact);
-                setContactId(contact.id);
+            <CompanySelector
+              onCompanySelect={(company) => {
+                setSelectedCompany(company);
                 setCompanyId(company?.id || '');
+                // Clear contact selection when company changes
+                setSelectedContact(null);
+                setContactId('');
               }}
-              selectedContact={selectedContact}
+              selectedCompany={selectedCompany}
+              placeholder="Search companies by name..."
             />
-            {selectedContact && !companyId && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <p className="text-sm text-amber-800">
-                  ⚠️ <strong>Note:</strong> This contact has no associated company. The work package will be created without a company assignment.
+            {selectedCompany && (
+              <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                <p className="text-sm text-green-800">
+                  ✓ <strong>Selected:</strong> {selectedCompany.companyName}
                 </p>
               </div>
             )}
           </div>
         </div>
+
+        {/* Contact Selection (Step 2) - Only shown after company is selected */}
+        {selectedCompany && (
+          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Users className="h-5 w-5 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Step 2: Select Client Contact</h3>
+              <span className="text-xs text-gray-500">(from {selectedCompany.companyName})</span>
+            </div>
+            <div className="max-w-md">
+              <ContactSelector
+                companyId={companyId}
+                onContactSelect={(contact, company) => {
+                  setSelectedContact(contact);
+                  setContactId(contact.id);
+                  // Ensure companyId is set (should already be set from step 1)
+                  if (company?.id) {
+                    setCompanyId(company.id);
+                  }
+                }}
+                selectedContact={selectedContact}
+              />
+              {selectedContact && (
+                <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                  <p className="text-sm text-green-800">
+                    ✓ <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
+                    {selectedContact.email && <span> • {selectedContact.email}</span>}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* File Upload */}
         <div className="mt-6 rounded-xl border-2 border-gray-200 bg-white p-8">
