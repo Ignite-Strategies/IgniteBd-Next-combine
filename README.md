@@ -68,3 +68,4 @@ Visit:
 ### Deployment
 
 Ready for Vercel (no custom server). Ensure environment variables are set in the Vercel dashboard. `npm run build` succeeds locally and `.next` is generated during deploy.
+# Trigger redeploy
