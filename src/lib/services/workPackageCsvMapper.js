@@ -70,23 +70,102 @@ export function fuzzyMatchHeader(csvHeader) {
     return matches[0].field;
   }
   
-  // Common aliases
+  // Common aliases - improved matching
   const aliases = {
+    // Work Package fields
     'proposaltitle': 'title',
+    'proposal_title': 'title',
+    'proposal-title': 'title',
+    'workpackagetitle': 'title',
+    'work_package_title': 'title',
+    
     'proposaldescription': 'description',
+    'proposal_description': 'description',
+    'proposal-description': 'description',
+    'workpackagedescription': 'description',
+    'work_package_description': 'description',
+    'proposalnotes': 'description', // Notes map to description
+    'proposal_notes': 'description',
+    'proposal-notes': 'description',
+    'notes': 'description',
+    
     'proposaltotalcost': 'totalCost',
+    'proposal_total_cost': 'totalCost',
+    'proposal-total-cost': 'totalCost',
+    'totalcost': 'totalCost',
+    'total_cost': 'totalCost',
+    'cost': 'totalCost',
+    
+    'effectivestartdate': 'effectiveStartDate',
+    'effective_start_date': 'effectiveStartDate',
+    'startdate': 'effectiveStartDate',
+    'start_date': 'effectiveStartDate',
+    
+    // Phase fields
     'phasename': 'name',
+    'phase_name': 'name',
+    'phase-name': 'name',
+    'phase': 'name',
+    
     'phaseposition': 'position',
+    'phase_position': 'position',
+    'phase-position': 'position',
+    'position': 'position',
+    
     'phasedescription': 'description',
+    'phase_description': 'description',
+    'phase-description': 'description',
+    
+    // Item/Deliverable fields
     'deliverablelabel': 'deliverableLabel',
+    'deliverable_label': 'deliverableLabel',
+    'deliverable-label': 'deliverableLabel',
+    'deliverablename': 'deliverableLabel',
+    'itemlabel': 'deliverableLabel',
+    'item_label': 'deliverableLabel',
+    'itemname': 'deliverableLabel',
+    'item_name': 'deliverableLabel',
+    
     'deliverabletype': 'deliverableType',
+    'deliverable_type': 'deliverableType',
+    'deliverable-type': 'deliverableType',
+    'itemtype': 'deliverableType',
+    'item_type': 'deliverableType',
+    
     'deliverabledescription': 'deliverableDescription',
+    'deliverable_description': 'deliverableDescription',
+    'deliverable-description': 'deliverableDescription',
+    'itemdescription': 'deliverableDescription',
+    'item_description': 'deliverableDescription',
+    
+    'quantity': 'quantity',
+    'qty': 'quantity',
+    'amount': 'quantity',
+    
     'estimatedhourseach': 'estimatedHoursEach',
+    'estimated_hours_each': 'estimatedHoursEach',
+    'estimated-hours-each': 'estimatedHoursEach',
+    'hours': 'estimatedHoursEach',
+    'hourseach': 'estimatedHoursEach',
+    
     'unitofmeasure': 'unitOfMeasure',
+    'unit_of_measure': 'unitOfMeasure',
+    'unit-of-measure': 'unitOfMeasure',
+    'unit': 'unitOfMeasure',
+    'uom': 'unitOfMeasure',
+    
+    'status': 'status',
   };
   
+  // Check aliases (exact match)
   if (aliases[header]) {
     return aliases[header];
+  }
+  
+  // Check aliases with common separators removed
+  const normalizedHeader = header.replace(/[-_\s]/g, '');
+  if (aliases[normalizedHeader]) {
+    return aliases[normalizedHeader];
   }
   
   return null;
