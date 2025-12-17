@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool, Download, ExternalLink } from 'lucide-react';
+import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool, Download, ExternalLink, Copy, Check } from 'lucide-react';
 
 // 🎯 LOCAL-FIRST FLAG: API sync is optional and explicit only
 const ENABLE_BLOG_API_SYNC = true;
@@ -16,6 +16,7 @@ export default function BlogPage() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [exportingBlogId, setExportingBlogId] = useState(null);
+  const [copiedBlogId, setCopiedBlogId] = useState<string | null>(null);
 
   const [companyHQId, setCompanyHQId] = useState('');
 
@@ -166,6 +167,36 @@ export default function BlogPage() {
 
       if (response.data?.success) {
         const docUrl = response.data.documentUrl;
+        
+        // 🎯 LOCAL-FIRST: Update localStorage with the updated blog (including googleDocUrl)
+        const id = companyHQId || (typeof window !== 'undefined'
+          ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+          : '');
+        
+        if (id) {
+          try {
+            const cachedKey = `blogs_${id}`;
+            const cached = localStorage.getItem(cachedKey);
+            if (cached) {
+              const blogs = JSON.parse(cached);
+              const existingIndex = blogs.findIndex((b: any) => b.id === blogId);
+              if (existingIndex >= 0) {
+                // Update the blog with the new googleDocUrl
+                blogs[existingIndex] = {
+                  ...blogs[existingIndex],
+                  googleDocUrl: docUrl,
+                };
+                localStorage.setItem(cachedKey, JSON.stringify(blogs));
+                // Update in-memory state
+                setBlogs(blogs);
+                console.log('💾 Updated localStorage and state with googleDocUrl');
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to update localStorage with googleDocUrl:', e);
+          }
+        }
+        
         // For export, always open in new tab
         window.open(docUrl, '_blank');
       } else {
@@ -349,16 +380,48 @@ export default function BlogPage() {
                           Created {formatDate(blog.createdAt)}
                         </p>
                         {blog.googleDocUrl && (
-                          <a
-                            href={blog.googleDocUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-1"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            View Google Doc
-                          </a>
+                          <div className="mt-2 flex items-center gap-2">
+                            <a
+                              href={blog.googleDocUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              View Google Doc
+                            </a>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (blog.googleDocUrl) {
+                                  try {
+                                    await navigator.clipboard.writeText(blog.googleDocUrl);
+                                    setCopiedBlogId(blog.id);
+                                    setTimeout(() => setCopiedBlogId(null), 2000);
+                                  } catch (err) {
+                                    console.error('Failed to copy:', err);
+                                    setCopiedBlogId(blog.id);
+                                    setTimeout(() => setCopiedBlogId(null), 2000);
+                                  }
+                                }
+                              }}
+                              className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800"
+                              title="Copy Google Doc URL"
+                            >
+                              {copiedBlogId === blog.id ? (
+                                <>
+                                  <Check className="h-3 w-3" />
+                                  <span className="text-green-600">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" />
+                                  <span>Copy URL</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -370,17 +433,20 @@ export default function BlogPage() {
                         <Eye className="h-3.5 w-3.5" />
                         View
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleExportToGoogleDocs(blog.id, e);
-                        }}
-                        disabled={exportingBlogId === blog.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Download className={`h-3.5 w-3.5 ${exportingBlogId === blog.id ? 'animate-spin' : ''}`} />
-                        <span>{exportingBlogId === blog.id ? 'Exporting...' : 'Export to Google Docs'}</span>
-                      </button>
+                      {/* Only show export button if googleDocUrl doesn't exist */}
+                      {!blog.googleDocUrl && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportToGoogleDocs(blog.id, e);
+                          }}
+                          disabled={exportingBlogId === blog.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Download className={`h-3.5 w-3.5 ${exportingBlogId === blog.id ? 'animate-spin' : ''}`} />
+                          <span>{exportingBlogId === blog.id ? 'Exporting...' : 'Export to Google Docs'}</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => router.push(`/content/blog/${blog.id}`)}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"

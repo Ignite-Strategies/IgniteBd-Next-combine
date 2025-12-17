@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Save, ArrowLeft, Trash2, Download, ExternalLink } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Download, ExternalLink, Copy, Check } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function BlogEditorPage() {
@@ -19,19 +19,83 @@ export default function BlogEditorPage() {
   const [exporting, setExporting] = useState(false);
   const [googleDocUrl, setGoogleDocUrl] = useState(null);
   const [savedGoogleDocUrl, setSavedGoogleDocUrl] = useState(null);
+  const [copied, setCopied] = useState(false);
 
+  // 🎯 Check if googleDocUrl exists on load - if it does, we don't need to export again
   useEffect(() => {
     if (blogId) {
       loadBlog();
     }
   }, [blogId]);
 
+  // 🎯 useEffect to check if googleDocUrl exists and prevent re-export
+  useEffect(() => {
+    if (savedGoogleDocUrl) {
+      console.log('✅ Google Doc URL already exists, export not needed');
+    }
+  }, [savedGoogleDocUrl]);
+
   const loadBlog = async () => {
     try {
       setLoading(true);
+      
+      // 🎯 LOCAL-FIRST: Try to load from localStorage first
+      let blog = null;
+      const companyHQId = typeof window !== 'undefined' 
+        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+        : '';
+      
+      if (typeof window !== 'undefined' && companyHQId) {
+        // First try: blogs_${companyHQId}
+        try {
+          const stored = localStorage.getItem(`blogs_${companyHQId}`);
+          if (stored) {
+            const blogs = JSON.parse(stored);
+            blog = Array.isArray(blogs) ? blogs.find(b => b.id === blogId) : null;
+            if (blog) {
+              console.log('✅ [LOCAL-FIRST] Loaded blog from localStorage');
+            }
+          }
+        } catch (e) {
+          console.warn('[LOCAL-FIRST] Failed to parse blogs from localStorage:', e);
+        }
+        
+        // Second try: companyHydration_${companyHQId}
+        if (!blog) {
+          try {
+            const hydrationKey = `companyHydration_${companyHQId}`;
+            const hydrationData = localStorage.getItem(hydrationKey);
+            if (hydrationData) {
+              const parsed = JSON.parse(hydrationData);
+              if (parsed?.data?.blogs && Array.isArray(parsed.data.blogs)) {
+                blog = parsed.data.blogs.find(b => b.id === blogId);
+                if (blog) {
+                  console.log('✅ [LOCAL-FIRST] Loaded blog from hydration data');
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[LOCAL-FIRST] Failed to parse hydration data:', e);
+          }
+        }
+      }
+      
+      // If found locally, use it
+      if (blog) {
+        setTitle(blog.title || '');
+        setSubtitle(blog.subtitle || '');
+        setBlogText(blog.blogText || '');
+        setSections(blog.sections || null);
+        setSavedGoogleDocUrl(blog.googleDocUrl || null);
+        setLoading(false);
+        return;
+      }
+      
+      // 🎯 FALLBACK: Load from API if not found locally
+      console.log('🔄 [LOCAL-FIRST] Blog not found locally, fetching from API...');
       const response = await api.get(`/api/content/blog/${blogId}`);
       if (response.data?.success) {
-        const blog = response.data.blog;
+        blog = response.data.blog;
         console.log('📦 Loaded blog from database:', blog.id);
         
         setTitle(blog.title || '');
@@ -39,13 +103,35 @@ export default function BlogEditorPage() {
         setBlogText(blog.blogText || '');
         setSections(blog.sections || null);
         setSavedGoogleDocUrl(blog.googleDocUrl || null);
+        
+        // Update localStorage with the fetched blog
+        if (typeof window !== 'undefined' && companyHQId) {
+          try {
+            const cachedKey = `blogs_${companyHQId}`;
+            const cached = localStorage.getItem(cachedKey);
+            const blogs = cached ? JSON.parse(cached) : [];
+            const existingIndex = blogs.findIndex((b: any) => b.id === blog.id);
+            if (existingIndex >= 0) {
+              blogs[existingIndex] = blog;
+            } else {
+              blogs.unshift(blog);
+            }
+            localStorage.setItem(cachedKey, JSON.stringify(blogs));
+            console.log('💾 Updated localStorage with blog from API');
+          } catch (e) {
+            console.warn('Failed to update localStorage:', e);
+          }
+        }
       } else {
         console.error('Failed to load blog:', response.data);
         alert('Failed to load blog');
       }
     } catch (err) {
       console.error('Error loading blog:', err);
-      alert('Failed to load blog. Please try again.');
+      // Only show alert if we couldn't load from localStorage either
+      if (typeof window === 'undefined' || !localStorage.getItem(`blogs_${localStorage.getItem('companyHQId') || ''}`)) {
+        alert('Failed to load blog. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -115,6 +201,34 @@ export default function BlogEditorPage() {
         const docUrl = response.data.documentUrl;
         setGoogleDocUrl(docUrl);
         setSavedGoogleDocUrl(docUrl); // Update saved URL
+        
+        // 🎯 LOCAL-FIRST: Update localStorage with the updated blog (including googleDocUrl)
+        const companyHQId = typeof window !== 'undefined' 
+          ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+          : '';
+        
+        if (companyHQId) {
+          try {
+            const cachedKey = `blogs_${companyHQId}`;
+            const cached = localStorage.getItem(cachedKey);
+            if (cached) {
+              const blogs = JSON.parse(cached);
+              const existingIndex = blogs.findIndex((b: any) => b.id === blogId);
+              if (existingIndex >= 0) {
+                // Update the blog with the new googleDocUrl
+                blogs[existingIndex] = {
+                  ...blogs[existingIndex],
+                  googleDocUrl: docUrl,
+                };
+                localStorage.setItem(cachedKey, JSON.stringify(blogs));
+                console.log('💾 Updated localStorage with googleDocUrl');
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to update localStorage with googleDocUrl:', e);
+          }
+        }
+        
         // For export, automatically open in new tab
         window.open(docUrl, '_blank');
       } else {
@@ -232,18 +346,68 @@ export default function BlogEditorPage() {
 
             {(googleDocUrl || savedGoogleDocUrl) && (
               <div className="rounded-lg border border-green-300 bg-green-50 p-4 mb-4">
-                <p className="text-sm font-semibold text-green-800 mb-2">
-                  ✅ Google Doc Available
-                </p>
-                <a
-                  href={googleDocUrl || savedGoogleDocUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-green-700 hover:text-green-900 underline"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open in Google Docs
-                </a>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-green-800">
+                    ✅ Google Doc Available
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={googleDocUrl || savedGoogleDocUrl || ''}
+                      className="flex-1 rounded border border-green-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      onClick={(e) => e.currentTarget.select()}
+                    />
+                    <button
+                      onClick={async () => {
+                        const url = googleDocUrl || savedGoogleDocUrl;
+                        if (url) {
+                          try {
+                            await navigator.clipboard.writeText(url);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 2000);
+                          } catch (err) {
+                            console.error('Failed to copy:', err);
+                            // Fallback: select and copy
+                            const input = document.createElement('input');
+                            input.value = url;
+                            document.body.appendChild(input);
+                            input.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(input);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 2000);
+                          }
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm text-green-700 hover:text-green-900 border border-green-300 rounded hover:bg-green-100 transition-colors"
+                      title="Copy URL to clipboard"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <a
+                    href={googleDocUrl || savedGoogleDocUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-green-700 hover:text-green-900 underline"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open in Google Docs
+                  </a>
+                </div>
               </div>
             )}
 
@@ -257,14 +421,17 @@ export default function BlogEditorPage() {
               </button>
               
               <div className="flex items-center gap-4">
-                <button
-                  onClick={handleExportToGoogleDocs}
-                  disabled={exporting || !blogText.trim()}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
-                >
-                  <Download className="h-4 w-4" />
-                  {exporting ? 'Exporting...' : 'Export to Google Docs'}
-                </button>
+                {/* Only show export button if googleDocUrl doesn't exist */}
+                {!savedGoogleDocUrl && !googleDocUrl && (
+                  <button
+                    onClick={handleExportToGoogleDocs}
+                    disabled={exporting || !blogText.trim()}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    {exporting ? 'Exporting...' : 'Export to Google Docs'}
+                  </button>
+                )}
                 <button
                   onClick={handleSave}
                   disabled={saving}

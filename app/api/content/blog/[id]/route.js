@@ -1,20 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
  * GET /api/content/blog/:id
  * Get a single blog
+ * Uses optional auth for read operations (local-first pattern)
  */
 export async function GET(request, { params }) {
-  try {
-    await verifyFirebaseToken(request);
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401 },
-    );
-  }
+  // Use optional auth for GET (read operation, scoped by blog ID)
+  await optionallyVerifyFirebaseToken(request);
 
   try {
     const { id } = await params;
