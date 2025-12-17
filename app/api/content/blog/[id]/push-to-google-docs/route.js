@@ -107,8 +107,10 @@ export async function POST(request, { params }) {
 
     // Create the document using Drive API (service accounts can create files they own)
     // Optional: Specify parent folder to avoid filling service account's root Drive
-    const parentFolderId = process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID;
+    const parentFolderId = process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID || '1khO3ytWyY9GUscxSyKPNhG35qRXVFtuT'; // HARDCODED FOR TESTING
     
+    console.log('🔍 DEBUG: process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID =', process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID);
+    console.log('🔍 DEBUG: Using parentFolderId =', parentFolderId);
     console.log(`📄 Creating Google Doc: "${documentTitle}"${parentFolderId ? ` in folder ${parentFolderId}` : ' in service account root'}`);
     
     const createResponse = await drive.files.create({
@@ -116,7 +118,7 @@ export async function POST(request, { params }) {
         name: documentTitle,
         mimeType: 'application/vnd.google-apps.document',
         // If parent folder is configured, use it; otherwise, doc goes to service account root
-        ...(parentFolderId ? { parents: [parentFolderId] } : {}),
+        parents: [parentFolderId], // Always use the folder (hardcoded or env)
       },
       fields: 'id',
     });
