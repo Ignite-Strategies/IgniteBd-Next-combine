@@ -42,31 +42,79 @@ export function getAllSystemFields() {
 
 // Fuzzy match CSV header to system field
 export function fuzzyMatchHeader(csvHeader) {
-  const header = csvHeader.toLowerCase().trim();
+  const header = csvHeader.toLowerCase().trim().replace(/[-_\s]/g, '');
   const allFields = getAllSystemFields();
   
-  // Exact matches
+  // First check aliases (most common patterns)
+  const aliases = {
+    // Work Package fields
+    'proposaltitle': 'title',
+    'proposaltotalcost': 'totalCost',
+    'proposaldescription': 'description',
+    'proposalnotes': 'description',
+    'workpackagetitle': 'title',
+    'workpackagedescription': 'description',
+    'workpackagetotalcost': 'totalCost',
+    
+    // Phase fields
+    'phasename': 'name',
+    'phaseposition': 'position',
+    'phasedescription': 'phaseDescription',
+    
+    // Item/Deliverable fields
+    'deliverablelabel': 'deliverableLabel',
+    'deliverablename': 'deliverableLabel',
+    'itemlabel': 'deliverableLabel',
+    'itemname': 'deliverableLabel',
+    'deliverabletype': 'deliverableType',
+    'itemtype': 'deliverableType',
+    'deliverabledescription': 'deliverableDescription',
+    'itemdescription': 'deliverableDescription',
+    'quantity': 'quantity',
+    'qty': 'quantity',
+    'estimatedhourseach': 'estimatedHoursEach',
+    'hourseach': 'estimatedHoursEach',
+    'hours': 'estimatedHoursEach',
+    'unitofmeasure': 'unitOfMeasure',
+    'unit': 'unitOfMeasure',
+    'status': 'status',
+  };
+  
+  // Check aliases first (exact match after normalization)
+  if (aliases[header]) {
+    return aliases[header];
+  }
+  
+  // Exact matches with original field names
   for (const field of allFields) {
     if (field.key === 'unmapped') continue;
-    if (header === field.key.toLowerCase() || header === field.label.toLowerCase()) {
+    const normalizedFieldKey = field.key.toLowerCase().replace(/[-_\s]/g, '');
+    const normalizedFieldLabel = field.label.toLowerCase().replace(/[-_\s]/g, '');
+    
+    if (header === normalizedFieldKey || header === normalizedFieldLabel) {
       return field.key;
     }
   }
   
-  // Partial matches
+  // Partial matches (check if header contains field name or vice versa)
   const matches = [];
   for (const field of allFields) {
     if (field.key === 'unmapped') continue;
-    const fieldLabel = field.label.toLowerCase();
-    const fieldKey = field.key.toLowerCase();
+    const fieldLabel = field.label.toLowerCase().replace(/[-_\s]/g, '');
+    const fieldKey = field.key.toLowerCase().replace(/[-_\s]/g, '');
     
+    // Check if header contains field name or field name contains header
     if (header.includes(fieldKey) || fieldKey.includes(header) ||
         header.includes(fieldLabel) || fieldLabel.includes(header)) {
-      matches.push({ field: field.key, score: 1 });
+      // Score based on match quality (exact > contains)
+      const score = (header === fieldKey || header === fieldLabel) ? 2 : 1;
+      matches.push({ field: field.key, score });
     }
   }
   
+  // Sort by score (best match first)
   if (matches.length > 0) {
+    matches.sort((a, b) => b.score - a.score);
     return matches[0].field;
   }
   
