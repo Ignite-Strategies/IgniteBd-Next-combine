@@ -33,11 +33,13 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   
   const systemFields = getAllSystemFields() as SystemField[];
 
-  // Hardcoded mappings for common CSV column names
+  // Hardcoded mappings for common CSV column names - EXACT MATCHES
   const getHardcodedMapping = (csvHeader: string): string | null => {
-    const normalized = csvHeader.toLowerCase().trim();
+    // Remove quotes and normalize
+    const cleaned = csvHeader.replace(/^["']|["']$/g, '').trim();
+    const normalized = cleaned.toLowerCase();
     
-    // Direct mappings based on exact CSV column names
+    // Direct mappings based on exact CSV column names from the template
     const hardcodedMappings: Record<string, string> = {
       // Work Package fields
       'proposaltitle': 'title',
@@ -139,20 +141,24 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
 
   useEffect(() => {
     if (!initialMappings && csvHeaders.length > 0) {
-      // Use hardcoded mappings first, fallback to generateMappings
+      // Direct hardcoded mappings - CSV headers are exact matches
       const autoMappings: Record<string, string> = {};
       
       csvHeaders.forEach((header) => {
         const hardcoded = getHardcodedMapping(header);
         if (hardcoded) {
           autoMappings[header] = hardcoded;
+          console.log(`✅ Mapped "${header}" → "${hardcoded}"`);
         } else {
-          // Fallback to fuzzy matching if no hardcoded match
-          const matched = generateMappings([header]) as Record<string, string>;
-          autoMappings[header] = matched[header] || 'unmapped';
+          // Fallback: try fuzzy matching from the mapper service
+          const allMappings = generateMappings(csvHeaders) as Record<string, string>;
+          const fallback = allMappings[header] || 'unmapped';
+          autoMappings[header] = fallback;
+          console.log(`⚠️ No hardcoded match for "${header}", using: "${fallback}"`);
         }
       });
       
+      console.log('🔍 Final auto-generated mappings:', autoMappings);
       setMappings(autoMappings);
       if (onMappingsChange) {
         onMappingsChange(autoMappings);
