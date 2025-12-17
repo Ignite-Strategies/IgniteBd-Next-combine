@@ -609,18 +609,33 @@ export default function ContactsViewPage() {
                              contact.companyName || 
                              'N/A'}
                           </span>
-                          {(contact.companies?.companyHealthScore !== null || contact.company?.companyHealthScore !== null) && (
+                          {/* Show health score if company exists, even if score is 0 */}
+                          {contact.companies && (
                             <span
                               className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                (contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0) >= 75
+                                (contact.companies.companyHealthScore ?? 0) >= 75
                                   ? 'bg-green-100 text-green-800'
-                                  : (contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0) >= 50
+                                  : (contact.companies.companyHealthScore ?? 0) >= 50
                                   ? 'bg-yellow-100 text-yellow-800'
                                   : 'bg-red-100 text-red-800'
                               }`}
-                              title={`Company Health: ${contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0}/100`}
+                              title={`Company Health: ${contact.companies.companyHealthScore ?? 0}/100`}
                             >
-                              {contact.companies?.companyHealthScore ?? contact.company?.companyHealthScore ?? 0}
+                              {contact.companies.companyHealthScore ?? 0}
+                            </span>
+                          )}
+                          {!contact.companies && contact.company && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                (contact.company.companyHealthScore ?? 0) >= 75
+                                  ? 'bg-green-100 text-green-800'
+                                  : (contact.company.companyHealthScore ?? 0) >= 50
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                              title={`Company Health: ${contact.company.companyHealthScore ?? 0}/100`}
+                            >
+                              {contact.company.companyHealthScore ?? 0}
                             </span>
                           )}
                           {assigningCompanyId === contact.id ? (
