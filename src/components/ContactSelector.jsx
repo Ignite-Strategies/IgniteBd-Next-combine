@@ -25,6 +25,11 @@ export default function ContactSelector({
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(contactId || null);
 
+  // Debug: Log companyId prop
+  useEffect(() => {
+    console.log('🔍 ContactSelector companyId prop:', companyId);
+  }, [companyId]);
+
   // Fetch contacts from API
   useEffect(() => {
     const fetchContacts = async () => {
@@ -71,6 +76,12 @@ export default function ContactSelector({
       try {
         setLoading(true);
         
+        console.log('🔍 ContactSelector: Fetching contacts', {
+          companyHQId: finalCompanyHQId,
+          companyId: companyId,
+          hasCompanyIdFilter: !!companyId
+        });
+        
         // Try localStorage first for quick display
         const cached = window.localStorage.getItem('contacts');
         let cachedContacts = [];
@@ -79,8 +90,11 @@ export default function ContactSelector({
             const parsed = JSON.parse(cached);
             if (Array.isArray(parsed) && parsed.length > 0) {
               cachedContacts = parsed;
-              setContacts(parsed);
-              setLoading(false);
+              // Don't set contacts yet if we have companyId filter - wait for API
+              if (!companyId) {
+                setContacts(parsed);
+                setLoading(false);
+              }
             }
           } catch (err) {
             console.warn('Failed to parse cached contacts', err);
@@ -90,29 +104,38 @@ export default function ContactSelector({
         // Fetch from API to get latest data
         // If companyId is provided, filter contacts by that company
         let apiUrl = `/api/contacts?companyHQId=${finalCompanyHQId}`;
+        console.log('🔍 ContactSelector: Fetching from API:', apiUrl, 'with companyId filter:', companyId);
         const response = await api.get(apiUrl);
         if (response.data?.success && response.data.contacts) {
           let fetched = response.data.contacts;
+          console.log('✅ ContactSelector: Received', fetched.length, 'contacts from API');
           
           // Filter by companyId if provided
           if (companyId) {
-            console.log('🔍 Filtering contacts by companyId:', companyId);
+            console.log('🔍 FILTERING contacts by companyId:', companyId);
             console.log('🔍 Total contacts before filter:', fetched.length);
+            
+            // Log first 5 contacts to see their structure
+            console.log('📋 First 5 contacts structure:', fetched.slice(0, 5).map(c => ({
+              name: `${c.firstName} ${c.lastName}`,
+              contactCompanyId: c.contactCompanyId,
+              contactCompanyId: c.contactCompany?.id,
+              companiesId: c.companies?.id,
+              hasContactCompany: !!c.contactCompany,
+              hasCompanies: !!c.companies,
+              companyName: c.contactCompany?.companyName || c.companies?.companyName
+            })));
             
             const filtered = fetched.filter(contact => {
               const matches = contact.contactCompanyId === companyId || 
                      contact.contactCompany?.id === companyId ||
                      contact.companies?.id === companyId;
               
-              // Debug: log first few contacts to see their company associations
-              if (fetched.indexOf(contact) < 3) {
-                console.log('📋 Sample contact:', {
-                  name: `${contact.firstName} ${contact.lastName}`,
+              if (matches) {
+                console.log('✅ MATCH:', `${contact.firstName} ${contact.lastName}`, {
                   contactCompanyId: contact.contactCompanyId,
                   contactCompanyId: contact.contactCompany?.id,
-                  companiesId: contact.companies?.id,
-                  companyName: contact.contactCompany?.companyName || contact.companies?.companyName,
-                  matches
+                  companiesId: contact.companies?.id
                 });
               }
               
@@ -124,18 +147,21 @@ export default function ContactSelector({
             // If filtering returns 0 results, show warning but still use empty array
             // (don't fall back to all contacts - user needs to select correct company)
             if (filtered.length === 0 && fetched.length > 0) {
-              console.warn('⚠️ No contacts found for companyId:', companyId);
-              console.warn('⚠️ Sample contacts have these companyIds:', 
-                fetched.slice(0, 5).map(c => ({
+              console.warn('⚠️⚠️⚠️ NO CONTACTS FOUND for companyId:', companyId);
+              console.warn('⚠️ All contacts have these companyIds:', 
+                fetched.slice(0, 10).map(c => ({
                   name: `${c.firstName} ${c.lastName}`,
                   contactCompanyId: c.contactCompanyId,
                   contactCompanyId: c.contactCompany?.id,
-                  companiesId: c.companies?.id
+                  companiesId: c.companies?.id,
+                  email: c.email
                 }))
               );
             }
             
             fetched = filtered;
+          } else {
+            console.log('ℹ️ No companyId filter - showing all', fetched.length, 'contacts');
           }
           
           setContacts(fetched);
@@ -178,7 +204,7 @@ export default function ContactSelector({
     };
 
     fetchContacts();
-  }, [companyHQId, companyHydrated, refreshCompanyHQ, companyId]);
+  }, [companyHQId, companyHydrated, refreshCompanyHQ, companyId]); // companyId in deps so it re-fetches when company changes
 
   // Initialize from props only
   useEffect(() => {
