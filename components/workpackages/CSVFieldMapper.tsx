@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { getAllSystemFields, generateMappings, validateMappings, fuzzyMatchHeader } from '@/lib/services/workPackageCsvMapper';
 
@@ -30,6 +30,7 @@ interface CSVFieldMapperProps {
 export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappingsChange }: CSVFieldMapperProps) {
   const [mappings, setMappings] = useState<Record<string, string>>(initialMappings || {});
   const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const hasGeneratedMappings = useRef(false);
   
   const systemFields = getAllSystemFields() as SystemField[];
 
@@ -140,34 +141,26 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   };
 
   useEffect(() => {
-    // Auto-generate mappings when we have headers and mappings haven't been generated yet
-    if (csvHeaders.length > 0) {
-      // Check if we need to generate mappings (empty or missing headers)
-      const needsMapping = Object.keys(mappings).length === 0 || 
-        csvHeaders.some(header => !mappings[header]);
+    // Auto-generate mappings when we have headers and haven't generated yet
+    if (csvHeaders.length > 0 && !hasGeneratedMappings.current && Object.keys(mappings).length === 0) {
+      // Use the existing fuzzyMatchHeader function from workPackageCsvMapper
+      const autoMappings: Record<string, string> = {};
       
-      if (needsMapping) {
-        // Use the existing fuzzyMatchHeader function from workPackageCsvMapper
-        const autoMappings: Record<string, string> = { ...mappings };
-        
-        csvHeaders.forEach((header) => {
-          // Only map if not already mapped
-          if (!autoMappings[header]) {
-            // Use the existing mapper's fuzzyMatchHeader function directly
-            const matched = fuzzyMatchHeader(header);
-            autoMappings[header] = matched || 'unmapped';
-            console.log(`🔍 Mapped "${header}" → "${matched || 'unmapped'}"`);
-          }
-        });
-        
-        console.log('✅ Final auto-generated mappings:', autoMappings);
-        setMappings(autoMappings);
-        if (onMappingsChange) {
-          onMappingsChange(autoMappings);
-        }
+      csvHeaders.forEach((header) => {
+        // Use the existing mapper's fuzzyMatchHeader function directly
+        const matched = fuzzyMatchHeader(header);
+        autoMappings[header] = matched || 'unmapped';
+        console.log(`🔍 Mapped "${header}" → "${matched || 'unmapped'}"`);
+      });
+      
+      console.log('✅ Final auto-generated mappings:', autoMappings);
+      hasGeneratedMappings.current = true;
+      setMappings(autoMappings);
+      if (onMappingsChange) {
+        onMappingsChange(autoMappings);
       }
     }
-  }, [csvHeaders]); // Only depend on csvHeaders, not mappings to avoid loops
+  }, [csvHeaders, mappings, onMappingsChange]);
 
   useEffect(() => {
     if (Object.keys(mappings).length > 0) {
