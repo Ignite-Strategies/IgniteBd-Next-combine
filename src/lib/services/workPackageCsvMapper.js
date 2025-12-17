@@ -16,7 +16,7 @@ export const SYSTEM_FIELDS = {
   phase: {
     name: { label: 'Phase Name', required: true, category: 'phase' },
     position: { label: 'Phase Position', required: true, category: 'phase' },
-    description: { label: 'Phase Description', required: false, category: 'phase' },
+    phaseDescription: { label: 'Phase Description', required: false, category: 'phase' },
   },
   // WorkPackageItem
   item: {
@@ -79,15 +79,20 @@ export function fuzzyMatchHeader(csvHeader) {
     'workpackagetitle': 'title',
     'work_package_title': 'title',
     
+    // Work Package description (not phase description)
     'proposaldescription': 'description',
     'proposal_description': 'description',
     'proposal-description': 'description',
     'workpackagedescription': 'description',
     'work_package_description': 'description',
-    'proposalnotes': 'description', // Notes map to description
+    'proposalnotes': 'description', // Notes map to work package description
     'proposal_notes': 'description',
     'proposal-notes': 'description',
-    'notes': 'description',
+    
+    // Phase description (separate from work package description)
+    'phasedescription': 'phaseDescription',
+    'phase_description': 'phaseDescription',
+    'phase-description': 'phaseDescription',
     
     'proposaltotalcost': 'totalCost',
     'proposal_total_cost': 'totalCost',
@@ -112,9 +117,7 @@ export function fuzzyMatchHeader(csvHeader) {
     'phase-position': 'position',
     'position': 'position',
     
-    'phasedescription': 'description',
-    'phase_description': 'description',
-    'phase-description': 'description',
+    // Already handled above - phaseDescription
     
     // Item/Deliverable fields
     'deliverablelabel': 'deliverableLabel',
@@ -257,7 +260,7 @@ export function groupIntoPhases(transformedRows) {
       phaseMap.set(phaseKey, {
         name: row.name || 'Unnamed Phase',
         position: row.position || 0,
-        description: row.description || null,
+        description: row.phaseDescription || null, // Use phaseDescription, not description
         items: [],
       });
     }
