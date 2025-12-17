@@ -7,10 +7,10 @@ import CSVPreview from './CSVPreview';
 import { transformRows, groupIntoPhases, validateMappings } from '@/lib/services/workPackageCsvMapper';
 
 const STEPS = [
-  { id: 'upload', label: 'Upload CSV', icon: Upload },
-  { id: 'map', label: 'Map Fields', icon: Map },
-  { id: 'preview', label: 'Preview', icon: Eye },
-  { id: 'create', label: 'Create', icon: CheckCircle },
+  { id: 'upload', label: 'Upload CSV', icon: Upload, phase: 1 },
+  { id: 'map', label: 'Map Fields', icon: Map, phase: 1 },
+  { id: 'preview', label: 'Preview Data', icon: Eye, phase: 2 },
+  { id: 'create', label: 'Confirm & Save', icon: CheckCircle, phase: 2 },
 ];
 
 /**
@@ -92,41 +92,120 @@ export default function CSVImportWizard({
     }
   };
 
+  // Group steps by phase
+  const phase1Steps = STEPS.filter(s => s.phase === 1);
+  const phase2Steps = STEPS.filter(s => s.phase === 2);
+  const currentPhase = STEPS[currentStep]?.phase || 1;
+
   return (
     <div className="space-y-6">
-      {/* Step Indicator */}
-      <div className="flex items-center justify-between">
-        {STEPS.map((s, index) => (
-          <div key={s.id} className="flex items-center flex-1">
-            <div className="flex items-center">
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                index === currentStep
-                  ? 'border-red-600 bg-red-50 text-red-600'
-                  : index < currentStep
-                  ? 'border-green-600 bg-green-50 text-green-600'
-                  : 'border-gray-300 bg-white text-gray-400'
-              }`}>
-                {index < currentStep ? (
-                  <CheckCircle className="h-6 w-6" />
-                ) : (
-                  <s.icon className="h-5 w-5" />
-                )}
-              </div>
-              <span className={`ml-2 text-sm font-medium ${
-                index === currentStep
-                  ? 'text-red-600'
-                  : index < currentStep
-                  ? 'text-green-600'
-                  : 'text-gray-400'
-              }`}>
-                {s.label}
-              </span>
+      {/* Phase Indicators */}
+      <div className="space-y-4">
+        {/* Phase 1: Match CSV to Fields */}
+        <div className={`rounded-lg border-2 p-4 ${
+          currentPhase === 1 
+            ? 'border-blue-500 bg-blue-50' 
+            : currentPhase > 1
+            ? 'border-green-500 bg-green-50'
+            : 'border-gray-300 bg-gray-50'
+        }`}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+              currentPhase === 1 
+                ? 'bg-blue-600 text-white' 
+                : currentPhase > 1
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-400 text-white'
+            }`}>
+              {currentPhase > 1 ? '✓' : '1'}
             </div>
-            {index < STEPS.length - 1 && (
-              <ChevronRight className="h-5 w-5 text-gray-400 mx-2 flex-shrink-0" />
-            )}
+            <h3 className={`text-lg font-semibold ${
+              currentPhase === 1 ? 'text-blue-900' : currentPhase > 1 ? 'text-green-900' : 'text-gray-600'
+            }`}>
+              Phase 1: Match CSV Columns to System Fields
+            </h3>
           </div>
-        ))}
+          <div className="flex items-center gap-2 ml-10">
+            {phase1Steps.map((s, index) => {
+              const stepIndex = STEPS.findIndex(step => step.id === s.id);
+              const isActive = stepIndex === currentStep;
+              const isComplete = stepIndex < currentStep;
+              return (
+                <div key={s.id} className="flex items-center">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                    isActive
+                      ? 'border-blue-600 bg-blue-100 text-blue-600'
+                      : isComplete
+                      ? 'border-green-600 bg-green-100 text-green-600'
+                      : 'border-gray-300 bg-white text-gray-400'
+                  }`}>
+                    {isComplete ? (
+                      <CheckCircle className="h-5 w-5" />
+                    ) : (
+                      <s.icon className="h-4 w-4" />
+                    )}
+                  </div>
+                  {index < phase1Steps.length - 1 && (
+                    <ChevronRight className="h-4 w-4 text-gray-400 mx-1" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Phase 2: Confirm & Save */}
+        <div className={`rounded-lg border-2 p-4 ${
+          currentPhase === 2 
+            ? 'border-blue-500 bg-blue-50' 
+            : currentPhase < 2
+            ? 'border-gray-300 bg-gray-50 opacity-50'
+            : 'border-green-500 bg-green-50'
+        }`}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+              currentPhase === 2 
+                ? 'bg-blue-600 text-white' 
+                : currentPhase < 2
+                ? 'bg-gray-400 text-white'
+                : 'bg-green-600 text-white'
+            }`}>
+              {currentPhase > 2 ? '✓' : '2'}
+            </div>
+            <h3 className={`text-lg font-semibold ${
+              currentPhase === 2 ? 'text-blue-900' : currentPhase < 2 ? 'text-gray-600' : 'text-green-900'
+            }`}>
+              Phase 2: Preview Actual Data & Confirm Save
+            </h3>
+          </div>
+          <div className="flex items-center gap-2 ml-10">
+            {phase2Steps.map((s, index) => {
+              const stepIndex = STEPS.findIndex(step => step.id === s.id);
+              const isActive = stepIndex === currentStep;
+              const isComplete = stepIndex < currentStep;
+              return (
+                <div key={s.id} className="flex items-center">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                    isActive
+                      ? 'border-blue-600 bg-blue-100 text-blue-600'
+                      : isComplete
+                      ? 'border-green-600 bg-green-100 text-green-600'
+                      : 'border-gray-300 bg-white text-gray-400'
+                  }`}>
+                    {isComplete ? (
+                      <CheckCircle className="h-5 w-5" />
+                    ) : (
+                      <s.icon className="h-4 w-4" />
+                    )}
+                  </div>
+                  {index < phase2Steps.length - 1 && (
+                    <ChevronRight className="h-4 w-4 text-gray-400 mx-1" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Step Content */}
@@ -142,27 +221,74 @@ export default function CSVImportWizard({
         )}
 
         {currentStep === 1 && (
-          <CSVFieldMapper
-            csvHeaders={csvHeaders}
-            initialMappings={mappings}
-            onMappingsChange={setMappings}
-          />
+          <div className="space-y-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <Map className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900 mb-1">
+                    Phase 1: Match CSV Columns to System Fields
+                  </p>
+                  <p className="text-sm text-blue-800">
+                    Map each CSV column to the corresponding system field. This determines how your data will be transformed.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <CSVFieldMapper
+              csvHeaders={csvHeaders}
+              initialMappings={mappings}
+              onMappingsChange={setMappings}
+            />
+          </div>
         )}
 
         {currentStep === 2 && previewData && (
-          <CSVPreview
-            workPackage={previewData.workPackage}
-            phases={previewData.phases}
-          />
+          <div className="space-y-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <Eye className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900 mb-1">
+                    Preview: Actual Transformed Data
+                  </p>
+                  <p className="text-sm text-blue-800">
+                    This preview shows the <strong>actual data</strong> that will be saved to your work package. 
+                    Review carefully before proceeding to save.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <CSVPreview
+              workPackage={previewData.workPackage}
+              phases={previewData.phases}
+            />
+          </div>
         )}
 
         {currentStep === 3 && (
-          <div className="text-center py-8">
-            <CheckCircle className="h-12 w-12 mx-auto text-green-600 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Create</h3>
-            <p className="text-sm text-gray-600">
-              Review the preview above, then click "Create Work Package" to proceed
-            </p>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-green-200 bg-green-50 p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-lg font-semibold text-green-900 mb-2">Ready to Save</h3>
+                  <p className="text-sm text-green-800 mb-4">
+                    You've reviewed the preview above. Click "Confirm & Save Work Package" to create the work package with the data shown.
+                  </p>
+                  {previewData && (
+                    <div className="rounded-lg border border-green-300 bg-white p-4 space-y-2">
+                      <p className="text-sm font-semibold text-gray-900">Summary:</p>
+                      <ul className="text-sm text-gray-700 space-y-1">
+                        <li>• Work Package: <strong>{previewData.workPackage?.title || 'Untitled'}</strong></li>
+                        <li>• Phases: <strong>{previewData.phases?.length || 0}</strong></li>
+                        <li>• Total Items: <strong>{previewData.phases?.reduce((sum, p) => sum + (p.items?.length || 0), 0) || 0}</strong></li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -191,9 +317,19 @@ export default function CSVImportWizard({
           <button
             onClick={handleCreate}
             disabled={!canProceed() || loading}
-            className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
-            {loading ? 'Creating...' : 'Create Work Package'}
+            {loading ? (
+              <>
+                <span className="animate-spin">⏳</span>
+                Creating...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                Confirm & Save Work Package
+              </>
+            )}
           </button>
         )}
       </div>
