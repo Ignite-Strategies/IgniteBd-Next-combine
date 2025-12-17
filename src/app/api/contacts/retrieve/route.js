@@ -136,15 +136,11 @@ export async function GET(request) {
     };
 
     // Filter by client company ID if provided
-    // Check both contactCompanyId (foreign key) and companyId (enrichment field)
+    // NOTE: Only use contactCompanyId (the actual foreign key)
+    // companyId field is enrichment data only, not a foreign key
     if (companyId) {
-      // Use OR to check both the foreign key and the enrichment field
-      // This handles cases where contactCompanyId is null but companyId (from enrichment) matches
-      where.OR = [
-        { contactCompanyId: companyId },
-        { companyId: companyId }, // Fallback: check enrichment companyId field
-      ];
-      console.log('🔍 Filtering contacts by companyId:', companyId, '(checking both contactCompanyId and companyId fields)');
+      where.contactCompanyId = companyId;
+      console.log('🔍 Filtering contacts by contactCompanyId (FK):', companyId);
     }
 
     // Filter by pipeline/stage if provided
