@@ -243,6 +243,7 @@ function WorkPackageCSVUploadContent() {
             </div>
             <div className="max-w-md">
               <CompanySelector
+                companyId={companyId}
                 onCompanySelect={(company: Company | null) => {
                   setSelectedCompany(company);
                   setCompanyId(company?.id || '');
@@ -351,6 +352,7 @@ function WorkPackageCSVUploadContent() {
           </div>
           <div className="max-w-md">
             <CompanySelector
+              companyId={companyId}
               onCompanySelect={(company: Company | null) => {
                 setSelectedCompany(company);
                 setCompanyId(company?.id || '');
