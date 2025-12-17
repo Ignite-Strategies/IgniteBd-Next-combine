@@ -34,6 +34,14 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   
   const systemFields = getAllSystemFields() as SystemField[];
 
+  // Sync with initialMappings prop when it changes (but only if it has values)
+  useEffect(() => {
+    if (initialMappings && Object.keys(initialMappings).length > 0) {
+      setMappings(initialMappings);
+      hasGeneratedMappings.current = true;
+    }
+  }, [initialMappings]);
+
   // Hardcoded mappings for common CSV column names - EXACT MATCHES
   const getHardcodedMapping = (csvHeader: string): string | null => {
     // Remove quotes and normalize
@@ -142,15 +150,22 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
 
   useEffect(() => {
     // Auto-generate mappings when we have headers and haven't generated yet
-    if (csvHeaders.length > 0 && !hasGeneratedMappings.current && Object.keys(mappings).length === 0) {
+    // Check if mappings are empty or if any header is missing a mapping
+    const isEmpty = Object.keys(mappings).length === 0;
+    const hasUnmappedHeaders = csvHeaders.some(header => !mappings[header] || mappings[header] === 'unmapped');
+    
+    if (csvHeaders.length > 0 && !hasGeneratedMappings.current && (isEmpty || hasUnmappedHeaders)) {
       // Use the existing fuzzyMatchHeader function from workPackageCsvMapper
-      const autoMappings: Record<string, string> = {};
+      const autoMappings: Record<string, string> = { ...mappings };
       
       csvHeaders.forEach((header) => {
-        // Use the existing mapper's fuzzyMatchHeader function directly
-        const matched = fuzzyMatchHeader(header);
-        autoMappings[header] = matched || 'unmapped';
-        console.log(`🔍 Mapped "${header}" → "${matched || 'unmapped'}"`);
+        // Only generate mapping if not already set or if it's unmapped
+        if (!autoMappings[header] || autoMappings[header] === 'unmapped') {
+          // Use the existing mapper's fuzzyMatchHeader function directly
+          const matched = fuzzyMatchHeader(header);
+          autoMappings[header] = matched || 'unmapped';
+          console.log(`🔍 Mapped "${header}" → "${matched || 'unmapped'}"`);
+        }
       });
       
       console.log('✅ Final auto-generated mappings:', autoMappings);
