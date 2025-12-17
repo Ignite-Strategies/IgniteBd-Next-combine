@@ -73,7 +73,7 @@ const PREDEFINED_TEMPLATES = [
 export default function TemplateBuildPage() {
   const router = useRouter();
   const { companyHQId } = useCompanyHQ();
-  const [mode, setMode] = useState('MANUAL'); // 'MANUAL' | 'TEMPLATE' | 'IDEA' | 'IDEA'
+  const [mode, setMode] = useState('MANUAL'); // 'MANUAL' | 'TEMPLATE' | 'IDEA' | 'VARIABLES'
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [idea, setIdea] = useState('');
   const [parsing, setParsing] = useState(false);
@@ -99,6 +99,7 @@ export default function TemplateBuildPage() {
   const [hydrating, setHydrating] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [extractedVariables, setExtractedVariables] = useState([]);
 
   // Generate title from form fields
   const generateTitle = (typeOfPerson) => {
@@ -193,7 +194,12 @@ export default function TemplateBuildPage() {
     setGenerating(true);
 
     try {
-      const response = await api.post('/api/template/generate', {
+      // Use different API based on mode
+      const endpoint = mode === 'VARIABLES' 
+        ? '/api/template/generate-with-variables'
+        : '/api/template/generate';
+      
+      const response = await api.post(endpoint, {
         relationship: form.relationship,
         typeOfPerson: form.typeOfPerson,
         whyReachingOut: form.whyReachingOut.trim(),
@@ -201,10 +207,20 @@ export default function TemplateBuildPage() {
       });
 
       if (response.data?.success) {
-        setPreview({
-          content: response.data.message,
-          sections: response.data.sections || {},
-        });
+        if (mode === 'VARIABLES') {
+          // For variable templates
+          setPreview({
+            content: response.data.template,
+            sections: {},
+          });
+          setExtractedVariables(response.data.variables || []);
+        } else {
+          // For regular templates
+          setPreview({
+            content: response.data.message,
+            sections: response.data.sections || {},
+          });
+        }
       } else {
         throw new Error('Failed to generate message');
       }
@@ -488,7 +504,7 @@ export default function TemplateBuildPage() {
         {/* Mode Toggle */}
         <div className="mb-6 flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4">
           <span className="text-sm font-medium text-gray-700">Mode:</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleSwitchToManual}
@@ -513,6 +529,21 @@ export default function TemplateBuildPage() {
               }`}
             >
               Create with AI
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('VARIABLES');
+                setSelectedTemplate(null);
+                setIdea('');
+              }}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                mode === 'VARIABLES'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Variables
             </button>
             <button
               type="button"
@@ -700,14 +731,14 @@ export default function TemplateBuildPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  {mode === 'IDEA' && !preview.content ? (
+                  {(mode === 'IDEA' || mode === 'VARIABLES') && !preview.content ? (
                     <button
                       type="button"
                       onClick={handleGenerateMessage}
                       disabled={generating || !form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()}
                       className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                     >
-                      {generating ? 'Generating...' : 'Generate Message'}
+                      {generating ? 'Generating...' : mode === 'VARIABLES' ? 'Generate Template' : 'Generate Message'}
                     </button>
                   ) : (
                     <>
@@ -729,7 +760,7 @@ export default function TemplateBuildPage() {
                           {hydrating ? 'Hydrating...' : 'Refresh Preview'}
                         </button>
                       )}
-                      {mode === 'IDEA' && (
+                      {(mode === 'IDEA' || mode === 'VARIABLES') && (
                         <button
                           type="button"
                           onClick={handleGenerateMessage}
@@ -753,38 +784,60 @@ export default function TemplateBuildPage() {
 
               {preview.content ? (
                 <div className="space-y-4">
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
-                    <div className="space-y-3 text-sm text-gray-800">
-                      {preview.sections.opening && (
-                        <div>
-                          <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Opening</div>
-                          <div>{preview.sections.opening}</div>
-                        </div>
-                      )}
-                      {preview.sections.context && (
-                        <div>
-                          <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Context</div>
-                          <div>{preview.sections.context}</div>
-                        </div>
-                      )}
-                      {preview.sections.releaseValve && (
-                        <div>
-                          <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Release Valve</div>
-                          <div>{preview.sections.releaseValve}</div>
-                        </div>
-                      )}
-                      {preview.sections.close && (
-                        <div>
-                          <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Close</div>
-                          <div>{preview.sections.close}</div>
-                        </div>
-                      )}
+                  {mode === 'VARIABLES' && extractedVariables.length > 0 && (
+                    <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
+                      <div className="mb-2 text-xs font-semibold uppercase text-blue-700">Detected Variables</div>
+                      <div className="space-y-2">
+                        {extractedVariables.map((variable) => (
+                          <div key={variable.name} className="flex items-start gap-2 text-sm">
+                            <span className="inline-block rounded bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-800">
+                              {`{{${variable.name}}}`}
+                            </span>
+                            <span className="text-gray-600">{variable.description}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {mode !== 'VARIABLES' && (preview.sections.opening || preview.sections.context) && (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
+                      <div className="space-y-3 text-sm text-gray-800">
+                        {preview.sections.opening && (
+                          <div>
+                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Opening</div>
+                            <div>{preview.sections.opening}</div>
+                          </div>
+                        )}
+                        {preview.sections.context && (
+                          <div>
+                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Context</div>
+                            <div>{preview.sections.context}</div>
+                          </div>
+                        )}
+                        {preview.sections.releaseValve && (
+                          <div>
+                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Release Valve</div>
+                            <div>{preview.sections.releaseValve}</div>
+                          </div>
+                        )}
+                        {preview.sections.close && (
+                          <div>
+                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Close</div>
+                            <div>{preview.sections.close}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="rounded-md border border-gray-200 bg-white p-4">
-                    <div className="mb-2 text-xs font-semibold uppercase text-gray-500">Full Message</div>
-                    <div className="text-sm text-gray-800 whitespace-pre-wrap">{preview.content}</div>
+                    <div className="mb-2 text-xs font-semibold uppercase text-gray-500">
+                      {mode === 'VARIABLES' ? 'Template with Variables' : 'Full Message'}
+                    </div>
+                    <div className="text-sm text-gray-800 whitespace-pre-wrap font-mono" style={{ fontFamily: mode === 'VARIABLES' ? 'monospace' : 'inherit' }}>
+                      {preview.content}
+                    </div>
                   </div>
 
                   {templateBaseId && (
@@ -802,7 +855,9 @@ export default function TemplateBuildPage() {
                 <div className="rounded-md border border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
                   {templateBaseId
                     ? 'Click "Refresh Preview" to generate the message'
-                    : 'Fill in the form and click "Build Template" to see a preview'}
+                    : mode === 'VARIABLES'
+                      ? 'Fill in the form and click "Generate Template" to create a template with variable tags'
+                      : 'Fill in the form and click "Build Template" to see a preview'}
                 </div>
               )}
             </div>

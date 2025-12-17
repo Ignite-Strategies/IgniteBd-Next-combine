@@ -1092,14 +1092,39 @@ model template_bases {
 }
 
 model outreach_templates {
-  id             String         @id @default(uuid())
-  templateBaseId String
-  content        String
-  mode           String // 'MANUAL' | 'AI'
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  template_bases template_bases @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
+  id                  String                        @id @default(uuid())
+  templateBaseId      String
+  content             String
+  mode                String // 'MANUAL' | 'AI'
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+  template_bases      template_bases                @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
+  template_variables  template_variables[]
 
   @@index([templateBaseId])
   @@index([createdAt])
+}
+
+model template_variables {
+  id                 String              @id @default(uuid())
+  outreachTemplateId String
+  variableName       String // e.g., 'firstName', 'companyName', 'timeSinceConnected'
+  variableType       TemplateVariableType
+  defaultValue       String? // Optional default if data not available
+  isRequired         Boolean             @default(true)
+  description        String? // Help text for what this variable represents
+  createdAt          DateTime            @default(now())
+  outreach_templates outreach_templates  @relation(fields: [outreachTemplateId], references: [id], onDelete: Cascade)
+
+  @@unique([outreachTemplateId, variableName])
+  @@index([outreachTemplateId])
+}
+
+enum TemplateVariableType {
+  TEXT           // firstName, lastName, companyName
+  DATE           // lastContactDate, startDate
+  TIME_DURATION  // timeSinceConnected (e.g., "2 years")
+  BOOLEAN        // knowledgeOfBusiness (yes/no)
+  ENUM           // timeHorizon (e.g., "2025", "2026")
+  CUSTOM         // Any other custom field
 }

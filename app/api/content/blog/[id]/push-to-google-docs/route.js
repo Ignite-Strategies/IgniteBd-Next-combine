@@ -61,6 +61,7 @@ export async function POST(request, { params }) {
     }
 
     // Initialize Google Auth
+    console.log('🔐 Initializing Google Auth...');
     const auth = await initializeGoogleAuth();
     if (!auth) {
       return NextResponse.json(
@@ -68,10 +69,12 @@ export async function POST(request, { params }) {
         { status: 500 },
       );
     }
+    console.log('✅ Google Auth initialized');
 
     // Get Google Drive and Docs clients
     const drive = getGoogleDriveClient();
     const docs = getGoogleDocsClient();
+    console.log('✅ Google Drive and Docs clients ready');
 
     // Prepare document content
     const documentTitle = blog.title || 'Untitled Blog';
@@ -103,17 +106,26 @@ export async function POST(request, { params }) {
     }
 
     // Create the document using Drive API (service accounts can create files they own)
+    // Optional: Specify parent folder to avoid filling service account's root Drive
+    const parentFolderId = process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID;
+    
+    console.log(`📄 Creating Google Doc: "${documentTitle}"${parentFolderId ? ` in folder ${parentFolderId}` : ' in service account root'}`);
+    
     const createResponse = await drive.files.create({
       requestBody: {
         name: documentTitle,
         mimeType: 'application/vnd.google-apps.document',
+        // If parent folder is configured, use it; otherwise, doc goes to service account root
+        ...(parentFolderId ? { parents: [parentFolderId] } : {}),
       },
       fields: 'id',
     });
-
+    
     const documentId = createResponse.data.id;
+    console.log(`✅ Document created with ID: ${documentId}`);
 
     // Make the document accessible (anyone with the link can view)
+    console.log('🔓 Setting document permissions...');
     await drive.permissions.create({
       fileId: documentId,
       requestBody: {
@@ -121,6 +133,7 @@ export async function POST(request, { params }) {
         type: 'anyone',
       },
     });
+    console.log('✅ Document permissions set');
 
     // Build batch update requests
     const requests = [];
@@ -167,22 +180,26 @@ export async function POST(request, { params }) {
 
     // Batch update the document with content and formatting
     if (requests.length > 0) {
+      console.log(`📝 Applying ${requests.length} formatting updates to document...`);
       await docs.documents.batchUpdate({
         documentId,
         requestBody: {
           requests,
         },
       });
+      console.log('✅ Document content and formatting applied');
     }
 
     // Get the document URL
     const documentUrl = `https://docs.google.com/document/d/${documentId}/edit`;
 
     // Save the Google Doc URL to the blog record
+    console.log('💾 Saving Google Doc URL to database...');
     await prisma.blogs.update({
       where: { id },
       data: { googleDocUrl: documentUrl },
     });
+    console.log(`✅ Blog export complete: ${documentUrl}`);
 
     return NextResponse.json({
       success: true,
@@ -192,11 +209,41 @@ export async function POST(request, { params }) {
     });
   } catch (error) {
     console.error('❌ Push to Google Docs error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      errors: error.errors,
+      response: error.response?.data,
+      stack: error.stack,
+    });
+    
+    // Check if it's a storage quota error
+    const isStorageError = error.message?.includes('storageQuotaExceeded') || 
+                          error.message?.includes('storage exceeded') ||
+                          (error.code === 403 && error.errors?.[0]?.reason === 'storageQuotaExceeded');
+    
+    if (isStorageError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Google Drive storage limit exceeded',
+          details: 'The service account Drive storage is full. Please configure GOOGLE_DRIVE_BLOG_FOLDER_ID to use a shared folder with more space.',
+          errorType: 'STORAGE_QUOTA_EXCEEDED',
+          rawError: error.message,
+        },
+        { status: 507 }, // 507 Insufficient Storage
+      );
+    }
+    
+    // Return detailed error for debugging
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to push blog to Google Docs',
         details: error.message,
+        errorCode: error.code,
+        errorReason: error.errors?.[0]?.reason,
+        fullError: process.env.NODE_ENV === 'development' ? error.toString() : undefined,
       },
       { status: 500 },
     );
