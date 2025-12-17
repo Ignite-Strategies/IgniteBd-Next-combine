@@ -8,6 +8,10 @@ import { getGoogleDocsClient, getGoogleDriveClient, initializeGoogleAuth } from 
  * Push a blog to Google Docs
  */
 export async function POST(request, { params }) {
+  console.log('🚨🚨🚨 ADAM TEST - EXPORT ROUTE CALLED - NEW CODE IS RUNNING 🚨🚨🚨');
+  console.log('🚨 Git commit: 7969109');
+  console.log('🚨 Time:', new Date().toISOString());
+  
   let firebaseUser;
   let owner;
 
