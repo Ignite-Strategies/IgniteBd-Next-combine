@@ -115,22 +115,100 @@ export async function POST(request, { params }) {
     
     console.log('🔍 DEBUG: process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID =', process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID);
     console.log('🔍 DEBUG: Using parentFolderId =', parentFolderId);
-    console.log(`📄 Creating Google Doc: "${documentTitle}"${parentFolderId ? ` in folder ${parentFolderId}` : ' in service account root'}`);
     
+    // 5️⃣ PREFLIGHT: Check folder access before creating
+    console.log(`🔍 PREFLIGHT: Checking access to folder ${parentFolderId}...`);
+    try {
+      const folderCheck = await drive.files.get({
+        fileId: parentFolderId,
+        fields: 'id, name, parents, driveId, capabilities, owners(emailAddress)',
+        supportsAllDrives: true,
+      });
+      
+      console.log('✅ PREFLIGHT: Folder access confirmed:', {
+        folderId: folderCheck.data.id,
+        folderName: folderCheck.data.name,
+        folderParents: folderCheck.data.parents,
+        folderDriveId: folderCheck.data.driveId,
+        folderOwners: folderCheck.data.owners,
+        capabilities: folderCheck.data.capabilities,
+      });
+      
+      if (folderCheck.data.driveId) {
+        console.log('📁 Folder is in a Shared Drive:', folderCheck.data.driveId);
+      } else {
+        console.log('📁 Folder is in My Drive (not a Shared Drive)');
+      }
+    } catch (folderError) {
+      console.error('❌ PREFLIGHT FAILED: Cannot access folder:', {
+        folderId: parentFolderId,
+        error: folderError.message,
+        code: folderError.code,
+        errors: folderError.errors,
+      });
+      
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid or inaccessible parent folder',
+          details: `Cannot access folder ${parentFolderId}. The service account may not have permission.`,
+          folderId: parentFolderId,
+          errorCode: folderError.code,
+          errorDetails: folderError.message,
+        },
+        { status: 400 },
+      );
+    }
+    
+    console.log(`📄 Creating Google Doc: "${documentTitle}" in folder ${parentFolderId}`);
+    
+    // 1️⃣ WIDEN: Request full diagnostic metadata
+    // 2️⃣ SUPPORT SHARED DRIVES: Add supportsAllDrives
     const createResponse = await drive.files.create({
       requestBody: {
         name: documentTitle,
         mimeType: 'application/vnd.google-apps.document',
-        // If parent folder is configured, use it; otherwise, doc goes to service account root
-        parents: [parentFolderId], // Always use the folder (hardcoded or env)
+        parents: [parentFolderId],
       },
-      fields: 'id',
+      fields: 'id, name, parents, owners(emailAddress), driveId, createdTime',
+      supportsAllDrives: true,
     });
     
-    const documentId = createResponse.data.id;
-    console.log(`✅ Document created with ID: ${documentId}`);
+    const file = createResponse.data;
+    console.log('✅ Drive API Response:', {
+      documentId: file.id,
+      documentName: file.name,
+      actualParents: file.parents,
+      owners: file.owners,
+      driveId: file.driveId,
+      createdTime: file.createdTime,
+    });
+    
+    // 3️⃣ HARD ASSERTION: Verify Google honored the parent folder
+    if (!file.parents || !file.parents.includes(parentFolderId)) {
+      console.error('❌ ASSERTION FAILED: Google Drive ignored parent folder!', {
+        expectedParent: parentFolderId,
+        actualParents: file.parents,
+        documentId: file.id,
+      });
+      
+      throw new Error(
+        `Drive ignored parent folder. Expected ${parentFolderId}, got ${JSON.stringify(file.parents)}`
+      );
+    }
+    console.log('✅ ASSERTION PASSED: Document created in correct folder');
+    
+    // 4️⃣ LOG WHICH DRIVE WAS USED
+    if (file.driveId) {
+      console.log('📁 Document created in SHARED DRIVE:', file.driveId);
+    } else {
+      console.log('📁 Document created in MY DRIVE (service account personal drive)');
+    }
+    
+    const documentId = file.id;
 
     // Make the document accessible (anyone with the link can view)
+    // 2️⃣ SUPPORT SHARED DRIVES: Add supportsAllDrives
     console.log('🔓 Setting document permissions...');
     await drive.permissions.create({
       fileId: documentId,
@@ -138,6 +216,7 @@ export async function POST(request, { params }) {
         role: 'writer',
         type: 'anyone',
       },
+      supportsAllDrives: true,
     });
     console.log('✅ Document permissions set');
 
@@ -214,10 +293,12 @@ export async function POST(request, { params }) {
       message: 'Blog pushed to Google Docs successfully',
     });
   } catch (error) {
+    // 6️⃣ IMPROVED ERROR SURFACING: Always log full details
     console.error('❌ Push to Google Docs error:', error);
-    console.error('Error details:', {
+    console.error('🔍 FULL ERROR DETAILS:', {
       message: error.message,
       code: error.code,
+      status: error.status,
       errors: error.errors,
       response: error.response?.data,
       stack: error.stack,
@@ -229,19 +310,34 @@ export async function POST(request, { params }) {
                           (error.code === 403 && error.errors?.[0]?.reason === 'storageQuotaExceeded');
     
     if (isStorageError) {
+      console.error('🚨 STORAGE QUOTA ERROR DETECTED');
+      console.error('🔍 This means Google Drive rejected the request due to storage limits');
+      console.error('🔍 Check the logs above to see which Drive was used');
+      
       return NextResponse.json(
         {
           success: false,
           error: 'Google Drive storage limit exceeded',
-          details: 'The service account Drive storage is full. Please configure GOOGLE_DRIVE_BLOG_FOLDER_ID to use a shared folder with more space.',
+          details: 'The Drive storage quota has been exceeded. Check server logs for which Drive was used.',
           errorType: 'STORAGE_QUOTA_EXCEEDED',
           rawError: error.message,
+          errorCode: error.code,
+          errorReason: error.errors?.[0]?.reason,
+          // Show full error in development
+          ...(process.env.NODE_ENV === 'development' && {
+            fullErrorDetails: {
+              message: error.message,
+              code: error.code,
+              errors: error.errors,
+              response: error.response?.data,
+            },
+          }),
         },
         { status: 507 }, // 507 Insufficient Storage
       );
     }
     
-    // Return detailed error for debugging
+    // Return detailed error for debugging (6️⃣)
     return NextResponse.json(
       {
         success: false,
@@ -249,9 +345,18 @@ export async function POST(request, { params }) {
         details: error.message,
         errorCode: error.code,
         errorReason: error.errors?.[0]?.reason,
-        fullError: process.env.NODE_ENV === 'development' ? error.toString() : undefined,
+        errorStatus: error.status,
+        // Show full error details in development
+        ...(process.env.NODE_ENV === 'development' && {
+          fullErrorDetails: {
+            message: error.message,
+            code: error.code,
+            errors: error.errors,
+            response: error.response?.data,
+          },
+        }),
       },
-      { status: 500 },
+      { status: error.status || 500 },
     );
   }
 }
