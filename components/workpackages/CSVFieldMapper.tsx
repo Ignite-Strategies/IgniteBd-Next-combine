@@ -36,7 +36,7 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   useEffect(() => {
     if (!initialMappings && csvHeaders.length > 0) {
       // Auto-generate initial mappings
-      const autoMappings = generateMappings(csvHeaders);
+      const autoMappings = generateMappings(csvHeaders) as Record<string, string>;
       setMappings(autoMappings);
       if (onMappingsChange) {
         onMappingsChange(autoMappings);
