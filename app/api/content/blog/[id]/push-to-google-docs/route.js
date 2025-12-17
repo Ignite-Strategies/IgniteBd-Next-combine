@@ -76,22 +76,15 @@ export async function POST(request, { params }) {
     // Prepare document content
     const documentTitle = blog.title || 'Untitled Blog';
     
-    // Build full text content
+    // 1️⃣ Build simple text content (no index math, no formatting)
     let fullText = '';
-    let titleStart = 1;
-    let titleEnd = 1;
-    let subtitleStart = -1;
-    let subtitleEnd = -1;
     
     // Title
     fullText += documentTitle + '\n';
-    titleEnd = documentTitle.length + 1;
     
     // Subtitle (if exists)
     if (blog.subtitle) {
-      subtitleStart = fullText.length + 1;
       fullText += blog.subtitle + '\n\n';
-      subtitleEnd = fullText.length;
     } else {
       fullText += '\n';
     }
@@ -101,6 +94,9 @@ export async function POST(request, { params }) {
       const blogText = blog.blogText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       fullText += blogText;
     }
+    
+    // 4️⃣ Ensure text is safe (non-empty)
+    const safeText = fullText || ' ';
 
     // MVP: Create doc in restricted folder (no public permissions)
     const parentFolderId = process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID || '1khO3ytWyY9GUscxSyKPNhG35qRXVFtuT';
@@ -121,58 +117,20 @@ export async function POST(request, { params }) {
     const documentId = createResponse.data.id;
     console.log(`✅ Document created: ${documentId}`);
 
-    // Build batch update requests
-    const requests = [];
-    
-    // Insert all text at once
-    if (fullText) {
-      requests.push({
-        insertText: {
-          location: { index: 1 },
-          text: fullText,
-        },
-      });
-    }
-    
-    // Apply title formatting (HEADING_1)
-    requests.push({
-      updateParagraphStyle: {
-        range: {
-          startIndex: titleStart,
-          endIndex: titleEnd,
-        },
-        paragraphStyle: {
-          namedStyleType: 'HEADING_1',
-        },
-        fields: 'namedStyleType',
+    // 1️⃣ MINIMAL DOCS API: Single insertText operation only
+    await docs.documents.batchUpdate({
+      documentId,
+      requestBody: {
+        requests: [
+          {
+            insertText: {
+              location: { index: 1 },
+              text: safeText,
+            },
+          },
+        ],
       },
     });
-    
-    // Apply subtitle formatting (HEADING_2) if exists
-    if (subtitleStart > 0 && subtitleEnd > 0) {
-      requests.push({
-        updateParagraphStyle: {
-          range: {
-            startIndex: subtitleStart,
-            endIndex: subtitleEnd,
-          },
-          paragraphStyle: {
-            namedStyleType: 'HEADING_2',
-          },
-          fields: 'namedStyleType',
-        },
-      });
-    }
-
-    // Batch update the document with content and formatting
-    if (requests.length > 0) {
-      await docs.documents.batchUpdate({
-        documentId,
-        requestBody: {
-          requests,
-        },
-      });
-    }
 
     // Get the document URL
     const documentUrl = `https://docs.google.com/document/d/${documentId}/edit`;
