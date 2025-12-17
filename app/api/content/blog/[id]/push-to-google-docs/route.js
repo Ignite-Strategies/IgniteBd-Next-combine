@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { getGoogleDocsClient, getGoogleDriveClient, initializeGoogleAuth } from '@/lib/googleServiceAccount';
+import { initializeGoogleAuth } from '@/lib/googleServiceAccount';
+import { assembleAndCreateGoogleDoc } from '@/lib/services/googleDocAssemblyService';
 
 /**
  * POST /api/content/blog/[id]/push-to-google-docs
@@ -61,90 +62,39 @@ export async function POST(request, { params }) {
     }
 
     // Initialize Google Auth
-    const auth = await initializeGoogleAuth();
-    if (!auth) {
+    const authClient = await initializeGoogleAuth();
+    if (!authClient) {
       return NextResponse.json(
         { success: false, error: 'Google service account not configured' },
         { status: 500 },
       );
     }
 
-    // Get Google Drive and Docs clients
-    const drive = getGoogleDriveClient();
-    const docs = getGoogleDocsClient();
-
-    // Prepare document content
-    const documentTitle = blog.title || 'Untitled Blog';
-    
-    // 1️⃣ Build simple text content (no index math, no formatting)
-    let fullText = '';
-    
-    // Title
-    fullText += documentTitle + '\n';
-    
-    // Subtitle (if exists)
-    if (blog.subtitle) {
-      fullText += blog.subtitle + '\n\n';
-    } else {
-      fullText += '\n';
-    }
-    
-    // Blog text content
-    if (blog.blogText) {
-      const blogText = blog.blogText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      fullText += blogText;
-    }
-    
-    // 4️⃣ Ensure text is safe (non-empty)
-    const safeText = fullText || ' ';
-
-    // MVP: Create doc in restricted folder (no public permissions)
+    // Get parent folder ID
     const parentFolderId = process.env.GOOGLE_DRIVE_BLOG_FOLDER_ID || '1khO3ytWyY9GUscxSyKPNhG35qRXVFtuT';
     
-    console.log(`📄 Creating Google Doc: "${documentTitle}"`);
-    
-    // 2️⃣ MINIMAL + SAFE: Just create the doc
-    const createResponse = await drive.files.create({
-      requestBody: {
-        name: documentTitle,
-        mimeType: 'application/vnd.google-apps.document',
-        parents: [parentFolderId],
+    // 🧩 ORCHESTRATION: Call assembly service
+    const result = await assembleAndCreateGoogleDoc(
+      {
+        title: blog.title,
+        subtitle: blog.subtitle,
+        body: blog.blogText,
+        parentFolderId,
       },
-      supportsAllDrives: true,
-      fields: 'id',
-    });
-    
-    const documentId = createResponse.data.id;
-    console.log(`✅ Document created: ${documentId}`);
-
-    // 1️⃣ MINIMAL DOCS API: Single insertText operation only
-    await docs.documents.batchUpdate({
-      documentId,
-      requestBody: {
-        requests: [
-          {
-            insertText: {
-              location: { index: 1 },
-              text: safeText,
-            },
-          },
-        ],
-      },
-    });
-
-    // Get the document URL
-    const documentUrl = `https://docs.google.com/document/d/${documentId}/edit`;
+      authClient,
+    );
 
     // Save the Google Doc URL to the blog record
     await prisma.blogs.update({
       where: { id },
-      data: { googleDocUrl: documentUrl },
+      data: { googleDocUrl: result.documentUrl },
     });
 
     return NextResponse.json({
       success: true,
-      documentId,
-      documentUrl,
+      documentId: result.documentId,
+      documentUrl: result.documentUrl,
+      textLength: result.textLength,
       message: 'Blog pushed to Google Docs successfully',
     });
   } catch (error) {
