@@ -330,13 +330,12 @@ export async function POST(request) {
             }
           }
 
-          // Associate company to contact
+          // Associate company to contact (ONLY set contactCompanyId - the FK)
           if (companyId) {
             await prisma.contact.update({
               where: { id: contact.id },
               data: {
-                companyId,
-                contactCompanyId: companyId, // Legacy field
+                contactCompanyId: companyId, // Only set the FK, not companyId (enrichment field)
               },
             });
           }

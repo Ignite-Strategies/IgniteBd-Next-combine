@@ -206,13 +206,15 @@ export async function PUT(request, { params }) {
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (title !== undefined) updateData.title = title;
-    // Prefer companyId over contactCompanyId
+    // Use contactCompanyId as the FK (companyId is enrichment data only)
     if (companyId !== undefined) {
-      updateData.companyId = companyId;
-      updateData.contactCompanyId = companyId; // Also set legacy field for backward compatibility
+      // If companyId is provided, use it as contactCompanyId (the FK)
+      updateData.contactCompanyId = companyId;
+      // Don't set companyId - it's enrichment data only
     } else if (contactCompanyId !== undefined) {
-      updateData.companyId = contactCompanyId;
+      // If contactCompanyId is provided directly, use it
       updateData.contactCompanyId = contactCompanyId;
+      // Don't set companyId - it's enrichment data only
     }
     if (buyerDecision !== undefined) updateData.buyerDecision = buyerDecision;
     if (howMet !== undefined) updateData.howMet = howMet;
