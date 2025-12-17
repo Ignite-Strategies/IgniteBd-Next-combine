@@ -102,66 +102,30 @@ export default function ContactSelector({
         }
         
         // Fetch from API to get latest data
-        // If companyId is provided, filter contacts by that company
+        // If companyId is provided, pass it to API for server-side filtering
         let apiUrl = `/api/contacts?companyHQId=${finalCompanyHQId}`;
-        console.log('🔍 ContactSelector: Fetching from API:', apiUrl, 'with companyId filter:', companyId);
+        if (companyId) {
+          apiUrl += `&companyId=${encodeURIComponent(companyId)}`;
+        }
+        console.log('🔍 ContactSelector: Fetching from API:', apiUrl);
         const response = await api.get(apiUrl);
         if (response.data?.success && response.data.contacts) {
           let fetched = response.data.contacts;
-          console.log('✅ ContactSelector: Received', fetched.length, 'contacts from API');
+          console.log('✅ ContactSelector: Received', fetched.length, 'contacts from API', 
+            companyId ? `(filtered by companyId: ${companyId})` : '(all contacts)');
           
-          // Filter by companyId if provided
-          if (companyId) {
-            console.log('🔍 FILTERING contacts by companyId:', companyId);
-            console.log('🔍 Total contacts before filter:', fetched.length);
-            
-            // Log first 5 contacts to see their structure
-            console.log('📋 First 5 contacts structure:', fetched.slice(0, 5).map(c => ({
+          // API now filters by companyId server-side, so no client-side filtering needed
+          // But log the results for debugging
+          if (companyId && fetched.length === 0) {
+            console.warn('⚠️⚠️⚠️ NO CONTACTS FOUND for companyId:', companyId);
+            console.warn('⚠️ This means no contacts have contactCompanyId matching:', companyId);
+          } else if (companyId && fetched.length > 0) {
+            console.log('✅ Found', fetched.length, 'contacts for companyId:', companyId);
+            console.log('📋 Contacts:', fetched.slice(0, 5).map(c => ({
               name: `${c.firstName} ${c.lastName}`,
-              contactCompanyId: c.contactCompanyId,
-              contactCompanyId: c.contactCompany?.id,
-              companiesId: c.companies?.id,
-              hasContactCompany: !!c.contactCompany,
-              hasCompanies: !!c.companies,
-              companyName: c.contactCompany?.companyName || c.companies?.companyName
+              email: c.email,
+              contactCompanyId: c.contactCompanyId
             })));
-            
-            const filtered = fetched.filter(contact => {
-              const matches = contact.contactCompanyId === companyId || 
-                     contact.contactCompany?.id === companyId ||
-                     contact.companies?.id === companyId;
-              
-              if (matches) {
-                console.log('✅ MATCH:', `${contact.firstName} ${contact.lastName}`, {
-                  contactCompanyId: contact.contactCompanyId,
-                  contactCompanyId: contact.contactCompany?.id,
-                  companiesId: contact.companies?.id
-                });
-              }
-              
-              return matches;
-            });
-            
-            console.log('🔍 Total contacts after filter:', filtered.length);
-            
-            // If filtering returns 0 results, show warning but still use empty array
-            // (don't fall back to all contacts - user needs to select correct company)
-            if (filtered.length === 0 && fetched.length > 0) {
-              console.warn('⚠️⚠️⚠️ NO CONTACTS FOUND for companyId:', companyId);
-              console.warn('⚠️ All contacts have these companyIds:', 
-                fetched.slice(0, 10).map(c => ({
-                  name: `${c.firstName} ${c.lastName}`,
-                  contactCompanyId: c.contactCompanyId,
-                  contactCompanyId: c.contactCompany?.id,
-                  companiesId: c.companies?.id,
-                  email: c.email
-                }))
-              );
-            }
-            
-            fetched = filtered;
-          } else {
-            console.log('ℹ️ No companyId filter - showing all', fetched.length, 'contacts');
           }
           
           setContacts(fetched);

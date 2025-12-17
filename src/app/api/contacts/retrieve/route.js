@@ -32,6 +32,7 @@ export async function GET(request) {
     const contactId = searchParams.get('contactId');
     const pipeline = searchParams.get('pipeline');
     const stage = searchParams.get('stage');
+    const companyId = searchParams.get('companyId'); // Filter by client company ID
 
     // Single contact retrieval by ID
     if (contactId) {
@@ -133,6 +134,12 @@ export async function GET(request) {
     const where = {
       crmId: companyHQId,
     };
+
+    // Filter by client company ID if provided
+    if (companyId) {
+      where.contactCompanyId = companyId;
+      console.log('🔍 Filtering contacts by companyId:', companyId);
+    }
 
     // Filter by pipeline/stage if provided
     if (pipeline || stage) {
