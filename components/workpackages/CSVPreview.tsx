@@ -3,12 +3,42 @@
 import { Package } from 'lucide-react';
 import { getItemTypeLabel } from '@/lib/config/workPackageConfig';
 
+interface WorkPackage {
+  title?: string;
+  description?: string | null;
+  totalCost?: number | null;
+  effectiveStartDate?: string | null;
+}
+
+interface PhaseItem {
+  deliverableLabel: string;
+  deliverableType: string;
+  deliverableDescription?: string | null;
+  quantity: number;
+  estimatedHoursEach: number;
+  unitOfMeasure?: string;
+  status?: string;
+}
+
+interface Phase {
+  name: string;
+  position: number;
+  description?: string | null;
+  items: PhaseItem[];
+  totalEstimatedHours?: number;
+}
+
+interface CSVPreviewProps {
+  workPackage: WorkPackage;
+  phases: Phase[];
+}
+
 /**
  * CSV Preview Component
  * Shows fully-hydrated WorkPackage preview using same UI as production
  */
-export default function CSVPreview({ workPackage, phases }) {
-  const getStatusColor = (status) => {
+export default function CSVPreview({ workPackage, phases }: CSVPreviewProps) {
+  const getStatusColor = (status?: string): string => {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800';
@@ -19,7 +49,7 @@ export default function CSVPreview({ workPackage, phases }) {
     }
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status?: string): string => {
     switch (status) {
       case 'completed':
         return 'Complete';
@@ -28,7 +58,7 @@ export default function CSVPreview({ workPackage, phases }) {
       case 'not_started':
         return 'Not Started';
       default:
-        return status;
+        return status || 'Unknown';
     }
   };
 
@@ -133,4 +163,3 @@ export default function CSVPreview({ workPackage, phases }) {
     </div>
   );
 }
-

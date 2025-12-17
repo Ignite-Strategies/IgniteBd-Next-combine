@@ -1,17 +1,67 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, ChevronLeft, Upload, Map, Eye, CheckCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Upload, Map, Eye, CheckCircle, LucideIcon } from 'lucide-react';
 import CSVFieldMapper from './CSVFieldMapper';
 import CSVPreview from './CSVPreview';
 import { transformRows, groupIntoPhases, validateMappings } from '@/lib/services/workPackageCsvMapper';
 
-const STEPS = [
+interface Step {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  phase: number;
+}
+
+const STEPS: Step[] = [
   { id: 'upload', label: 'Upload CSV', icon: Upload, phase: 1 },
   { id: 'map', label: 'Map Fields', icon: Map, phase: 1 },
   { id: 'preview', label: 'Preview Data', icon: Eye, phase: 2 },
   { id: 'create', label: 'Confirm & Save', icon: CheckCircle, phase: 2 },
 ];
+
+interface WorkPackage {
+  title?: string;
+  description?: string | null;
+  totalCost?: number | null;
+  effectiveStartDate?: string | null;
+}
+
+interface PhaseItem {
+  deliverableLabel: string;
+  deliverableType: string;
+  deliverableDescription?: string | null;
+  quantity: number;
+  estimatedHoursEach: number;
+  unitOfMeasure?: string;
+  status?: string;
+}
+
+interface Phase {
+  name: string;
+  position: number;
+  description?: string | null;
+  items: PhaseItem[];
+  totalEstimatedHours?: number;
+}
+
+interface PreviewData {
+  workPackage: WorkPackage;
+  phases: Phase[];
+}
+
+interface CSVImportWizardProps {
+  csvHeaders: string[];
+  csvRows: Record<string, string>[];
+  onComplete?: (data: {
+    workPackage: WorkPackage;
+    phases: Phase[];
+    transformedRows: any[];
+    mappings: Record<string, string>;
+  }) => Promise<void>;
+  contactId?: string;
+  companyId?: string;
+}
 
 /**
  * CSV Import Wizard Component
@@ -23,10 +73,10 @@ export default function CSVImportWizard({
   onComplete,
   contactId,
   companyId 
-}) {
+}: CSVImportWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [mappings, setMappings] = useState({});
-  const [previewData, setPreviewData] = useState(null);
+  const [mappings, setMappings] = useState<Record<string, string>>({});
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const step = STEPS[currentStep];
@@ -77,14 +127,14 @@ export default function CSVImportWizard({
     }
   };
 
-  const canProceed = () => {
+  const canProceed = (): boolean => {
     switch (currentStep) {
       case 0: // Upload
         return csvHeaders && csvHeaders.length > 0;
       case 1: // Map
-        return validation && validation.isValid;
+        return validation ? validation.isValid : false;
       case 2: // Preview
-        return previewData && previewData.phases.length > 0;
+        return previewData ? previewData.phases.length > 0 : false;
       case 3: // Create
         return true;
       default:
@@ -336,4 +386,3 @@ export default function CSVImportWizard({
     </div>
   );
 }
-

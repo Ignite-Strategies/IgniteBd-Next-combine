@@ -4,15 +4,34 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { getAllSystemFields, generateMappings, validateMappings } from '@/lib/services/workPackageCsvMapper';
 
+interface ValidationResult {
+  errors: string[];
+  warnings: string[];
+  isValid: boolean;
+}
+
+interface SystemField {
+  key: string;
+  label: string;
+  required: boolean;
+  category: string;
+}
+
+interface CSVFieldMapperProps {
+  csvHeaders: string[];
+  initialMappings?: Record<string, string>;
+  onMappingsChange?: (mappings: Record<string, string>) => void;
+}
+
 /**
  * CSV Field Mapper Component
  * Allows users to map CSV columns to system fields
  */
-export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappingsChange }) {
-  const [mappings, setMappings] = useState(initialMappings || {});
-  const [validation, setValidation] = useState(null);
+export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappingsChange }: CSVFieldMapperProps) {
+  const [mappings, setMappings] = useState<Record<string, string>>(initialMappings || {});
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
   
-  const systemFields = getAllSystemFields();
+  const systemFields = getAllSystemFields() as SystemField[];
 
   useEffect(() => {
     if (!initialMappings && csvHeaders.length > 0) {
@@ -23,31 +42,31 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
         onMappingsChange(autoMappings);
       }
     }
-  }, [csvHeaders]);
+  }, [csvHeaders, initialMappings, onMappingsChange]);
 
   useEffect(() => {
     if (Object.keys(mappings).length > 0) {
-      const validation = validateMappings(mappings, csvHeaders);
-      setValidation(validation);
+      const validationResult = validateMappings(mappings, csvHeaders);
+      setValidation(validationResult);
       if (onMappingsChange) {
         onMappingsChange(mappings);
       }
     }
-  }, [mappings]);
+  }, [mappings, csvHeaders, onMappingsChange]);
 
-  const handleMappingChange = (csvHeader, systemField) => {
+  const handleMappingChange = (csvHeader: string, systemField: string) => {
     setMappings(prev => ({
       ...prev,
       [csvHeader]: systemField,
     }));
   };
 
-  const getFieldCategory = (systemFieldKey) => {
+  const getFieldCategory = (systemFieldKey: string): string => {
     const field = systemFields.find(f => f.key === systemFieldKey);
     return field?.category || 'other';
   };
 
-  const getCategoryColor = (category) => {
+  const getCategoryColor = (category: string): string => {
     switch (category) {
       case 'workPackage':
         return 'bg-blue-50 border-blue-200 text-blue-800';
@@ -193,4 +212,3 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
     </div>
   );
 }
-

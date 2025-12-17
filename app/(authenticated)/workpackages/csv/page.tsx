@@ -6,8 +6,25 @@ import PageHeader from '@/components/PageHeader.jsx';
 import CompanySelector from '@/components/CompanySelector.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import CSVImportWizard from '@/components/workpackages/CSVImportWizard';
-import { Upload, FileText, CheckCircle, AlertCircle, Download, Building2, Users } from 'lucide-react';
+import { Upload, AlertCircle, Download, Building2, Users } from 'lucide-react';
 import api from '@/lib/api';
+
+interface Company {
+  id: string;
+  companyName: string;
+}
+
+interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
+interface ParsedCSV {
+  headers: string[];
+  rows: Record<string, string>[];
+}
 
 /**
  * Work Package CSV Upload Page
@@ -15,25 +32,25 @@ import api from '@/lib/api';
  */
 function WorkPackageCSVUploadContent() {
   const router = useRouter();
-  const [file, setFile] = useState(null);
-  const [csvHeaders, setCsvHeaders] = useState([]);
-  const [csvRows, setCsvRows] = useState([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [contactId, setContactId] = useState('');
   const [companyId, setCompanyId] = useState('');
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [selectedContact, setSelectedContact] = useState(null);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [showWizard, setShowWizard] = useState(false);
 
   // Parse CSV file (handles quoted fields)
-  const parseCSV = (text) => {
+  const parseCSV = (text: string): ParsedCSV => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
     
     // Handle quoted fields
-    const parseLine = (line) => {
-      const result = [];
+    const parseLine = (line: string): string[] => {
+      const result: string[] = [];
       let current = '';
       let inQuotes = false;
       
@@ -55,7 +72,7 @@ function WorkPackageCSVUploadContent() {
     const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/"/g, '').trim());
     const rows = lines.slice(1).map(line => {
       const values = parseLine(line).map(v => v.replace(/^"|"$/g, ''));
-      const row = {};
+      const row: Record<string, string> = {};
       headers.forEach((header, index) => {
         row[header] = values[index] || '';
       });
@@ -66,8 +83,8 @@ function WorkPackageCSVUploadContent() {
   };
 
   // Handle file selection
-  const handleFileSelect = async (e) => {
-    const selectedFile = e.target.files[0];
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
     setFile(selectedFile);
@@ -100,7 +117,12 @@ function WorkPackageCSVUploadContent() {
   };
 
   // Handle wizard completion
-  const handleWizardComplete = async (data) => {
+  const handleWizardComplete = async (data: {
+    workPackage: any;
+    phases: any[];
+    transformedRows: any[];
+    mappings: Record<string, string>;
+  }) => {
     if (!contactId) {
       setError('Please select a client contact first');
       return;
@@ -131,7 +153,7 @@ function WorkPackageCSVUploadContent() {
         // Save to localStorage
         if (typeof window !== 'undefined') {
           const cached = window.localStorage.getItem('workPackages');
-          let workPackages = [];
+          let workPackages: any[] = [];
           if (cached) {
             try {
               workPackages = JSON.parse(cached);
@@ -167,7 +189,7 @@ function WorkPackageCSVUploadContent() {
       } else {
         setError(response.data?.error || 'Failed to create work package');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating work package:', err);
       setError(err.response?.data?.error || 'Failed to create work package');
     } finally {
@@ -221,7 +243,7 @@ function WorkPackageCSVUploadContent() {
             </div>
             <div className="max-w-md">
               <CompanySelector
-                onCompanySelect={(company) => {
+                onCompanySelect={(company: Company | null) => {
                   setSelectedCompany(company);
                   setCompanyId(company?.id || '');
                   // Clear contact selection when company changes
@@ -252,9 +274,11 @@ function WorkPackageCSVUploadContent() {
               <div className="max-w-md">
                 <ContactSelector
                   companyId={companyId}
-                  onContactSelect={(contact, company) => {
+                  onContactSelect={(contact: Contact | null, company?: Company | null) => {
                     setSelectedContact(contact);
-                    setContactId(contact.id);
+                    if (contact) {
+                      setContactId(contact.id);
+                    }
                     // Ensure companyId is set (should already be set from step 1)
                     if (company?.id) {
                       setCompanyId(company.id);
@@ -327,7 +351,7 @@ function WorkPackageCSVUploadContent() {
           </div>
           <div className="max-w-md">
             <CompanySelector
-              onCompanySelect={(company) => {
+              onCompanySelect={(company: Company | null) => {
                 setSelectedCompany(company);
                 setCompanyId(company?.id || '');
                 // Clear contact selection when company changes
@@ -358,9 +382,11 @@ function WorkPackageCSVUploadContent() {
             <div className="max-w-md">
               <ContactSelector
                 companyId={companyId}
-                onContactSelect={(contact, company) => {
+                onContactSelect={(contact: Contact | null, company?: Company | null) => {
                   setSelectedContact(contact);
-                  setContactId(contact.id);
+                  if (contact) {
+                    setContactId(contact.id);
+                  }
                   // Ensure companyId is set (should already be set from step 1)
                   if (company?.id) {
                     setCompanyId(company.id);
