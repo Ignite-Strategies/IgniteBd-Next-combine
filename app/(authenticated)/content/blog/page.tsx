@@ -41,6 +41,12 @@ export default function BlogPage() {
             setBlogs(parsed);
             loaded = true;
             console.log('✅ [LOCAL-FIRST] Loaded', parsed.length, 'blogs from localStorage');
+            // Debug: Check for googleDocUrl in loaded blogs
+            const blogsWithGoogleDoc = parsed.filter(b => b.googleDocUrl);
+            console.log(`📊 [LOCAL-FIRST] Found ${blogsWithGoogleDoc.length} blogs with googleDocUrl out of ${parsed.length} total`);
+            parsed.forEach(b => {
+              console.log(`  - "${b.title}": ${b.googleDocUrl ? 'HAS googleDocUrl' : 'NO googleDocUrl'}`, b.googleDocUrl || '');
+            });
           }
         }
       }
@@ -133,6 +139,12 @@ export default function BlogPage() {
         // Log to verify we got full objects
         if (fetchedBlogs.length > 0) {
           console.log('✅ [LOCAL-FIRST] Synced blog sample fields:', Object.keys(fetchedBlogs[0]).join(', '));
+          // Check for googleDocUrl in synced blogs
+          const blogsWithGoogleDoc = fetchedBlogs.filter(b => b.googleDocUrl);
+          console.log(`📊 [LOCAL-FIRST] Found ${blogsWithGoogleDoc.length} blogs with googleDocUrl out of ${fetchedBlogs.length} total`);
+          blogsWithGoogleDoc.forEach(b => {
+            console.log(`  - "${b.title}": ${b.googleDocUrl}`);
+          });
         }
         
         // 🎯 LOCAL-FIRST: Update localStorage (authoritative source)
@@ -357,6 +369,15 @@ export default function BlogPage() {
         ) : (
           <div className="space-y-2">
             {blogs.map((blog) => {
+              // Debug: Log blog data to console (always log for debugging)
+              console.log('📝 Blog data:', {
+                id: blog.id,
+                title: blog.title,
+                hasGoogleDocUrl: !!blog.googleDocUrl,
+                googleDocUrl: blog.googleDocUrl || 'NO googleDocUrl',
+                allKeys: Object.keys(blog),
+              });
+              
               return (
                 <div
                   key={blog.id}
@@ -379,8 +400,12 @@ export default function BlogPage() {
                         <p className="text-xs text-gray-500">
                           Created {formatDate(blog.createdAt)}
                         </p>
-                        {blog.googleDocUrl && (
+                        {blog.googleDocUrl ? (
                           <div className="mt-2 flex items-center gap-2">
+                            <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <span>✓</span>
+                              <span>Google Doc Available</span>
+                            </div>
                             <a
                               href={blog.googleDocUrl}
                               target="_blank"
@@ -421,6 +446,10 @@ export default function BlogPage() {
                                 </>
                               )}
                             </button>
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-xs text-gray-500">
+                            No Google Doc URL (click "Export to Google Docs" to create one)
                           </div>
                         )}
                       </div>
