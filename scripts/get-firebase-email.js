@@ -2,7 +2,7 @@
  * Get email from Firebase UID
  */
 require('dotenv').config({ path: '.env.local' });
-const { admin } = require('../src/lib/firebaseAdmin');
+const { admin } = require('../lib/firebaseAdmin');
 
 async function getEmail(uid) {
   try {
