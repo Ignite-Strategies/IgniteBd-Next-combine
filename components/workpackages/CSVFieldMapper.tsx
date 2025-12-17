@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
-import { getAllSystemFields, generateMappings, validateMappings } from '@/lib/services/workPackageCsvMapper';
+import { getAllSystemFields, generateMappings, validateMappings, fuzzyMatchHeader } from '@/lib/services/workPackageCsvMapper';
 
 interface ValidationResult {
   errors: string[];
@@ -142,30 +142,23 @@ export default function CSVFieldMapper({ csvHeaders, initialMappings, onMappings
   useEffect(() => {
     // Always auto-generate if we have headers and no mappings set yet
     if (csvHeaders.length > 0 && Object.keys(mappings).length === 0) {
-      // Direct hardcoded mappings - CSV headers are exact matches
+      // Use the existing fuzzyMatchHeader function from workPackageCsvMapper
       const autoMappings: Record<string, string> = {};
       
       csvHeaders.forEach((header) => {
-        const hardcoded = getHardcodedMapping(header);
-        if (hardcoded) {
-          autoMappings[header] = hardcoded;
-          console.log(`✅ Mapped "${header}" → "${hardcoded}"`);
-        } else {
-          // Fallback: try fuzzy matching from the mapper service
-          const allMappings = generateMappings(csvHeaders) as Record<string, string>;
-          const fallback = allMappings[header] || 'unmapped';
-          autoMappings[header] = fallback;
-          console.log(`⚠️ No hardcoded match for "${header}", using: "${fallback}"`);
-        }
+        // Use the existing mapper's fuzzyMatchHeader function directly
+        const matched = fuzzyMatchHeader(header);
+        autoMappings[header] = matched || 'unmapped';
+        console.log(`🔍 Mapped "${header}" → "${matched || 'unmapped'}"`);
       });
       
-      console.log('🔍 Final auto-generated mappings:', autoMappings);
+      console.log('✅ Final auto-generated mappings:', autoMappings);
       setMappings(autoMappings);
       if (onMappingsChange) {
         onMappingsChange(autoMappings);
       }
     }
-  }, [csvHeaders, initialMappings, onMappingsChange]);
+  }, [csvHeaders, mappings, onMappingsChange]);
 
   useEffect(() => {
     if (Object.keys(mappings).length > 0) {
