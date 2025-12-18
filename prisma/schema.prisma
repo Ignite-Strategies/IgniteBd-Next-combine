@@ -7,6 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model platform {
+  id           String         @id @default(uuid())
+  name         String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  company_hqs  company_hqs[]
+  super_admins super_admins[]
+}
+
 model assessments {
   id                   String       @id
   ownerId              String
@@ -186,15 +195,13 @@ model company_hqs {
   managerId                                     String?
   companyAnnualRev                              String?
   yearsInBusiness                               String?
-  ultraTenantId                                 String?
+  platformId                                    String?
   assessments                                   assessments[]
   blogs                                         blogs[]
   companies                                     companies[]
   contacts_company_hqs_contactOwnerIdTocontacts Contact?                  @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                   @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
   owners_company_hqs_ownerIdToowners            owners?                   @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
-  company_hqs                                   company_hqs?              @relation("company_hqsTocompany_hqs", fields: [ultraTenantId], references: [id])
-  other_company_hqs                             company_hqs[]             @relation("company_hqsTocompany_hqs")
   company_memberships                           company_memberships[]
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
@@ -210,15 +217,19 @@ model company_hqs {
   proposals                                     proposals[]
   templates                                     templates[]
   template_bases                                template_bases[]
+  platform                                      platform?                 @relation(fields: [platformId], references: [id])
+
+  @@index([platformId])
 }
 
 model company_memberships {
   id          String      @id
-  userId      String
+  userId      String // owner.id (not firebaseId)
   companyHqId String
   role        String
   isPrimary   Boolean     @default(false)
   createdAt   DateTime    @default(now())
+  owners      owners      @relation(fields: [userId], references: [id], onDelete: Cascade)
   company_hqs company_hqs @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyHqId])
@@ -586,8 +597,8 @@ model landing_pages {
 }
 
 model owners {
-  id                                        String             @id
-  firebaseId                                String             @unique
+  id                                        String                @id
+  firebaseId                                String                @unique
   firstName                                 String?
   lastName                                  String?
   name                                      String? // Deprecated: Use firstName and lastName instead
@@ -600,11 +611,12 @@ model owners {
   microsoftEmail                            String?
   microsoftDisplayName                      String?
   microsoftTenantId                         String?
-  createdAt                                 DateTime           @default(now())
+  createdAt                                 DateTime              @default(now())
   updatedAt                                 DateTime
   assessments                               assessments[]
-  company_hqs_company_hqs_managerIdToowners company_hqs[]      @relation("company_hqs_managerIdToowners")
-  company_hqs_company_hqs_ownerIdToowners   company_hqs[]      @relation("company_hqs_ownerIdToowners")
+  company_hqs_company_hqs_managerIdToowners company_hqs[]         @relation("company_hqs_managerIdToowners")
+  company_hqs_company_hqs_ownerIdToowners   company_hqs[]         @relation("company_hqs_ownerIdToowners")
+  company_memberships                       company_memberships[]
   email_activities                          email_activities[]
   super_admins                              super_admins?
   google_oauth_tokens                       GoogleOAuthToken[]
@@ -850,11 +862,15 @@ model saved_events {
 }
 
 model super_admins {
-  id        String   @id
-  ownerId   String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-  owners    owners   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id         String   @id
+  ownerId    String   @unique
+  platformId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  owners     owners   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  platform   platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@index([platformId])
 }
 
 model templates {
@@ -988,14 +1004,14 @@ model GoogleOAuthToken {
   id           String   @id @default(uuid())
   ownerId      String
   provider     String   @default("google")
-  refreshToken String   // TODO: Encrypt in production
-  scopes       String?  // Space-separated scopes
-  email        String?  // Google account email
+  refreshToken String // TODO: Encrypt in production
+  scopes       String? // Space-separated scopes
+  email        String? // Google account email
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
-  owner        owners   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  
+
+  owner owners @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
   @@unique([ownerId, provider])
   @@index([ownerId])
 }
@@ -1092,63 +1108,63 @@ enum TypeOfPersonEnum {
 }
 
 model template_bases {
-  id                 String               @id @default(uuid())
-  companyHQId        String
-  title              String
-  relationship       RelationshipEnum
-  typeOfPerson       TypeOfPersonEnum
-  whyReachingOut     String
-  whatWantFromThem   String?
+  id                    String               @id @default(uuid())
+  companyHQId           String
+  title                 String
+  relationship          RelationshipEnum
+  typeOfPerson          TypeOfPersonEnum
+  whyReachingOut        String
+  whatWantFromThem      String?
   // Template-specific context fields (user inputs during template creation)
-  timeSinceConnected String? // e.g., "a long time", "2 years", "a while"
-  timeHorizon        String? // e.g., "2026", "Q1 2025", "soon"
-  knowledgeOfBusiness Boolean? @default(false) // Do they know about your business?
+  timeSinceConnected    String? // e.g., "a long time", "2 years", "a while"
+  timeHorizon           String? // e.g., "2026", "Q1 2025", "soon"
+  knowledgeOfBusiness   Boolean?             @default(false) // Do they know about your business?
   myBusinessDescription String? // How you describe your business in this context
-  desiredOutcome     String? // What you want from them
-  contextNotes       String? // Any additional context for this template
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  company_hqs        company_hqs          @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  outreach_templates outreach_templates[]
+  desiredOutcome        String? // What you want from them
+  contextNotes          String? // Any additional context for this template
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  company_hqs           company_hqs          @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  outreach_templates    outreach_templates[]
 
   @@index([companyHQId])
   @@index([createdAt])
 }
 
 model outreach_templates {
-  id                  String                        @id @default(uuid())
-  templateBaseId      String
-  content             String
-  mode                String // 'MANUAL' | 'AI'
-  createdAt           DateTime                      @default(now())
-  updatedAt           DateTime                      @updatedAt
-  template_bases      template_bases                @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
-  template_variables  template_variables[]
+  id                 String               @id @default(uuid())
+  templateBaseId     String
+  content            String
+  mode               String // 'MANUAL' | 'AI'
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  template_bases     template_bases       @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
+  template_variables template_variables[]
 
   @@index([templateBaseId])
   @@index([createdAt])
 }
 
 model template_variables {
-  id                 String              @id @default(uuid())
+  id                 String               @id @default(uuid())
   outreachTemplateId String
   variableName       String // e.g., 'firstName', 'companyName', 'timeSinceConnected'
   variableType       TemplateVariableType
   defaultValue       String? // Optional default if data not available
-  isRequired         Boolean             @default(true)
+  isRequired         Boolean              @default(true)
   description        String? // Help text for what this variable represents
-  createdAt          DateTime            @default(now())
-  outreach_templates outreach_templates  @relation(fields: [outreachTemplateId], references: [id], onDelete: Cascade)
+  createdAt          DateTime             @default(now())
+  outreach_templates outreach_templates   @relation(fields: [outreachTemplateId], references: [id], onDelete: Cascade)
 
   @@unique([outreachTemplateId, variableName])
   @@index([outreachTemplateId])
 }
 
 enum TemplateVariableType {
-  TEXT           // firstName, lastName, companyName
-  DATE           // lastContactDate, startDate
-  TIME_DURATION  // timeSinceConnected (e.g., "2 years")
-  BOOLEAN        // knowledgeOfBusiness (yes/no)
-  ENUM           // timeHorizon (e.g., "2025", "2026")
-  CUSTOM         // Any other custom field
+  TEXT // firstName, lastName, companyName
+  DATE // lastContactDate, startDate
+  TIME_DURATION // timeSinceConnected (e.g., "2 years")
+  BOOLEAN // knowledgeOfBusiness (yes/no)
+  ENUM // timeHorizon (e.g., "2025", "2026")
+  CUSTOM // Any other custom field
 }

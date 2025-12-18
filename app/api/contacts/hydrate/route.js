@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { resolveMembership } from '@/lib/membership';
 
 /**
  * POST /api/contacts/hydrate
@@ -21,8 +22,9 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * }
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -38,6 +40,28 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, error: 'companyHQId is required' },
         { status: 400 },
+      );
+    }
+
+    // Get owner from firebaseId
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: { id: true }
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
+    // Membership guard
+    const { membership } = await resolveMembership(owner.id, companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: No membership in this CompanyHQ' },
+        { status: 403 },
       );
     }
 

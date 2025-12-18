@@ -6,6 +6,7 @@
  */
 
 import { google } from 'googleapis';
+import { assembleBlogText } from '@/lib/utils/blogTextAssembly';
 
 export type GoogleDocAssemblyInput = {
   title: string | null;
@@ -32,29 +33,14 @@ export async function assembleAndCreateGoogleDoc(
   input: GoogleDocAssemblyInput,
   authClient: any, // google.auth.JWT
 ): Promise<GoogleDocAssemblyResult> {
-  // 🧠 ASSEMBLY RULES: Build single string
-  let documentText = '';
+  // 🧠 ASSEMBLY: Use shared utility
+  const safeText = assembleBlogText({
+    title: input.title,
+    subtitle: input.subtitle,
+    body: input.body,
+  });
   
-  // Title (or "Untitled Blog") + \n
   const documentTitle = input.title || 'Untitled Blog';
-  documentText += documentTitle + '\n';
-  
-  // Subtitle (if present) + \n\n
-  if (input.subtitle) {
-    documentText += input.subtitle + '\n\n';
-  } else {
-    documentText += '\n';
-  }
-  
-  // Body (if present)
-  if (input.body) {
-    // Normalize newlines (\r\n → \n)
-    const normalizedBody = input.body.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    documentText += normalizedBody;
-  }
-  
-  // Coerce to non-empty string (Google Docs rejects empty inserts)
-  const safeText = documentText || ' ';
   
   // 🧪 OBSERVABILITY: Log what we're sending
   console.log('🧾 GoogleDocAssembly payload', {
@@ -105,35 +91,4 @@ export async function assembleAndCreateGoogleDoc(
     documentUrl,
     textLength: safeText.length,
   };
-}
-
-/**
- * Assemble blog content for display or copying
- * Pure text assembly with no Google API calls
- * 
- * @param input - Blog content to assemble
- * @returns Assembled text
- */
-export function assembleBlogText(input: Omit<GoogleDocAssemblyInput, 'parentFolderId'>): string {
-  let documentText = '';
-  
-  // Title (or "Untitled Blog") + \n
-  const documentTitle = input.title || 'Untitled Blog';
-  documentText += documentTitle + '\n';
-  
-  // Subtitle (if present) + \n\n
-  if (input.subtitle) {
-    documentText += input.subtitle + '\n\n';
-  } else {
-    documentText += '\n';
-  }
-  
-  // Body (if present)
-  if (input.body) {
-    // Normalize newlines (\r\n → \n)
-    const normalizedBody = input.body.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    documentText += normalizedBody;
-  }
-  
-  return documentText || ' ';
 }

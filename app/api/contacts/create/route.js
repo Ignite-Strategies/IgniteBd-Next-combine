@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { resolveMembership } from '@/lib/membership';
 
 /**
  * POST /api/contacts/create
@@ -51,6 +52,15 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, error: 'CompanyHQ not found for owner' },
         { status: 404 },
+      );
+    }
+
+    // Membership guard
+    const { membership } = await resolveMembership(owner.id, crmId);
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: No membership in this CompanyHQ' },
+        { status: 403 },
       );
     }
 

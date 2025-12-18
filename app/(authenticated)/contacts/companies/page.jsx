@@ -43,15 +43,17 @@ export default function CompaniesPage() {
           backTo="/contacts"
           backLabel="Back to People Hub"
           actions={
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={loading}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              {loading ? 'Syncing…' : 'Sync from Dynamics 365'}
-            </button>
+            companies.length > 0 ? (
+              <button
+                type="button"
+                onClick={handleSync}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+                {loading ? 'Syncing…' : 'Sync from Dynamics 365'}
+              </button>
+            ) : null
           }
         />
 

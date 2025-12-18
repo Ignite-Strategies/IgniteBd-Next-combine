@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { resolveMembership } from '@/lib/membership';
 
 /**
  * WorkPackage Route - Company-First Architecture
@@ -8,7 +9,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  */
 
 /**
- * Helper: Get owner's companyHQId from Firebase token
+ * Helper: Get owner's companyHQId from Firebase token and verify membership
  */
 async function getOwnerCompanyHQId(firebaseUser) {
   // Find owner by firebaseId
@@ -31,6 +32,12 @@ async function getOwnerCompanyHQId(firebaseUser) {
   
   if (!companyHQId) {
     throw new Error('Owner has no associated CompanyHQ');
+  }
+
+  // Membership guard
+  const { membership } = await resolveMembership(owner.id, companyHQId);
+  if (!membership) {
+    throw new Error('Forbidden: No membership in this CompanyHQ');
   }
 
   return companyHQId;

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Copy, Check } from 'lucide-react';
-import { assembleBlogText } from '@/lib/services/googleDocAssemblyService';
+import { assembleBlogText } from '@/lib/utils/blogTextAssembly';
 
 export default function BlogViewPage() {
   const params = useParams();

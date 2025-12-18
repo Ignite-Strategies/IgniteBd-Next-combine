@@ -86,7 +86,6 @@ export async function POST(request) {
           results.companyHQ = { id: updated.id, action: 'updated' };
         } else {
           // Create new
-          const ULTRA_TENANT_ID = 'cmhmdw78k0001mb1vioxdw2g8';
           const created = await prisma.companyHQ.create({
             data: {
               companyName: companyHQ.companyName || 'My Company',
@@ -100,7 +99,9 @@ export async function POST(request) {
               yearsInBusiness: companyHQ.yearsInBusiness || null,
               teamSize: companyHQ.teamSize || null,
               ownerId: owner.id,
-              ultraTenantId: ULTRA_TENANT_ID,
+              platform: {
+                connect: { id: 'platform-ignitebd-001' }
+              },
             },
           });
           companyHQId = created.id;

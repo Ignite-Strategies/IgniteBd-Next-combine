@@ -2,15 +2,22 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAlignmentScore } from '@/lib/alignmentScore';
 import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { resolveMembership } from '@/lib/membership';
 
 // TODO WEDNESDAY FIX #3: Personas MUST be scoped by companyHQId, never by ownerId
 // TODO WEDNESDAY FIX #3: All persona queries must use: where: { companyHQId: currentCompanyHQId }
 const DEFAULT_COMPANY_HQ_ID = process.env.DEFAULT_COMPANY_HQ_ID || null;
 
 export async function GET(request) {
-  // Use optionalAuth for GET requests (read operations)
-  // Data is scoped by companyHQId, so auth is optional
-  await optionallyVerifyFirebaseToken(request);
+  let firebaseUser;
+  try {
+    firebaseUser = await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 },
+    );
+  }
 
   try {
     const { searchParams } = new URL(request.url);
@@ -21,6 +28,28 @@ export async function GET(request) {
       return NextResponse.json(
         { error: 'companyHQId is required' },
         { status: 400 },
+      );
+    }
+
+    // Get owner from firebaseId
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: { id: true }
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
+    // Membership guard
+    const { membership } = await resolveMembership(owner.id, companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'Forbidden: No membership in this CompanyHQ' },
+        { status: 403 },
       );
     }
 
@@ -61,8 +90,9 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -100,6 +130,28 @@ export async function POST(request) {
       return NextResponse.json(
         { error: 'companyHQId is required' },
         { status: 400 },
+      );
+    }
+
+    // Get owner from firebaseId
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: { id: true }
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
+    // Membership guard
+    const { membership } = await resolveMembership(owner.id, tenantId);
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'Forbidden: No membership in this CompanyHQ' },
+        { status: 403 },
       );
     }
 

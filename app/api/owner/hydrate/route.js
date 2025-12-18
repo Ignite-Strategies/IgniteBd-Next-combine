@@ -23,14 +23,19 @@ export async function GET(request) {
 
     console.log('🚀 OWNER HYDRATE: Finding Owner by Firebase ID:', firebaseId);
 
-    // Find owner by firebaseId - get full owner object
+    // Find owner by firebaseId
     const owner = await prisma.owners.findUnique({
       where: { firebaseId },
-      include: {
-        company_hqs_company_hqs_ownerIdToowners: {
-          take: 1,
-          select: { id: true },
-        },
+      select: {
+        id: true,
+        firebaseId: true,
+        firstName: true,
+        lastName: true,
+        name: true,
+        email: true,
+        photoURL: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -47,19 +52,45 @@ export async function GET(request) {
       );
     }
 
-    // Get companyHQId from the relation
-    const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id || null;
+    // Get ALL memberships for this owner
+    const memberships = await prisma.company_memberships.findMany({
+      where: { userId: owner.id },
+      include: {
+        company_hqs: {
+          select: {
+            id: true,
+            companyName: true,
+            companyWebsite: true,
+            companyIndustry: true,
+          }
+        }
+      },
+      orderBy: [
+        { isPrimary: 'desc' }, // Primary first
+        { createdAt: 'asc' },   // Then by oldest
+      ]
+    });
 
-    // Return the full owner object with companyHQId added
-    const ownerWithCompanyHQId = {
+    console.log(`✅ OWNER HYDRATE: Found ${memberships.length} membership(s) for owner ${owner.id}`);
+
+    // Get primary/default CompanyHQ
+    const primaryMembership = memberships.find(m => m.isPrimary) || memberships[0];
+    const companyHQId = primaryMembership?.companyHqId || null;
+    const companyHQ = primaryMembership?.company_hqs || null;
+
+    // Return owner with memberships
+    const ownerWithMemberships = {
       ...owner,
-      companyHQId,
+      companyHQId,        // Default/primary CompanyHQ
+      companyHQ,          // Full CompanyHQ object
+      memberships,        // Array of all memberships
     };
 
     return NextResponse.json({
       success: true,
       message: 'Owner hydrated successfully',
-      owner: ownerWithCompanyHQId,
+      owner: ownerWithMemberships,
+      memberships,        // Also return at top level for easy access
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
