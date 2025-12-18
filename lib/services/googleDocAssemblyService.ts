@@ -97,6 +97,28 @@ export async function assembleAndCreateGoogleDoc(
     },
   });
   
+  // 🔁 OWNERSHIP TRANSFER: Move doc to human owner (fixes storage quota)
+  const newOwnerEmail = process.env.GOOGLE_DOCS_OWNER_EMAIL;
+  
+  if (!newOwnerEmail) {
+    throw new Error('GOOGLE_DOCS_OWNER_EMAIL is not configured');
+  }
+  
+  console.log(`🔁 Transferring document ownership to ${newOwnerEmail}`);
+  
+  await drive.permissions.create({
+    fileId: documentId,
+    supportsAllDrives: true,
+    transferOwnership: true,
+    requestBody: {
+      role: 'owner',
+      type: 'user',
+      emailAddress: newOwnerEmail,
+    },
+  });
+  
+  console.log('✅ Ownership transferred successfully');
+  
   // 📤 RETURN VALUE: Clean success payload
   const documentUrl = `https://docs.google.com/document/d/${documentId}/edit`;
   
