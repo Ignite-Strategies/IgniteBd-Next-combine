@@ -99,31 +99,22 @@ export default function BlogViewPage() {
             Back to Blogs
           </button>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push(`/content/blog/${blogId}/edit`)}
-              className="flex items-center gap-2 rounded-lg border-2 border-gray-300 bg-white px-6 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Edit
-            </button>
-            
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700 transition-colors"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-5 w-5" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-5 w-5" />
-                  Copy Full Blog
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700 transition-colors"
+          >
+            {copied ? (
+              <>
+                <Check className="h-5 w-5" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="h-5 w-5" />
+                Copy Full Blog
+              </>
+            )}
+          </button>
         </div>
 
         {/* Help Text */}

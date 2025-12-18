@@ -236,27 +236,145 @@ api.interceptors.request.use(async (config) => {
 
 ### Complete Onboarding Flow
 
-1. **Sign Up** (`/signup`)
-   - Firebase Auth creates user
-   - `POST /api/owner/create` creates Owner record
-   - Stores `ownerId` in localStorage
-   - Redirects to `/welcome`
+**Entry Point:** Root `/` → Redirects to `/splash`
 
-2. **Welcome Hydration** (`/welcome`)
-   - `GET /api/owner/hydrate` loads full Owner data
-   - Stores `owner`, `companyHQId`, `companyHQ` in localStorage
-   - Routes based on completeness:
-     - No company → `/company/create-or-choose`
-     - Has company → `/growth-dashboard`
+#### 1. **Splash Screen** (`/splash`)
+**Purpose:** Initial branding page with auto-redirect and auth detection
 
-3. **Company Setup** (`/company/profile`)
-   - `POST /api/companyhq/create` creates CompanyHQ
-   - Updates localStorage with new `companyHQId`
-   - Redirects to `/growth-dashboard`
+**Features:**
+- 2-second display with flame icon (SVG) animation
+- Firebase auth state check using `onAuthStateChanged`
+- Auto-redirects based on auth status:
+  - Authenticated → `/welcome`
+  - Not authenticated → `/signup`
 
-4. **Dashboard** (`/growth-dashboard`)
-   - Reads from localStorage for fast initial render
-   - May refresh data from API as needed
+**Design Pattern:**
+- Red gradient background: `from-red-600 via-red-700 to-red-800`
+- Large centered flame SVG icon
+- "IgniteGrowth Engine" branding
+- "by Ignite Strategies" subtitle
+
+**Implementation:**
+```javascript
+// app/(public)/splash/page.jsx
+useEffect(() => {
+  const timer = setTimeout(() => {
+    unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace('/welcome');
+      } else {
+        router.replace('/signup');
+      }
+    });
+  }, 2000);
+}, [router]);
+```
+
+#### 2. **Sign Up/Sign In** (`/signup`, `/signin`)
+**Purpose:** Authentication with Firebase
+
+**Features:**
+- Tab switcher: Google OAuth vs Email/Password
+- Firebase authentication (client SDK)
+- Creates/finds Owner record in database
+- Persists session to localStorage
+- Redirects to `/welcome` on success
+
+**UI Pattern:**
+- Logo at top
+- Glass-morphism card: `bg-white/10 backdrop-blur-sm`
+- Toggle between auth methods
+- Google sign-in with branded button
+- Email form with styled inputs
+- Link to sign up/sign in (toggle)
+
+**Session Storage (localStorage):**
+```javascript
+localStorage.setItem('firebaseId', firebaseUser.uid);
+localStorage.setItem('ownerId', ownerRecord.id);
+localStorage.setItem('email', ownerRecord.email);
+localStorage.setItem('firebaseToken', idToken);
+```
+
+**API Call:**
+```javascript
+POST /api/owner/create
+Body: {
+  firebaseId: result.uid,
+  email: result.email,
+  firstName: result.name?.split(' ')[0],
+  lastName: result.name?.split(' ').slice(1).join(' '),
+  photoURL: result.photoURL,
+}
+```
+
+#### 3. **Welcome Page** (`/welcome`)
+**Purpose:** Post-authentication landing before main app
+
+**Features:**
+- Uses `useOwner()` hook to fetch user data
+- Three states: Loading, Error, Success
+- Personalized greeting using owner's name
+- Shows company name if available
+- "Continue →" button to `/growth-dashboard`
+
+**State Management:**
+```javascript
+const { owner, loading, hydrated, error } = useOwner();
+```
+
+**Loading State:**
+- Animated spinner: `animate-spin rounded-full h-16 w-16 border-b-4 border-white`
+- "Loading your account..." message
+- Red gradient background
+
+**Error State:**
+- White card with error message
+- "Reload Page" button
+- Red gradient background
+
+**Success State:**
+- White card with welcome message
+- Personalized: "Welcome, {firstName}!" or "Welcome, {email}!"
+- Company context: "Ready to manage {companyName}?"
+- Continue button to dashboard
+
+**Implementation:**
+```javascript
+// app/(onboarding)/welcome/page.jsx
+const nextRoute = '/growth-dashboard';
+
+const handleContinue = () => {
+  router.push(nextRoute);
+};
+```
+
+**API Hydration:**
+```javascript
+GET /api/owner/hydrate
+Authorization: Bearer <firebaseToken>
+Returns: { owner, companyHQ, ... }
+```
+
+#### 4. **Company Setup** (if needed)
+**Routes:**
+- `/company/create-or-choose` - Choose to create or join company
+- `/company/profile` - Company profile form
+
+**API Call:**
+```javascript
+POST /api/companyhq/create
+Body: {
+  companyName, ownerId, whatYouDo,
+  companyStreet, companyCity, companyState,
+  companyWebsite, companyIndustry,
+  companyAnnualRev, yearsInBusiness, teamSize
+}
+```
+
+#### 5. **Dashboard** (`/growth-dashboard`)
+- Reads from localStorage for fast initial render
+- May refresh data from API as needed
 
 ### Firebase Token Management
 
@@ -827,6 +945,202 @@ model Persona {
 - `/personas/build-from-contacts` - Generate personas from contacts
 
 **Documentation**: See `docs/personas-parser/PERSONA_ARCHITECTURE.md` for complete reference.
+
+---
+
+## Design System & UX Patterns
+
+### Typography
+
+**Fonts:**
+- Sans: `Geist` (Google Font)
+- Mono: `Geist_Mono` (Google Font)
+- Applied via CSS variables: `--font-geist-sans`, `--font-geist-mono`
+
+**Setup in Root Layout:**
+```javascript
+// app/layout.js
+import { Geist, Geist_Mono } from "next/font/google";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  display: "swap",
+});
+```
+
+**Hierarchy:**
+- H1: `text-3xl` or `text-4xl font-bold`
+- Body: Base size with `antialiased`
+
+### Color Palette
+
+**Primary Brand:**
+- Red gradient: `bg-gradient-to-br from-red-600 via-red-700 to-red-800`
+- Accent gradient: `bg-gradient-to-r from-red-600 to-orange-600`
+- Primary button: `bg-red-600 hover:bg-red-700`
+
+**UI Elements:**
+- Glass-morphism: `bg-white/10 backdrop-blur-sm`
+- Borders: `border-white/20` or `border-white/30`
+- Text on dark: `text-white`, `text-white/80`, `text-white/60`
+- White cards: `bg-white rounded-xl shadow-xl`
+
+### Component Patterns
+
+#### Buttons
+
+**Primary Button:**
+```jsx
+className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition"
+```
+
+**Gradient Button:**
+```jsx
+className="bg-gradient-to-r from-red-600 to-orange-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-red-700 hover:to-orange-700 transition shadow-lg"
+```
+
+**Glass Button:**
+```jsx
+className="bg-white/20 border-2 border-white/30 text-white py-4 px-6 rounded-xl font-semibold hover:bg-white/30 transition shadow-lg"
+```
+
+#### Cards
+
+**Glass-morphism Card (Auth Pages):**
+```jsx
+className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20"
+```
+
+**White Card (Authenticated App):**
+```jsx
+className="bg-white rounded-xl shadow-xl p-8"
+```
+
+#### Loading States
+
+**Spinner:**
+```jsx
+<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4" />
+<p className="text-white text-xl">Loading your account...</p>
+```
+
+**Full Page Loading (Red Gradient Background):**
+```jsx
+<div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
+  <div className="text-center">
+    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4" />
+    <p className="text-white text-xl">Loading...</p>
+  </div>
+</div>
+```
+
+#### Form Inputs
+
+**Glass Input (Auth Pages):**
+```jsx
+className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-red-500"
+```
+
+#### Error States
+
+**Error Card:**
+```jsx
+<div className="bg-white rounded-xl shadow-xl p-8">
+  <p className="text-red-600 text-lg mb-4">{error}</p>
+  <button className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium">
+    Reload Page
+  </button>
+</div>
+```
+
+### Layout Patterns
+
+#### Authenticated Layout
+**Pattern:** Provider wrapper with AppShell
+
+```javascript
+// app/layout.js
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+
+// app/providers.jsx
+export default function Providers({ children }) {
+  return (
+    <ActivationProvider>
+      <AppShell>{children}</AppShell>
+    </ActivationProvider>
+  );
+}
+```
+
+#### Route Group Layouts
+**Pattern:** Each route group can have its own layout
+
+- `(public)/` - No layout (full-page auth screens)
+- `(onboarding)/` - No additional layout (full-page flows)
+- `(authenticated)/` - AppShell with sidebar navigation
+
+### Spacing & Animations
+
+**Spacing:**
+- Consistent Tailwind spacing scale
+- Section padding: `p-4`, `p-8`
+- Gaps: `gap-3`, `gap-4`, `space-y-4`, `space-y-8`
+
+**Animations:**
+- Spin: `animate-spin` for loading spinners
+- Transitions: `transition`, `transition-colors`
+- Hover states on all interactive elements
+
+### Key UX Patterns to Copy to CRM
+
+#### 1. **Splash Screen Pattern**
+- Initial branding page with 2-second delay
+- Firebase auth state detection
+- Auto-redirect based on auth status
+
+#### 2. **Glass-morphism Auth Pages**
+- Red gradient backgrounds
+- Glass-morphism cards for forms
+- Tab switchers for auth methods
+- Styled inputs with white/transparent backgrounds
+
+#### 3. **Loading States**
+- Animated spinners on red gradient backgrounds
+- Clear messaging ("Loading your account...")
+- Consistent loading state patterns
+
+#### 4. **Error States**
+- White cards with error messages
+- Action buttons to retry/reload
+- User-friendly error messaging
+
+#### 5. **Welcome Flow**
+- Personalized greetings using owner data
+- Context-aware messaging (company name, etc.)
+- Clear CTA buttons to continue
+
+#### 6. **Route Group Organization**
+```
+app/
+├── (public)/          # Splash, signin, signup
+├── (onboarding)/      # Welcome, company setup
+└── (authenticated)/   # Main app features
+```
 
 ---
 
