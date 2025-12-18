@@ -35,6 +35,14 @@ export function formatBlogContent(
   // Normalize line endings
   const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   
+  // Check if text has any newlines at all
+  const hasNewlines = normalized.includes('\n');
+  
+  // If no newlines, treat as continuous text and split intelligently
+  if (!hasNewlines) {
+    return formatContinuousText(normalized, opts);
+  }
+  
   // Split into lines and clean up
   const lines = normalized.split('\n').map(line => line.trim());
   
@@ -132,6 +140,50 @@ export function formatBlogContent(
   flushList();
   flushParagraph();
 
+  return elements.length > 0 
+    ? elements 
+    : [<p key="empty" className="text-gray-500">No content to display</p>];
+}
+
+/**
+ * Format continuous text (no newlines) by splitting into logical paragraphs
+ */
+function formatContinuousText(
+  text: string,
+  options: FormatterOptions
+): React.ReactElement[] {
+  // Split into sentences using common sentence endings
+  const sentenceRegex = /([^.!?]+[.!?]+(?:\s+|$))/g;
+  const sentences = text.match(sentenceRegex) || [];
+  
+  if (sentences.length === 0) {
+    // Fallback: just return the whole text as one paragraph
+    return [
+      <p key={0} className="text-gray-800 leading-relaxed mb-4 text-lg">
+        {text.trim()}
+      </p>
+    ];
+  }
+
+  const elements: React.ReactElement[] = [];
+  let key = 0;
+  
+  // Group sentences into paragraphs (3-5 sentences per paragraph for readability)
+  const sentencesPerParagraph = 4;
+  
+  for (let i = 0; i < sentences.length; i += sentencesPerParagraph) {
+    const paragraphSentences = sentences.slice(i, i + sentencesPerParagraph);
+    const paragraphText = paragraphSentences.join(' ').trim();
+    
+    if (paragraphText) {
+      elements.push(
+        <p key={key++} className="text-gray-800 leading-relaxed mb-4 text-lg">
+          {paragraphText}
+        </p>
+      );
+    }
+  }
+  
   return elements.length > 0 
     ? elements 
     : [<p key="empty" className="text-gray-500">No content to display</p>];
