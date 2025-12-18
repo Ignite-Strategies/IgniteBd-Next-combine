@@ -23,6 +23,12 @@ export async function POST(request) {
       typeOfPerson,
       whyReachingOut,
       whatWantFromThem,
+      // Template context fields
+      timeSinceConnected,
+      timeHorizon,
+      knowledgeOfBusiness,
+      myBusinessDescription,
+      desiredOutcome,
     } = body ?? {};
 
     const tenantId = companyHQId || DEFAULT_COMPANY_HQ_ID;
@@ -78,6 +84,12 @@ export async function POST(request) {
         typeOfPerson,
         whyReachingOut: whyReachingOut.trim(),
         whatWantFromThem: whatWantFromThem?.trim() || null,
+        // Template context fields
+        timeSinceConnected: timeSinceConnected?.trim() || null,
+        timeHorizon: timeHorizon?.trim() || null,
+        knowledgeOfBusiness: knowledgeOfBusiness ?? false,
+        myBusinessDescription: myBusinessDescription?.trim() || null,
+        desiredOutcome: desiredOutcome?.trim() || null,
       },
     });
 

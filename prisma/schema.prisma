@@ -607,6 +607,7 @@ model owners {
   company_hqs_company_hqs_ownerIdToowners   company_hqs[]      @relation("company_hqs_ownerIdToowners")
   email_activities                          email_activities[]
   super_admins                              super_admins?
+  google_oauth_tokens                       GoogleOAuthToken[]
 }
 
 model payments {
@@ -983,6 +984,22 @@ enum EventOppStatus {
   PASSED
 }
 
+model GoogleOAuthToken {
+  id           String   @id @default(uuid())
+  ownerId      String
+  provider     String   @default("google")
+  refreshToken String   // TODO: Encrypt in production
+  scopes       String?  // Space-separated scopes
+  email        String?  // Google account email
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  owner        owners   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  @@unique([ownerId, provider])
+  @@index([ownerId])
+}
+
 enum EventSourceType {
   AI
   CSV
@@ -1082,6 +1099,13 @@ model template_bases {
   typeOfPerson       TypeOfPersonEnum
   whyReachingOut     String
   whatWantFromThem   String?
+  // Template-specific context fields (user inputs during template creation)
+  timeSinceConnected String? // e.g., "a long time", "2 years", "a while"
+  timeHorizon        String? // e.g., "2026", "Q1 2025", "soon"
+  knowledgeOfBusiness Boolean? @default(false) // Do they know about your business?
+  myBusinessDescription String? // How you describe your business in this context
+  desiredOutcome     String? // What you want from them
+  contextNotes       String? // Any additional context for this template
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   company_hqs        company_hqs          @relation(fields: [companyHQId], references: [id], onDelete: Cascade)

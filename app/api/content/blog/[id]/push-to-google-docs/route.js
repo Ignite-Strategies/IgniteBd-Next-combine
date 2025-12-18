@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { initializeGoogleAuth } from '@/lib/googleServiceAccount';
+import { getGoogleAuthForOwner } from '@/lib/googleOAuth';
 import { assembleAndCreateGoogleDoc } from '@/lib/services/googleDocAssemblyService';
 
 /**
@@ -61,12 +61,18 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Initialize Google Auth
-    const authClient = await initializeGoogleAuth();
+    // Get Google OAuth client for owner
+    const authClient = await getGoogleAuthForOwner(owner.id);
+    
     if (!authClient) {
+      // No Google OAuth token - user needs to connect
       return NextResponse.json(
-        { success: false, error: 'Google service account not configured' },
-        { status: 500 },
+        { 
+          success: false, 
+          requiresGoogleConnect: true,
+          error: 'Google account not connected',
+        },
+        { status: 403 },
       );
     }
 

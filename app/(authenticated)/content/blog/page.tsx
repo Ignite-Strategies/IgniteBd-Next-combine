@@ -455,12 +455,13 @@ export default function BlogPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+                      {/* View & Copy - Always available */}
                       <button
-                        onClick={() => router.push(`/content/blog/${blog.id}`)}
+                        onClick={() => router.push(`/content/blog/${blog.id}/view`)}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        View
+                        View & Copy
                       </button>
                       {/* Only show export button if googleDocUrl doesn't exist */}
                       {!blog.googleDocUrl && (

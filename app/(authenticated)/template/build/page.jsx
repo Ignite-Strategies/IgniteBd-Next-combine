@@ -84,6 +84,12 @@ export default function TemplateBuildPage() {
     typeOfPerson: '',
     whyReachingOut: '',
     whatWantFromThem: '',
+    // Template-specific context fields
+    timeSinceConnected: '',
+    timeHorizon: '',
+    knowledgeOfBusiness: false,
+    myBusinessDescription: '',
+    desiredOutcome: '',
   });
   const [preview, setPreview] = useState({
     content: '',
@@ -204,6 +210,14 @@ export default function TemplateBuildPage() {
         typeOfPerson: form.typeOfPerson,
         whyReachingOut: form.whyReachingOut.trim(),
         whatWantFromThem: form.whatWantFromThem?.trim() || null,
+        // Template context fields (only for VARIABLES mode)
+        ...(mode === 'VARIABLES' && {
+          timeSinceConnected: form.timeSinceConnected?.trim() || null,
+          timeHorizon: form.timeHorizon?.trim() || null,
+          knowledgeOfBusiness: form.knowledgeOfBusiness || false,
+          myBusinessDescription: form.myBusinessDescription?.trim() || null,
+          desiredOutcome: form.desiredOutcome?.trim() || null,
+        }),
       });
 
       if (response.data?.success) {
@@ -296,6 +310,12 @@ export default function TemplateBuildPage() {
         typeOfPerson: form.typeOfPerson,
         whyReachingOut: form.whyReachingOut.trim(),
         whatWantFromThem: form.whatWantFromThem?.trim() || null,
+        // Template context fields
+        timeSinceConnected: form.timeSinceConnected?.trim() || null,
+        timeHorizon: form.timeHorizon?.trim() || null,
+        knowledgeOfBusiness: form.knowledgeOfBusiness || false,
+        myBusinessDescription: form.myBusinessDescription?.trim() || null,
+        desiredOutcome: form.desiredOutcome?.trim() || null,
       });
 
       if (response.data?.success && response.data?.templateBase) {
@@ -420,6 +440,12 @@ export default function TemplateBuildPage() {
           typeOfPerson: form.typeOfPerson,
           whyReachingOut: form.whyReachingOut.trim(),
           whatWantFromThem: form.whatWantFromThem?.trim() || null,
+          // Template context fields
+          timeSinceConnected: form.timeSinceConnected?.trim() || null,
+          timeHorizon: form.timeHorizon?.trim() || null,
+          knowledgeOfBusiness: form.knowledgeOfBusiness || false,
+          myBusinessDescription: form.myBusinessDescription?.trim() || null,
+          desiredOutcome: form.desiredOutcome?.trim() || null,
         });
 
         if (buildResponse.data?.success && buildResponse.data?.templateBase) {
@@ -729,6 +755,104 @@ export default function TemplateBuildPage() {
                     Optional and often empty in early outreach
                   </p>
                 </div>
+
+                {/* Template Context Fields - Only show in VARIABLES mode */}
+                {mode === 'VARIABLES' && (
+                  <>
+                    <div className="col-span-full mt-4 border-t border-gray-200 pt-4">
+                      <h3 className="mb-3 text-sm font-semibold text-gray-900">Template Context</h3>
+                      <p className="mb-4 text-xs text-gray-600">
+                        These fields define the context for this template. They'll be baked into the template content, 
+                        while contact-specific info like names will be filled in later.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Time Since Connected
+                      </label>
+                      <input
+                        type="text"
+                        name="timeSinceConnected"
+                        value={form.timeSinceConnected}
+                        onChange={handleChange}
+                        placeholder="e.g., a long time, 2 years, a while"
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        How long since you last connected? (e.g., "a long time", "2 years")
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Time Horizon
+                      </label>
+                      <input
+                        type="text"
+                        name="timeHorizon"
+                        value={form.timeHorizon}
+                        onChange={handleChange}
+                        placeholder="e.g., 2026, Q1 2025, soon"
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        When do you want to connect? (e.g., "2026", "early next year")
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        My Business Description
+                      </label>
+                      <input
+                        type="text"
+                        name="myBusinessDescription"
+                        value={form.myBusinessDescription}
+                        onChange={handleChange}
+                        placeholder="e.g., my own NDA house, Ignite Growth Partners"
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        How you want to describe your business in this template
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Desired Outcome
+                      </label>
+                      <input
+                        type="text"
+                        name="desiredOutcome"
+                        value={form.desiredOutcome}
+                        onChange={handleChange}
+                        placeholder="e.g., see if we can collaborate and get some NDA work"
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        What you want from this person
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="knowledgeOfBusiness"
+                          checked={form.knowledgeOfBusiness}
+                          onChange={(e) => setForm(prev => ({ ...prev, knowledgeOfBusiness: e.target.checked }))}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm font-medium text-gray-700">They already know about my business</span>
+                      </label>
+                      <p className="mt-1 ml-6 text-xs text-gray-500">
+                        Check if you don't need to introduce your business
+                      </p>
+                    </div>
+                  </>
+                )}
+
 
                 <div className="flex gap-2">
                   {(mode === 'IDEA' || mode === 'VARIABLES') && !preview.content ? (

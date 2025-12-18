@@ -32,7 +32,18 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { relationship, typeOfPerson, whyReachingOut, whatWantFromThem } = body ?? {};
+    const { 
+      relationship, 
+      typeOfPerson, 
+      whyReachingOut, 
+      whatWantFromThem,
+      // Template context fields
+      timeSinceConnected,
+      timeHorizon,
+      knowledgeOfBusiness,
+      myBusinessDescription,
+      desiredOutcome,
+    } = body ?? {};
 
     if (!relationship || !typeOfPerson || !whyReachingOut) {
       return NextResponse.json(
@@ -49,6 +60,13 @@ Type of Person: ${typeOfPerson}
 Why Reaching Out: ${whyReachingOut}
 ${whatWantFromThem ? `What Want From Them: ${whatWantFromThem}` : 'What Want From Them: Not specified'}
 
+=== TEMPLATE CONTEXT (Use these in the template content) ===
+${timeSinceConnected ? `Time Since Connected: ${timeSinceConnected}` : 'Time Since Connected: Not specified'}
+${timeHorizon ? `Time Horizon: ${timeHorizon}` : 'Time Horizon: Not specified'}
+${myBusinessDescription ? `My Business: ${myBusinessDescription}` : 'My Business: Not specified'}
+${desiredOutcome ? `Desired Outcome: ${desiredOutcome}` : 'Desired Outcome: Not specified'}
+Knowledge of Business: ${knowledgeOfBusiness ? 'Yes, they know' : 'No, they don\'t know'}
+
 === YOUR TASK ===
 Create a warm, human, low-pressure outreach message template using VARIABLE TAGS for personalization.
 
@@ -59,46 +77,51 @@ Return ONLY valid JSON in this exact format:
 }
 
 === VARIABLE TAG FORMAT ===
-Use {{variableName}} for any dynamic content that should be filled in later with contact-specific data.
+Use {{variableName}} ONLY for contact-specific data that will be filled in later from the database.
 
-Available variables you SHOULD use:
+**CONTACT VARIABLES** (use {{tags}} - these will be filled later):
 - {{firstName}} - Contact's first name
 - {{lastName}} - Contact's last name  
 - {{companyName}} - Their current company
 - {{title}} - Their job title
-- {{timeSinceConnected}} - How long since last contact (e.g., "2 years")
-- {{timeHorizon}} - When to connect (e.g., "2026", "Q1 2025")
-- {{knowledgeOfBusiness}} - Whether they know about your business
-- {{myBusinessName}} - Your company/business name
-- {{desiredOutcome}} - What you want from them
-- {{myRole}} - Your name/role for signature
+
+**TEMPLATE CONTEXT** (use provided values DIRECTLY as text, NOT as {{variables}}):
+- Time Since Connected: "${timeSinceConnected || 'a while'}" - BAKE THIS INTO THE CONTENT
+- Time Horizon: "${timeHorizon || 'soon'}" - BAKE THIS INTO THE CONTENT
+- My Business: "${myBusinessDescription || 'my business'}" - BAKE THIS INTO THE CONTENT
+- Desired Outcome: "${desiredOutcome || 'catch up'}" - BAKE THIS INTO THE CONTENT
+- They ${knowledgeOfBusiness ? 'ALREADY KNOW' : 'DO NOT KNOW'} about your business - ADJUST INTRO ACCORDINGLY
 
 === REQUIREMENTS ===
-1. **Use Variable Tags**: Replace ALL contact-specific info with {{variableName}}
-2. **Human & Natural**: Write like a real person, not a sales bot
-3. **Low Pressure**: Always include a release valve that removes pressure
-4. **No Sales Language**: No CTAs, no calendar links, no "let's hop on a call"
-5. **Greeting**: Always start with "Hi {{firstName}}," or similar
-6. **Time Context**: Use {{timeSinceConnected}} for dormant relationships
+1. **Contact Variables Only**: ONLY use {{variableName}} for firstName, lastName, companyName, title
+2. **Bake in Context**: Time, business description, desired outcome should be PLAIN TEXT (not {{variables}})
+3. **Human & Natural**: Write like a real person, not a sales bot
+4. **Low Pressure**: Always include a release valve that removes pressure
+5. **No Sales Language**: No CTAs, no calendar links, no "let's hop on a call"
+6. **Greeting**: Always start with "Hi {{firstName}}," or similar
 7. **Company Context**: Use {{companyName}} when relevant
-8. **Your Business**: Use {{myBusinessName}} to reference your business
-9. **Closing**: Sign off with {{myRole}} or a name variable
+8. **Signature**: End with a plain name like "Joel" or "Cheers, Joel"
 
 === EXAMPLE OUTPUT ===
+
+If timeSinceConnected="a long time", timeHorizon="2026", myBusinessDescription="my own NDA house", desiredOutcome="see if we can collaborate and get some NDA work":
+
 {
-  "content": "Hi {{firstName}},\\n\\nI know it's been {{timeSinceConnected}} since we connected. I saw you recently started working at {{companyName}}.\\n\\nNot sure if you knew, but I run {{myBusinessName}}.\\n\\nLet's get together in {{timeHorizon}} — {{desiredOutcome}}.\\n\\nNo pressure at all — just wanted to reach out.\\n\\nCheers to what's ahead!\\n\\n{{myRole}}",
-  "suggestedVariables": ["firstName", "timeSinceConnected", "companyName", "myBusinessName", "timeHorizon", "desiredOutcome", "myRole"]
+  "content": "Hi {{firstName}},\\n\\nI know it's been a long time since we connected. I saw you recently started working at {{companyName}}.\\n\\nNot sure if you knew, but I run my own NDA house.\\n\\nLet's get together in 2026 — see if we can collaborate and get some NDA work from you.\\n\\nNo pressure at all — just wanted to reach out.\\n\\nCheers to what's ahead!\\n\\nJoel",
+  "suggestedVariables": ["firstName", "companyName"]
 }
 
+IMPORTANT: Only use {{variables}} for contact-specific data. Template context should be BAKED INTO the content as plain text.
+
 === RELATIONSHIP TONE ===
-- COLD: Friendly but acknowledge it's a first contact, may not need {{timeSinceConnected}}
-- WARM: Reference the prior connection naturally
+- COLD: Friendly but acknowledge it's a first contact
+- WARM: Reference the prior connection naturally using the provided timeSinceConnected text
 - ESTABLISHED: Casual, like checking in with a friend
-- DORMANT: MUST use {{timeSinceConnected}} to acknowledge the gap
+- DORMANT: MUST acknowledge the gap using the provided timeSinceConnected text
 
 === WHAT WANT FROM THEM ===
-If provided, use {{desiredOutcome}} variable in context like:
-"Let's get together in {{timeHorizon}} — {{desiredOutcome}}."
+If desiredOutcome provided, use it directly in the content:
+"Let's get together in [timeHorizon] — [desiredOutcome]."
 
 If not provided, use a simple friendly close like "Let's catch up soon."
 

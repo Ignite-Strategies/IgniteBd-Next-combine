@@ -97,28 +97,6 @@ export async function assembleAndCreateGoogleDoc(
     },
   });
   
-  // 🔁 OWNERSHIP TRANSFER: Move doc to human owner (fixes storage quota)
-  const newOwnerEmail = process.env.GOOGLE_DOCS_OWNER_EMAIL;
-  
-  if (!newOwnerEmail) {
-    throw new Error('GOOGLE_DOCS_OWNER_EMAIL is not configured');
-  }
-  
-  console.log(`🔁 Transferring document ownership to ${newOwnerEmail}`);
-  
-  await drive.permissions.create({
-    fileId: documentId,
-    supportsAllDrives: true,
-    transferOwnership: true,
-    requestBody: {
-      role: 'owner',
-      type: 'user',
-      emailAddress: newOwnerEmail,
-    },
-  });
-  
-  console.log('✅ Ownership transferred successfully');
-  
   // 📤 RETURN VALUE: Clean success payload
   const documentUrl = `https://docs.google.com/document/d/${documentId}/edit`;
   
@@ -127,4 +105,35 @@ export async function assembleAndCreateGoogleDoc(
     documentUrl,
     textLength: safeText.length,
   };
+}
+
+/**
+ * Assemble blog content for display or copying
+ * Pure text assembly with no Google API calls
+ * 
+ * @param input - Blog content to assemble
+ * @returns Assembled text
+ */
+export function assembleBlogText(input: Omit<GoogleDocAssemblyInput, 'parentFolderId'>): string {
+  let documentText = '';
+  
+  // Title (or "Untitled Blog") + \n
+  const documentTitle = input.title || 'Untitled Blog';
+  documentText += documentTitle + '\n';
+  
+  // Subtitle (if present) + \n\n
+  if (input.subtitle) {
+    documentText += input.subtitle + '\n\n';
+  } else {
+    documentText += '\n';
+  }
+  
+  // Body (if present)
+  if (input.body) {
+    // Normalize newlines (\r\n → \n)
+    const normalizedBody = input.body.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    documentText += normalizedBody;
+  }
+  
+  return documentText || ' ';
 }
