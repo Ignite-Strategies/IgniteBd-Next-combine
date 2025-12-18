@@ -457,7 +457,7 @@ export default function BlogPage() {
                     <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                       {/* View & Copy - Always available */}
                       <button
-                        onClick={() => router.push(`/content/blog/${blog.id}/view`)}
+                        onClick={() => router.push(`/content/blog/${blog.id}`)}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                       >
                         <Eye className="h-3.5 w-3.5" />
@@ -478,7 +478,7 @@ export default function BlogPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => router.push(`/content/blog/${blog.id}`)}
+                        onClick={() => router.push(`/content/blog/${blog.id}/edit`)}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
