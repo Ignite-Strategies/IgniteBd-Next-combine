@@ -138,9 +138,9 @@ export default function BlogViewPage() {
             </h2>
           )}
 
-          {/* Body - Auto-formatted */}
+          {/* Body - Auto-formatted with Markdown support */}
           {blog.blogText && (
-            <div className="space-y-1">
+            <div className="blog-content">
               {formatBlogContent(blog.blogText)}
             </div>
           )}

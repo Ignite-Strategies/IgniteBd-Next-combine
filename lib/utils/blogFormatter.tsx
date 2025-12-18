@@ -1,31 +1,38 @@
 /**
  * Blog Content Formatter
  * 
- * Intelligently formats plain text blog content into properly structured HTML
- * Handles various paragraph styles, headings, lists, and line breaks
+ * Intelligently formats blog content into properly structured HTML
+ * Supports both Markdown and plain text formats
  */
 
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export interface FormatterOptions {
   detectHeadings?: boolean;
   detectLists?: boolean;
   minParagraphLength?: number;
+  forceMarkdown?: boolean; // Force Markdown parsing even if no MD syntax detected
+  forcePlainText?: boolean; // Force plain text formatting (no MD parsing)
 }
 
 const defaultOptions: FormatterOptions = {
   detectHeadings: true,
   detectLists: true,
   minParagraphLength: 10,
+  forceMarkdown: false,
+  forcePlainText: false,
 };
 
 /**
- * Main formatter function - converts plain text to formatted React elements
+ * Main formatter function - converts text to formatted React elements
+ * Automatically detects Markdown and renders accordingly
  */
 export function formatBlogContent(
   text: string,
   options: FormatterOptions = {}
-): React.ReactElement[] {
+): React.ReactElement | React.ReactElement[] {
   const opts = { ...defaultOptions, ...options };
   
   if (!text || !text.trim()) {
@@ -35,6 +42,50 @@ export function formatBlogContent(
   // Normalize line endings
   const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   
+  // Check if text contains Markdown syntax
+  const hasMarkdown = opts.forceMarkdown || (
+    !opts.forcePlainText && (
+      /^#{1,6}\s/.test(normalized) ||           // Headings: # Heading
+      /\*\*.*\*\*/.test(normalized) ||          // Bold: **text**
+      /\*.*\*/.test(normalized) ||              // Italic: *text*
+      /^\s*[-*+]\s/.test(normalized) ||         // Lists: - item
+      /^\s*\d+\.\s/.test(normalized) ||         // Numbered lists: 1. item
+      /\[.*\]\(.*\)/.test(normalized)           // Links: [text](url)
+    )
+  );
+  
+  // If Markdown detected, use Markdown renderer
+  if (hasMarkdown) {
+    return (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ node, ...props }) => <h1 className="text-3xl font-bold text-gray-900 mb-4 mt-8" {...props} />,
+          h2: ({ node, ...props }) => <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-6" {...props} />,
+          h3: ({ node, ...props }) => <h3 className="text-xl font-bold text-gray-900 mb-3 mt-6" {...props} />,
+          h4: ({ node, ...props }) => <h4 className="text-lg font-bold text-gray-900 mb-2 mt-4" {...props} />,
+          p: ({ node, ...props }) => <p className="text-gray-800 leading-relaxed mb-4 text-lg" {...props} />,
+          ul: ({ node, ...props }) => <ul className="list-disc list-inside space-y-2 mb-4 ml-4" {...props} />,
+          ol: ({ node, ...props }) => <ol className="list-decimal list-inside space-y-2 mb-4 ml-4" {...props} />,
+          li: ({ node, ...props }) => <li className="text-gray-800 leading-relaxed text-lg" {...props} />,
+          strong: ({ node, ...props }) => <strong className="font-bold text-gray-900" {...props} />,
+          em: ({ node, ...props }) => <em className="italic" {...props} />,
+          a: ({ node, ...props }) => <a className="text-blue-600 hover:text-blue-800 underline" {...props} />,
+          blockquote: ({ node, ...props }) => (
+            <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-700 my-4" {...props} />
+          ),
+          code: ({ node, inline, ...props }: any) => 
+            inline 
+              ? <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props} />
+              : <code className="block bg-gray-100 p-4 rounded text-sm font-mono overflow-x-auto mb-4" {...props} />,
+        }}
+      >
+        {normalized}
+      </ReactMarkdown>
+    );
+  }
+  
+  // Fallback to plain text formatting
   // Check if text has any newlines at all
   const hasNewlines = normalized.includes('\n');
   
