@@ -237,6 +237,79 @@ export async function getPreviewIntelligence(previewId: string): Promise<any | n
 }
 
 /**
+ * Store Microsoft Outlook contact preview in Redis
+ * 
+ * @param previewId - Preview ID (e.g., "preview:123:abc")
+ * @param outlookContacts - Array of ContactCandidate from Outlook messages
+ * @param rawMessages - Raw Microsoft Graph messages response
+ * @param ttl - Time to live in seconds (default: 7 days)
+ * @returns Promise<string> - Redis key
+ */
+export async function storeMicrosoftContactPreview(
+  previewId: string,
+  outlookContacts: any[],
+  rawMessages: any,
+  ttl: number = 7 * 24 * 60 * 60 // 7 days
+): Promise<string> {
+  try {
+    const redisClient = getRedis();
+    const redisKey = `microsoft:${previewId}`;
+    
+    // Store raw Microsoft Graph messages
+    await redisClient.setex(
+      redisKey,
+      ttl,
+      JSON.stringify({
+        rawMessages,
+        previewId,
+        fetchedAt: new Date().toISOString(),
+      })
+    );
+    
+    // Store normalized contact candidates under previewId
+    await redisClient.setex(
+      previewId,
+      ttl,
+      JSON.stringify({
+        previewId,
+        redisKey,
+        outlookContacts,
+        contactCount: outlookContacts.length,
+        createdAt: new Date().toISOString(),
+      })
+    );
+    
+    console.log(`✅ Microsoft contact preview stored in Redis: ${previewId}`);
+    return redisKey;
+  } catch (error: any) {
+    console.error('❌ Redis store Microsoft preview error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get Microsoft contact preview from Redis by previewId
+ * 
+ * @param previewId - Preview ID (e.g., "preview:123:abc")
+ * @returns Promise<any | null> - Preview data or null
+ */
+export async function getMicrosoftContactPreview(previewId: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const data = await redisClient.get(previewId);
+    
+    if (!data) {
+      return null;
+    }
+    
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis get Microsoft preview error:', error);
+    return null;
+  }
+}
+
+/**
  * Store presentation outline in Redis
  * 
  * @param outline - Generated presentation outline

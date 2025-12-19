@@ -11,6 +11,7 @@ import {
   ArrowRight,
   RefreshCw,
   Sparkles,
+  Mail,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -84,6 +85,16 @@ const CORE_ACTIONS = [
     containerClasses:
       'from-cyan-50 to-cyan-100 border-cyan-200 hover:border-cyan-400',
     iconClasses: 'bg-cyan-500 text-white',
+  },
+  {
+    id: 'ingest-microsoft',
+    title: 'Import from Email',
+    description: 'Extract contacts from people you email in Outlook',
+    route: '/contacts/ingest/microsoft',
+    icon: Mail,
+    containerClasses:
+      'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
+    iconClasses: 'bg-blue-600 text-white',
   },
 ];
 
