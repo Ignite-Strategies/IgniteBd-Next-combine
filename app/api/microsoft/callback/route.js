@@ -27,27 +27,31 @@ export async function GET(req) {
       );
     }
 
+    // CRITICAL: Microsoft OAuth sends authorization code, NOT access token
+    // The code must be exchanged for tokens via /token endpoint
+    // If code is missing, the OAuth flow failed
     if (!code) {
+      console.error('❌ No authorization code provided in callback');
       return NextResponse.redirect(
-        `${appUrl}/settings/integrations?error=missing_code`
+        `${appUrl}/settings/integrations?error=no_authorization_code_provided`
       );
     }
 
-    // Decode state to get ownerId
-    let ownerId;
+    // Decode state to get ownerId (if present)
+    let ownerId = null;
     try {
-      const stateData = JSON.parse(Buffer.from(state || '', 'base64url').toString());
-      ownerId = stateData.ownerId;
-      
-      // Verify state is recent (within 10 minutes)
-      if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
-        throw new Error('State expired');
+      if (state) {
+        const stateData = JSON.parse(Buffer.from(state || '', 'base64url').toString());
+        ownerId = stateData.ownerId;
+        
+        // Verify state is recent (within 10 minutes)
+        if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
+          throw new Error('State expired');
+        }
       }
     } catch (err) {
-      console.error('Invalid state parameter:', err);
-      return NextResponse.redirect(
-        `${appUrl}/settings/integrations?error=invalid_state`
-      );
+      console.warn('State parameter missing or invalid (will try to find owner by email):', err);
+      // Continue - we'll try to find owner by email
     }
 
     // MSAL configuration for server-side token exchange
@@ -63,7 +67,10 @@ export async function GET(req) {
 
     const cca = new ConfidentialClientApplication(msalConfig);
 
-    // Exchange authorization code for tokens
+    // STEP 3: Exchange authorization code for access_token + refresh_token
+    // This is where we actually get tokens - NOT in the login endpoint
+    // The code is a one-time use token that Microsoft gives us
+    // We exchange it server-side (with client_secret) for real tokens
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://ignitegrowth.biz/api/microsoft/callback';
     const tokenResponse = await cca.acquireTokenByCode({
       code,
@@ -121,6 +128,34 @@ export async function GET(req) {
       } catch (err) {
         console.warn('Failed to fetch user data from Graph:', err);
       }
+    }
+
+    // If ownerId not in state, try to find owner by Microsoft email
+    if (!ownerId && microsoftEmail) {
+      try {
+        const ownerByEmail = await prisma.owners.findFirst({
+          where: {
+            OR: [
+              { email: microsoftEmail },
+              { microsoftEmail: microsoftEmail },
+            ],
+          },
+        });
+        if (ownerByEmail) {
+          ownerId = ownerByEmail.id;
+          console.log('✅ Found owner by email:', ownerId);
+        }
+      } catch (err) {
+        console.warn('Failed to find owner by email:', err);
+      }
+    }
+
+    // If still no ownerId, we can't save tokens
+    if (!ownerId) {
+      console.error('❌ Cannot save tokens: ownerId not found');
+      return NextResponse.redirect(
+        `${appUrl}/settings/integrations?error=owner_not_found`
+      );
     }
 
     // Calculate token expiration

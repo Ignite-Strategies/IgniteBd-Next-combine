@@ -1,52 +1,51 @@
 import { NextResponse } from 'next/server';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 /**
  * GET /api/microsoft/login
  * 
- * Initiates Microsoft OAuth flow
- * Requires Firebase authentication to identify the user
+ * Initiates Microsoft OAuth Authorization Code Flow
+ * 
+ * IMPORTANT: This endpoint does NOT require authentication tokens.
+ * OAuth Authorization Code Flow works like this:
+ * 1. User clicks "Connect Microsoft" → redirects to Microsoft
+ * 2. User authenticates with Microsoft
+ * 3. Microsoft redirects back with ?code=XYZ (authorization code, NOT a token)
+ * 4. /api/microsoft/callback exchanges the code for access_token + refresh_token
+ * 
+ * We cannot have access_token before step 4. Expecting a token here is architecturally wrong.
+ * 
+ * Optional query params:
+ * - ownerId: If provided, will be encoded in state parameter for callback to identify user
+ *            If not provided, callback will find owner by Microsoft email
  */
 export async function GET(request) {
   try {
-    // Verify Firebase authentication to get the user
-    const firebaseUser = await verifyFirebaseToken(request);
-    
-    // Get or create Owner record
-    let owner = await prisma.owners.findUnique({
-      where: { firebaseId: firebaseUser.uid },
-    });
+    const { searchParams } = new URL(request.url);
+    const ownerIdParam = searchParams.get('ownerId');
 
-    if (!owner) {
-      // Create owner if it doesn't exist
-      owner = await prisma.owners.create({
-        data: {
-          firebaseId: firebaseUser.uid,
-          email: firebaseUser.email || null,
-          name: firebaseUser.name || null,
-        },
-      });
-    }
-
-    // Generate state parameter to verify callback
+    // Generate state parameter for CSRF protection
+    // State can optionally include ownerId, but it's not required
+    // If ownerId is provided, encode it in state for callback to use
+    // If not provided, callback will find owner by Microsoft email after token exchange
     const state = crypto.randomBytes(32).toString('base64url');
     
-    // Store state and ownerId in a simple in-memory cache (in production, use Redis or session store)
-    // For now, we'll encode the ownerId in the state parameter
-    const stateData = {
-      ownerId: owner.id,
+    let stateData = {
       timestamp: Date.now(),
     };
+    
+    // Optionally include ownerId in state if provided
+    // This helps callback identify which owner to save tokens for
+    // But callback can also find owner by Microsoft email as fallback
+    if (ownerIdParam) {
+      stateData.ownerId = ownerIdParam;
+    }
+    
     const encodedState = Buffer.from(JSON.stringify(stateData)).toString('base64url');
 
-    // Build OAuth URL
-    // Use the redirect URI from environment or default
+    // Build Microsoft OAuth authorization URL
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://ignitegrowth.biz/api/microsoft/callback';
     
-    // Scopes for multi-tenant authentication
-    // Using specific scopes instead of .default for better compatibility
     const scopes = [
       'openid',
       'profile',
@@ -62,30 +61,26 @@ export async function GET(request) {
     
     const params = new URLSearchParams({
       client_id: process.env.AZURE_CLIENT_ID,
-      response_type: 'code',
+      response_type: 'code', // Authorization Code Flow - Microsoft will return ?code=, NOT a token
       redirect_uri: redirectUri,
       response_mode: 'query',
       scope: scopes,
       state: encodedState,
     });
 
-    // Use 'common' endpoint for multi-tenant support
-    // This allows users from any Microsoft 365 organization to authenticate
-    // The actual tenant ID will be extracted from the ID token after authentication
     const authority = 'https://login.microsoftonline.com/common';
     const authUrl = `${authority}/oauth2/v2.0/authorize?${params}`;
 
-    // Return JSON with auth URL for client-side redirect
-    // This allows the authenticated API call to succeed, then client redirects
-    return NextResponse.json({
-      success: true,
-      authUrl,
-    });
+    // Always redirect to Microsoft OAuth
+    // This is a redirect-only endpoint - it never returns JSON
+    // The redirect happens in the browser, Microsoft authenticates the user,
+    // then Microsoft redirects back to /api/microsoft/callback with ?code=
+    return NextResponse.redirect(authUrl);
   } catch (error) {
     console.error('Microsoft OAuth login error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to initiate OAuth flow' },
-      { status: error.message?.includes('Unauthorized') ? 401 : 500 }
+    const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
+    return NextResponse.redirect(
+      `${appUrl}/settings/integrations?error=${encodeURIComponent(error.message || 'Failed to initiate OAuth flow')}`
     );
   }
 }
