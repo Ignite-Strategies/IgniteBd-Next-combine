@@ -102,7 +102,7 @@ export default function ContactUploadPage() {
       
       alert(message + details);
       setFile(null);
-      router.push('/contacts');
+      router.push('/people');
     } catch (error) {
       console.error('Upload failed:', error);
       alert(`Upload failed: ${error.message || 'Please try again.'}`);
@@ -113,8 +113,8 @@ export default function ContactUploadPage() {
 
   const downloadTemplate = () => {
     if (typeof window === 'undefined') return;
-    // Enhanced template with all supported fields
-    const template = 'First Name,Last Name,Email,Phone,Title,Company Name,Company Domain,Pipeline,Stage,Notes,How Met';
+    // Simple template matching the simple contact save process
+    const template = 'First Name,Last Name,Email,Company Name,Pipeline,Stage';
     const blob = new Blob([template], { type: 'text/csv' });
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -130,8 +130,8 @@ export default function ContactUploadPage() {
         <PageHeader
           title="📥 Upload Contacts"
           subtitle="Upload a CSV to add people to your Ignite workspace"
-          backTo="/contacts"
-          backLabel="Back to People Hub"
+          backTo="/people/load"
+          backLabel="Back to Load Up"
         />
 
         <div className="mb-8">
@@ -174,7 +174,7 @@ export default function ContactUploadPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Upload CSV</h2>
               <p className="text-gray-600">
-                Required: First Name, Last Name. Optional: Email, Phone, Title, Company Name, Pipeline, Stage.
+                Required: First Name, Last Name. Optional: Email, Company Name, Pipeline, Stage.
               </p>
             </div>
             <button

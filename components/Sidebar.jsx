@@ -28,6 +28,7 @@ import {
   PlayCircle,
   Network,
   Edit,
+  Building2,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -59,12 +60,19 @@ const navigationGroups = [
   },
   {
     name: 'Engage',
-    hubPath: '/contacts',
+    hubPath: '/people',
     items: [
-      { name: 'Contact Hub', path: '/contacts', icon: Users },
-      { name: 'Templates', path: '/template', icon: FileText },
-      { name: 'Compose', path: '/outreach/compose', icon: MessageSquare },
-      { name: 'Meetings', path: '/meetings', icon: Calendar },
+      { name: 'People', path: '/people', icon: Users },
+      { name: 'Lists', path: '/people/lists', icon: List },
+      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
+      { name: 'Deals', path: '/pipelines/roadmap', icon: GitBranch },
+    ],
+  },
+  {
+    name: 'Companies',
+    hubPath: '/companies',
+    items: [
+      { name: 'Company Hub', path: '/companies', icon: Building2 },
     ],
   },
   {

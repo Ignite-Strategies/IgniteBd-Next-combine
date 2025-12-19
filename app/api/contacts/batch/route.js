@@ -9,14 +9,16 @@ import { ensureContactPipeline } from '@/lib/services/pipelineService';
 /**
  * POST /api/contacts/batch
  * Batch create contacts with company association and pipeline setup
- * Processes CSV with all data at once (HubSpot-style)
+ * Simple contact save process - matches the simplified contact creation flow
  * 
  * Body: FormData with 'file' field containing CSV
- * CSV format:
+ * CSV format (simple):
  * - firstName, lastName (required)
- * - email, phone, title, goesBy, notes, howMet (optional)
- * - companyName, companyDomain (optional - for company association)
- * - pipeline, stage (optional - for pipeline setup)
+ * - email (optional)
+ * - companyName (optional - for company association)
+ * - pipeline, stage (optional - for deal stage/pipeline setup)
+ * 
+ * Note: Additional fields like phone, title, notes, howMet should be added on the contact detail page, not via CSV
  * 
  * Returns:
  * - success: boolean
@@ -108,7 +110,7 @@ export async function POST(request) {
       );
     }
 
-    // Normalize headers (case-insensitive matching)
+    // Normalize headers (case-insensitive matching) - simplified to match simple contact save process
     const normalizeHeader = (header) => {
       const normalized = header.toLowerCase().trim();
       const mappings = {
@@ -118,26 +120,12 @@ export async function POST(request) {
         'last name': 'lastName',
         'lastname': 'lastName',
         'last': 'lastName',
-        'goes by': 'goesBy',
-        'goesby': 'goesBy',
-        'preferred name': 'goesBy',
         'email': 'email',
-        'phone': 'phone',
-        'title': 'title',
-        'job title': 'title',
-        'jobtitle': 'title',
         'company name': 'companyName',
         'companyname': 'companyName',
         'company': 'companyName',
-        'company domain': 'companyDomain',
-        'companydomain': 'companyDomain',
-        'domain': 'companyDomain',
-        'website': 'companyDomain',
         'pipeline': 'pipeline',
         'stage': 'stage',
-        'notes': 'notes',
-        'how met': 'howMet',
-        'howmet': 'howMet',
       };
       return mappings[normalized] || normalized;
     };
@@ -184,16 +172,11 @@ export async function POST(request) {
           continue;
         }
 
-        // Extract contact data
+        // Extract contact data - simple fields only (name, email, company, deal stage)
         const contactData = {
           firstName: normalizedRow.firstName,
           lastName: normalizedRow.lastName,
-          goesBy: normalizedRow.goesBy || null,
           email: normalizedRow.email ? normalizedRow.email.toLowerCase().trim() : null,
-          phone: normalizedRow.phone || null,
-          title: normalizedRow.title || null,
-          notes: normalizedRow.notes || null,
-          howMet: normalizedRow.howMet || null,
         };
 
         // Step 1: Create or update contact
@@ -226,17 +209,12 @@ export async function POST(request) {
               continue;
             }
             
-            // Update existing contact
+            // Update existing contact - only update name and email (simple fields)
             contact = await prisma.contact.update({
               where: { id: existingContact.id },
               data: {
                 firstName: contactData.firstName,
                 lastName: contactData.lastName,
-                goesBy: contactData.goesBy,
-                phone: contactData.phone,
-                title: contactData.title,
-                notes: contactData.notes,
-                howMet: contactData.howMet,
               },
             });
             results.updated++;
@@ -260,17 +238,12 @@ export async function POST(request) {
                     where: { email: normalizedEmail },
                   });
                   if (raceContact && raceContact.crmId === companyHQId) {
-                    // Found it, update instead
+                    // Found it, update instead - only update name (simple fields)
                     contact = await prisma.contact.update({
                       where: { id: raceContact.id },
                       data: {
                         firstName: contactData.firstName,
                         lastName: contactData.lastName,
-                        goesBy: contactData.goesBy,
-                        phone: contactData.phone,
-                        title: contactData.title,
-                        notes: contactData.notes,
-                        howMet: contactData.howMet,
                       },
                     });
                     results.updated++;
@@ -296,16 +269,12 @@ export async function POST(request) {
           results.created++;
         }
 
-        // Step 2: Handle company association
+        // Step 2: Handle company association (simple - companyName only)
         let companyId = null;
-        if (normalizedRow.companyName || normalizedRow.companyDomain) {
+        if (normalizedRow.companyName) {
           const companyName = normalizedRow.companyName?.trim();
-          const companyDomain = normalizedRow.companyDomain?.trim() || 
-            (contactData.email && contactData.email.includes('@') 
-              ? contactData.email.split('@')[1].toLowerCase() 
-              : null);
 
-          // Try to find existing company
+          // Try to find existing company by name
           let company = null;
           if (companyName) {
             const normalizedName = companyName.toLowerCase().trim();
@@ -314,44 +283,21 @@ export async function POST(request) {
             );
           }
 
-          if (!company && companyDomain) {
-            // Try to find by domain
-            company = existingCompanies.find(
-              (c) => c.domain && c.domain.toLowerCase().trim() === companyDomain.toLowerCase()
-            );
-          }
-
           if (company) {
             companyId = company.id;
             results.companiesFound++;
-          } else {
+          } else if (companyName) {
             // Create new company
-            if (companyDomain) {
-              company = await findOrCreateCompanyByDomain(
-                companyDomain,
+            company = await prisma.companies.create({
+              data: {
                 companyHQId,
-                companyName || 'Unknown Company'
-              );
-              if (company && !existingCompanies.find((c) => c.id === company.id)) {
-                existingCompanies.push(company);
-                companyMap.set(companyName?.toLowerCase().trim(), company);
-                companyMap.set(companyDomain.toLowerCase().trim(), company);
-              }
-            } else if (companyName) {
-              company = await prisma.companies.create({
-                data: {
-                  companyHQId,
-                  companyName: companyName,
-                },
-              });
-              existingCompanies.push(company);
-              companyMap.set(companyName.toLowerCase().trim(), company);
-            }
-
-            if (company) {
-              companyId = company.id;
-              results.companiesCreated++;
-            }
+                companyName: companyName,
+              },
+            });
+            existingCompanies.push(company);
+            companyMap.set(companyName.toLowerCase().trim(), company);
+            companyId = company.id;
+            results.companiesCreated++;
           }
 
           // Associate company to contact (ONLY set contactCompanyId - the FK)

@@ -72,8 +72,8 @@ export default function ContactListBuilderPage() {
         <PageHeader
           title="Create Contact List"
           subtitle="Pick a blueprint for your new audience segment"
-          backTo="/contacts/list-manager"
-          backLabel="Back to Contact Lists"
+          backTo="/people/outreach-prep"
+          backLabel="Back to Outreach Prep"
         />
 
         <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">

@@ -88,7 +88,7 @@ export default function ContactListManagerPage() {
         <PageHeader
           title="Contact Lists"
           subtitle="Manage reusable segments for outreach and personalization"
-          backTo="/contacts"
+          backTo="/people"
           backLabel="Back to People Hub"
           actions={
             <button

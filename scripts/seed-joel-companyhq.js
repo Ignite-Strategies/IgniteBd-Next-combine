@@ -41,6 +41,8 @@ async function seedJoelCompanyHQ() {
 
     if (!joel) {
       console.log('  ⚠️  Joel not found. Creating...');
+      console.log('  ⚠️  Note: Will create with placeholder Firebase ID');
+      console.log('  💡 Run update-joel-firebase-id.js to set real Firebase ID after Joel authenticates');
       const now = new Date();
       joel = await prisma.owners.create({
         data: {
@@ -57,6 +59,10 @@ async function seedJoelCompanyHQ() {
       console.log(`  ✅ Created Joel: ${joel.email} (${joel.id})`);
     } else {
       console.log(`  ✅ Found Joel: ${joel.email} (${joel.id})`);
+      if (joel.firebaseId && joel.firebaseId.startsWith('joel_')) {
+        console.log(`  ⚠️  Joel has placeholder Firebase ID: ${joel.firebaseId}`);
+        console.log(`  💡 Run update-joel-firebase-id.js to set real Firebase ID`);
+      }
     }
 
     // =====================================================

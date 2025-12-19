@@ -5,6 +5,8 @@
  * No auth. No Prisma. No routing logic.
  */
 
+import 'server-only';
+
 import { google } from 'googleapis';
 import { assembleBlogText } from '@/lib/utils/blogTextAssembly';
 
