@@ -59,7 +59,9 @@ export async function GET(request) {
     // 1. User authenticates with Microsoft → Microsoft redirects back with ?code= (authorization code)
     // 2. We exchange the code server-side for access_token + refresh_token
     // Microsoft NEVER sends access_token directly in the redirect
-    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://ignitegrowth.biz/api/microsoft/callback';
+    // 
+    // SERVER-SIDE ONLY: This redirectUri must match exactly in callback route
+    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://app.ignitegrowth.biz/api/microsoft/callback';
     
     const scopes = [
       'openid',

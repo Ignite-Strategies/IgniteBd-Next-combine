@@ -6,19 +6,32 @@ import { assertValidMicrosoftOAuthConfig, getMicrosoftClientId, getMicrosoftAuth
 /**
  * GET /api/microsoft/callback
  * 
- * Handles Microsoft OAuth callback
- * Exchanges authorization code for tokens and stores them in database
+ * SERVER-SIDE ONLY: This is a Next.js App Router API route
+ * Handles Microsoft OAuth callback - exchanges authorization code for tokens
+ * 
+ * IMPORTANT: This route runs entirely server-side:
+ * - No 'use client' directive (defaults to server component)
+ * - Uses Next.js App Router request object
+ * - Accesses environment variables server-side only
+ * - Performs database operations server-side
+ * 
+ * Flow:
+ * 1. Microsoft redirects here with ?code= (authorization code)
+ * 2. We exchange code for access_token + refresh_token (server-side)
+ * 3. Store tokens in database
+ * 4. Redirect user to app UI
  */
-export async function GET(req) {
+export async function GET(request) {
   // Get app URL once at the top
   const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
   
   try {
-    const { searchParams } = new URL(req.url);
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
-    const error = searchParams.get('error');
-    const errorDescription = searchParams.get('error_description');
+    // Next.js App Router: Use request.nextUrl.searchParams (not new URL(req.url))
+    // This is the recommended pattern for App Router API routes
+    const code = request.nextUrl.searchParams.get('code');
+    const state = request.nextUrl.searchParams.get('state');
+    const error = request.nextUrl.searchParams.get('error');
+    const errorDescription = request.nextUrl.searchParams.get('error_description');
 
     // Check for OAuth errors
     if (error) {
@@ -90,7 +103,10 @@ export async function GET(req) {
     // This is where we actually get tokens - NOT in the login endpoint
     // The code is a one-time use token that Microsoft gives us
     // We exchange it server-side (with client_secret) for real tokens
-    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://ignitegrowth.biz/api/microsoft/callback';
+    // 
+    // SERVER-SIDE ONLY: This exchange requires client_secret which must never be exposed to client
+    // The redirectUri must match exactly what was used in the login endpoint
+    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://app.ignitegrowth.biz/api/microsoft/callback';
     const tokenResponse = await cca.acquireTokenByCode({
       code,
       scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Send', 'Mail.Read', 'Contacts.Read', 'Contacts.ReadWrite', 'Calendars.Read'],
