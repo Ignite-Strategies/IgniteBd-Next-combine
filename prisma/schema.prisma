@@ -271,15 +271,24 @@ model consultant_deliverables {
 }
 
 model contact_lists {
-  id          String      @id
-  companyId   String
-  name        String
-  description String?
-  type        String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime
-  company_hqs company_hqs @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts    Contact[]
+  id            String      @id
+  companyId     String
+  name          String
+  description   String?
+  type          String       @default("static") // static, smart, manual
+  filters       Json?       // For smart lists: { audienceType: "...", stages: [...], tags: [...] }
+  totalContacts Int         @default(0)
+  lastUpdated   DateTime    @default(now())
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  company_hqs   company_hqs @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contacts      Contact[]
+  campaigns     campaigns[]
+
+  @@index([companyId])
+  @@index([isActive])
+  @@unique([companyId, name])
 }
 
 model Contact {
@@ -467,6 +476,10 @@ model campaigns {
   description     String?
   status          CampaignStatus    @default(DRAFT) // DRAFT, SCHEDULED, ACTIVE, PAUSED, COMPLETED, CANCELLED
   type            CampaignType      @default(EMAIL) // EMAIL, SEQUENCE, ONE_OFF
+  // WHO - Contact list (reusable, modular)
+  contact_list_id String?
+  contact_lists   contact_lists?   @relation(fields: [contact_list_id], references: [id], onDelete: SetNull)
+  // Email content (optional - can be in sequences)
   subject         String?
   preview_text    String?
   from_email      String?
@@ -488,7 +501,7 @@ model campaigns {
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt
   owners          owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  company_hqs     company_hqs?     @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
+  company_hqs     company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
   email_activities email_activities[]
   email_sequences email_sequences[]
 
@@ -496,6 +509,7 @@ model campaigns {
   @@index([company_hq_id])
   @@index([status])
   @@index([created_at])
+  @@index([contact_list_id])
 }
 
 enum CampaignStatus {
@@ -781,6 +795,8 @@ model owners {
   microsoftEmail                            String?
   microsoftDisplayName                      String?
   microsoftTenantId                         String?
+  sendgridVerifiedEmail                     String? // Verified sender email for SendGrid
+  sendgridVerifiedName                      String? // Display name for verified sender
   createdAt                                 DateTime              @default(now())
   updatedAt                                 DateTime
   assessments                               assessments[]

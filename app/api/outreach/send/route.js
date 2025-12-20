@@ -26,6 +26,14 @@ export async function POST(request) {
     // Get or find Owner record
     let owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
+      select: {
+        id: true,
+        sendgridVerifiedEmail: true,
+        sendgridVerifiedName: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+      },
     });
 
     if (!owner) {
@@ -36,10 +44,25 @@ export async function POST(request) {
           email: firebaseUser.email || null,
           name: firebaseUser.name || null,
         },
+        select: {
+          id: true,
+          sendgridVerifiedEmail: true,
+          sendgridVerifiedName: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+        },
       });
     }
 
     const ownerId = owner.id;
+    
+    // Get verified sender email/name from owner, with fallbacks
+    const fromEmail = owner.sendgridVerifiedEmail || owner.email || process.env.SENDGRID_FROM_EMAIL || 'adam@ignitestrategies.co';
+    const fromName = owner.sendgridVerifiedName || 
+                     (owner.firstName && owner.lastName ? `${owner.firstName} ${owner.lastName}` : owner.firstName || owner.lastName || '') ||
+                     process.env.SENDGRID_FROM_NAME || 
+                     'Adam - Ignite Strategies';
 
     // Parse request body
     const body = await request.json();
@@ -75,6 +98,8 @@ export async function POST(request) {
       campaignId: campaignId || null,
       sequenceId: sequenceId || null,
       sequenceStepId: sequenceStepId || null,
+      from: fromEmail,
+      fromName: fromName,
     });
 
     // Log email activity in database (Apollo-like tracking)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles } from 'lucide-react';
+import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles, Settings, Megaphone } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import api from '@/lib/api';
@@ -36,12 +36,16 @@ function ComposeContent() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
-  const [recentSends, setRecentSends] = useState([]);
-  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [activeTab, setActiveTab] = useState('compose');
   
-  // Sender info (read-only, prefilled)
-  const senderEmail = process.env.NEXT_PUBLIC_SENDGRID_FROM_EMAIL || 'adam@ignitestrategies.co';
-  const senderName = process.env.NEXT_PUBLIC_SENDGRID_FROM_NAME || 'Adam - Ignite Strategies';
+  // Verified sender state
+  const [senderEmail, setSenderEmail] = useState('');
+  const [senderName, setSenderName] = useState('');
+  const [loadingSender, setLoadingSender] = useState(true);
+  const [showSenderSettings, setShowSenderSettings] = useState(false);
+  const [newSenderEmail, setNewSenderEmail] = useState('');
+  const [newSenderName, setNewSenderName] = useState('');
+  const [savingSender, setSavingSender] = useState(false);
   
   // Check for contactId in URL params
   useEffect(() => {
@@ -58,12 +62,61 @@ function ComposeContent() {
     }
   }, [companyHQId]);
   
-  // Load recent sends
+  // Load verified sender
   useEffect(() => {
     if (ownerId) {
-      loadRecentSends();
+      loadVerifiedSender();
     }
   }, [ownerId]);
+
+  // Load verified sender from API
+  const loadVerifiedSender = async () => {
+    try {
+      setLoadingSender(true);
+      const response = await api.get('/api/outreach/verified-senders');
+      if (response.data?.success) {
+        setSenderEmail(response.data.email || response.data.verifiedEmail || '');
+        setSenderName(response.data.name || response.data.verifiedName || '');
+        setNewSenderEmail(response.data.email || response.data.verifiedEmail || '');
+        setNewSenderName(response.data.name || response.data.verifiedName || '');
+      }
+    } catch (err) {
+      console.error('Failed to load verified sender:', err);
+      // Fallback to env vars
+      setSenderEmail(process.env.NEXT_PUBLIC_SENDGRID_FROM_EMAIL || 'adam@ignitestrategies.co');
+      setSenderName(process.env.NEXT_PUBLIC_SENDGRID_FROM_NAME || 'Adam - Ignite Strategies');
+    } finally {
+      setLoadingSender(false);
+    }
+  };
+
+  // Save verified sender
+  const handleSaveSender = async () => {
+    if (!newSenderEmail) {
+      setError('Email is required');
+      return;
+    }
+
+    try {
+      setSavingSender(true);
+      const response = await api.put('/api/outreach/verified-senders', {
+        email: newSenderEmail,
+        name: newSenderName || undefined,
+      });
+
+      if (response.data?.success) {
+        setSenderEmail(response.data.verifiedEmail);
+        setSenderName(response.data.verifiedName || newSenderName);
+        setShowSenderSettings(false);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Failed to save verified sender:', err);
+      setError(err.response?.data?.error || 'Failed to save verified sender');
+    } finally {
+      setSavingSender(false);
+    }
+  };
   
   // Handle contact selection
   const handleContactSelect = (contact, company) => {
@@ -135,19 +188,6 @@ function ComposeContent() {
     }
   };
 
-  const loadRecentSends = async () => {
-    try {
-      setLoadingRecent(true);
-      const response = await api.get(`/api/outreach/recent?limit=5`);
-      if (response.data.success) {
-        setRecentSends(response.data.emailActivities || []);
-      }
-    } catch (err) {
-      console.error('Failed to load recent sends:', err);
-    } finally {
-      setLoadingRecent(false);
-    }
-  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -189,9 +229,6 @@ function ComposeContent() {
         setSelectedTemplate(null);
         setHydratedContent(null);
         
-        // Reload recent sends
-        await loadRecentSends();
-        
         // Clear success message after 3 seconds
         setTimeout(() => setSuccess(false), 3000);
       } else {
@@ -205,54 +242,48 @@ function ComposeContent() {
     }
   };
 
-  const getEventIcon = (event) => {
-    switch (event) {
-      case 'delivered':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'opened':
-        return <Eye className="h-4 w-4 text-blue-600" />;
-      case 'clicked':
-        return <MousePointerClick className="h-4 w-4 text-purple-600" />;
-      case 'bounce':
-      case 'dropped':
-        return <Mail className="h-4 w-4 text-red-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-400" />;
-    }
-  };
-
-  const getEventLabel = (event) => {
-    switch (event) {
-      case 'sent':
-        return 'Sent';
-      case 'delivered':
-        return 'Delivered';
-      case 'opened':
-        return 'Opened';
-      case 'clicked':
-        return 'Clicked';
-      case 'bounce':
-        return 'Bounced';
-      case 'dropped':
-        return 'Dropped';
-      default:
-        return event || 'Pending';
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Compose Outreach Email"
-          subtitle="Send 1-to-1 personalized emails via SendGrid"
+          title="1-to-1 Outreach"
+          subtitle="Send personalized emails via SendGrid"
           backTo="/outreach"
           backLabel="Back to Outreach"
         />
 
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Left Column: Compose Form */}
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        {/* Tabs */}
+        <div className="mt-8 border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('compose')}
+              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${
+                activeTab === 'compose'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <Send className="inline h-4 w-4 mr-2" />
+              Compose
+            </button>
+            <button
+              onClick={() => setActiveTab('campaigns')}
+              className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${
+                activeTab === 'campaigns'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <Megaphone className="inline h-4 w-4 mr-2" />
+              Campaigns
+            </button>
+          </nav>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'compose' && (
+          <div className="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Compose Email</h2>
               
@@ -270,17 +301,97 @@ function ComposeContent() {
               )}
 
               <form onSubmit={handleSend} className="space-y-4">
-                {/* Sender (Read-only) */}
+                {/* Sender with Settings */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    From
-                  </label>
-                  <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                    {senderName} &lt;{senderEmail}&gt;
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      From
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSenderSettings(!showSenderSettings)}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      <Settings className="h-3 w-3" />
+                      {showSenderSettings ? 'Hide' : 'Change'}
+                    </button>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Verified sender identity (read-only)
-                  </p>
+                  
+                  {showSenderSettings ? (
+                    <div className="space-y-3 rounded-md border border-gray-300 bg-gray-50 p-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Verified Email <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          value={newSenderEmail}
+                          onChange={(e) => setNewSenderEmail(e.target.value)}
+                          placeholder="your-email@example.com"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          This email must be verified in SendGrid
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Display Name (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={newSenderName}
+                          onChange={(e) => setNewSenderName(e.target.value)}
+                          placeholder="Your Name"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveSender}
+                          disabled={savingSender || !newSenderEmail}
+                          className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {savingSender ? (
+                            <>
+                              <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save'
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowSenderSettings(false);
+                            setNewSenderEmail(senderEmail);
+                            setNewSenderName(senderName);
+                          }}
+                          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {loadingSender ? (
+                        <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                          <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+                          Loading sender...
+                        </div>
+                      ) : (
+                        <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                          {senderName ? `${senderName} <${senderEmail}>` : senderEmail}
+                        </div>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">
+                        Verified sender identity
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Contact Selector */}
@@ -479,62 +590,27 @@ function ComposeContent() {
               </form>
             </div>
           </div>
+        )}
 
-          {/* Right Column: Recent Sends */}
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        {activeTab === 'campaigns' && (
+          <div className="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Recent Sends</h2>
-              
-              {loadingRecent ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                </div>
-              ) : recentSends.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-200 p-8 text-center">
-                  <Mail className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No emails sent yet</p>
-                  <p className="text-xs text-gray-400 mt-1">Your sent emails will appear here</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recentSends.map((activity) => (
-                    <div
-                      key={activity.id}
-                      className="rounded-lg border border-gray-200 p-4 hover:border-gray-300 transition"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">{activity.email}</p>
-                          <p className="text-xs text-gray-600 mt-1">{activity.subject}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getEventIcon(activity.event)}
-                          <span className="text-xs font-medium text-gray-600">
-                            {getEventLabel(activity.event)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>
-                          {new Date(activity.createdAt).toLocaleDateString()} at{' '}
-                          {new Date(activity.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                        {activity.contactId && (
-                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
-                            Contact: {activity.contactId}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="text-center py-12">
+                <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Your Campaigns</h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  View and manage your 1-to-1 email campaigns
+                </p>
+                <button
+                  onClick={() => router.push('/outreach/campaigns')}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                >
+                  Go to Campaigns
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
