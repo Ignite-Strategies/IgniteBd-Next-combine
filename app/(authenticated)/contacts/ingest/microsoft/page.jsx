@@ -109,7 +109,8 @@ export default function MicrosoftEmailIngest() {
       console.log('✅ Microsoft connected, loading preview...');
       loadPreview();
     }
-  }, [ownerId, owner, loadPreview, preview]); // Include all dependencies to prevent stale closures
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerId, owner]); // loadPreview is stable (useCallback), preview checked inside but not in deps
 
   // Toggle selection
   function toggleSelect(previewId) {
