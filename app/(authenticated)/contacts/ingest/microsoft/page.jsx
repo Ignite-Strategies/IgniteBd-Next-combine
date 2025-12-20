@@ -60,26 +60,17 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Load preview if Microsoft is connected (tokens exist)
-  // Simple check: owner.microsoftAccessToken exists = connected, show preview
-  useEffect(() => {
-    if (!ownerId || !owner) return; // Wait for owner from hook
-    
-    // If tokens exist, load preview automatically
-    if (isConnected) {
-      loadPreview();
-    }
-  }, [ownerId, owner, isConnected]);
-
   // Load preview from API
-  async function loadPreview() {
+  const loadPreview = async () => {
     setLoading(true);
     setError(null);
 
     try {
+      console.log('🔄 Loading Microsoft email preview...');
       const response = await api.get('/api/microsoft/email-contacts/preview');
       
       if (response.data?.success) {
+        console.log('✅ Preview loaded:', response.data.items?.length || 0, 'contacts');
         setPreview(response.data);
         setSelectedPreviewIds(new Set()); // Reset selection
         setSaveResult(null); // Clear previous save result
@@ -87,12 +78,40 @@ export default function MicrosoftEmailIngest() {
         throw new Error(response.data?.error || 'Failed to load preview');
       }
     } catch (err) {
-      console.error('Failed to load preview:', err);
+      console.error('❌ Failed to load preview:', err);
+      console.error('Error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+      });
       setError(err.response?.data?.error || err.message || 'Failed to load preview');
     } finally {
       setLoading(false);
     }
-  }
+  };
+
+  // Load preview if Microsoft is connected (tokens exist)
+  // Simple check: owner.microsoftAccessToken exists = connected, show preview
+  useEffect(() => {
+    if (!ownerId || !owner) {
+      console.log('⏳ Waiting for owner from hook...', { ownerId: !!ownerId, owner: !!owner });
+      return; // Wait for owner from hook
+    }
+    
+    console.log('🔍 Checking Microsoft connection:', { 
+      isConnected, 
+      hasToken: !!owner?.microsoftAccessToken,
+      ownerId 
+    });
+    
+    // If tokens exist, load preview automatically
+    if (isConnected) {
+      console.log('✅ Microsoft connected, loading preview...');
+      loadPreview();
+    } else {
+      console.log('⚠️ Microsoft not connected, skipping preview load');
+    }
+  }, [ownerId, owner, isConnected, loadPreview]);
 
   // Redirect to OAuth if not connected
   // IMPORTANT: OAuth login must use direct navigation, not AJAX
