@@ -58,12 +58,31 @@ export default function IntegrationsPage() {
   }, []);
 
   // Handle Microsoft connection
+  // IMPORTANT: OAuth login must use direct navigation, not AJAX
+  // CRITICAL: Pass ownerId as query param so callback can find the owner
+  // ownerId comes from Firebase auth (resolved in /api/microsoft/status)
   const handleConnectMicrosoft = async () => {
     try {
       setConnecting(true);
       setError(null);
-      // Redirect to OAuth login endpoint
-      window.location.href = '/api/microsoft/login';
+      
+      // If we don't have ownerId yet, fetch it first
+      let currentOwnerId = ownerId;
+      if (!currentOwnerId) {
+        const response = await api.get('/api/microsoft/status');
+        currentOwnerId = response.data?.ownerId;
+        if (currentOwnerId) {
+          setOwnerId(currentOwnerId);
+        }
+      }
+      
+      if (currentOwnerId) {
+        // Redirect to OAuth login endpoint with ownerId - it will redirect to Microsoft OAuth
+        window.location.href = `/api/microsoft/login?ownerId=${currentOwnerId}`;
+      } else {
+        setError('Unable to identify user. Please refresh and try again.');
+        setConnecting(false);
+      }
     } catch (err) {
       setError(err.message || 'Failed to initiate Microsoft connection');
       setConnecting(false);
