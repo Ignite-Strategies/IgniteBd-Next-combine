@@ -66,8 +66,10 @@ export async function GET(request) {
       );
     }
 
+    // If ownerId not in state, callback can't save tokens
+    // This is OK - user can reconnect later with ownerId
     if (!ownerId) {
-      console.error('❌ ownerId not found in state parameter');
+      console.warn('⚠️ ownerId not found in state parameter - tokens cannot be saved');
       return NextResponse.redirect(
         `${appUrl}/contacts/ingest/microsoft?error=ownerId_not_found`
       );
