@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles, Settings, Megaphone } from 'lucide-react';
+import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles, Settings, Megaphone, Plus, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import api from '@/lib/api';
@@ -47,13 +47,27 @@ function ComposeContent() {
   const [newSenderName, setNewSenderName] = useState('');
   const [savingSender, setSavingSender] = useState(false);
   
-  // Check for contactId in URL params
+  // Quick contact creation modal
+  const [showQuickContactModal, setShowQuickContactModal] = useState(false);
+  const [quickContactData, setQuickContactData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+  });
+  const [savingQuickContact, setSavingQuickContact] = useState(false);
+  const [quickContactError, setQuickContactError] = useState(null);
+  
+  // Check for contactId in URL params and auto-set tenantId
   useEffect(() => {
     const contactIdParam = searchParams?.get('contactId');
     if (contactIdParam) {
       setContactId(contactIdParam);
     }
-  }, [searchParams]);
+    // Auto-set tenantId from company HQ
+    if (companyHQId) {
+      setTenantId(companyHQId);
+    }
+  }, [searchParams, companyHQId]);
 
   // Load templates
   useEffect(() => {
@@ -117,6 +131,49 @@ function ComposeContent() {
       setSavingSender(false);
     }
   };
+
+  // Quick contact creation
+  const handleQuickSaveContact = async () => {
+    if (!quickContactData.firstName || !quickContactData.lastName || !quickContactData.email) {
+      setQuickContactError('First name, last name, and email are required');
+      return;
+    }
+
+    if (!companyHQId) {
+      setQuickContactError('Company HQ not found. Please refresh the page.');
+      return;
+    }
+
+    try {
+      setSavingQuickContact(true);
+      setQuickContactError(null);
+      
+      const response = await api.post('/api/contacts/create', {
+        firstName: quickContactData.firstName,
+        lastName: quickContactData.lastName,
+        email: quickContactData.email,
+      });
+
+      if (response.data?.success && response.data.contact) {
+        const newContact = response.data.contact;
+        
+        // Auto-select the newly created contact
+        handleContactSelect(newContact, null);
+        
+        // Close modal and reset form
+        setShowQuickContactModal(false);
+        setQuickContactData({ firstName: '', lastName: '', email: '' });
+        setQuickContactError(null);
+      } else {
+        throw new Error('Failed to create contact');
+      }
+    } catch (err) {
+      console.error('Failed to create quick contact:', err);
+      setQuickContactError(err.response?.data?.error || err.response?.data?.details || 'Failed to create contact');
+    } finally {
+      setSavingQuickContact(false);
+    }
+  };
   
   // Handle contact selection
   const handleContactSelect = (contact, company) => {
@@ -124,6 +181,14 @@ function ComposeContent() {
     setContactId(contact.id);
     setTo(contact.email || '');
     setToName(contact.goesBy || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '');
+    
+    // Auto-set tenantId from contact's company HQ (crmId)
+    if (contact.crmId) {
+      setTenantId(contact.crmId);
+    } else if (companyHQId) {
+      // Fallback to current company HQ
+      setTenantId(companyHQId);
+    }
     
     // If template is selected, auto-hydrate
     if (selectedTemplate) {
@@ -236,7 +301,16 @@ function ComposeContent() {
       }
     } catch (err) {
       console.error('Send error:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to send email');
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to send email';
+      
+      // Show user-friendly error messages
+      if (errorMessage.includes('credits') || errorMessage.includes('exceeded')) {
+        setError('SendGrid account has exceeded email credits. Please upgrade your plan or wait for credits to reset. Contact your administrator for help.');
+      } else if (errorMessage.includes('authentication') || errorMessage.includes('Unauthorized')) {
+        setError('SendGrid authentication failed. Please contact your administrator to check API key configuration.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setSending(false);
     }
@@ -396,11 +470,24 @@ function ComposeContent() {
 
                 {/* Contact Selector */}
                 <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Select Contact
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickContactModal(true)}
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Quick Save
+                    </button>
+                  </div>
                   <ContactSelector
                     contactId={contactId}
                     onContactSelect={handleContactSelect}
                     selectedContact={selectedContact}
-                    showLabel={true}
+                    showLabel={false}
                   />
                 </div>
 
@@ -534,38 +621,6 @@ function ComposeContent() {
                   </p>
                 </div>
 
-                {/* Optional Fields */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <p className="text-xs font-medium text-gray-700 mb-3">Optional Tracking Fields</p>
-                  <div className="space-y-3">
-                    <div>
-                      <label htmlFor="contactId" className="block text-xs font-medium text-gray-600 mb-1">
-                        Contact ID
-                      </label>
-                      <input
-                        type="text"
-                        id="contactId"
-                        value={contactId}
-                        onChange={(e) => setContactId(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                        placeholder="c_123"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="tenantId" className="block text-xs font-medium text-gray-600 mb-1">
-                        Tenant ID
-                      </label>
-                      <input
-                        type="text"
-                        id="tenantId"
-                        value={tenantId}
-                        onChange={(e) => setTenantId(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-xs focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                        placeholder="t_001"
-                      />
-                    </div>
-                  </div>
-                </div>
 
                 {/* Send Button */}
                 <div className="flex justify-end pt-4">
@@ -612,6 +667,110 @@ function ComposeContent() {
           </div>
         )}
       </div>
+
+      {/* Quick Contact Creation Modal */}
+      {showQuickContactModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Quick Save Contact</h3>
+              <button
+                onClick={() => {
+                  setShowQuickContactModal(false);
+                  setQuickContactData({ firstName: '', lastName: '', email: '' });
+                  setQuickContactError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {quickContactError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                  <p className="text-sm font-medium text-red-900">{quickContactError}</p>
+                </div>
+              )}
+              
+              <div>
+                <label htmlFor="quickFirstName" className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="quickFirstName"
+                  value={quickContactData.firstName}
+                  onChange={(e) => setQuickContactData({ ...quickContactData, firstName: e.target.value })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="John"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="quickLastName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="quickLastName"
+                  value={quickContactData.lastName}
+                  onChange={(e) => setQuickContactData({ ...quickContactData, lastName: e.target.value })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Doe"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="quickEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  id="quickEmail"
+                  value={quickContactData.email}
+                  onChange={(e) => setQuickContactData({ ...quickContactData, email: e.target.value })}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="john.doe@example.com"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuickContactModal(false);
+                  setQuickContactData({ firstName: '', lastName: '', email: '' });
+                  setQuickContactError(null);
+                }}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickSaveContact}
+                disabled={savingQuickContact || !quickContactData.firstName || !quickContactData.lastName || !quickContactData.email}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingQuickContact ? (
+                  <>
+                    <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="inline h-4 w-4 mr-2" />
+                    Save & Select
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

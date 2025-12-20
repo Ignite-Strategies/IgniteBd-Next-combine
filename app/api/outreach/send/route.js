@@ -129,12 +129,23 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Outreach send error:', error);
+    
+    // Determine appropriate status code
+    let statusCode = 500;
+    if (error.message?.includes('Unauthorized') || error.message?.includes('authentication')) {
+      statusCode = 401;
+    } else if (error.message?.includes('credits') || error.message?.includes('exceeded')) {
+      statusCode = 402; // Payment Required
+    } else if (error.message?.includes('permission') || error.message?.includes('Forbidden')) {
+      statusCode = 403;
+    }
+    
     return NextResponse.json(
       {
         success: false,
         error: error.message || 'Failed to send outreach email',
       },
-      { status: error.message?.includes('Unauthorized') ? 401 : 500 }
+      { status: statusCode }
     );
   }
 }

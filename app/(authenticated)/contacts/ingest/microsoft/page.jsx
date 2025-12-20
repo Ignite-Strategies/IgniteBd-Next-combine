@@ -266,17 +266,13 @@ export default function MicrosoftEmailIngest() {
               </div>
               <button
                 onClick={() => {
-                  if (!ownerId) {
-                    alert('Please wait for authentication...');
-                    return;
-                  }
-                  // FORCE redirect - no event handling, just redirect
-                  window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
+                  // OAuth login is navigation, not data fetching
+                  // Browser MUST visibly leave the app and show Microsoft login page
+                  window.location.href = '/api/microsoft/login';
                 }}
-                disabled={!ownerId}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm hover:shadow transition-all"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm hover:shadow transition-all"
               >
-                {!ownerId ? 'Loading...' : 'Connect Microsoft Account'}
+                Connect Microsoft Account
               </button>
             </div>
           )}
