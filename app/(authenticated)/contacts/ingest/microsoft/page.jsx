@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
 
 export default function MicrosoftEmailIngest() {
   const router = useRouter();
+  const { ownerId } = useOwner(); // Get ownerId from hook (no API call needed)
   const [companyHQId, setCompanyHQId] = useState('');
 
   const [microsoftStatus, setMicrosoftStatus] = useState(null);
@@ -130,23 +132,15 @@ export default function MicrosoftEmailIngest() {
   // Direct navigation (window.location.href) is the correct pattern
   // 
   // CRITICAL: Pass ownerId as query param so callback can find the owner
-  // Get ownerId from status API response
-  async function handleConnectMicrosoft() {
-    try {
-      // Get ownerId from status API (which resolves from Firebase auth)
-      const statusResponse = await api.get('/api/microsoft/status');
-      const ownerId = statusResponse.data?.ownerId;
-      
-      if (ownerId) {
-        // Direct navigation to login endpoint with ownerId - it will redirect to Microsoft OAuth
-        window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
-      } else {
-        setError('Unable to identify user. Please refresh and try again.');
-      }
-    } catch (err) {
-      console.error('Failed to get ownerId:', err);
-      setError('Failed to initiate Microsoft connection');
+  // ownerId comes from useOwner hook (resolved from Firebase auth via hook)
+  function handleConnectMicrosoft() {
+    if (!ownerId) {
+      setError('Unable to identify user. Please wait for authentication to complete.');
+      return;
     }
+    
+    // Direct navigation to login endpoint with ownerId - it will redirect to Microsoft OAuth
+    window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
   }
 
   // Toggle selection
