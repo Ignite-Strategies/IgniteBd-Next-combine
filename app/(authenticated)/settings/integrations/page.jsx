@@ -1,5 +1,11 @@
 'use client';
 
+// TEMPORARILY DISABLED: Microsoft OAuth is now scoped to contacts ingest flow only
+// This page allowed generic "Connect Microsoft" which doesn't have a specific purpose
+// Microsoft OAuth should only be initiated from /contacts/ingest/microsoft
+// where it has a clear purpose: importing contacts from email
+
+/*
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, Loader2, Mail, RefreshCw } from 'lucide-react';
