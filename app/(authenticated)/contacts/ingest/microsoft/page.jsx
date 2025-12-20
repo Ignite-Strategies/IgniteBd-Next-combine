@@ -117,18 +117,14 @@ export default function MicrosoftEmailIngest() {
   // ownerId comes from useOwner hook (resolved from Firebase auth via hook)
   const handleConnectMicrosoft = () => {
     if (!ownerId) {
-      console.error('❌ Cannot connect: ownerId not available');
-      setError('Unable to identify user. Please wait for authentication to complete.');
+      alert('Please wait for authentication to complete.');
       return;
     }
     
-    console.log('🚀 Initiating Microsoft OAuth flow...', { ownerId });
-    console.log('🔗 Redirecting to:', `/api/microsoft/login?ownerId=${ownerId}`);
-    
-    // Direct navigation to login endpoint with ownerId - it will redirect to Microsoft OAuth
-    // This opens the Microsoft login window where user enters email/password
-    // CRITICAL: Must use window.location.href (not router.push) for OAuth redirects
-    window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
+    // IMMEDIATE redirect - no delays, no checks, just GO
+    const loginUrl = `/api/microsoft/login?ownerId=${ownerId}`;
+    console.log('🚀 REDIRECTING NOW to:', loginUrl);
+    window.location.href = loginUrl;
   };
 
   // Toggle selection
@@ -269,11 +265,13 @@ export default function MicrosoftEmailIngest() {
                 </div>
               </div>
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('🔘 Button clicked!', { ownerId, hasOwner: !!owner });
-                  handleConnectMicrosoft();
+                onClick={() => {
+                  if (!ownerId) {
+                    alert('Please wait for authentication...');
+                    return;
+                  }
+                  // FORCE redirect - no event handling, just redirect
+                  window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
                 }}
                 disabled={!ownerId}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm hover:shadow transition-all"
