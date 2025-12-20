@@ -22,9 +22,11 @@ import { assertValidMicrosoftOAuthConfig, getMicrosoftClientId, getMicrosoftAuth
  * 4. Redirect user to app UI
  */
 export async function GET(request) {
-  // Get app URL once at the top
-  // Use app.ignitegrowth.biz (not ignitegrowth.biz) to match the actual app domain
-  const appUrl = process.env.APP_URL || 'https://app.ignitegrowth.biz';
+  // Get app URL from request origin (server-side)
+  // This is the base URL where we redirect back to frontend after OAuth
+  // We can derive it from the request instead of needing APP_URL env var
+  const appUrl = process.env.APP_URL || 
+    (request.nextUrl.origin || 'https://app.ignitegrowth.biz');
   
   try {
     // Next.js App Router: Use request.nextUrl.searchParams (not new URL(req.url))
