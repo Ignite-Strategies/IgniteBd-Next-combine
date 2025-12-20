@@ -28,6 +28,32 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
+  // Check for OAuth callback success/error in URL params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const success = params.get('success');
+      const errorParam = params.get('error');
+      
+      if (success === '1') {
+        // OAuth completed successfully - clear URL params and refresh status
+        window.history.replaceState({}, '', '/contacts/ingest/microsoft');
+        // Status will be refreshed in initialize()
+      }
+      
+      if (errorParam) {
+        // OAuth error - show error message
+        setError(errorParam === 'owner_not_found' 
+          ? 'Unable to identify your account. Please try again.'
+          : errorParam === 'no_authorization_code_provided'
+          ? 'Authorization was cancelled or incomplete'
+          : errorParam);
+        // Clear URL params
+        window.history.replaceState({}, '', '/contacts/ingest/microsoft');
+      }
+    }
+  }, []);
+
   // Check Microsoft OAuth status and load preview on mount
   useEffect(() => {
     async function initialize() {
@@ -42,7 +68,10 @@ export default function MicrosoftEmailIngest() {
         }
       } catch (err) {
         console.error('Failed to initialize:', err);
-        setError(err.response?.data?.error || err.message || 'Failed to initialize');
+        // Don't set error on 401 - that's expected when not connected
+        if (err.response?.status !== 401) {
+          setError(err.response?.data?.error || err.message || 'Failed to initialize');
+        }
       } finally {
         setLoading(false);
       }

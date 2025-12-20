@@ -38,7 +38,7 @@ export async function GET(request) {
     if (error) {
       console.error('OAuth error:', error, errorDescription);
       return NextResponse.redirect(
-        `${appUrl}/settings/integrations?error=${encodeURIComponent(error)}`
+        `${appUrl}/contacts/ingest/microsoft?error=${encodeURIComponent(error)}`
       );
     }
 
@@ -53,7 +53,7 @@ export async function GET(request) {
     if (!code) {
       console.error('❌ No authorization code provided in callback');
       return NextResponse.redirect(
-        `${appUrl}/settings/integrations?error=no_authorization_code_provided`
+        `${appUrl}/contacts/ingest/microsoft?error=no_authorization_code_provided`
       );
     }
 
@@ -190,7 +190,7 @@ export async function GET(request) {
     if (!ownerId) {
       console.error('❌ Cannot save tokens: ownerId not found');
       return NextResponse.redirect(
-        `${appUrl}/settings/integrations?error=owner_not_found`
+        `${appUrl}/contacts/ingest/microsoft?error=owner_not_found`
       );
     }
 
@@ -213,14 +213,14 @@ export async function GET(request) {
 
     console.log('✅ Microsoft OAuth tokens stored for owner:', ownerId);
 
-    // Redirect to success page
+    // Redirect back to contacts ingest page (where user started OAuth flow)
     return NextResponse.redirect(
-      `${appUrl}/settings/integrations?success=1`
+      `${appUrl}/contacts/ingest/microsoft?success=1`
     );
   } catch (err) {
     console.error('OAuth callback error:', err);
     return NextResponse.redirect(
-      `${appUrl}/settings/integrations?error=${encodeURIComponent(err.message || 'oauth_failed')}`
+      `${appUrl}/contacts/ingest/microsoft?error=${encodeURIComponent(err.message || 'oauth_failed')}`
     );
   }
 }
