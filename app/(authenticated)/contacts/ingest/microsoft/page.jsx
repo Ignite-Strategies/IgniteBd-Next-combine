@@ -269,7 +269,12 @@ export default function MicrosoftEmailIngest() {
                 </div>
               </div>
               <button
-                onClick={handleConnectMicrosoft}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🔘 Button clicked!', { ownerId, hasOwner: !!owner });
+                  handleConnectMicrosoft();
+                }}
                 disabled={!ownerId}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm hover:shadow transition-all"
               >
