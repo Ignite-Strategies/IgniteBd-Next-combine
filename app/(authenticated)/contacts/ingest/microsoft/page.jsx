@@ -99,33 +99,17 @@ export default function MicrosoftEmailIngest() {
       return; // Wait for owner from hook
     }
     
+    // Compute isConnected inside effect (not as dependency)
+    // This prevents infinite loops when owner updates
+    const isConnected = !!owner?.microsoftAccessToken;
+    
     // Only load preview if connected AND we don't already have preview data
     // This prevents infinite loops
     if (isConnected && !preview) {
       console.log('✅ Microsoft connected, loading preview...');
       loadPreview();
     }
-  }, [ownerId, owner, isConnected]); // Removed loadPreview and preview from deps to prevent loops
-
-  // Redirect to OAuth if not connected
-  // IMPORTANT: OAuth login must use direct navigation, not AJAX
-  // The /api/microsoft/login endpoint redirects to Microsoft OAuth
-  // AJAX requests can't follow OAuth redirects due to CORS
-  // Direct navigation (window.location.href) is the correct pattern
-  // 
-  // CRITICAL: Pass ownerId as query param so callback can find the owner
-  // ownerId comes from useOwner hook (resolved from Firebase auth via hook)
-  const handleConnectMicrosoft = () => {
-    if (!ownerId) {
-      alert('Please wait for authentication to complete.');
-      return;
-    }
-    
-    // IMMEDIATE redirect - no delays, no checks, just GO
-    const loginUrl = `/api/microsoft/login?ownerId=${ownerId}`;
-    console.log('🚀 REDIRECTING NOW to:', loginUrl);
-    window.location.href = loginUrl;
-  };
+  }, [ownerId, owner, loadPreview, preview]); // Include all dependencies to prevent stale closures
 
   // Toggle selection
   function toggleSelect(previewId) {
@@ -247,7 +231,10 @@ export default function MicrosoftEmailIngest() {
                 </div>
               </div>
               <button
-                onClick={handleConnectMicrosoft}
+                onClick={() => {
+                  // OAuth login is navigation, not data fetching
+                  window.location.href = '/api/microsoft/login';
+                }}
                 className="text-sm text-blue-600 hover:text-blue-800"
               >
                 Reconnect
