@@ -94,9 +94,9 @@ export async function GET(request) {
     return NextResponse.redirect(authUrl);
   } catch (error) {
     console.error('Microsoft OAuth login error:', error);
-    const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
+    const appUrl = process.env.APP_URL || 'https://app.ignitegrowth.biz';
     return NextResponse.redirect(
-      `${appUrl}/settings/integrations?error=${encodeURIComponent(error.message || 'Failed to initiate OAuth flow')}`
+      `${appUrl}/contacts/ingest/microsoft?error=${encodeURIComponent(error.message || 'Failed to initiate OAuth flow')}`
     );
   }
 }
