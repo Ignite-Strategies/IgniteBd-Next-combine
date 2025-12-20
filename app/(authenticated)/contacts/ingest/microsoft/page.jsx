@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
 
@@ -16,6 +18,20 @@ export default function MicrosoftEmailIngest() {
   const [selectedPreviewIds, setSelectedPreviewIds] = useState(new Set());
   const [saveResult, setSaveResult] = useState(null);
   const [error, setError] = useState(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
+
+  // Wait for Firebase auth to be ready before making API calls
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setAuthInitialized(true);
+      } else {
+        setAuthInitialized(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Get companyHQId from localStorage and initialize
   useEffect(() => {
@@ -55,10 +71,15 @@ export default function MicrosoftEmailIngest() {
   }, []);
 
   // Check Microsoft OAuth status and load preview on mount
+  // CRITICAL: Wait for Firebase auth to be initialized before making API calls
+  // This ensures the Axios interceptor can attach the Firebase token
   useEffect(() => {
+    if (!authInitialized) return; // Wait for Firebase auth
+
     async function initialize() {
       try {
-        // Check Microsoft status
+        setLoading(true);
+        // Check Microsoft status (Axios will attach Firebase token via interceptor)
         const statusResponse = await api.get('/api/microsoft/status');
         setMicrosoftStatus(statusResponse.data?.microsoftAuth || null);
 
@@ -77,7 +98,7 @@ export default function MicrosoftEmailIngest() {
       }
     }
     initialize();
-  }, []);
+  }, [authInitialized]);
 
   // Load preview from API
   async function loadPreview() {
