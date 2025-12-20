@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 
 /**
@@ -8,6 +10,9 @@ import api from '@/lib/api';
  * 
  * Manages owner and companyHQId hydration from localStorage and API.
  * Hydrate uses Firebase ID from token to find owner and ALL memberships.
+ * 
+ * IMPORTANT: Waits for Firebase auth to initialize before calling hydrate API.
+ * This prevents 401 errors when hook mounts before Firebase is ready.
  * 
  * @returns {Object} { ownerId, owner, companyHQId, companyHQ, memberships, loading, hydrated, error }
  */
@@ -20,6 +25,7 @@ export function useOwner() {
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const hasHydratedRef = useRef(false);
 
   // Load from localStorage first (instant)
@@ -73,9 +79,27 @@ export function useOwner() {
     setLoading(false);
   }, []);
 
-  // Hydrate once - uses Firebase ID from token to find owner
+  // Wait for Firebase auth to initialize before hydrating
+  // CRITICAL: This prevents 401 errors when hook mounts before Firebase is ready
   useEffect(() => {
-    if (hasHydratedRef.current) return;
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setAuthInitialized(true);
+      } else {
+        // User not authenticated - still mark as initialized so we can handle gracefully
+        setAuthInitialized(true);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Hydrate once - uses Firebase ID from token to find owner
+  // CRITICAL: Only hydrate after Firebase auth is initialized
+  // This ensures Axios interceptor can attach Firebase token
+  useEffect(() => {
+    if (!authInitialized) return; // Wait for Firebase auth
+    if (hasHydratedRef.current) return; // Already hydrated
     hasHydratedRef.current = true;
 
     const hydrate = async () => {
@@ -114,14 +138,17 @@ export function useOwner() {
         }
       } catch (err) {
         console.error('Error hydrating owner:', err);
-        setError(err.message || 'Failed to hydrate owner data');
+        // Don't set error on 401 - that's expected when not authenticated
+        if (err.response?.status !== 401) {
+          setError(err.message || 'Failed to hydrate owner data');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     hydrate();
-  }, []);
+  }, [authInitialized]);
 
   return {
     ownerId,
