@@ -74,20 +74,13 @@ export default function MicrosoftEmailIngest() {
   }
 
   // Redirect to OAuth if not connected
+  // IMPORTANT: OAuth login must use direct navigation, not AJAX
+  // The /api/microsoft/login endpoint redirects to Microsoft OAuth
+  // AJAX requests can't follow OAuth redirects due to CORS
+  // Direct navigation (window.location.href) is the correct pattern
   function handleConnectMicrosoft() {
-    // Use API call with token to get authUrl (includes ownerId in state)
-    api.get('/api/microsoft/login')
-      .then(response => {
-        if (response.data?.authUrl) {
-          window.location.href = response.data.authUrl;
-        } else {
-          setError('Failed to get Microsoft login URL');
-        }
-      })
-      .catch(err => {
-        console.error('Failed to initiate Microsoft login:', err);
-        setError(err.response?.data?.error || 'Failed to connect Microsoft account');
-      });
+    // Direct navigation to login endpoint - it will redirect to Microsoft OAuth
+    window.location.href = '/api/microsoft/login';
   }
 
   // Toggle selection

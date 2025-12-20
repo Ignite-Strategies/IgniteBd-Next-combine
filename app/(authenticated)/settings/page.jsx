@@ -154,22 +154,13 @@ export default function SettingsPage() {
   }, [owner, companyHQ, ownerId, authInitialized, fetchConnectionStatus, fetchSendGridConfig]);
 
   // Handle Microsoft connection
+  // IMPORTANT: OAuth login must use direct navigation, not AJAX
+  // The /api/microsoft/login endpoint redirects to Microsoft OAuth
+  // AJAX requests can't follow OAuth redirects due to CORS
+  // Direct navigation (window.location.href) is the correct pattern
   const handleConnectMicrosoft = async () => {
-    try {
-      // Make authenticated API call to get OAuth URL
-      const response = await api.get('/api/microsoft/login');
-      
-      // If the response is a redirect, follow it
-      if (response.data?.authUrl) {
-        window.location.href = response.data.authUrl;
-      } else if (response.request?.responseURL) {
-        // Handle redirect response
-        window.location.href = response.request.responseURL;
-      }
-    } catch (err) {
-      console.error('Failed to initiate Microsoft OAuth:', err);
-      setError(err.response?.data?.error || 'Failed to connect Microsoft account');
-    }
+    // Direct navigation to login endpoint - it will redirect to Microsoft OAuth
+    window.location.href = '/api/microsoft/login';
   };
 
   // Handle profile update
