@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { prisma } from '@/lib/prisma';
+import { assertValidMicrosoftOAuthConfig, getMicrosoftClientId, getMicrosoftAuthority } from '@/lib/microsoftOAuthGuardrails';
 
 /**
  * GET /api/microsoft/callback
@@ -27,9 +28,14 @@ export async function GET(req) {
       );
     }
 
-    // CRITICAL: Microsoft OAuth sends authorization code, NOT access token
-    // The code must be exchanged for tokens via /token endpoint
-    // If code is missing, the OAuth flow failed
+    // CRITICAL: Microsoft OAuth uses Authorization Code Flow
+    // Microsoft redirects back with ?code= (authorization code), NOT access_token
+    // The code is a one-time use token that we exchange server-side for real tokens
+    // 
+    // Why Microsoft returns code, not token:
+    // - Security: Access tokens never appear in browser URL or redirect
+    // - Server-side exchange requires client_secret (kept secret on server)
+    // - Code is single-use and short-lived (prevents replay attacks)
     if (!code) {
       console.error('❌ No authorization code provided in callback');
       return NextResponse.redirect(
@@ -54,13 +60,26 @@ export async function GET(req) {
       // Continue - we'll try to find owner by email
     }
 
+    // Get validated OAuth configuration
+    // CRITICAL: Must use AZURE_CLIENT_ID, never AZURE_TENANT_ID
+    // Authority must be "common" for token exchange (matches login endpoint)
+    const clientId = getMicrosoftClientId();
+    const authority = getMicrosoftAuthority();
+    
+    // Runtime assertion: Fail fast if configuration is wrong
+    assertValidMicrosoftOAuthConfig(clientId, authority);
+
     // MSAL configuration for server-side token exchange
-    // Use 'common' endpoint to accept tokens from any tenant
-    // The actual tenant ID will be extracted from the ID token
+    // IMPORTANT: We use "common" authority here to match the login endpoint
+    // This ensures we can exchange codes from any tenant (personal or work/school)
+    // The actual tenant ID is extracted from the ID token and stored for future token refresh
+    // 
+    // NOTE: Token refresh uses tenant-specific authority (see microsoftGraphClient.js)
+    // But initial OAuth flow (login + callback) MUST use "common"
     const msalConfig = {
       auth: {
-        clientId: process.env.AZURE_CLIENT_ID,
-        authority: 'https://login.microsoftonline.com/common', // Multi-tenant endpoint
+        clientId: clientId, // Validated: Must be AZURE_CLIENT_ID, never AZURE_TENANT_ID
+        authority: authority, // Validated: Must be "common" for multi-tenant support
         clientSecret: process.env.AZURE_CLIENT_SECRET,
       },
     };

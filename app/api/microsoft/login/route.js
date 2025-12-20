@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { assertValidMicrosoftOAuthConfig, getMicrosoftClientId, getMicrosoftAuthority } from '@/lib/microsoftOAuthGuardrails';
 
 /**
  * GET /api/microsoft/login
@@ -43,7 +44,21 @@ export async function GET(request) {
     
     const encodedState = Buffer.from(JSON.stringify(stateData)).toString('base64url');
 
+    // Get validated OAuth configuration
+    // CRITICAL: Must use AZURE_CLIENT_ID, never AZURE_TENANT_ID
+    // Authority must be "common" for multi-tenant support (personal + work/school accounts)
+    const clientId = getMicrosoftClientId();
+    const authority = getMicrosoftAuthority();
+    
+    // Runtime assertion: Fail fast if configuration is wrong
+    // This prevents silent failures where personal accounts can't sign in
+    assertValidMicrosoftOAuthConfig(clientId, authority);
+
     // Build Microsoft OAuth authorization URL
+    // IMPORTANT: Microsoft OAuth uses Authorization Code Flow:
+    // 1. User authenticates with Microsoft → Microsoft redirects back with ?code= (authorization code)
+    // 2. We exchange the code server-side for access_token + refresh_token
+    // Microsoft NEVER sends access_token directly in the redirect
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://ignitegrowth.biz/api/microsoft/callback';
     
     const scopes = [
@@ -60,15 +75,14 @@ export async function GET(request) {
     ].join(' ');
     
     const params = new URLSearchParams({
-      client_id: process.env.AZURE_CLIENT_ID,
-      response_type: 'code', // Authorization Code Flow - Microsoft will return ?code=, NOT a token
+      client_id: clientId, // Validated: Must be AZURE_CLIENT_ID, never AZURE_TENANT_ID
+      response_type: 'code', // Authorization Code Flow - Microsoft returns ?code=, NOT access_token
       redirect_uri: redirectUri,
       response_mode: 'query',
       scope: scopes,
       state: encodedState,
     });
 
-    const authority = 'https://login.microsoftonline.com/common';
     const authUrl = `${authority}/oauth2/v2.0/authorize?${params}`;
 
     // Always redirect to Microsoft OAuth
