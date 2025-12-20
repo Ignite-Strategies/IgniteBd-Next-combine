@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { prisma } from '@/lib/prisma';
 import { exchangeMicrosoftAuthCode } from '@/lib/microsoftTokenExchange';
+import { getRedis } from '@/lib/redis';
+import crypto from 'crypto';
 
 /**
  * GET /api/microsoft/callback
  * 
- * SERVER-SIDE ONLY: Handles Microsoft OAuth callback
+ * ROUTE 3: Accept Microsoft tokens
  * 
- * Required order:
- * 1. Verify Firebase auth
- * 2. Resolve ownerId from Firebase UID
- * 3. Call exchangeMicrosoftAuthCode (pure service)
- * 4. Persist tokens to Owner
- * 5. Redirect user back to app
+ * This route receives the OAuth callback from Microsoft with an authorization code.
+ * It exchanges the code for tokens and stores them temporarily in Redis.
+ * 
+ * IMPORTANT: This route does NOT require Firebase auth.
+ * Microsoft redirects here, so there's no Firebase token available.
+ * 
+ * Flow:
+ * 1. Receive authorization code from Microsoft
+ * 2. Exchange code for tokens (pure service)
+ * 3. Store tokens temporarily in Redis with a session ID
+ * 4. Redirect to frontend with session ID
  */
 export async function GET(request) {
   const appUrl = process.env.APP_URL || 
@@ -41,51 +46,32 @@ export async function GET(request) {
       );
     }
 
-    // STEP 1: Verify Firebase auth
-    // Firebase is the ONLY identity system - ownerId comes from Firebase UID
-    const firebaseUser = await verifyFirebaseToken(request);
-
-    // STEP 2: Resolve ownerId from Firebase UID
-    // Microsoft OAuth does NOT define identity - ownerId comes from Firebase
-    const owner = await prisma.owners.findUnique({
-      where: { firebaseId: firebaseUser.uid },
-    });
-
-    if (!owner) {
-      console.error('❌ Cannot save tokens: Owner not found for Firebase UID:', firebaseUser.uid);
-      return NextResponse.redirect(
-        `${appUrl}/contacts/ingest/microsoft?error=owner_not_found`
-      );
-    }
-
-    const ownerId = owner.id;
-
-    // STEP 3: Exchange authorization code for tokens (pure service)
-    // This is infrastructure - no identity, no database, just token exchange
+    // Exchange authorization code for tokens (pure service)
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://app.ignitegrowth.biz/api/microsoft/callback';
     const tokenData = await exchangeMicrosoftAuthCode({
       code,
       redirectUri,
     });
 
-    // STEP 4: Persist tokens to Owner
-    await prisma.owners.update({
-      where: { id: ownerId },
-      data: {
-        microsoftAccessToken: tokenData.accessToken,
-        microsoftRefreshToken: tokenData.refreshToken,
-        microsoftExpiresAt: tokenData.expiresAt,
-        microsoftEmail: tokenData.email,
-        microsoftDisplayName: tokenData.displayName,
-        microsoftTenantId: tokenData.tenantId,
-      },
-    });
+    // Generate a temporary session ID to store tokens
+    // This allows the frontend to retrieve tokens after Firebase auth is verified
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    const redisKey = `microsoft_oauth_session:${sessionId}`;
+    
+    // Store tokens in Redis with 5 minute TTL (enough time for user to return)
+    const redisClient = getRedis();
+    await redisClient.setex(
+      redisKey,
+      5 * 60, // 5 minutes
+      JSON.stringify(tokenData)
+    );
 
-    console.log('✅ Microsoft OAuth tokens stored for owner:', ownerId);
+    console.log('✅ Microsoft tokens exchanged and stored temporarily:', sessionId);
 
-    // STEP 5: Redirect user back to app
+    // Redirect to frontend with session ID
+    // Frontend will call /api/microsoft/tokens/save with this session ID
     return NextResponse.redirect(
-      `${appUrl}/contacts/ingest/microsoft?success=1`
+      `${appUrl}/contacts/ingest/microsoft?oauth_session=${sessionId}`
     );
   } catch (err) {
     console.error('OAuth callback error:', err);
@@ -94,4 +80,3 @@ export async function GET(request) {
     );
   }
 }
-
