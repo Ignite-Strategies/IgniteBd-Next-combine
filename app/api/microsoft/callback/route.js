@@ -1,27 +1,34 @@
+/**
+ * OAuth invariant:
+ * - client_id identifies the app
+ * - state carries internal owner context
+ * - ownerId is NEVER sent as a query param
+ * - callback must decode state to resolve owner
+ */
+
 import { NextResponse } from 'next/server';
 import { exchangeMicrosoftAuthCode } from '@/lib/microsoftTokenExchange';
-import { getRedis } from '@/lib/redis';
-import crypto from 'crypto';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/microsoft/callback
  * 
- * ROUTE 3: Accept Microsoft tokens (NO database writes, NO navigation logic)
+ * OAuth callback route - decodes state to get ownerId and saves tokens directly
  * 
- * This route receives the OAuth callback from Microsoft with an authorization code.
- * It exchanges the code for tokens and stores them temporarily in Redis.
+ * Flow:
+ * 1. Receive authorization code and state from Microsoft
+ * 2. Decode state to extract ownerId
+ * 3. Exchange code for tokens
+ * 4. Save tokens directly to owner record using ownerId from state
+ * 5. Redirect to frontend with success
  * 
  * IMPORTANT: This route does NOT:
  * - Require Firebase auth
- * - Write to database
- * - Resolve ownerId
- * - Handle business logic
+ * - Call /api/owner/hydrate
+ * - Infer owner identity
+ * - Use Redis temporary storage
  * 
- * Flow:
- * 1. Receive authorization code from Microsoft
- * 2. Exchange code for tokens (pure service)
- * 3. Store tokens temporarily in Redis with session ID
- * 4. Redirect to frontend with session ID
+ * Owner identity comes exclusively from OAuth state.
  */
 export async function GET(request) {
   const appUrl = process.env.APP_URL || 
@@ -30,55 +37,74 @@ export async function GET(request) {
   try {
     // Extract OAuth callback parameters
     const code = request.nextUrl.searchParams.get('code');
+    const rawState = request.nextUrl.searchParams.get('state');
     const error = request.nextUrl.searchParams.get('error');
     const errorDescription = request.nextUrl.searchParams.get('error_description');
 
     // Check for OAuth errors
     if (error) {
-      console.error('OAuth error:', error, errorDescription);
       return NextResponse.redirect(
         `${appUrl}/contacts/ingest/microsoft?error=${encodeURIComponent(error)}`
       );
     }
 
-    // CRITICAL: Authorization code is required
-    if (!code) {
-      console.error('❌ No authorization code provided in callback');
+    // CRITICAL: Authorization code and state are required
+    if (!code || !rawState) {
       return NextResponse.redirect(
-        `${appUrl}/contacts/ingest/microsoft?error=no_authorization_code_provided`
+        `${appUrl}/contacts/ingest/microsoft?error=invalid_oauth_callback`
       );
     }
 
-    // Exchange authorization code for tokens (pure service)
-    // This is infrastructure - no identity, no database, just token exchange
+    // Decode state to extract ownerId
+    let ownerId;
+    try {
+      const stateData = JSON.parse(decodeURIComponent(rawState));
+      ownerId = stateData.ownerId;
+      
+      // Validate state timestamp (prevent replay attacks)
+      if (stateData.ts && Date.now() - stateData.ts > 10 * 60 * 1000) {
+        return NextResponse.redirect(
+          `${appUrl}/contacts/ingest/microsoft?error=state_expired`
+        );
+      }
+    } catch (err) {
+      return NextResponse.redirect(
+        `${appUrl}/contacts/ingest/microsoft?error=invalid_state`
+      );
+    }
+
+    if (!ownerId) {
+      return NextResponse.redirect(
+        `${appUrl}/contacts/ingest/microsoft?error=missing_owner_context`
+      );
+    }
+
+    // Exchange authorization code for tokens
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://app.ignitegrowth.biz/api/microsoft/callback';
     const tokenData = await exchangeMicrosoftAuthCode({
       code,
       redirectUri,
     });
 
-    // Generate a temporary session ID to store tokens
-    // Frontend will use this session ID to save tokens after Firebase auth
-    const sessionId = crypto.randomBytes(32).toString('hex');
-    const redisKey = `microsoft_oauth_session:${sessionId}`;
-    
-    // Store tokens in Redis with 5 minute TTL
-    const redisClient = getRedis();
-    await redisClient.setex(
-      redisKey,
-      5 * 60, // 5 minutes
-      JSON.stringify(tokenData)
-    );
+    // Save tokens directly to owner record using ownerId from state
+    // No hydration, no Firebase inference, no guessing
+    await prisma.owners.update({
+      where: { id: ownerId },
+      data: {
+        microsoftAccessToken: tokenData.accessToken,
+        microsoftRefreshToken: tokenData.refreshToken,
+        microsoftExpiresAt: tokenData.expiresAt ? new Date(tokenData.expiresAt) : null,
+        microsoftEmail: tokenData.email,
+        microsoftDisplayName: tokenData.displayName,
+        microsoftTenantId: tokenData.tenantId,
+      },
+    });
 
-    console.log('✅ Microsoft tokens exchanged and stored temporarily:', sessionId);
-
-    // Redirect to frontend with session ID
-    // Frontend will call /api/microsoft/tokens/save with this session ID
+    // Redirect to frontend with success
     return NextResponse.redirect(
-      `${appUrl}/contacts/ingest/microsoft?oauth_session=${sessionId}`
+      `${appUrl}/contacts/ingest/microsoft?success=1`
     );
   } catch (err) {
-    console.error('OAuth callback error:', err);
     return NextResponse.redirect(
       `${appUrl}/contacts/ingest/microsoft?error=${encodeURIComponent(err.message || 'oauth_failed')}`
     );

@@ -59,92 +59,46 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Check for OAuth callback session ID and save tokens
-  // CRITICAL: Add gating checks BEFORE calling API - prevent invalid requests
+  // Handle OAuth callback result
+  // Callback now saves tokens directly - we just handle success/error display
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const oauthSession = params.get('oauth_session');
+      const success = params.get('success');
       const errorParam = params.get('error');
+      
+      // Clear URL params immediately
+      window.history.replaceState({}, '', '/contacts/ingest/microsoft');
+      
+      // Handle OAuth success
+      if (success === '1') {
+        setUiState(UI_STATES.SUCCESS);
+        setErrorMessage(null);
+        // Owner hook will refresh automatically, then preview will load
+        return;
+      }
       
       // Handle OAuth errors from callback
       if (errorParam) {
         setUiState(UI_STATES.RECONNECT_MICROSOFT);
         setErrorMessage(
-          errorParam === 'ownerId_not_found' || errorParam === 'owner_not_found'
+          errorParam === 'ownerId_required'
+            ? 'Owner context required. Please try again.'
+            : errorParam === 'invalid_oauth_callback'
+            ? 'Invalid OAuth callback. Please try again.'
+            : errorParam === 'invalid_state'
+            ? 'OAuth state invalid. Please try again.'
+            : errorParam === 'state_expired'
+            ? 'OAuth session expired. Please try again.'
+            : errorParam === 'missing_owner_context'
             ? 'Unable to identify your account. Please try again.'
             : errorParam === 'no_authorization_code_provided'
             ? 'Authorization was cancelled or incomplete'
-            : errorParam === 'invalid_state'
-            ? 'OAuth session expired. Please try again.'
             : 'OAuth error occurred. Please try again.'
         );
-        window.history.replaceState({}, '', '/contacts/ingest/microsoft');
-        return;
-      }
-      
-      // If we have a session ID from OAuth callback, save tokens
-      if (oauthSession) {
-        // Clear URL params immediately
-        window.history.replaceState({}, '', '/contacts/ingest/microsoft');
-        
-        // GATING CHECKS: Prevent invalid requests before calling API
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-          setUiState(UI_STATES.LOGIN_REQUIRED);
-          setErrorMessage('Please sign in to continue');
-          return;
-        }
-        
-        if (!ownerId) {
-          setUiState(UI_STATES.LOGIN_REQUIRED);
-          setErrorMessage('Account not loaded. Please refresh the page.');
-          return;
-        }
-        
-        // All checks passed - save tokens
-        const saveTokens = async () => {
-          try {
-            const response = await api.post('/api/microsoft/tokens/save', {
-              sessionId: oauthSession,
-            });
-            
-            if (response.data?.success) {
-              setUiState(UI_STATES.SUCCESS);
-              setErrorMessage(null);
-              // Owner hook will refresh automatically, then preview will load
-            } else {
-              // Backend returned error (shouldn't happen with new error format)
-              setUiState(UI_STATES.RETRY);
-              setErrorMessage(response.data?.message || 'Failed to save tokens');
-            }
-          } catch (err) {
-            // Axios interceptor transforms errors to structured format
-            switch (err.action) {
-              case 'LOGIN_REQUIRED':
-                setUiState(UI_STATES.LOGIN_REQUIRED);
-                setErrorMessage('Please sign in to continue');
-                break;
-              case 'RECONNECT_MICROSOFT':
-                setUiState(UI_STATES.RECONNECT_MICROSOFT);
-                setErrorMessage(err.message || 'Please reconnect your Microsoft account');
-                break;
-              case 'RELOAD_APP':
-                setUiState(UI_STATES.LOGIN_REQUIRED);
-                setErrorMessage('Account not found. Please refresh the page.');
-                break;
-              case 'RETRY':
-              default:
-                setUiState(UI_STATES.RETRY);
-                setErrorMessage(err.message || 'Failed to save tokens. Please try again.');
-            }
-          }
-        };
-        
-        saveTokens();
       }
     }
-  }, [ownerId]); // Wait for ownerId before saving tokens
+  }, []); // Only run once on mount
 
   // Load preview from API
   // Memoized with useCallback to prevent infinite loops in useEffect

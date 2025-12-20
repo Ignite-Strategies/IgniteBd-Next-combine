@@ -21,23 +21,37 @@ import { getMicrosoftClientId } from '@/lib/microsoftOAuthGuardrails';
  * 
  * Its ONLY job is to get the browser out of the app.
  */
+/**
+ * OAuth invariant:
+ * - client_id identifies the app
+ * - state carries internal owner context
+ * - ownerId is NEVER sent as a query param
+ * - callback must decode state to resolve owner
+ */
 export async function GET(request) {
   try {
-    // Get ownerId from query params (optional - passed from frontend if available)
+    // Get ownerId from query params (required - passed from frontend)
     const ownerId = request.nextUrl.searchParams.get('ownerId');
+    
+    if (!ownerId) {
+      const appUrl = process.env.APP_URL || 
+        (request.nextUrl.origin || 'https://app.ignitegrowth.biz');
+      return NextResponse.redirect(
+        `${appUrl}/contacts/ingest/microsoft?error=ownerId_required`
+      );
+    }
     
     // Get OAuth configuration
     const clientId = getMicrosoftClientId();
     
-    // Generate state with ownerId and clientId encoded (CSRF protection + identification)
+    // Generate state payload with ownerId, nonce, and timestamp
+    // OAuth state carries owner context - NEVER send ownerId as query param
     const stateData = {
-      timestamp: Date.now(),
-      clientId: clientId, // Always include clientId for identification
+      ownerId,
+      nonce: crypto.randomUUID(),
+      ts: Date.now(),
     };
-    if (ownerId) {
-      stateData.ownerId = ownerId;
-    }
-    const encodedState = Buffer.from(JSON.stringify(stateData)).toString('base64url');
+    const encodedState = encodeURIComponent(JSON.stringify(stateData));
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://app.ignitegrowth.biz/api/microsoft/callback';
     
     const scopes = [
