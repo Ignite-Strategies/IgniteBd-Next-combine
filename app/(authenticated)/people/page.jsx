@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Upload,
   Settings,
   List,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -47,13 +48,15 @@ export default function PeopleHubPage() {
   const router = useRouter();
   const [companyHQId, setCompanyHQId] = useState('');
   const [contactCount, setContactCount] = useState(0);
-  const [checking, setChecking] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const hasRedirectedRef = useRef(false);
 
-  const checkContactCount = useCallback(async (tenantId) => {
-    if (!tenantId) {
-      setChecking(false);
-      return;
-    }
+  // Sync contacts from API (non-blocking, background)
+  const syncContacts = useCallback(async (tenantId, showLoading = false) => {
+    if (!tenantId) return;
+    
+    if (showLoading) setSyncing(true);
+    
     try {
       const response = await api.get(`/api/contacts?companyHQId=${tenantId}`);
 
@@ -62,33 +65,30 @@ export default function PeopleHubPage() {
         const count = contacts.length;
         setContactCount(count);
         
-        // Redirect if no contacts
-        if (count === 0) {
-          router.push('/people/load');
-          return;
-        }
-        
         if (typeof window !== 'undefined') {
           window.localStorage.setItem('contacts', JSON.stringify(contacts));
         }
       } else {
-        setContactCount(0);
+        const count = 0;
+        setContactCount(count);
         if (typeof window !== 'undefined') {
           window.localStorage.setItem('contacts', JSON.stringify([]));
         }
-        // Redirect if no contacts
-        router.push('/people/load');
-        return;
       }
     } catch (error) {
-      console.error('Error checking contacts:', error);
+      console.error('Error syncing contacts:', error);
+      // Don't update state on error - keep cached data
     } finally {
-      setChecking(false);
+      if (showLoading) setSyncing(false);
     }
-  }, [router]);
+  }, []);
 
+  // Load from localStorage immediately (local-first)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    // Prevent multiple redirects
+    if (hasRedirectedRef.current) return;
     
     const storedCompanyHQId =
       window.localStorage.getItem('companyHQId') ||
@@ -96,7 +96,7 @@ export default function PeopleHubPage() {
       '';
     setCompanyHQId(storedCompanyHQId);
 
-    // Check cached contacts first
+    // Load from cache immediately - no API call
     const cachedContacts = window.localStorage.getItem('contacts');
     if (cachedContacts) {
       try {
@@ -104,37 +104,40 @@ export default function PeopleHubPage() {
         const count = contacts.length;
         setContactCount(count);
         
-        // Still check with API to ensure accuracy
-        if (storedCompanyHQId) {
-          checkContactCount(storedCompanyHQId);
-        } else {
-          setChecking(false);
+        // Only redirect if cached count is 0
+        if (count === 0 && storedCompanyHQId) {
+          hasRedirectedRef.current = true;
+          router.push('/people/load');
+          return;
         }
       } catch (error) {
         console.warn('Failed to parse cached contacts', error);
+        // If cache is corrupted, check if we need to redirect
         if (storedCompanyHQId) {
-          checkContactCount(storedCompanyHQId);
-        } else {
-          setChecking(false);
+          hasRedirectedRef.current = true;
+          router.push('/people/load');
+          return;
         }
       }
-    } else if (storedCompanyHQId) {
-      checkContactCount(storedCompanyHQId);
     } else {
-      setChecking(false);
+      // No cache at all - redirect to load if we have companyHQId
+      if (storedCompanyHQId) {
+        hasRedirectedRef.current = true;
+        router.push('/people/load');
+        return;
+      }
     }
-  }, [checkContactCount]);
 
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="mb-2 text-2xl font-bold text-gray-900">Loading...</div>
-          <div className="text-gray-600">Checking your contacts</div>
-        </div>
-      </div>
-    );
-  }
+    // Optional: Sync in background (non-blocking) after a short delay
+    // This keeps data fresh without blocking the UI
+    if (storedCompanyHQId) {
+      const syncTimer = setTimeout(() => {
+        syncContacts(storedCompanyHQId, false);
+      }, 500); // Small delay to let UI render first
+      
+      return () => clearTimeout(syncTimer);
+    }
+  }, [syncContacts]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -149,14 +152,31 @@ export default function PeopleHubPage() {
                 Manage your contacts and prepare for outreach.
               </p>
             </div>
-            {contactCount > 0 && (
-              <div className="text-right">
-                <div className="text-sm text-gray-500">Contacts</div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {contactCount}
+            <div className="flex items-center gap-4">
+              {contactCount > 0 && (
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Contacts</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {contactCount}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+              {companyHQId && (
+                <button
+                  type="button"
+                  onClick={() => syncContacts(companyHQId, true)}
+                  disabled={syncing}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                    syncing
+                      ? 'cursor-not-allowed bg-gray-300 text-gray-500'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  <RefreshCw className={syncing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+                  {syncing ? 'Syncing…' : 'Sync'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

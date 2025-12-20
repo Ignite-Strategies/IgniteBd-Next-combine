@@ -22,7 +22,7 @@ export default function GoogleImportPage() {
               Coming Soon
             </h2>
             <p className="mb-6 text-gray-600">
-              Google Workspace import is currently under development.
+              Google Workspace import is currently under development. This will work similarly to the Microsoft Outlook import, allowing you to extract and import contacts from your Google Workspace account.
             </p>
             <button
               type="button"

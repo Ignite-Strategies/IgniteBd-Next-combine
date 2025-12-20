@@ -1,8 +1,5 @@
 'use client';
 
-// Force dynamic rendering - this page uses searchParams
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles } from 'lucide-react';

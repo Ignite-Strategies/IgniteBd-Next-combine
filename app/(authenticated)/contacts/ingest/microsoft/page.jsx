@@ -75,7 +75,19 @@ export default function MicrosoftEmailIngest() {
 
   // Redirect to OAuth if not connected
   function handleConnectMicrosoft() {
-    window.location.href = '/api/microsoft/login';
+    // Use API call with token to get authUrl (includes ownerId in state)
+    api.get('/api/microsoft/login')
+      .then(response => {
+        if (response.data?.authUrl) {
+          window.location.href = response.data.authUrl;
+        } else {
+          setError('Failed to get Microsoft login URL');
+        }
+      })
+      .catch(err => {
+        console.error('Failed to initiate Microsoft login:', err);
+        setError(err.response?.data?.error || 'Failed to connect Microsoft account');
+      });
   }
 
   // Toggle selection
