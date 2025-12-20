@@ -34,6 +34,8 @@ export default function MicrosoftEmailIngest() {
   }, []);
 
   // Check for OAuth callback success/error in URL params
+  // IMPORTANT: This effect only reads URL params and updates state
+  // It does NOT perform navigation - navigation is user-initiated only
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -43,8 +45,8 @@ export default function MicrosoftEmailIngest() {
       if (success === '1') {
         // OAuth completed successfully - clear URL params
         window.history.replaceState({}, '', '/contacts/ingest/microsoft');
-        // Owner hook will refresh automatically, then useEffect will load preview
-        // No need to manually reload - hook handles it
+        // Owner hook will refresh automatically when page re-renders
+        // The useEffect that loads preview will run when owner updates with new tokens
       }
       
       if (errorParam) {
@@ -233,7 +235,8 @@ export default function MicrosoftEmailIngest() {
               </div>
               <button
                 onClick={() => {
-                  // OAuth login is navigation, not data fetching
+                  // IMPORTANT: OAuth login must use browser navigation.
+                  // Do NOT replace with Axios, fetch, or move into useEffect.
                   window.location.href = '/api/microsoft/login';
                 }}
                 className="text-sm text-blue-600 hover:text-blue-800"
@@ -254,8 +257,8 @@ export default function MicrosoftEmailIngest() {
               </div>
               <button
                 onClick={() => {
-                  // OAuth login is navigation, not data fetching
-                  // Browser MUST visibly leave the app and show Microsoft login page
+                  // IMPORTANT: OAuth login must use browser navigation.
+                  // Do NOT replace with Axios, fetch, or move into useEffect.
                   window.location.href = '/api/microsoft/login';
                 }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm hover:shadow transition-all"
