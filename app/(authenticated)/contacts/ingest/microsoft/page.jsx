@@ -93,26 +93,19 @@ export default function MicrosoftEmailIngest() {
 
   // Load preview if Microsoft is connected (tokens exist)
   // Simple check: owner.microsoftAccessToken exists = connected, show preview
+  // Only run once when owner loads and is connected
   useEffect(() => {
     if (!ownerId || !owner) {
-      console.log('⏳ Waiting for owner from hook...', { ownerId: !!ownerId, owner: !!owner });
       return; // Wait for owner from hook
     }
     
-    console.log('🔍 Checking Microsoft connection:', { 
-      isConnected, 
-      hasToken: !!owner?.microsoftAccessToken,
-      ownerId 
-    });
-    
-    // If tokens exist, load preview automatically
-    if (isConnected) {
+    // Only load preview if connected AND we don't already have preview data
+    // This prevents infinite loops
+    if (isConnected && !preview) {
       console.log('✅ Microsoft connected, loading preview...');
       loadPreview();
-    } else {
-      console.log('⚠️ Microsoft not connected, skipping preview load');
     }
-  }, [ownerId, owner, isConnected, loadPreview]);
+  }, [ownerId, owner, isConnected]); // Removed loadPreview and preview from deps to prevent loops
 
   // Redirect to OAuth if not connected
   // IMPORTANT: OAuth login must use direct navigation, not AJAX
@@ -122,7 +115,7 @@ export default function MicrosoftEmailIngest() {
   // 
   // CRITICAL: Pass ownerId as query param so callback can find the owner
   // ownerId comes from useOwner hook (resolved from Firebase auth via hook)
-  function handleConnectMicrosoft() {
+  const handleConnectMicrosoft = () => {
     if (!ownerId) {
       console.error('❌ Cannot connect: ownerId not available');
       setError('Unable to identify user. Please wait for authentication to complete.');
@@ -130,10 +123,13 @@ export default function MicrosoftEmailIngest() {
     }
     
     console.log('🚀 Initiating Microsoft OAuth flow...', { ownerId });
+    console.log('🔗 Redirecting to:', `/api/microsoft/login?ownerId=${ownerId}`);
+    
     // Direct navigation to login endpoint with ownerId - it will redirect to Microsoft OAuth
     // This opens the Microsoft login window where user enters email/password
+    // CRITICAL: Must use window.location.href (not router.push) for OAuth redirects
     window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
-  }
+  };
 
   // Toggle selection
   function toggleSelect(previewId) {
