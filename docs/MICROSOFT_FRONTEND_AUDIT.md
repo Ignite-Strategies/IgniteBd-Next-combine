@@ -194,3 +194,4 @@ if (success === '1') {
 - Remove `isConnected` from dependencies
 - Delete `handleConnectMicrosoft` function
 - Use direct redirect in Reconnect button
+

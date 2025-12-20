@@ -1,3 +1,13 @@
+/**
+ * NOTE:
+ * Owner hydration happens once during app boot.
+ * Feature routes and OAuth flows MUST NOT hydrate.
+ * OAuth returns tokens only. Save routes attach them.
+ * 
+ * This route is for app bootstrap/welcome flow ONLY.
+ * Do NOT call from feature pages, OAuth callbacks, or token save routes.
+ */
+
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';

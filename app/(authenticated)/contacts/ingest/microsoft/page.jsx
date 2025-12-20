@@ -3,8 +3,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOwner } from '@/hooks/useOwner';
+import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
+
+// UI states for error handling
+const UI_STATES = {
+  SUCCESS: 'SUCCESS',
+  LOGIN_REQUIRED: 'LOGIN_REQUIRED',
+  CONNECT_MICROSOFT: 'CONNECT_MICROSOFT',
+  RECONNECT_MICROSOFT: 'RECONNECT_MICROSOFT',
+  RETRY: 'RETRY',
+};
 
 export default function MicrosoftEmailIngest() {
   const router = useRouter();
@@ -16,7 +26,8 @@ export default function MicrosoftEmailIngest() {
   const [preview, setPreview] = useState(null);
   const [selectedPreviewIds, setSelectedPreviewIds] = useState(new Set());
   const [saveResult, setSaveResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [uiState, setUiState] = useState(null); // UI state instead of raw error
+  const [errorMessage, setErrorMessage] = useState(null); // User-friendly message
   
   // Simple check: tokens exist = connected (green), no tokens = not connected (red)
   // No API calls needed - owner object from hook has all the info
@@ -49,20 +60,49 @@ export default function MicrosoftEmailIngest() {
   }, []);
 
   // Check for OAuth callback session ID and save tokens
-  // IMPORTANT: This effect only reads URL params and calls API
-  // It does NOT perform navigation - navigation is user-initiated only
+  // CRITICAL: Add gating checks BEFORE calling API - prevent invalid requests
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const oauthSession = params.get('oauth_session');
       const errorParam = params.get('error');
       
+      // Handle OAuth errors from callback
+      if (errorParam) {
+        setUiState(UI_STATES.RECONNECT_MICROSOFT);
+        setErrorMessage(
+          errorParam === 'ownerId_not_found' || errorParam === 'owner_not_found'
+            ? 'Unable to identify your account. Please try again.'
+            : errorParam === 'no_authorization_code_provided'
+            ? 'Authorization was cancelled or incomplete'
+            : errorParam === 'invalid_state'
+            ? 'OAuth session expired. Please try again.'
+            : 'OAuth error occurred. Please try again.'
+        );
+        window.history.replaceState({}, '', '/contacts/ingest/microsoft');
+        return;
+      }
+      
       // If we have a session ID from OAuth callback, save tokens
-      if (oauthSession && ownerId) {
+      if (oauthSession) {
         // Clear URL params immediately
         window.history.replaceState({}, '', '/contacts/ingest/microsoft');
         
-        // Save tokens using session ID (Route 4)
+        // GATING CHECKS: Prevent invalid requests before calling API
+        const firebaseUser = auth.currentUser;
+        if (!firebaseUser) {
+          setUiState(UI_STATES.LOGIN_REQUIRED);
+          setErrorMessage('Please sign in to continue');
+          return;
+        }
+        
+        if (!ownerId) {
+          setUiState(UI_STATES.LOGIN_REQUIRED);
+          setErrorMessage('Account not loaded. Please refresh the page.');
+          return;
+        }
+        
+        // All checks passed - save tokens
         const saveTokens = async () => {
           try {
             const response = await api.post('/api/microsoft/tokens/save', {
@@ -70,31 +110,38 @@ export default function MicrosoftEmailIngest() {
             });
             
             if (response.data?.success) {
-              console.log('✅ Microsoft tokens saved successfully');
+              setUiState(UI_STATES.SUCCESS);
+              setErrorMessage(null);
               // Owner hook will refresh automatically, then preview will load
             } else {
-              setError(response.data?.error || 'Failed to save tokens');
+              // Backend returned error (shouldn't happen with new error format)
+              setUiState(UI_STATES.RETRY);
+              setErrorMessage(response.data?.message || 'Failed to save tokens');
             }
           } catch (err) {
-            console.error('Failed to save tokens:', err);
-            setError(err.response?.data?.error || err.message || 'Failed to save tokens');
+            // Axios interceptor transforms errors to structured format
+            switch (err.action) {
+              case 'LOGIN_REQUIRED':
+                setUiState(UI_STATES.LOGIN_REQUIRED);
+                setErrorMessage('Please sign in to continue');
+                break;
+              case 'RECONNECT_MICROSOFT':
+                setUiState(UI_STATES.RECONNECT_MICROSOFT);
+                setErrorMessage(err.message || 'Please reconnect your Microsoft account');
+                break;
+              case 'RELOAD_APP':
+                setUiState(UI_STATES.LOGIN_REQUIRED);
+                setErrorMessage('Account not found. Please refresh the page.');
+                break;
+              case 'RETRY':
+              default:
+                setUiState(UI_STATES.RETRY);
+                setErrorMessage(err.message || 'Failed to save tokens. Please try again.');
+            }
           }
         };
         
         saveTokens();
-      }
-      
-      if (errorParam) {
-        // OAuth error - show error message
-        setError(errorParam === 'ownerId_not_found' || errorParam === 'owner_not_found'
-          ? 'Unable to identify your account. Please try again.'
-          : errorParam === 'no_authorization_code_provided'
-          ? 'Authorization was cancelled or incomplete'
-          : errorParam === 'invalid_state'
-          ? 'OAuth session expired. Please try again.'
-          : errorParam);
-        // Clear URL params
-        window.history.replaceState({}, '', '/contacts/ingest/microsoft');
       }
     }
   }, [ownerId]); // Wait for ownerId before saving tokens
@@ -103,28 +150,32 @@ export default function MicrosoftEmailIngest() {
   // Memoized with useCallback to prevent infinite loops in useEffect
   const loadPreview = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setUiState(null);
+    setErrorMessage(null);
 
     try {
-      console.log('🔄 Loading Microsoft email preview...');
       const response = await api.get('/api/microsoft/email-contacts/preview');
       
       if (response.data?.success) {
-        console.log('✅ Preview loaded:', response.data.items?.length || 0, 'contacts');
         setPreview(response.data);
         setSelectedPreviewIds(new Set()); // Reset selection
         setSaveResult(null); // Clear previous save result
       } else {
-        throw new Error(response.data?.error || 'Failed to load preview');
+        setUiState(UI_STATES.RETRY);
+        setErrorMessage(response.data?.message || 'Failed to load preview');
       }
     } catch (err) {
-      console.error('❌ Failed to load preview:', err);
-      console.error('Error details:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message,
-      });
-      setError(err.response?.data?.error || err.message || 'Failed to load preview');
+      // Axios interceptor transforms errors to structured format
+      switch (err.action) {
+        case 'LOGIN_REQUIRED':
+          setUiState(UI_STATES.LOGIN_REQUIRED);
+          setErrorMessage('Please sign in to continue');
+          break;
+        case 'RETRY':
+        default:
+          setUiState(UI_STATES.RETRY);
+          setErrorMessage(err.message || 'Failed to load preview');
+      }
     } finally {
       setLoading(false);
     }
@@ -179,17 +230,20 @@ export default function MicrosoftEmailIngest() {
   // Save selected contacts
   async function handleSave() {
     if (!companyHQId) {
-      setError('companyHQId is required. Please navigate from a company context.');
+      setUiState(UI_STATES.RETRY);
+      setErrorMessage('Company context required. Please navigate from a company.');
       return;
     }
 
     if (selectedPreviewIds.size === 0) {
-      setError('Please select at least one contact to save');
+      setUiState(UI_STATES.RETRY);
+      setErrorMessage('Please select at least one contact to save');
       return;
     }
 
     setSaving(true);
-    setError(null);
+    setUiState(null);
+    setErrorMessage(null);
 
     try {
       const response = await api.post('/api/microsoft/email-contacts/save', {
@@ -206,11 +260,21 @@ export default function MicrosoftEmailIngest() {
         // Clear selection after save
         setSelectedPreviewIds(new Set());
       } else {
-        throw new Error(response.data?.error || 'Failed to save contacts');
+        setUiState(UI_STATES.RETRY);
+        setErrorMessage(response.data?.message || 'Failed to save contacts');
       }
     } catch (err) {
-      console.error('Save error:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to save contacts');
+      // Axios interceptor transforms errors to structured format
+      switch (err.action) {
+        case 'LOGIN_REQUIRED':
+          setUiState(UI_STATES.LOGIN_REQUIRED);
+          setErrorMessage('Please sign in to continue');
+          break;
+        case 'RETRY':
+        default:
+          setUiState(UI_STATES.RETRY);
+          setErrorMessage(err.message || 'Failed to save contacts');
+      }
     } finally {
       setSaving(false);
     }
@@ -329,17 +393,61 @@ export default function MicrosoftEmailIngest() {
           )}
         </div>
 
-        {/* Error Message */}
-        {error && (
+        {/* Error Message - UI State Based */}
+        {uiState && errorMessage && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-                <p className="text-red-800">{error}</p>
+              <div className="flex-1">
+                <div className="flex items-center mb-2">
+                  <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                  <p className="text-red-800 font-medium">{errorMessage}</p>
+                </div>
+                {/* Action buttons based on UI state */}
+                <div className="flex gap-2 mt-3">
+                  {uiState === UI_STATES.LOGIN_REQUIRED && (
+                    <button
+                      onClick={() => router.push('/welcome')}
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                    >
+                      Go to Sign In
+                    </button>
+                  )}
+                  {uiState === UI_STATES.RECONNECT_MICROSOFT && (
+                    <button
+                      onClick={() => {
+                        if (!ownerId) {
+                          router.push('/welcome');
+                          return;
+                        }
+                        window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    >
+                      Reconnect Microsoft
+                    </button>
+                  )}
+                  {uiState === UI_STATES.RETRY && (
+                    <button
+                      onClick={() => {
+                        setUiState(null);
+                        setErrorMessage(null);
+                        if (isConnected) {
+                          loadPreview();
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
               </div>
               <button
-                onClick={() => setError(null)}
-                className="text-red-600 hover:text-red-800"
+                onClick={() => {
+                  setUiState(null);
+                  setErrorMessage(null);
+                }}
+                className="text-red-600 hover:text-red-800 ml-4"
               >
                 <X className="h-4 w-4" />
               </button>

@@ -4,9 +4,11 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import { useOwner } from '@/hooks/useOwner';
 
 export default function CompanyProfilePage() {
   const router = useRouter();
+  const { owner, companyHQId: ownerCompanyHQId } = useOwner(); // CRITICAL: Use hook exclusively - NO API calls to hydrate
   const [formData, setFormData] = useState({
     companyName: '',
     whatYouDo: '',
@@ -24,6 +26,7 @@ export default function CompanyProfilePage() {
   const [existingCompany, setExistingCompany] = useState(null);
 
   // Check if company already exists on mount - if so, redirect
+  // CRITICAL: Owner must come from hook (already hydrated on welcome) - NO API calls to hydrate
   useEffect(() => {
     const checkExistingCompany = async () => {
       try {
@@ -36,17 +39,11 @@ export default function CompanyProfilePage() {
           return;
         }
 
-        // If no localStorage, check via API
-        const hydrateResponse = await api.get('/api/owner/hydrate');
-        if (hydrateResponse.data?.success && hydrateResponse.data?.owner) {
-          const owner = hydrateResponse.data.owner;
-          const companyHQId = owner.companyHQId;
-
-          if (companyHQId) {
-            // Company exists - redirect
-            router.push('/company/create-success');
-            return;
-          }
+        // If no localStorage, check owner from hook
+        if (owner && ownerCompanyHQId) {
+          // Company exists - redirect
+          router.push('/company/create-success');
+          return;
         }
       } catch (err) {
         console.warn('Could not check for existing company:', err);
@@ -57,7 +54,7 @@ export default function CompanyProfilePage() {
     };
 
     checkExistingCompany();
-  }, [router]);
+  }, [router, owner, ownerCompanyHQId]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -93,22 +90,8 @@ export default function CompanyProfilePage() {
         localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
       }
 
-      // Refresh owner data
-      try {
-        const hydrateResponse = await api.get('/api/owner/hydrate');
-        if (hydrateResponse.data.success && hydrateResponse.data.owner) {
-          localStorage.setItem('ownerId', hydrateResponse.data.owner.id);
-          localStorage.setItem('owner', JSON.stringify(hydrateResponse.data.owner));
-          if (hydrateResponse.data.owner.companyHQId) {
-            localStorage.setItem('companyHQId', hydrateResponse.data.owner.companyHQId);
-          }
-          if (hydrateResponse.data.owner.companyHQ) {
-            localStorage.setItem('companyHQ', JSON.stringify(hydrateResponse.data.owner.companyHQ));
-          }
-        }
-      } catch (err) {
-        console.warn('Could not refresh owner data:', err);
-      }
+      // CRITICAL: NO API calls to hydrate - owner data will refresh naturally via hook on next page load
+      // Just update localStorage from response - hook will pick it up
 
       router.push('/company/create-success');
     } catch (error) {

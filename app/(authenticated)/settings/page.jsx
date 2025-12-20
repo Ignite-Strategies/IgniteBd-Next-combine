@@ -135,22 +135,13 @@ export default function SettingsPage() {
       fetchSendGridConfig();
     }
     // Note: Microsoft connection status now comes from owner hook (no API call needed)
-
-    // Check SuperAdmin status
-    const checkSuperAdmin = async () => {
-      try {
-        console.log('🚀 Settings: Calling /api/owner/hydrate');
-        const response = await api.get('/api/owner/hydrate');
-        if (response.data?.success) {
-          setIsSuperAdmin(response.data.isSuperAdmin === true);
-        }
-      } catch (err) {
-        console.error('❌ Settings: Error checking SuperAdmin status:', err);
-      }
-    };
-
-    if (ownerId) {
-      checkSuperAdmin();
+    
+    // CRITICAL: Owner must come from hook (already hydrated on welcome) - NO API calls to hydrate
+    // SuperAdmin status should be available from owner object if needed
+    // If not available, set to false (feature pages must not call hydrate)
+    if (ownerId && owner) {
+      // Use owner from hook - no hydrate call
+      setIsSuperAdmin(owner.isSuperAdmin === true || false);
     }
   }, [owner, companyHQ, ownerId, authInitialized, fetchSendGridConfig]);
 

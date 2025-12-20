@@ -3,10 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react';
-import api from '@/lib/api';
+import { useOwner } from '@/hooks/useOwner';
 
 export default function SetupWizard({ companyHQ, hasContacts = false, onComplete }) {
   const router = useRouter();
+  const { owner } = useOwner(); // CRITICAL: Use hook exclusively - NO API calls to hydrate
   const [hasAssessment, setHasAssessment] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [companyComplete, setCompanyComplete] = useState(false);
@@ -16,30 +17,16 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
   const hasCompany = companyHQ && companyHQ.id;
 
   // Check owner profile completeness
+  // CRITICAL: Owner must come from hook (already hydrated on welcome) - NO API calls to hydrate
   useEffect(() => {
-    const checkProfile = async () => {
-      try {
-        const ownerStr = typeof window !== 'undefined' ? localStorage.getItem('owner') : null;
-        if (ownerStr) {
-          const owner = JSON.parse(ownerStr);
-          // Check if owner has name and email
-          setHasProfile(!!(owner?.name && owner?.email));
-        } else {
-          // Try API
-          const response = await api.get('/api/owner/hydrate');
-          if (response.data?.success && response.data?.owner) {
-            const owner = response.data.owner;
-            setHasProfile(!!(owner?.name && owner?.email));
-          }
-        }
-      } catch (err) {
-        console.warn('Could not check profile:', err);
-        setHasProfile(false);
-      }
-    };
-
-    checkProfile();
-  }, []);
+    if (owner) {
+      // Use owner from hook - check if owner has name and email
+      setHasProfile(!!(owner?.name && owner?.email));
+    } else {
+      // Owner not available from hook - assume incomplete
+      setHasProfile(false);
+    }
+  }, [owner]);
 
   // Check company completeness
   useEffect(() => {
