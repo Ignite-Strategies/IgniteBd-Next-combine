@@ -33,54 +33,36 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Check for OAuth callback session ID and save tokens
-  // IMPORTANT: This effect only reads URL params and calls API
+  // Check for OAuth callback success/error in URL params
+  // IMPORTANT: This effect only reads URL params and updates state
   // It does NOT perform navigation - navigation is user-initiated only
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const oauthSession = params.get('oauth_session');
+      const success = params.get('success');
       const errorParam = params.get('error');
       
-      // If we have a session ID from OAuth callback, save tokens
-      if (oauthSession && ownerId) {
-        // Clear URL params immediately
+      if (success === '1') {
+        // OAuth completed successfully - clear URL params
         window.history.replaceState({}, '', '/contacts/ingest/microsoft');
-        
-        // Save tokens using session ID
-        const saveTokens = async () => {
-          try {
-            const response = await api.post('/api/microsoft/tokens/save', {
-              sessionId: oauthSession,
-            });
-            
-            if (response.data?.success) {
-              console.log('✅ Microsoft tokens saved successfully');
-              // Owner hook will refresh automatically, then preview will load
-            } else {
-              setError(response.data?.error || 'Failed to save tokens');
-            }
-          } catch (err) {
-            console.error('Failed to save tokens:', err);
-            setError(err.response?.data?.error || err.message || 'Failed to save tokens');
-          }
-        };
-        
-        saveTokens();
+        // Owner hook will refresh automatically when page re-renders
+        // The useEffect that loads preview will run when owner updates with new tokens
       }
       
       if (errorParam) {
         // OAuth error - show error message
-        setError(errorParam === 'owner_not_found' 
+        setError(errorParam === 'ownerId_not_found' || errorParam === 'owner_not_found'
           ? 'Unable to identify your account. Please try again.'
           : errorParam === 'no_authorization_code_provided'
           ? 'Authorization was cancelled or incomplete'
+          : errorParam === 'invalid_state'
+          ? 'OAuth session expired. Please try again.'
           : errorParam);
         // Clear URL params
         window.history.replaceState({}, '', '/contacts/ingest/microsoft');
       }
     }
-  }, [ownerId]); // Wait for ownerId before saving tokens
+  }, []);
 
   // Load preview from API
   // Memoized with useCallback to prevent infinite loops in useEffect
@@ -255,9 +237,14 @@ export default function MicrosoftEmailIngest() {
               </div>
               <button
                 onClick={() => {
+                  if (!ownerId) {
+                    alert('Please wait for authentication to complete.');
+                    return;
+                  }
                   // IMPORTANT: OAuth login must use browser navigation.
                   // Do NOT replace with Axios, fetch, or move into useEffect.
-                  window.location.href = '/api/microsoft/login';
+                  // Pass ownerId in URL so callback can save tokens
+                  window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
                 }}
                 className="text-sm text-blue-600 hover:text-blue-800"
               >

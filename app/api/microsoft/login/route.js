@@ -23,8 +23,23 @@ import { getMicrosoftClientId } from '@/lib/microsoftOAuthGuardrails';
  */
 export async function GET(request) {
   try {
-    // Generate state for CSRF protection
-    const state = crypto.randomBytes(32).toString('base64url');
+    // Get ownerId from query params (passed from frontend)
+    const ownerId = request.nextUrl.searchParams.get('ownerId');
+    
+    if (!ownerId) {
+      const appUrl = process.env.APP_URL || 
+        (request.nextUrl.origin || 'https://app.ignitegrowth.biz');
+      return NextResponse.redirect(
+        `${appUrl}/contacts/ingest/microsoft?error=ownerId_required`
+      );
+    }
+    
+    // Generate state with ownerId encoded (CSRF protection + owner identification)
+    const stateData = {
+      timestamp: Date.now(),
+      ownerId: ownerId,
+    };
+    const encodedState = Buffer.from(JSON.stringify(stateData)).toString('base64url');
     
     // Get OAuth configuration
     const clientId = getMicrosoftClientId();
@@ -48,7 +63,7 @@ export async function GET(request) {
       clientId,
       redirectUri,
       scopes,
-      state,
+      state: encodedState,
     });
 
     // IMMEDIATE redirect - browser leaves app, goes to Microsoft
