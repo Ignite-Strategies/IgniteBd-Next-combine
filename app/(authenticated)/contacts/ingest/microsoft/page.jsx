@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
@@ -61,7 +61,8 @@ export default function MicrosoftEmailIngest() {
   }, []);
 
   // Load preview from API
-  const loadPreview = async () => {
+  // Memoized with useCallback to prevent infinite loops in useEffect
+  const loadPreview = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -88,7 +89,7 @@ export default function MicrosoftEmailIngest() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Empty deps - function doesn't depend on any props/state
 
   // Load preview if Microsoft is connected (tokens exist)
   // Simple check: owner.microsoftAccessToken exists = connected, show preview
