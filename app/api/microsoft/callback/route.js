@@ -47,12 +47,14 @@ export async function GET(request) {
       );
     }
 
-    // Decode ownerId from state parameter
+    // Decode ownerId and clientId from state parameter
     let ownerId = null;
+    let clientId = null;
     try {
       if (state) {
         const stateData = JSON.parse(Buffer.from(state, 'base64url').toString());
         ownerId = stateData.ownerId;
+        clientId = stateData.clientId;
         
         // Verify state is recent (within 10 minutes)
         if (Date.now() - stateData.timestamp > 10 * 60 * 1000) {
@@ -66,10 +68,13 @@ export async function GET(request) {
       );
     }
 
+    // Log state data for debugging
+    console.log('📋 OAuth callback state:', { ownerId, clientId });
+
     // If ownerId not in state, callback can't save tokens
     // This is OK - user can reconnect later with ownerId
     if (!ownerId) {
-      console.warn('⚠️ ownerId not found in state parameter - tokens cannot be saved');
+      console.warn('⚠️ ownerId not found in state parameter - tokens cannot be saved', { clientId });
       return NextResponse.redirect(
         `${appUrl}/contacts/ingest/microsoft?error=ownerId_not_found`
       );

@@ -26,17 +26,18 @@ export async function GET(request) {
     // Get ownerId from query params (optional - passed from frontend if available)
     const ownerId = request.nextUrl.searchParams.get('ownerId');
     
-    // Generate state with ownerId encoded if provided (CSRF protection + owner identification)
+    // Get OAuth configuration
+    const clientId = getMicrosoftClientId();
+    
+    // Generate state with ownerId and clientId encoded (CSRF protection + identification)
     const stateData = {
       timestamp: Date.now(),
+      clientId: clientId, // Always include clientId for identification
     };
     if (ownerId) {
       stateData.ownerId = ownerId;
     }
     const encodedState = Buffer.from(JSON.stringify(stateData)).toString('base64url');
-    
-    // Get OAuth configuration
-    const clientId = getMicrosoftClientId();
     const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://app.ignitegrowth.biz/api/microsoft/callback';
     
     const scopes = [
