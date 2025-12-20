@@ -4,61 +4,35 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useLocalStorage } from '@/hooks/useLocalStorage.js';
-
-const getInitialLists = () => [
-  {
-    id: 'demo-q1-outreach',
-    name: 'Q1 Outreach Targets',
-    description: 'High-priority contacts for Q1 outreach campaign',
-    type: 'Campaign',
-    totalContacts: 47,
-    contactIds: [],
-    createdAt: new Date('2024-01-15').toISOString(),
-  },
-  {
-    id: 'demo-event-attendees',
-    name: 'Legal Tech Conference 2024',
-    description: 'All attendees from the Legal Tech Conference',
-    type: 'Event',
-    totalContacts: 128,
-    contactIds: [],
-    createdAt: new Date('2024-02-10').toISOString(),
-  },
-  {
-    id: 'demo-warm-leads',
-    name: 'Warm Leads - Follow Up',
-    description: 'Contacts who have engaged but need follow-up',
-    type: 'Custom',
-    totalContacts: 23,
-    contactIds: [],
-    createdAt: new Date('2024-02-20').toISOString(),
-  },
-];
+import api from '@/lib/api';
 
 export default function ContactListManagerPage() {
   const router = useRouter();
-  const [lists, setLists] = useLocalStorage('contactLists', []);
-  const [campaigns, setCampaigns] = useLocalStorage('campaigns', []);
+  const [lists, setLists] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (lists.length === 0) {
-      const initialLists = getInitialLists();
-      setLists(initialLists);
-      if (campaigns.length === 0) {
-        setCampaigns([
-          {
-            id: 'demo-q1-campaign',
-            name: 'Q1 Outreach Campaign',
-            contactListId: 'demo-q1-outreach',
-            status: 'active',
-            createdAt: new Date('2024-01-15').toISOString(),
-          },
-        ]);
+    const fetchLists = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get('/api/contact-lists');
+        if (response.data?.success) {
+          setLists(response.data.lists || []);
+        } else {
+          setError(response.data?.error || 'Failed to load contact lists');
+        }
+      } catch (err) {
+        console.error('Error fetching contact lists:', err);
+        setError(err.response?.data?.error || 'Failed to load contact lists');
+      } finally {
+        setLoading(false);
       }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    };
+
+    fetchLists();
   }, []);
 
   const filteredLists = useMemo(() => {
@@ -67,9 +41,19 @@ export default function ContactListManagerPage() {
     return lists.filter((list) => list.name.toLowerCase().includes(needle));
   }, [lists, searchTerm]);
 
-  const deleteList = (listId) => {
+  const deleteList = async (listId) => {
     if (window.confirm('Delete this contact list? This cannot be undone.')) {
-      setLists(lists.filter((list) => list.id !== listId));
+      try {
+        const response = await api.delete(`/api/contact-lists/${listId}`);
+        if (response.data?.success) {
+          setLists(lists.filter((list) => list.id !== listId));
+        } else {
+          alert(response.data?.error || 'Failed to delete list');
+        }
+      } catch (err) {
+        console.error('Error deleting list:', err);
+        alert(err.response?.data?.error || 'Failed to delete list');
+      }
     }
   };
 
@@ -115,7 +99,22 @@ export default function ContactListManagerPage() {
           </div>
         </div>
 
-        {filteredLists.length === 0 ? (
+        {loading ? (
+          <div className="rounded-2xl bg-white p-12 text-center shadow">
+            <p className="text-lg font-semibold text-gray-800">Loading contact lists...</p>
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl bg-white p-12 text-center shadow">
+            <p className="text-lg font-semibold text-red-800">{error}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-700"
+            >
+              Retry
+            </button>
+          </div>
+        ) : filteredLists.length === 0 ? (
           <div className="rounded-2xl bg-white p-12 text-center shadow">
             <p className="text-lg font-semibold text-gray-800">
               {searchTerm ? 'No lists match your search' : 'No contact lists yet'}

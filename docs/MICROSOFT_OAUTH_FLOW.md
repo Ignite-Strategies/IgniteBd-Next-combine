@@ -97,3 +97,4 @@
    - Token exchange happens server-side (requires `client_secret`)
    - Database writes happen server-side
    - Frontend only initiates and receives success/error
+

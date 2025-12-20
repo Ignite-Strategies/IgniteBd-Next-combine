@@ -45,18 +45,19 @@ export default function SettingsPage() {
     teamSize: '',
   });
 
-  // Fetch Microsoft connection status (non-blocking)
-  const fetchConnectionStatus = useCallback(async () => {
-    try {
-      const response = await api.get('/api/microsoft/status');
-      if (response.data.success) {
-        setMicrosoftAuth(response.data.microsoftAuth);
-      }
-    } catch (err) {
-      // Not an error if not connected
+  // Get Microsoft connection status from owner hook (no API call needed)
+  // owner.microsoftAccessToken is the source of truth
+  useEffect(() => {
+    if (owner?.microsoftAccessToken) {
+      setMicrosoftAuth({
+        email: owner.microsoftEmail,
+        displayName: owner.microsoftDisplayName,
+        expiresAt: owner.microsoftExpiresAt,
+      });
+    } else {
       setMicrosoftAuth(null);
     }
-  }, []);
+  }, [owner]);
 
   // Fetch SendGrid configuration (non-blocking)
   const fetchSendGridConfig = useCallback(async () => {
@@ -129,11 +130,11 @@ export default function SettingsPage() {
     // Only make API calls after auth is initialized
     if (!authInitialized) return;
     
-    // Fetch Microsoft integration status (checks by ownerId via API)
+    // Fetch SendGrid configuration (non-blocking)
     if (ownerId) {
-      fetchConnectionStatus();
       fetchSendGridConfig();
     }
+    // Note: Microsoft connection status now comes from owner hook (no API call needed)
 
     // Check SuperAdmin status
     const checkSuperAdmin = async () => {
@@ -151,7 +152,7 @@ export default function SettingsPage() {
     if (ownerId) {
       checkSuperAdmin();
     }
-  }, [owner, companyHQ, ownerId, authInitialized, fetchConnectionStatus, fetchSendGridConfig]);
+  }, [owner, companyHQ, ownerId, authInitialized, fetchSendGridConfig]);
 
   // Handle Microsoft connection
   // IMPORTANT: OAuth login must use direct navigation, not AJAX

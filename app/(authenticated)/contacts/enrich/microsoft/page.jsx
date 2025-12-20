@@ -1,23 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
 import { Mail, RefreshCw, Sparkles, Check } from 'lucide-react';
 
 export default function MicrosoftEnrich() {
+  const { owner, ownerId } = useOwner(); // Get owner from hook (no deprecated status API)
   const [loading, setLoading] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [enriching, setEnriching] = useState(false);
 
   async function handleFetchContacts() {
-    setLoading(true);
-    try {
-      const statusResponse = await api.get('/api/microsoft/status');
-      if (!statusResponse.data?.isAuthenticated) {
-        window.location.href = '/api/microsoft/login';
+    // Check Microsoft connection from owner hook (no API call needed)
+    if (!owner?.microsoftAccessToken) {
+      if (!ownerId) {
+        alert('Please wait for authentication to complete');
         return;
       }
+      // Redirect to login with ownerId
+      window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
+      return;
+    }
+
+    setLoading(true);
+    try {
 
       const contactsResponse = await api.get('/api/microsoft-graph/contacts');
       if (contactsResponse.data?.success) {

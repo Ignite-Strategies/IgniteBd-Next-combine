@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Building2, Mail, CheckCircle } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useLocalStorage } from '@/hooks/useLocalStorage.js';
+import api from '@/lib/api';
 
 const LIST_OPTIONS = [
   {
@@ -35,10 +35,11 @@ const LIST_OPTIONS = [
 
 export default function ContactListBuilderPage() {
   const router = useRouter();
-  const [lists, setLists] = useLocalStorage('contactLists', []);
   const [selectedType, setSelectedType] = useState('');
   const [listName, setListName] = useState('');
   const [listDescription, setListDescription] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSelectType = (option) => {
     setSelectedType(option.id);
@@ -46,24 +47,42 @@ export default function ContactListBuilderPage() {
     setListDescription(option.description);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!selectedType || !listName.trim()) {
       alert('Please choose a list type and name your list.');
       return;
     }
 
-    const newList = {
-      id: `${selectedType}-${Date.now()}`,
-      name: listName.trim(),
-      description: listDescription.trim(),
-      type: selectedType,
-      totalContacts: selectedType === 'custom' ? 0 : undefined,
-      createdAt: new Date().toISOString(),
-      contactIds: [],
-    };
+    setIsCreating(true);
+    setError(null);
 
-    setLists([newList, ...lists]);
-    router.push('/contacts/list-manager');
+    try {
+      // Map frontend list type to backend type
+      let backendType = 'static';
+      if (selectedType === 'all_contacts' || selectedType === 'org_members' || selectedType === 'event_contacts') {
+        backendType = 'smart';
+      } else if (selectedType === 'custom') {
+        backendType = 'manual';
+      }
+
+      const response = await api.post('/api/contact-lists', {
+        name: listName.trim(),
+        description: listDescription.trim() || undefined,
+        type: backendType,
+        filters: selectedType !== 'custom' ? { audienceType: selectedType } : null,
+      });
+
+      if (response.data?.success) {
+        router.push('/contacts/list-manager');
+      } else {
+        setError(response.data?.error || 'Failed to create list');
+        setIsCreating(false);
+      }
+    } catch (err) {
+      console.error('Error creating list:', err);
+      setError(err.response?.data?.error || 'Failed to create list');
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -168,12 +187,18 @@ export default function ContactListBuilderPage() {
           <button
             type="button"
             onClick={handleCreate}
-            disabled={!selectedType || !listName.trim()}
+            disabled={!selectedType || !listName.trim() || isCreating}
             className="rounded-lg bg-indigo-600 px-6 py-2 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Create List →
+            {isCreating ? 'Creating...' : 'Create List →'}
           </button>
         </div>
+
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-4">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
       </div>
     </div>
   );

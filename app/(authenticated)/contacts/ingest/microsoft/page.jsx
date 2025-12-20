@@ -300,7 +300,7 @@ export default function MicrosoftEmailIngest() {
         )}
 
         {/* Preview Section */}
-        {microsoftStatus && (
+        {isConnected && (
           <div className="bg-white p-6 rounded-lg shadow border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -417,7 +417,7 @@ export default function MicrosoftEmailIngest() {
         )}
 
         {/* Help Text */}
-        {!microsoftStatus && (
+        {!isConnected && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
               Connect your Microsoft account to import contacts from people you email in Outlook.
