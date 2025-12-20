@@ -8,16 +8,19 @@ import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, X } from 
 
 export default function MicrosoftEmailIngest() {
   const router = useRouter();
-  const { ownerId } = useOwner(); // ownerId from our DB (via hook)
+  const { ownerId, owner } = useOwner(); // ownerId and owner from our DB (via hook)
   const [companyHQId, setCompanyHQId] = useState('');
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(null);
   const [selectedPreviewIds, setSelectedPreviewIds] = useState(new Set());
   const [saveResult, setSaveResult] = useState(null);
   const [error, setError] = useState(null);
-  const [isConnected, setIsConnected] = useState(false); // Track if Microsoft is connected (based on preview load success)
+  
+  // Simple check: tokens exist = connected (green), no tokens = not connected (red)
+  // No API calls needed - owner object from hook has all the info
+  const isConnected = !!owner?.microsoftAccessToken;
 
   // Get companyHQId from localStorage and initialize
   useEffect(() => {
@@ -38,12 +41,10 @@ export default function MicrosoftEmailIngest() {
       const errorParam = params.get('error');
       
       if (success === '1') {
-        // OAuth completed successfully - clear URL params and reload preview
+        // OAuth completed successfully - clear URL params
         window.history.replaceState({}, '', '/contacts/ingest/microsoft');
-        // Reload preview to show connected state
-        if (ownerId) {
-          loadPreview().then(() => setIsConnected(true)).catch(() => setIsConnected(false));
-        }
+        // Owner hook will refresh automatically, then useEffect will load preview
+        // No need to manually reload - hook handles it
       }
       
       if (errorParam) {
@@ -59,45 +60,37 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Try to load preview on mount (if ownerId is available)
-  // If it fails with 401, Microsoft is not connected - show "Connect" button
-  // If it succeeds, Microsoft is connected - show preview
+  // Load preview if Microsoft is connected (tokens exist)
+  // Simple check: owner.microsoftAccessToken exists = connected, show preview
   useEffect(() => {
-    if (!ownerId) return; // Wait for ownerId from hook
-
-    async function initialize() {
-      try {
-        setLoading(true);
-        await loadPreview();
-        setIsConnected(true);
-      } catch (err) {
-        // 401 = not connected (expected) - don't show error
-        if (err.response?.status === 401) {
-          setIsConnected(false);
-        } else {
-          // Other errors - show them
-          setError(err.response?.data?.error || err.message || 'Failed to load preview');
-        }
-      } finally {
-        setLoading(false);
-      }
+    if (!ownerId || !owner) return; // Wait for owner from hook
+    
+    // If tokens exist, load preview automatically
+    if (isConnected) {
+      loadPreview();
     }
-    initialize();
-  }, [ownerId]);
+  }, [ownerId, owner, isConnected]);
 
   // Load preview from API
   async function loadPreview() {
+    setLoading(true);
     setError(null);
 
-    const response = await api.get('/api/microsoft/email-contacts/preview');
-    
-    if (response.data?.success) {
-      setPreview(response.data);
-      setSelectedPreviewIds(new Set()); // Reset selection
-      setSaveResult(null); // Clear previous save result
-      setIsConnected(true);
-    } else {
-      throw new Error(response.data?.error || 'Failed to load preview');
+    try {
+      const response = await api.get('/api/microsoft/email-contacts/preview');
+      
+      if (response.data?.success) {
+        setPreview(response.data);
+        setSelectedPreviewIds(new Set()); // Reset selection
+        setSaveResult(null); // Clear previous save result
+      } else {
+        throw new Error(response.data?.error || 'Failed to load preview');
+      }
+    } catch (err) {
+      console.error('Failed to load preview:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to load preview');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -225,12 +218,30 @@ export default function MicrosoftEmailIngest() {
         </div>
 
         {/* Microsoft Connection Status */}
-        {!isConnected && (
-          <div className="bg-white p-6 rounded-lg shadow border mb-6">
-            <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
+        <div className="bg-white p-6 rounded-lg shadow border mb-6">
+          <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
+          {isConnected ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
+                <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+                <div>
+                  <p className="font-medium text-green-700">Connected</p>
+                  {owner?.microsoftEmail && (
+                    <p className="text-sm text-gray-500">{owner.microsoftEmail}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleConnectMicrosoft}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Reconnect
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
                 <p className="text-gray-600">Not connected</p>
               </div>
               <button
@@ -241,8 +252,8 @@ export default function MicrosoftEmailIngest() {
                 Connect Microsoft Account
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Error Message */}
         {error && (
