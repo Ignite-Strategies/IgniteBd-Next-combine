@@ -2,38 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
 
 export default function MicrosoftEmailIngest() {
   const router = useRouter();
-  const { ownerId } = useOwner(); // Get ownerId from hook (no API call needed)
+  const { ownerId } = useOwner(); // ownerId from our DB (via hook)
   const [companyHQId, setCompanyHQId] = useState('');
 
-  const [microsoftStatus, setMicrosoftStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(null);
   const [selectedPreviewIds, setSelectedPreviewIds] = useState(new Set());
   const [saveResult, setSaveResult] = useState(null);
   const [error, setError] = useState(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
-
-  // Wait for Firebase auth to be ready before making API calls
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setAuthInitialized(true);
-      } else {
-        setAuthInitialized(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const [isConnected, setIsConnected] = useState(false); // Track if Microsoft is connected (based on preview load success)
 
   // Get companyHQId from localStorage and initialize
   useEffect(() => {
@@ -54,9 +38,12 @@ export default function MicrosoftEmailIngest() {
       const errorParam = params.get('error');
       
       if (success === '1') {
-        // OAuth completed successfully - clear URL params and refresh status
+        // OAuth completed successfully - clear URL params and reload preview
         window.history.replaceState({}, '', '/contacts/ingest/microsoft');
-        // Status will be refreshed in initialize()
+        // Reload preview to show connected state
+        if (ownerId) {
+          loadPreview().then(() => setIsConnected(true)).catch(() => setIsConnected(false));
+        }
       }
       
       if (errorParam) {
@@ -72,56 +59,45 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Check Microsoft OAuth status and load preview on mount
-  // CRITICAL: Wait for Firebase auth to be initialized before making API calls
-  // This ensures the Axios interceptor can attach the Firebase token
+  // Try to load preview on mount (if ownerId is available)
+  // If it fails with 401, Microsoft is not connected - show "Connect" button
+  // If it succeeds, Microsoft is connected - show preview
   useEffect(() => {
-    if (!authInitialized) return; // Wait for Firebase auth
+    if (!ownerId) return; // Wait for ownerId from hook
 
     async function initialize() {
       try {
         setLoading(true);
-        // Check Microsoft status (Axios will attach Firebase token via interceptor)
-        const statusResponse = await api.get('/api/microsoft/status');
-        setMicrosoftStatus(statusResponse.data?.microsoftAuth || null);
-
-        // If connected, load preview
-        if (statusResponse.data?.microsoftAuth) {
-          await loadPreview();
-        }
+        await loadPreview();
+        setIsConnected(true);
       } catch (err) {
-        console.error('Failed to initialize:', err);
-        // Don't set error on 401 - that's expected when not connected
-        if (err.response?.status !== 401) {
-          setError(err.response?.data?.error || err.message || 'Failed to initialize');
+        // 401 = not connected (expected) - don't show error
+        if (err.response?.status === 401) {
+          setIsConnected(false);
+        } else {
+          // Other errors - show them
+          setError(err.response?.data?.error || err.message || 'Failed to load preview');
         }
       } finally {
         setLoading(false);
       }
     }
     initialize();
-  }, [authInitialized]);
+  }, [ownerId]);
 
   // Load preview from API
   async function loadPreview() {
-    setLoading(true);
     setError(null);
 
-    try {
-      const response = await api.get('/api/microsoft/email-contacts/preview');
-      
-      if (response.data?.success) {
-        setPreview(response.data);
-        setSelectedPreviewIds(new Set()); // Reset selection
-        setSaveResult(null); // Clear previous save result
-      } else {
-        throw new Error(response.data?.error || 'Failed to load preview');
-      }
-    } catch (err) {
-      console.error('Load preview error:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to load preview');
-    } finally {
-      setLoading(false);
+    const response = await api.get('/api/microsoft/email-contacts/preview');
+    
+    if (response.data?.success) {
+      setPreview(response.data);
+      setSelectedPreviewIds(new Set()); // Reset selection
+      setSaveResult(null); // Clear previous save result
+      setIsConnected(true);
+    } else {
+      throw new Error(response.data?.error || 'Failed to load preview');
     }
   }
 
@@ -249,26 +225,9 @@ export default function MicrosoftEmailIngest() {
         </div>
 
         {/* Microsoft Connection Status */}
-        <div className="bg-white p-6 rounded-lg shadow border mb-6">
-          <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
-          
-          {microsoftStatus ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
-                <div>
-                  <p className="font-medium">{microsoftStatus.displayName || 'Connected'}</p>
-                  <p className="text-sm text-gray-500">{microsoftStatus.email}</p>
-                </div>
-              </div>
-              <button
-                onClick={handleConnectMicrosoft}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                Reconnect
-              </button>
-            </div>
-          ) : (
+        {!isConnected && (
+          <div className="bg-white p-6 rounded-lg shadow border mb-6">
+            <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
@@ -276,13 +235,14 @@ export default function MicrosoftEmailIngest() {
               </div>
               <button
                 onClick={handleConnectMicrosoft}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={!ownerId}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Connect Microsoft Account
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
