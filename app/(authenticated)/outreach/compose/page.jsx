@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -9,7 +9,8 @@ import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
-export default function ComposePage() {
+// Component that uses useSearchParams - needs to be separate for Suspense
+function ComposeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { ownerId } = useOwner();
@@ -536,6 +537,29 @@ export default function ComposePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main page component wrapped in Suspense
+export default function ComposePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PageHeader
+            title="Compose Outreach Email"
+            subtitle="Send 1-to-1 personalized emails via SendGrid"
+            backTo="/outreach"
+            backLabel="Back to Outreach"
+          />
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
+        </div>
+      </div>
+    }>
+      <ComposeContent />
+    </Suspense>
   );
 }
 
