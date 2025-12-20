@@ -22,6 +22,21 @@ export default function MicrosoftEmailIngest() {
   // No API calls needed - owner object from hook has all the info
   const isConnected = !!owner?.microsoftAccessToken;
 
+  // CRITICAL: Owner must be hydrated from welcome page
+  // If owner is not available from hook, redirect to welcome
+  // NO API calls to hydrate owner on this page - use hook exclusively
+  useEffect(() => {
+    // Give hook a moment to provide owner data (if it's already hydrated from welcome)
+    const timer = setTimeout(() => {
+      if (!ownerId || !owner) {
+        console.log('⚠️ Owner not available from hook - redirecting to welcome');
+        router.push('/welcome');
+      }
+    }, 1000); // 1 second grace period for hook to provide data
+
+    return () => clearTimeout(timer);
+  }, [ownerId, owner, router]);
+
   // Get companyHQId from localStorage and initialize
   useEffect(() => {
     const storedCompanyHQId = typeof window !== 'undefined'
@@ -118,9 +133,10 @@ export default function MicrosoftEmailIngest() {
   // Load preview if Microsoft is connected (tokens exist)
   // Simple check: owner.microsoftAccessToken exists = connected, show preview
   // Only run once when owner loads and is connected
+  // CRITICAL: Owner must come from hook (already hydrated on welcome) - NO API calls here
   useEffect(() => {
     if (!ownerId || !owner) {
-      return; // Wait for owner from hook
+      return; // Owner not available - redirect will happen in other effect
     }
     
     // Compute isConnected inside effect (not as dependency)
@@ -206,6 +222,23 @@ export default function MicrosoftEmailIngest() {
     // The API will recompute if we force a refresh
     setSaveResult(null);
     await loadPreview();
+  }
+
+  // CRITICAL: Owner must be available from hook (hydrated on welcome page)
+  // If not available, show loading state while redirect happens
+  if (!ownerId || !owner) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-10">
+        <div className="mx-auto max-w-4xl px-6">
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <div className="flex items-center justify-center">
+              <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mr-3" />
+              <p className="text-gray-600">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading && !preview) {
