@@ -43,7 +43,17 @@ export async function POST(request) {
 
     // Parse request body
     const body = await request.json();
-    const { to, subject, body: emailBody, contactId, tenantId, toName } = body;
+    const { 
+      to, 
+      subject, 
+      body: emailBody, 
+      contactId, 
+      tenantId, 
+      toName,
+      campaignId,
+      sequenceId,
+      sequenceStepId,
+    } = body;
 
     // Validation
     if (!to || !subject || !emailBody) {
@@ -62,14 +72,20 @@ export async function POST(request) {
       ownerId,
       contactId,
       tenantId,
+      campaignId: campaignId || null,
+      sequenceId: sequenceId || null,
+      sequenceStepId: sequenceStepId || null,
     });
 
-    // Log email activity in database
-    const emailActivity = await prisma.emailActivity.create({
+    // Log email activity in database (Apollo-like tracking)
+    const emailActivity = await prisma.email_activities.create({
       data: {
-        ownerId,
-        contactId: contactId || null,
-        tenantId: tenantId || null,
+        owner_id: ownerId,
+        contact_id: contactId || null,
+        tenant_id: tenantId || null,
+        campaign_id: campaignId || null,
+        sequence_id: sequenceId || null,
+        sequence_step_id: sequenceStepId || null,
         email: to,
         subject,
         body: emailBody,

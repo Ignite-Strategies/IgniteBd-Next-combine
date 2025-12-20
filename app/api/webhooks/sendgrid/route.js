@@ -68,18 +68,42 @@ export async function POST(request) {
       }
 
       try {
+        // Extract additional custom args for campaign/sequence tracking
+        const {
+          custom_arg_campaign_id: campaignId,
+          custom_arg_sequence_id: sequenceId,
+          custom_arg_sequence_step_id: sequenceStepId,
+        } = event;
+
         // Find email activity by messageId
-        const emailActivity = await prisma.emailActivity.findUnique({
+        const emailActivity = await prisma.email_activities.findUnique({
           where: { messageId: cleanMessageId },
         });
 
         if (emailActivity) {
-          // Update event state
-          await prisma.emailActivity.update({
+          // Update event state (latest event)
+          await prisma.email_activities.update({
             where: { messageId: cleanMessageId },
             data: {
               event: eventType, // delivered, opened, clicked, bounce, etc.
               updatedAt: timestamp ? new Date(timestamp * 1000) : new Date(),
+            },
+          });
+
+          // Create detailed event record (Apollo-like: track all events, not just latest)
+          await prisma.email_events.create({
+            data: {
+              email_activity_id: emailActivity.id,
+              event_type: eventType.toUpperCase(),
+              event_data: {
+                timestamp,
+                email,
+                ...(event.url && { url: event.url }), // For click events
+                ...(event.reason && { reason: event.reason }), // For bounce events
+              },
+              ip_address: event.ip || null,
+              user_agent: event.useragent || null,
+              occurred_at: timestamp ? new Date(timestamp * 1000) : new Date(),
             },
           });
 
@@ -88,16 +112,32 @@ export async function POST(request) {
         } else {
           // If activity doesn't exist, create it (in case webhook arrives before DB write)
           if (ownerId) {
-            const newActivity = await prisma.emailActivity.create({
+            const newActivity = await prisma.email_activities.create({
               data: {
-                ownerId,
-                contactId: contactId || null,
-                tenantId: tenantId || null,
+                owner_id: ownerId,
+                contact_id: contactId || null,
+                tenant_id: tenantId || null,
+                campaign_id: campaignId || null,
+                sequence_id: sequenceId || null,
+                sequence_step_id: sequenceStepId || null,
                 email: email || 'unknown',
                 subject: 'Unknown', // Webhook doesn't include subject
                 body: '', // Webhook doesn't include body
                 messageId: cleanMessageId,
                 event: eventType,
+              },
+            });
+
+            // Create event record
+            await prisma.email_events.create({
+              data: {
+                email_activity_id: newActivity.id,
+                event_type: eventType.toUpperCase(),
+                event_data: {
+                  timestamp,
+                  email,
+                },
+                occurred_at: timestamp ? new Date(timestamp * 1000) : new Date(),
               },
             });
 

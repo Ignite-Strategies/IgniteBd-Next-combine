@@ -33,9 +33,9 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit') || '5', 10);
 
     // Fetch recent email activities
-    const emailActivities = await prisma.emailActivity.findMany({
+    const emailActivities = await prisma.email_activities.findMany({
       where: {
-        ownerId: owner.id,
+        owner_id: owner.id,
       },
       orderBy: {
         createdAt: 'desc',
@@ -46,8 +46,10 @@ export async function GET(request) {
         email: true,
         subject: true,
         event: true,
-        contactId: true,
-        tenantId: true,
+        contact_id: true,
+        tenant_id: true,
+        campaign_id: true,
+        sequence_id: true,
         createdAt: true,
         updatedAt: true,
       },

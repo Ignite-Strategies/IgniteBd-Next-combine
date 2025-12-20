@@ -189,28 +189,99 @@ function OutreachContent() {
           />
         </div>
 
-        <div className="mb-8 rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-8 shadow-sm transition hover:border-indigo-400">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-500 text-white">
-                <Plus className="h-8 w-8" />
+        {/* Two Main Actions */}
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* 1:1 Compose */}
+          <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 p-8 shadow-sm transition hover:border-blue-400">
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-blue-500 text-white">
+                  <Send className="h-8 w-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    1:1 Compose
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    Send personalized emails with contact selection, templates, and variable hydration.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Set Up Your Next Campaign
-                </h2>
-                <p className="text-sm text-gray-600">
-                  Craft targeted outreach, add templates, and schedule multi-touch sequences.
-                </p>
+              <div className="space-y-2 text-sm text-gray-700">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span>Select a contact</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span>Choose a template</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span>Auto-fill variables</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <span>Send via SendGrid</span>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => router.push('/outreach/compose')}
+                className="self-start rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Compose Email →
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => router.push('/outreach/campaigns/create')}
-              className="self-start rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-            >
-              Launch Builder →
-            </button>
+          </div>
+
+          {/* Launch Campaign */}
+          <div className="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-8 shadow-sm transition hover:border-indigo-400">
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-500 text-white">
+                  <Plus className="h-8 w-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Launch Campaign
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    Create targeted campaigns with contact lists, sequences, and scheduling.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm text-gray-700">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-indigo-600" />
+                  <span>Select contact list</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-indigo-600" />
+                  <span>Configure email content</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-indigo-600" />
+                  <span>Schedule or send now</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-indigo-600" />
+                  <span>Track performance</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (targetContact?.id) params.set('contactId', targetContact.id);
+                  if (targetProduct?.id) params.set('productId', targetProduct.id);
+                  router.push(`/outreach/campaigns/create?${params.toString()}`);
+                }}
+                className="self-start rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                Launch Campaign →
+              </button>
+            </div>
           </div>
         </div>
 

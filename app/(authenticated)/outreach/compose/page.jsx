@@ -1,23 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
+import ContactSelector from '@/components/ContactSelector.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 export default function ComposePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { ownerId } = useOwner();
+  const { companyHQId } = useCompanyHQ();
   
   // Form state
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [to, setTo] = useState('');
   const [toName, setToName] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [contactId, setContactId] = useState('');
   const [tenantId, setTenantId] = useState('');
+  
+  // Template & hydration state
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [hydrating, setHydrating] = useState(false);
+  const [hydratedContent, setHydratedContent] = useState(null);
   
   // UI state
   const [sending, setSending] = useState(false);
@@ -29,13 +41,98 @@ export default function ComposePage() {
   // Sender info (read-only, prefilled)
   const senderEmail = process.env.NEXT_PUBLIC_SENDGRID_FROM_EMAIL || 'adam@ignitestrategies.co';
   const senderName = process.env.NEXT_PUBLIC_SENDGRID_FROM_NAME || 'Adam - Ignite Strategies';
+  
+  // Check for contactId in URL params
+  useEffect(() => {
+    const contactIdParam = searchParams?.get('contactId');
+    if (contactIdParam) {
+      setContactId(contactIdParam);
+    }
+  }, [searchParams]);
 
+  // Load templates
+  useEffect(() => {
+    if (companyHQId) {
+      loadTemplates();
+    }
+  }, [companyHQId]);
+  
   // Load recent sends
   useEffect(() => {
     if (ownerId) {
       loadRecentSends();
     }
   }, [ownerId]);
+  
+  // Handle contact selection
+  const handleContactSelect = (contact, company) => {
+    setSelectedContact(contact);
+    setContactId(contact.id);
+    setTo(contact.email || '');
+    setToName(contact.goesBy || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '');
+    
+    // If template is selected, auto-hydrate
+    if (selectedTemplate) {
+      hydrateTemplate(contact);
+    }
+  };
+  
+  // Load templates
+  const loadTemplates = async () => {
+    if (!companyHQId) return;
+    
+    try {
+      setLoadingTemplates(true);
+      const response = await api.get(`/api/template/saved?companyHQId=${companyHQId}`);
+      if (response.data?.success && response.data.templates) {
+        setTemplates(response.data.templates);
+      }
+    } catch (err) {
+      console.error('Failed to load templates:', err);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+  
+  // Handle template selection
+  const handleTemplateSelect = (template) => {
+    setSelectedTemplate(template);
+    setSubject(template.template_bases?.title || '');
+    setBody(template.content || '');
+    
+    // If contact is selected, auto-hydrate
+    if (selectedContact) {
+      hydrateTemplate(selectedContact, template);
+    }
+  };
+  
+  // Hydrate template with contact data
+  const hydrateTemplate = async (contact, template = selectedTemplate) => {
+    if (!template || !contact) return;
+    
+    try {
+      setHydrating(true);
+      const response = await api.post('/api/template/hydrate-with-contact', {
+        templateId: template.id,
+        contactId: contact.id,
+      });
+      
+      if (response.data?.success && response.data.hydratedContent) {
+        setHydratedContent(response.data.hydratedContent);
+        setBody(response.data.hydratedContent);
+        
+        // Update subject if template has one
+        if (template.template_bases?.title) {
+          setSubject(template.template_bases.title);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to hydrate template:', err);
+      setError('Failed to hydrate template with contact data');
+    } finally {
+      setHydrating(false);
+    }
+  };
 
   const loadRecentSends = async () => {
     try {
@@ -87,6 +184,9 @@ export default function ComposePage() {
         setBody('');
         setContactId('');
         setTenantId('');
+        setSelectedContact(null);
+        setSelectedTemplate(null);
+        setHydratedContent(null);
         
         // Reload recent sends
         await loadRecentSends();
@@ -182,7 +282,71 @@ export default function ComposePage() {
                   </p>
                 </div>
 
-                {/* To */}
+                {/* Contact Selector */}
+                <div>
+                  <ContactSelector
+                    contactId={contactId}
+                    onContactSelect={handleContactSelect}
+                    selectedContact={selectedContact}
+                    showLabel={true}
+                  />
+                </div>
+
+                {/* Template Selector */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Select Template (Optional)
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedTemplate?.id || ''}
+                      onChange={(e) => {
+                        const template = templates.find(t => t.id === e.target.value);
+                        if (template) {
+                          handleTemplateSelect(template);
+                        } else {
+                          setSelectedTemplate(null);
+                        }
+                      }}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                      disabled={loadingTemplates}
+                    >
+                      <option value="">-- No template (compose manually) --</option>
+                      {templates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.template_bases?.title || 'Untitled Template'}
+                        </option>
+                      ))}
+                    </select>
+                    {loadingTemplates && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  {selectedTemplate && selectedContact && (
+                    <button
+                      type="button"
+                      onClick={() => hydrateTemplate(selectedContact)}
+                      disabled={hydrating}
+                      className="mt-2 flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      {hydrating ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Hydrating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3 w-3" />
+                          Re-hydrate with contact data
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* To (auto-filled from contact) */}
                 <div>
                   <label htmlFor="to" className="block text-sm font-medium text-gray-700 mb-1">
                     To <span className="text-red-500">*</span>
@@ -198,7 +362,7 @@ export default function ComposePage() {
                   />
                 </div>
 
-                {/* To Name (Optional) */}
+                {/* To Name (auto-filled from contact) */}
                 <div>
                   <label htmlFor="toName" className="block text-sm font-medium text-gray-700 mb-1">
                     Recipient Name (Optional)
@@ -233,18 +397,28 @@ export default function ComposePage() {
                 <div>
                   <label htmlFor="body" className="block text-sm font-medium text-gray-700 mb-1">
                     Message <span className="text-red-500">*</span>
+                    {hydratedContent && (
+                      <span className="ml-2 text-xs font-normal text-green-600">
+                        (Variables hydrated)
+                      </span>
+                    )}
                   </label>
                   <textarea
                     id="body"
                     value={body}
-                    onChange={(e) => setBody(e.target.value)}
+                    onChange={(e) => {
+                      setBody(e.target.value);
+                      setHydratedContent(null); // Clear hydration flag if manually edited
+                    }}
                     required
                     rows={10}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    placeholder="Hey, saw your work on..."
+                    placeholder="Hey, saw your work on... (or select a template to auto-fill)"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    HTML is supported. Plain text will be auto-formatted.
+                    {selectedTemplate 
+                      ? 'Template loaded. Variables will be filled when you select a contact.'
+                      : 'HTML is supported. Plain text will be auto-formatted. Select a template to use variables.'}
                   </p>
                 </div>
 
