@@ -11,6 +11,7 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [microsoftAuth, setMicrosoftAuth] = useState(null);
+  const [ownerId, setOwnerId] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
@@ -41,6 +42,7 @@ export default function IntegrationsPage() {
       const response = await api.get('/api/microsoft/status');
       if (response.data.success) {
         setMicrosoftAuth(response.data.microsoftAuth);
+        setOwnerId(response.data.ownerId); // Store ownerId for OAuth login
       }
     } catch (err) {
       console.error('Failed to fetch Microsoft connection status:', err);

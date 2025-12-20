@@ -23,7 +23,8 @@ import { assertValidMicrosoftOAuthConfig, getMicrosoftClientId, getMicrosoftAuth
  */
 export async function GET(request) {
   // Get app URL once at the top
-  const appUrl = process.env.APP_URL || 'https://ignitegrowth.biz';
+  // Use app.ignitegrowth.biz (not ignitegrowth.biz) to match the actual app domain
+  const appUrl = process.env.APP_URL || 'https://app.ignitegrowth.biz';
   
   try {
     // Next.js App Router: Use request.nextUrl.searchParams (not new URL(req.url))

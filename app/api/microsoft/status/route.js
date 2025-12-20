@@ -56,6 +56,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       connected: !!microsoftAuth,
+      ownerId: owner.id, // Return ownerId so frontend can pass it to login route
       microsoftAuth,
     });
   } catch (error) {

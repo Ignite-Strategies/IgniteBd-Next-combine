@@ -78,9 +78,25 @@ export default function MicrosoftEmailIngest() {
   // The /api/microsoft/login endpoint redirects to Microsoft OAuth
   // AJAX requests can't follow OAuth redirects due to CORS
   // Direct navigation (window.location.href) is the correct pattern
-  function handleConnectMicrosoft() {
-    // Direct navigation to login endpoint - it will redirect to Microsoft OAuth
-    window.location.href = '/api/microsoft/login';
+  // 
+  // CRITICAL: Pass ownerId as query param so callback can find the owner
+  // Get ownerId from status API response
+  async function handleConnectMicrosoft() {
+    try {
+      // Get ownerId from status API (which resolves from Firebase auth)
+      const statusResponse = await api.get('/api/microsoft/status');
+      const ownerId = statusResponse.data?.ownerId;
+      
+      if (ownerId) {
+        // Direct navigation to login endpoint with ownerId - it will redirect to Microsoft OAuth
+        window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
+      } else {
+        setError('Unable to identify user. Please refresh and try again.');
+      }
+    } catch (err) {
+      console.error('Failed to get ownerId:', err);
+      setError('Failed to initiate Microsoft connection');
+    }
   }
 
   // Toggle selection
