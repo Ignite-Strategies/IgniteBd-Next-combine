@@ -2,53 +2,33 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useOwner } from '@/hooks/useOwner';
-import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
 
-// UI states for error handling
-const UI_STATES = {
-  SUCCESS: 'SUCCESS',
-  LOGIN_REQUIRED: 'LOGIN_REQUIRED',
-  CONNECT_MICROSOFT: 'CONNECT_MICROSOFT',
-  RECONNECT_MICROSOFT: 'RECONNECT_MICROSOFT',
-  RETRY: 'RETRY',
+// UI states
+const CONNECTION_STATES = {
+  LOADING: 'LOADING',
+  NOT_CONNECTED: 'NOT_CONNECTED',
+  CONNECTED: 'CONNECTED',
 };
 
 export default function MicrosoftEmailIngest() {
   const router = useRouter();
-  const { ownerId, owner } = useOwner(); // ownerId and owner from our DB (via hook)
   const [companyHQId, setCompanyHQId] = useState('');
 
+  // Microsoft connection status (from server)
+  const [connectionState, setConnectionState] = useState(CONNECTION_STATES.LOADING);
+  const [microsoftEmail, setMicrosoftEmail] = useState(null);
+  const [microsoftExpiresAt, setMicrosoftExpiresAt] = useState(null);
+
+  // Preview and save state
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(null);
   const [selectedPreviewIds, setSelectedPreviewIds] = useState(new Set());
   const [saveResult, setSaveResult] = useState(null);
-  const [uiState, setUiState] = useState(null); // UI state instead of raw error
-  const [errorMessage, setErrorMessage] = useState(null); // User-friendly message
-  
-  // Simple check: tokens exist = connected (green), no tokens = not connected (red)
-  // No API calls needed - owner object from hook has all the info
-  const isConnected = !!owner?.microsoftAccessToken;
 
-  // CRITICAL: Owner must be hydrated from welcome page
-  // If owner is not available from hook, redirect to welcome
-  // NO API calls to hydrate owner on this page - use hook exclusively
-  useEffect(() => {
-    // Give hook a moment to provide owner data (if it's already hydrated from welcome)
-    const timer = setTimeout(() => {
-      if (!ownerId || !owner) {
-        console.log('⚠️ Owner not available from hook - redirecting to welcome');
-        router.push('/welcome');
-      }
-    }, 1000); // 1 second grace period for hook to provide data
-
-    return () => clearTimeout(timer);
-  }, [ownerId, owner, router]);
-
-  // Get companyHQId from localStorage and initialize
+  // Get companyHQId from localStorage
   useEffect(() => {
     const storedCompanyHQId = typeof window !== 'undefined'
       ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
@@ -59,53 +39,39 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Handle OAuth callback result
-  // Callback now saves tokens directly - we just handle success/error display
+  // SINGLE useEffect: Fetch Microsoft connection status on page load
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const success = params.get('success');
-      const errorParam = params.get('error');
-      
-      // Clear URL params immediately
-      window.history.replaceState({}, '', '/contacts/ingest/microsoft');
-      
-      // Handle OAuth success
-      if (success === '1') {
-        setUiState(UI_STATES.SUCCESS);
-        setErrorMessage(null);
-        // Owner hook will refresh automatically, then preview will load
-        return;
-      }
-      
-      // Handle OAuth errors from callback
-      if (errorParam) {
-        setUiState(UI_STATES.RECONNECT_MICROSOFT);
-        setErrorMessage(
-          errorParam === 'ownerId_required'
-            ? 'Owner context required. Please try again.'
-            : errorParam === 'invalid_oauth_callback'
-            ? 'Invalid OAuth callback. Please try again.'
-            : errorParam === 'invalid_state'
-            ? 'OAuth state invalid. Please try again.'
-            : errorParam === 'state_expired'
-            ? 'OAuth session expired. Please try again.'
-            : errorParam === 'missing_owner_context'
-            ? 'Unable to identify your account. Please try again.'
-            : errorParam === 'no_authorization_code_provided'
-            ? 'Authorization was cancelled or incomplete'
-            : 'OAuth error occurred. Please try again.'
-        );
+    async function fetchMicrosoftStatus() {
+      try {
+        const response = await api.get('/api/microsoft/status');
+        
+        if (response.data) {
+          setConnectionState(
+            response.data.connected 
+              ? CONNECTION_STATES.CONNECTED 
+              : CONNECTION_STATES.NOT_CONNECTED
+          );
+          setMicrosoftEmail(response.data.email || null);
+          setMicrosoftExpiresAt(response.data.expiresAt || null);
+        } else {
+          setConnectionState(CONNECTION_STATES.NOT_CONNECTED);
+        }
+      } catch (error) {
+        console.error('Failed to fetch Microsoft status:', error);
+        setConnectionState(CONNECTION_STATES.NOT_CONNECTED);
       }
     }
+
+    fetchMicrosoftStatus();
   }, []); // Only run once on mount
 
-  // Load preview from API
-  // Memoized with useCallback to prevent infinite loops in useEffect
+  // Load preview from API (only when connected)
   const loadPreview = useCallback(async () => {
+    if (connectionState !== CONNECTION_STATES.CONNECTED) {
+      return;
+    }
+
     setLoading(true);
-    setUiState(null);
-    setErrorMessage(null);
 
     try {
       const response = await api.get('/api/microsoft/email-contacts/preview');
@@ -114,48 +80,56 @@ export default function MicrosoftEmailIngest() {
         setPreview(response.data);
         setSelectedPreviewIds(new Set()); // Reset selection
         setSaveResult(null); // Clear previous save result
-      } else {
-        setUiState(UI_STATES.RETRY);
-        setErrorMessage(response.data?.message || 'Failed to load preview');
       }
     } catch (err) {
-      // Axios interceptor transforms errors to structured format
-      switch (err.action) {
-        case 'LOGIN_REQUIRED':
-          setUiState(UI_STATES.LOGIN_REQUIRED);
-          setErrorMessage('Please sign in to continue');
-          break;
-        case 'RETRY':
-        default:
-          setUiState(UI_STATES.RETRY);
-          setErrorMessage(err.message || 'Failed to load preview');
-      }
+      console.error('Failed to load preview:', err);
     } finally {
       setLoading(false);
     }
-  }, []); // Empty deps - function doesn't depend on any props/state
+  }, [connectionState]);
 
-  // Load preview if Microsoft is connected (tokens exist)
-  // Simple check: owner.microsoftAccessToken exists = connected, show preview
-  // Only run once when owner loads and is connected
-  // CRITICAL: Owner must come from hook (already hydrated on welcome) - NO API calls here
+  // Load preview when connected
   useEffect(() => {
-    if (!ownerId || !owner) {
-      return; // Owner not available - redirect will happen in other effect
-    }
-    
-    // Compute isConnected inside effect (not as dependency)
-    // This prevents infinite loops when owner updates
-    const isConnected = !!owner?.microsoftAccessToken;
-    
-    // Only load preview if connected AND we don't already have preview data
-    // This prevents infinite loops
-    if (isConnected && !preview) {
-      console.log('✅ Microsoft connected, loading preview...');
+    if (connectionState === CONNECTION_STATES.CONNECTED && !preview) {
       loadPreview();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ownerId, owner]); // loadPreview is stable (useCallback), preview checked inside but not in deps
+  }, [connectionState, preview, loadPreview]);
+
+  // Handle connect button
+  function handleConnect() {
+    // Get ownerId from localStorage
+    const ownerId = typeof window !== 'undefined' 
+      ? localStorage.getItem('ownerId') 
+      : null;
+
+    if (!ownerId) {
+      alert('Please sign in first.');
+      return;
+    }
+
+    // Navigate to OAuth login with ownerId
+    window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
+  }
+
+  // Handle disconnect button
+  async function handleDisconnect() {
+    try {
+      const response = await api.patch('/api/microsoft/disconnect');
+      
+      if (response.data?.disconnected) {
+        // Clear local Microsoft status state
+        setConnectionState(CONNECTION_STATES.NOT_CONNECTED);
+        setMicrosoftEmail(null);
+        setMicrosoftExpiresAt(null);
+        setPreview(null);
+        setSelectedPreviewIds(new Set());
+        setSaveResult(null);
+      }
+    } catch (error) {
+      console.error('Failed to disconnect:', error);
+      alert('Failed to disconnect Microsoft account. Please try again.');
+    }
+  }
 
   // Toggle selection
   function toggleSelect(previewId) {
@@ -184,20 +158,16 @@ export default function MicrosoftEmailIngest() {
   // Save selected contacts
   async function handleSave() {
     if (!companyHQId) {
-      setUiState(UI_STATES.RETRY);
-      setErrorMessage('Company context required. Please navigate from a company.');
+      alert('Company context required. Please navigate from a company.');
       return;
     }
 
     if (selectedPreviewIds.size === 0) {
-      setUiState(UI_STATES.RETRY);
-      setErrorMessage('Please select at least one contact to save');
+      alert('Please select at least one contact to save');
       return;
     }
 
     setSaving(true);
-    setUiState(null);
-    setErrorMessage(null);
 
     try {
       const response = await api.post('/api/microsoft/email-contacts/save', {
@@ -211,24 +181,11 @@ export default function MicrosoftEmailIngest() {
           skipped: response.data.skipped,
           errors: response.data.errors,
         });
-        // Clear selection after save
         setSelectedPreviewIds(new Set());
-      } else {
-        setUiState(UI_STATES.RETRY);
-        setErrorMessage(response.data?.message || 'Failed to save contacts');
       }
     } catch (err) {
-      // Axios interceptor transforms errors to structured format
-      switch (err.action) {
-        case 'LOGIN_REQUIRED':
-          setUiState(UI_STATES.LOGIN_REQUIRED);
-          setErrorMessage('Please sign in to continue');
-          break;
-        case 'RETRY':
-        default:
-          setUiState(UI_STATES.RETRY);
-          setErrorMessage(err.message || 'Failed to save contacts');
-      }
+      console.error('Failed to save contacts:', err);
+      alert('Failed to save contacts. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -236,15 +193,12 @@ export default function MicrosoftEmailIngest() {
 
   // Handle "Import next 50"
   async function handleNext50() {
-    // Invalidate Redis cache by fetching fresh data
-    // The API will recompute if we force a refresh
     setSaveResult(null);
     await loadPreview();
   }
 
-  // CRITICAL: Owner must be available from hook (hydrated on welcome page)
-  // If not available, show loading state while redirect happens
-  if (!ownerId || !owner) {
+  // Render based on connection state
+  if (connectionState === CONNECTION_STATES.LOADING) {
     return (
       <div className="min-h-screen bg-gray-50 py-10">
         <div className="mx-auto max-w-4xl px-6">
@@ -252,21 +206,6 @@ export default function MicrosoftEmailIngest() {
             <div className="flex items-center justify-center">
               <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mr-3" />
               <p className="text-gray-600">Loading...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading && !preview) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-10">
-        <div className="mx-auto max-w-4xl px-6">
-          <div className="bg-white p-6 rounded-lg shadow border">
-            <div className="flex items-center justify-center">
-              <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mr-3" />
-              <p className="text-gray-600">Loading preview...</p>
             </div>
           </div>
         </div>
@@ -295,34 +234,9 @@ export default function MicrosoftEmailIngest() {
         {/* Microsoft Connection Status */}
         <div className="bg-white p-6 rounded-lg shadow border mb-6">
           <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
-          {isConnected ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
-                <div>
-                  <p className="font-medium text-green-700">Connected</p>
-                  {owner?.microsoftEmail && (
-                    <p className="text-sm text-gray-500">{owner.microsoftEmail}</p>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  if (!ownerId) {
-                    alert('Please wait for authentication to complete.');
-                    return;
-                  }
-                  // IMPORTANT: OAuth login must use browser navigation.
-                  // Do NOT replace with Axios, fetch, or move into useEffect.
-                  // Pass ownerId in URL so callback can save tokens
-                  window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                Reconnect
-              </button>
-            </div>
-          ) : (
+          
+          {connectionState === CONNECTION_STATES.NOT_CONNECTED ? (
+            // ❌ Not Connected
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
@@ -334,80 +248,46 @@ export default function MicrosoftEmailIngest() {
                 </div>
               </div>
               <button
-                onClick={() => {
-                  // IMPORTANT: OAuth login must use browser navigation.
-                  // Do NOT replace with Axios, fetch, or move into useEffect.
-                  window.location.href = '/api/microsoft/login';
-                }}
+                onClick={handleConnect}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm hover:shadow transition-all"
               >
                 Connect Microsoft Account
               </button>
             </div>
-          )}
-        </div>
-
-        {/* Error Message - UI State Based */}
-        {uiState && errorMessage && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          ) : (
+            // ✅ Connected
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center mb-2">
-                  <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-                  <p className="text-red-800 font-medium">{errorMessage}</p>
-                </div>
-                {/* Action buttons based on UI state */}
-                <div className="flex gap-2 mt-3">
-                  {uiState === UI_STATES.LOGIN_REQUIRED && (
-                    <button
-                      onClick={() => router.push('/welcome')}
-                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                    >
-                      Go to Sign In
-                    </button>
-                  )}
-                  {uiState === UI_STATES.RECONNECT_MICROSOFT && (
-                    <button
-                      onClick={() => {
-                        if (!ownerId) {
-                          router.push('/welcome');
-                          return;
-                        }
-                        window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                    >
-                      Reconnect Microsoft
-                    </button>
-                  )}
-                  {uiState === UI_STATES.RETRY && (
-                    <button
-                      onClick={() => {
-                        setUiState(null);
-                        setErrorMessage(null);
-                        if (isConnected) {
-                          loadPreview();
-                        }
-                      }}
-                      className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
-                    >
-                      Retry
-                    </button>
+              <div className="flex items-center">
+                <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+                <div>
+                  <p className="font-medium text-green-700">Connected</p>
+                  {microsoftEmail && (
+                    <p className="text-sm text-gray-500">Connected as {microsoftEmail}</p>
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setUiState(null);
-                  setErrorMessage(null);
-                }}
-                className="text-red-600 hover:text-red-800 ml-4"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    // Continue to import (load preview if not loaded)
+                    if (!preview) {
+                      loadPreview();
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  Continue to Import
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+                >
+                  Disconnect Microsoft
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Success Screen */}
         {saveResult && (
@@ -446,8 +326,8 @@ export default function MicrosoftEmailIngest() {
           </div>
         )}
 
-        {/* Preview Section */}
-        {isConnected && (
+        {/* Preview Section - Only show when connected */}
+        {connectionState === CONNECTION_STATES.CONNECTED && (
           <div className="bg-white p-6 rounded-lg shadow border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -563,8 +443,8 @@ export default function MicrosoftEmailIngest() {
           </div>
         )}
 
-        {/* Help Text */}
-        {!isConnected && (
+        {/* Help Text - Only show when not connected */}
+        {connectionState === CONNECTION_STATES.NOT_CONNECTED && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
               Connect your Microsoft account to import contacts from people you email in Outlook.

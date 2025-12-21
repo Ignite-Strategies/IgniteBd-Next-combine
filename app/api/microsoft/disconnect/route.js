@@ -3,11 +3,25 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
 /**
- * DELETE /api/microsoft/disconnect
+ * PATCH /api/microsoft/disconnect
+ * DELETE /api/microsoft/disconnect (legacy support)
  * 
  * Disconnect Microsoft OAuth connection for the current user
+ * 
+ * Returns:
+ * {
+ *   "disconnected": true
+ * }
  */
+export async function PATCH(request) {
+  return handleDisconnect(request);
+}
+
 export async function DELETE(request) {
+  return handleDisconnect(request);
+}
+
+async function handleDisconnect(request) {
   try {
     // Verify Firebase authentication
     const firebaseUser = await verifyFirebaseToken(request);
@@ -19,7 +33,7 @@ export async function DELETE(request) {
 
     if (!owner) {
       return NextResponse.json(
-        { success: false, error: 'Owner not found' },
+        { disconnected: false, error: 'Owner not found' },
         { status: 404 }
       );
     }
@@ -40,8 +54,7 @@ export async function DELETE(request) {
     console.log('✅ Microsoft OAuth disconnected for owner:', owner.id);
 
     return NextResponse.json({
-      success: true,
-      message: 'Microsoft account disconnected successfully',
+      disconnected: true,
     });
   } catch (error) {
     console.error('Microsoft disconnect error:', error);
@@ -49,13 +62,12 @@ export async function DELETE(request) {
     // If record doesn't exist, that's okay
     if (error.code === 'P2025') {
       return NextResponse.json({
-        success: true,
-        message: 'Microsoft account already disconnected',
+        disconnected: true,
       });
     }
 
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to disconnect Microsoft account' },
+      { disconnected: false, error: error.message || 'Failed to disconnect Microsoft account' },
       { status: error.message?.includes('Unauthorized') ? 401 : 500 }
     );
   }
