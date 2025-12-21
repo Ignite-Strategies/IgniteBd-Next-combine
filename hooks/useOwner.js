@@ -157,5 +157,8 @@ export function useOwner() {
     loading,
     hydrated,
     error,
+    // Microsoft connection status (computed server-side, no tokens in owner object)
+    isMicrosoftConnected: owner?.microsoftConnected || false,
+    microsoftEmail: owner?.microsoftEmail || null,
   };
 }

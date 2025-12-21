@@ -1,216 +1,135 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
-import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, X } from 'lucide-react';
-
-// UI states
-const CONNECTION_STATES = {
-  LOADING: 'LOADING',
-  NOT_CONNECTED: 'NOT_CONNECTED',
-  CONNECTED: 'CONNECTED',
-};
+import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, Users, Download } from 'lucide-react';
 
 export default function MicrosoftEmailIngest() {
   const router = useRouter();
+  const { ownerId, isMicrosoftConnected, microsoftEmail } = useOwner();
+  
   const [companyHQId, setCompanyHQId] = useState('');
-
-  // Microsoft connection status (from server)
-  const [connectionState, setConnectionState] = useState(CONNECTION_STATES.LOADING);
-  const [microsoftEmail, setMicrosoftEmail] = useState(null);
-  const [microsoftExpiresAt, setMicrosoftExpiresAt] = useState(null);
-
-  // Preview and save state
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState(null);
-  const [selectedPreviewIds, setSelectedPreviewIds] = useState(new Set());
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   // Get companyHQId from localStorage
   useEffect(() => {
-    const storedCompanyHQId = typeof window !== 'undefined'
-      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
-      : null;
-    
-    if (storedCompanyHQId) {
-      setCompanyHQId(storedCompanyHQId);
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+      if (stored) setCompanyHQId(stored);
     }
   }, []);
 
-  // SINGLE useEffect: Fetch Microsoft connection status on page load
+  // Auto-load preview when connected (only once)
   useEffect(() => {
-    async function fetchMicrosoftStatus() {
-      try {
-        const response = await api.get('/api/microsoft/status');
-        
-        if (response.data) {
-          setConnectionState(
-            response.data.connected 
-              ? CONNECTION_STATES.CONNECTED 
-              : CONNECTION_STATES.NOT_CONNECTED
-          );
-          setMicrosoftEmail(response.data.email || null);
-          setMicrosoftExpiresAt(response.data.expiresAt || null);
-        } else {
-          setConnectionState(CONNECTION_STATES.NOT_CONNECTED);
-        }
-      } catch (error) {
-        console.error('Failed to fetch Microsoft status:', error);
-        setConnectionState(CONNECTION_STATES.NOT_CONNECTED);
-      }
+    if (isMicrosoftConnected && !preview && !previewLoading && !hasLoadedOnce) {
+      handleLoadPreview();
     }
+  }, [isMicrosoftConnected]); // Only depend on connection status
 
-    fetchMicrosoftStatus();
-  }, []); // Only run once on mount
-
-  // Load preview from API (only when connected)
-  const loadPreview = useCallback(async () => {
-    if (connectionState !== CONNECTION_STATES.CONNECTED) {
-      return;
-    }
-
-    setLoading(true);
-
+  // Load preview function
+  async function handleLoadPreview() {
+    setPreviewLoading(true);
+    setHasLoadedOnce(true);
     try {
       const response = await api.get('/api/microsoft/email-contacts/preview');
-      
       if (response.data?.success) {
         setPreview(response.data);
-        setSelectedPreviewIds(new Set()); // Reset selection
-        setSaveResult(null); // Clear previous save result
+        setSelectedIds(new Set());
+        setSaveResult(null);
+      } else {
+        setPreview(null);
       }
-    } catch (err) {
-      console.error('Failed to load preview:', err);
+    } catch (error) {
+      console.error('Failed to load preview:', error);
+      setPreview(null);
     } finally {
-      setLoading(false);
+      setPreviewLoading(false);
     }
-  }, [connectionState]);
+  }
 
-  // Load preview when connected
-  useEffect(() => {
-    if (connectionState === CONNECTION_STATES.CONNECTED && !preview) {
-      loadPreview();
-    }
-  }, [connectionState, preview, loadPreview]);
-
-  // Handle connect button
+  // Connect button
   function handleConnect() {
-    // Get ownerId from localStorage
-    const ownerId = typeof window !== 'undefined' 
-      ? localStorage.getItem('ownerId') 
-      : null;
-
     if (!ownerId) {
       alert('Please sign in first.');
       return;
     }
-
-    // Navigate to OAuth login with ownerId
     window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
   }
 
-  // Handle disconnect button
+  // Disconnect button
   async function handleDisconnect() {
+    if (!confirm('Are you sure you want to disconnect your Microsoft account?')) {
+      return;
+    }
     try {
-      const response = await api.patch('/api/microsoft/disconnect');
-      
-      if (response.data?.disconnected) {
-        // Clear local Microsoft status state
-        setConnectionState(CONNECTION_STATES.NOT_CONNECTED);
-        setMicrosoftEmail(null);
-        setMicrosoftExpiresAt(null);
-        setPreview(null);
-        setSelectedPreviewIds(new Set());
-        setSaveResult(null);
-      }
+      await api.patch('/api/microsoft/disconnect');
+      window.location.reload();
     } catch (error) {
-      console.error('Failed to disconnect:', error);
-      alert('Failed to disconnect Microsoft account. Please try again.');
+      console.error('Disconnect failed:', error);
+      alert('Failed to disconnect. Please try again.');
     }
   }
 
   // Toggle selection
-  function toggleSelect(previewId) {
-    setSelectedPreviewIds(prev => {
-      const updated = new Set(prev);
-      if (updated.has(previewId)) {
-        updated.delete(previewId);
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
       } else {
-        updated.add(previewId);
+        next.add(id);
       }
-      return updated;
+      return next;
     });
   }
 
   // Toggle all
   function toggleSelectAll() {
-    if (!preview || !preview.items) return;
-    
-    if (selectedPreviewIds.size === preview.items.length) {
-      setSelectedPreviewIds(new Set());
+    if (!preview?.items) return;
+    if (selectedIds.size === preview.items.length) {
+      setSelectedIds(new Set());
     } else {
-      setSelectedPreviewIds(new Set(preview.items.map(item => item.previewId)));
+      setSelectedIds(new Set(preview.items.map(item => item.previewId)));
     }
   }
 
-  // Save selected contacts
+  // Save button
   async function handleSave() {
     if (!companyHQId) {
       alert('Company context required. Please navigate from a company.');
       return;
     }
-
-    if (selectedPreviewIds.size === 0) {
-      alert('Please select at least one contact to save');
+    if (selectedIds.size === 0) {
+      alert('Please select at least one contact to import.');
       return;
     }
 
     setSaving(true);
-
     try {
       const response = await api.post('/api/microsoft/email-contacts/save', {
-        previewIds: Array.from(selectedPreviewIds),
+        previewIds: Array.from(selectedIds),
         companyHQId,
       });
-
       if (response.data?.success) {
         setSaveResult({
           saved: response.data.saved,
           skipped: response.data.skipped,
-          errors: response.data.errors,
         });
-        setSelectedPreviewIds(new Set());
+        setSelectedIds(new Set());
       }
-    } catch (err) {
-      console.error('Failed to save contacts:', err);
+    } catch (error) {
+      console.error('Save failed:', error);
       alert('Failed to save contacts. Please try again.');
     } finally {
       setSaving(false);
     }
-  }
-
-  // Handle "Import next 50"
-  async function handleNext50() {
-    setSaveResult(null);
-    await loadPreview();
-  }
-
-  // Render based on connection state
-  if (connectionState === CONNECTION_STATES.LOADING) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-10">
-        <div className="mx-auto max-w-4xl px-6">
-          <div className="bg-white p-6 rounded-lg shadow border">
-            <div className="flex items-center justify-center">
-              <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mr-3" />
-              <p className="text-gray-600">Loading...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -220,12 +139,15 @@ export default function MicrosoftEmailIngest() {
         <div className="mb-6">
           <button
             onClick={() => router.push('/contacts')}
-            className="mb-4 flex items-center text-gray-600 hover:text-gray-900"
+            className="mb-4 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Contacts
           </button>
-          <h1 className="text-3xl font-bold mb-2">Import People from Email</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <Mail className="h-8 w-8 text-blue-600" />
+            <h1 className="text-3xl font-bold">Import People from Email</h1>
+          </div>
           <p className="text-gray-600">
             Extract contact signals from people you email in Outlook
           </p>
@@ -235,11 +157,10 @@ export default function MicrosoftEmailIngest() {
         <div className="bg-white p-6 rounded-lg shadow border mb-6">
           <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
           
-          {connectionState === CONNECTION_STATES.NOT_CONNECTED ? (
-            // ❌ Not Connected
+          {!isMicrosoftConnected ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
                 <div>
                   <p className="text-gray-600 font-medium">Not connected</p>
                   <p className="text-sm text-gray-500 mt-1">
@@ -255,10 +176,9 @@ export default function MicrosoftEmailIngest() {
               </button>
             </div>
           ) : (
-            // ✅ Connected
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+                <CheckCircle2 className="h-5 w-5 text-green-500 mr-3" />
                 <div>
                   <p className="font-medium text-green-700">Connected</p>
                   {microsoftEmail && (
@@ -266,37 +186,56 @@ export default function MicrosoftEmailIngest() {
                   )}
                 </div>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    // Continue to import (load preview if not loaded)
-                    if (!preview) {
-                      loadPreview();
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                >
-                  Continue to Import
-                </button>
-                <button
-                  onClick={handleDisconnect}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-                >
-                  Disconnect Microsoft
-                </button>
-              </div>
+              <button
+                onClick={handleDisconnect}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+              >
+                Disconnect
+              </button>
             </div>
           )}
         </div>
 
-        {/* Success Screen */}
+        {/* Loading State */}
+        {isMicrosoftConnected && previewLoading && !preview && (
+          <div className="bg-white p-12 rounded-lg shadow border mb-6">
+            <div className="flex flex-col items-center justify-center">
+              <RefreshCw className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+              <p className="text-gray-600 font-medium">Loading contacts from your inbox...</p>
+              <p className="text-sm text-gray-500 mt-2">Analyzing recent email metadata</p>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State - Connected but no preview loaded */}
+        {isMicrosoftConnected && !previewLoading && !preview && (
+          <div className="bg-white p-12 rounded-lg shadow border mb-6">
+            <div className="flex flex-col items-center justify-center text-center">
+              <Users className="h-16 w-16 text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Import Contacts</h3>
+              <p className="text-gray-600 mb-6 max-w-md">
+                Click the button below to scan your recent emails and find people you've been in contact with.
+              </p>
+              <button
+                onClick={handleLoadPreview}
+                disabled={previewLoading}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                <Download className="h-5 w-5" />
+                {previewLoading ? 'Loading...' : 'Load Contacts from Email'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Success Message */}
         {saveResult && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
             <div className="flex items-start">
-              <CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-0.5" />
+              <CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-green-800 mb-2">
-                  {saveResult.saved} contact{saveResult.saved !== 1 ? 's' : ''} saved
+                  Successfully imported {saveResult.saved} contact{saveResult.saved !== 1 ? 's' : ''}
                 </h3>
                 {saveResult.skipped > 0 && (
                   <p className="text-sm text-green-700 mb-4">
@@ -305,10 +244,13 @@ export default function MicrosoftEmailIngest() {
                 )}
                 <div className="flex gap-3">
                   <button
-                    onClick={handleNext50}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center"
+                    onClick={() => {
+                      setSaveResult(null);
+                      handleLoadPreview();
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors flex items-center gap-2"
                   >
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <RefreshCw className="h-4 w-4" />
                     Import Next 50
                   </button>
                   <button
@@ -316,9 +258,9 @@ export default function MicrosoftEmailIngest() {
                       setSaveResult(null);
                       router.push('/contacts');
                     }}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-medium transition-colors"
                   >
-                    Done for Now
+                    Done
                   </button>
                 </div>
               </div>
@@ -326,65 +268,61 @@ export default function MicrosoftEmailIngest() {
           </div>
         )}
 
-        {/* Preview Section - Only show when connected */}
-        {connectionState === CONNECTION_STATES.CONNECTED && (
+        {/* Preview Section */}
+        {isMicrosoftConnected && preview && preview.items && (
           <div className="bg-white p-6 rounded-lg shadow border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold">Preview Contacts</h2>
-                {preview && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    {preview.items?.length || 0} unique people from {preview.limit} recent emails
-                    {preview.generatedAt && (
-                      <span className="ml-2">
-                        • Generated {new Date(preview.generatedAt).toLocaleString()}
-                      </span>
-                    )}
-                  </p>
-                )}
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  Preview Contacts
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {preview.items.length} unique {preview.items.length === 1 ? 'person' : 'people'} from {preview.limit} recent emails
+                  {preview.generatedAt && (
+                    <span className="ml-2">
+                      • Generated {new Date(preview.generatedAt).toLocaleString()}
+                    </span>
+                  )}
+                </p>
               </div>
               <div className="flex gap-2">
-                {preview && preview.items && preview.items.length > 0 && (
+                {preview.items.length > 0 && (
                   <button
                     onClick={toggleSelectAll}
-                    className="text-sm text-blue-600 hover:text-blue-800"
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
                   >
-                    {selectedPreviewIds.size === preview.items.length ? 'Deselect All' : 'Select All'}
+                    {selectedIds.size === preview.items.length ? 'Deselect All' : 'Select All'}
                   </button>
                 )}
                 <button
-                  onClick={loadPreview}
-                  disabled={loading}
-                  className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 flex items-center"
+                  onClick={handleLoadPreview}
+                  disabled={previewLoading}
+                  className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center gap-1.5"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 ${previewLoading ? 'animate-spin' : ''}`} />
                   Refresh
                 </button>
               </div>
             </div>
 
-            {loading && !preview ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mr-3" />
-                <p className="text-gray-600">Loading preview...</p>
-              </div>
-            ) : preview && preview.items && preview.items.length > 0 ? (
+            {preview.items.length > 0 ? (
               <>
-                <div className="max-h-96 overflow-y-auto space-y-2 mb-4">
+                <div className="max-h-96 overflow-y-auto space-y-2 mb-4 border rounded-lg p-2">
                   {preview.items.map((item) => (
                     <div
                       key={item.previewId}
-                      className={`flex items-center gap-3 p-3 border rounded hover:bg-gray-50 cursor-pointer ${
-                        selectedPreviewIds.has(item.previewId) ? 'bg-blue-50 border-blue-300' : ''
+                      className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
+                        selectedIds.has(item.previewId) ? 'bg-blue-50 border-2 border-blue-300' : 'border border-gray-200'
                       }`}
                       onClick={() => toggleSelect(item.previewId)}
                     >
                       <input
                         type="checkbox"
-                        checked={selectedPreviewIds.has(item.previewId)}
+                        checked={selectedIds.has(item.previewId)}
                         onChange={() => toggleSelect(item.previewId)}
                         onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4"
+                        className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">
@@ -392,7 +330,7 @@ export default function MicrosoftEmailIngest() {
                         </p>
                         <p className="text-xs text-gray-500 truncate">{item.email}</p>
                         <div className="flex gap-4 mt-1 text-xs text-gray-400">
-                          <span>{item.domain}</span>
+                          <span className="font-medium">{item.domain}</span>
                           <span>{item.stats.messageCount} message{item.stats.messageCount !== 1 ? 's' : ''}</span>
                           {item.stats.lastSeenAt && (
                             <span>
@@ -406,49 +344,51 @@ export default function MicrosoftEmailIngest() {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t">
-                  <p className="text-sm text-gray-600">
-                    {selectedPreviewIds.size} of {preview.items.length} selected
+                  <p className="text-sm text-gray-600 font-medium">
+                    {selectedIds.size} of {preview.items.length} selected
                   </p>
                   <button
                     onClick={handleSave}
-                    disabled={saving || selectedPreviewIds.size === 0 || !companyHQId}
-                    className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    disabled={saving || selectedIds.size === 0 || !companyHQId}
+                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm hover:shadow transition-all flex items-center gap-2"
                   >
                     {saving ? (
                       <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Importing...
                       </>
                     ) : (
                       <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Save Selected Contacts
+                        <Check className="h-4 w-4" />
+                        Import Selected ({selectedIds.size})
                       </>
                     )}
                   </button>
                 </div>
               </>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Mail className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>No contacts found in preview</p>
+              <div className="text-center py-12 text-gray-500">
+                <Mail className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                <p className="font-medium mb-2">No contacts found</p>
+                <p className="text-sm mb-4">We couldn't find any unique contacts in your recent emails.</p>
                 <button
-                  onClick={loadPreview}
-                  className="mt-4 text-sm text-blue-600 hover:text-blue-800"
+                  onClick={handleLoadPreview}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
                 >
-                  Refresh Preview
+                  Try Again
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Help Text - Only show when not connected */}
-        {connectionState === CONNECTION_STATES.NOT_CONNECTED && (
+        {/* Help Text */}
+        {!isMicrosoftConnected && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
-              Connect your Microsoft account to import contacts from people you email in Outlook.
-              This extracts contact signals from your inbox metadata (no message content is read).
+              <strong>How it works:</strong> Connect your Microsoft account to scan your recent email metadata. 
+              We extract contact signals from people you email in Outlook (no message content is read). 
+              You can then select which contacts to import into your CRM.
             </p>
           </div>
         )}

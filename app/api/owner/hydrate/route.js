@@ -46,6 +46,13 @@ export async function GET(request) {
         photoURL: true,
         createdAt: true,
         updatedAt: true,
+        // Microsoft OAuth fields (for connection status check only - NOT returned to frontend)
+        microsoftAccessToken: true,
+        microsoftRefreshToken: true,
+        microsoftExpiresAt: true,
+        microsoftEmail: true,
+        microsoftDisplayName: true,
+        microsoftTenantId: true,
       },
     });
 
@@ -88,12 +95,35 @@ export async function GET(request) {
     const companyHQId = primaryMembership?.companyHqId || null;
     const companyHQ = primaryMembership?.company_hqs || null;
 
-    // Return owner with memberships
+    // Compute Microsoft connection status server-side (NO tokens sent to frontend)
+    const now = new Date();
+    const expiresAt = owner.microsoftExpiresAt ? new Date(owner.microsoftExpiresAt) : null;
+    const microsoftConnected = !!(
+      owner.microsoftAccessToken &&
+      owner.microsoftRefreshToken &&
+      expiresAt &&
+      expiresAt > now
+    );
+
+    // Return owner with memberships (NO tokens - only safe data)
+    // Destructure to exclude sensitive token fields
+    const {
+      microsoftAccessToken,
+      microsoftRefreshToken,
+      microsoftExpiresAt,
+      microsoftTenantId,
+      microsoftDisplayName,
+      ...ownerSafe
+    } = owner;
+
     const ownerWithMemberships = {
-      ...owner,
+      ...ownerSafe,
       companyHQId,        // Default/primary CompanyHQ
       companyHQ,          // Full CompanyHQ object
       memberships,        // Array of all memberships
+      // Microsoft connection state (computed server-side, no tokens)
+      microsoftConnected,
+      microsoftEmail: owner.microsoftEmail || null,
     };
 
     return NextResponse.json({
