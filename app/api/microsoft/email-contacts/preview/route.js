@@ -112,6 +112,152 @@ export async function GET(request) {
 
     const messages = messagesResponse.value || [];
 
+    // Filter out automated/business emails
+    function isAutomatedEmail(email, displayName) {
+      const emailLower = email.toLowerCase();
+      const nameLower = (displayName || '').toLowerCase();
+      
+      // Common automated email patterns
+      const automatedPatterns = [
+        /^noreply@/i,
+        /^no-reply@/i,
+        /^donotreply@/i,
+        /^donot-reply@/i,
+        /^automated@/i,
+        /^automation@/i,
+        /^system@/i,
+        /^notification@/i,
+        /^notifications@/i,
+        /^alerts@/i,
+        /^mailer@/i,
+        /^mailer-daemon@/i,
+        /^postmaster@/i,
+        /^webmaster@/i,
+        /^support@/i,
+        /^help@/i,
+        /^info@/i,
+        /^contact@/i,
+        /^hello@/i,
+        /^hi@/i,
+      ];
+      
+      // Check email patterns
+      if (automatedPatterns.some(pattern => pattern.test(emailLower))) {
+        return true;
+      }
+      
+      // Common automated/business domains
+      const automatedDomains = [
+        'sendgrid.com',
+        'sendgrid.net',
+        'mail.sendgrid.net',
+        'godaddy.com',
+        'venmo.com',
+        'email.venmo.com',
+        'bluevine.com',
+        'email.bluevine.com',
+        'stripe.com',
+        'mail.stripe.com',
+        'paypal.com',
+        'mail.paypal.com',
+        'amazon.com',
+        'amazonaws.com',
+        'mail.amazon.com',
+        'github.com',
+        'noreply.github.com',
+        'linkedin.com',
+        'notifications.linkedin.com',
+        'facebook.com',
+        'mail.facebook.com',
+        'twitter.com',
+        'x.com',
+        'mail.x.com',
+        'google.com',
+        'mail.google.com',
+        'microsoft.com',
+        'mail.microsoft.com',
+        'outlook.com',
+        'mail.outlook.com',
+        'mailchimp.com',
+        'mail.mailchimp.com',
+        'hubspot.com',
+        'mail.hubspot.com',
+        'salesforce.com',
+        'mail.salesforce.com',
+        'zendesk.com',
+        'mail.zendesk.com',
+        'intercom.com',
+        'mail.intercom.com',
+        'slack.com',
+        'mail.slack.com',
+        'dropbox.com',
+        'mail.dropbox.com',
+        'zoom.us',
+        'mail.zoom.us',
+        'calendly.com',
+        'mail.calendly.com',
+        'eventbrite.com',
+        'mail.eventbrite.com',
+        'square.com',
+        'mail.square.com',
+        'quickbooks.com',
+        'mail.quickbooks.com',
+        'xero.com',
+        'mail.xero.com',
+        'freshbooks.com',
+        'mail.freshbooks.com',
+      ];
+      
+      const domain = emailLower.split('@')[1];
+      if (automatedDomains.includes(domain)) {
+        return true;
+      }
+      
+      // Check if displayName looks like a business/service name (common patterns)
+      const businessNamePatterns = [
+        /^sendgrid$/i,
+        /^godaddy/i,
+        /^venmo$/i,
+        /^bluevine$/i,
+        /^stripe$/i,
+        /^paypal$/i,
+        /^amazon$/i,
+        /^github$/i,
+        /^linkedin$/i,
+        /^facebook$/i,
+        /^twitter$/i,
+        /^google$/i,
+        /^microsoft$/i,
+        /^outlook$/i,
+        /^mailchimp$/i,
+        /^hubspot$/i,
+        /^salesforce$/i,
+        /^zendesk$/i,
+        /^intercom$/i,
+        /^slack$/i,
+        /^dropbox$/i,
+        /^zoom$/i,
+        /^calendly$/i,
+        /^eventbrite$/i,
+        /^square$/i,
+        /^quickbooks$/i,
+        /^xero$/i,
+        /^freshbooks$/i,
+        /renewals?$/i,
+        /notifications?$/i,
+        /alerts?$/i,
+        /updates?$/i,
+        /newsletter$/i,
+        /marketing$/i,
+      ];
+      
+      if (businessNamePatterns.some(pattern => pattern.test(nameLower))) {
+        return true;
+      }
+      
+      return false;
+    }
+
     // Aggregate messages into unique people by email address
     const contactMap = new Map();
 
@@ -127,6 +273,12 @@ export async function GET(request) {
       }
 
       const displayName = from.emailAddress.name || email.split('@')[0];
+      
+      // Skip automated/business emails
+      if (isAutomatedEmail(email, displayName)) {
+        continue;
+      }
+      
       const domain = email.split('@')[1];
       const receivedDateTime = message.receivedDateTime;
 

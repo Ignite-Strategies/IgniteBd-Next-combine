@@ -345,18 +345,38 @@ function ComposeContent() {
               )}
 
               <form onSubmit={handleSend} className="space-y-4">
-                {/* Sender Identity Panel */}
+                {/* Sender Identity Panel - Show prominently when blank */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     From
                   </label>
-                  <SenderIdentityPanel />
                   
-                  {/* Show current sender email if verified */}
-                  {senderEmail && (
-                    <div className="mt-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                      {senderName ? `${senderName} <${senderEmail}>` : senderEmail}
+                  {!senderEmail && !loadingSender ? (
+                    <div className="rounded-lg border-2 border-dashed border-yellow-300 bg-yellow-50 p-4">
+                      <div className="flex items-start gap-3">
+                        <Mail className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-yellow-900 mb-1">
+                            Add a verified sender email with SendGrid
+                          </p>
+                          <p className="text-xs text-yellow-700 mb-3">
+                            You need to verify your business email address with SendGrid before sending emails. 
+                            This ensures your emails are delivered successfully.
+                          </p>
+                          <SenderIdentityPanel />
+                        </div>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      <SenderIdentityPanel />
+                      {/* Show current sender email if verified */}
+                      {senderEmail && (
+                        <div className="mt-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                          {senderName ? `${senderName} <${senderEmail}>` : senderEmail}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 
@@ -519,13 +539,18 @@ function ComposeContent() {
                 <div className="flex justify-end pt-4">
                   <button
                     type="submit"
-                    disabled={sending || !ownerId}
+                    disabled={sending || !ownerId || !senderEmail}
                     className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {sending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Sending...
+                      </>
+                    ) : !senderEmail ? (
+                      <>
+                        <Mail className="h-4 w-4" />
+                        Verify Sender First
                       </>
                     ) : (
                       <>

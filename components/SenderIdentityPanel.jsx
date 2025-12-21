@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mail, CheckCircle2, Clock, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Mail, CheckCircle2, Clock, Loader2, RefreshCw, AlertCircle, List } from 'lucide-react';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 
@@ -9,7 +9,8 @@ import { useOwner } from '@/hooks/useOwner';
  * SenderIdentityPanel Component
  * 
  * Manages SendGrid sender identity verification
- * - Shows current verified sender
+ * - First checks SendGrid for existing verified senders
+ * - Allows selecting from already-verified senders
  * - Allows starting verification for new sender
  * - Checks verification status
  * - Only updates Owner after SendGrid confirms verification
@@ -21,6 +22,12 @@ export default function SenderIdentityPanel() {
   const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  
+  // Available senders from SendGrid
+  const [availableSenders, setAvailableSenders] = useState([]);
+  const [loadingSenders, setLoadingSenders] = useState(false);
+  const [showSenderList, setShowSenderList] = useState(false);
+  const [selectingSender, setSelectingSender] = useState(false);
   
   // Form state for new sender
   const [showForm, setShowForm] = useState(false);
@@ -56,13 +63,70 @@ export default function SenderIdentityPanel() {
           setSenderEmail(null);
           setSenderName(null);
           setVerified(false);
+          // If no sender configured, check SendGrid for available verified senders
+          await loadAvailableSenders();
         }
+      } else {
+        // If no sender configured, check SendGrid for available verified senders
+        await loadAvailableSenders();
       }
     } catch (err) {
       console.error('Failed to load sender status:', err);
       setError('Failed to load sender status');
+      // Still try to load available senders
+      await loadAvailableSenders();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAvailableSenders = async () => {
+    try {
+      setLoadingSenders(true);
+      const response = await api.get('/api/outreach/verified-senders/list');
+      if (response.data?.success && response.data.senders) {
+        // Filter to only verified senders
+        const verified = response.data.senders.filter(sender => {
+          const isVerified = sender.verified?.status === 'verified' || 
+                           sender.verified === true ||
+                           sender.verification?.status === 'verified';
+          return isVerified;
+        });
+        setAvailableSenders(verified);
+      }
+    } catch (err) {
+      console.error('Failed to load available senders:', err);
+      // Don't set error here - it's okay if this fails
+    } finally {
+      setLoadingSenders(false);
+    }
+  };
+
+  const handleSelectSender = async (sender) => {
+    try {
+      setSelectingSender(true);
+      setError(null);
+      
+      const senderEmail = sender.from?.email || sender.email;
+      const senderName = sender.from?.name || sender.name;
+      
+      // Update Owner with selected sender
+      const response = await api.put('/api/outreach/verified-senders', {
+        email: senderEmail,
+        name: senderName,
+      });
+      
+      if (response.data?.success) {
+        setSenderEmail(senderEmail);
+        setSenderName(senderName);
+        setVerified(true);
+        setShowSenderList(false);
+      }
+    } catch (err) {
+      console.error('Failed to select sender:', err);
+      setError(err.response?.data?.error || 'Failed to select sender');
+    } finally {
+      setSelectingSender(false);
     }
   };
 
@@ -141,12 +205,97 @@ export default function SenderIdentityPanel() {
       )}
 
       {!senderEmail ? (
-        // No sender configured - show form
+        // No sender configured - check for available senders first
         <div>
-          {!showForm ? (
+          {loadingSenders ? (
+            <div className="text-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400 mx-auto mb-2" />
+              <p className="text-xs text-gray-500">Checking for verified senders...</p>
+            </div>
+          ) : availableSenders.length > 0 ? (
+            // Show available verified senders to select from
+            <div>
+              {!showSenderList ? (
+                <div className="text-center py-4">
+                  <List className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-gray-700 mb-1">Select a verified sender</p>
+                  <p className="text-xs text-gray-500 mb-4">
+                    Found {availableSenders.length} verified sender{availableSenders.length !== 1 ? 's' : ''} in SendGrid
+                  </p>
+                  <div className="flex items-center gap-2 justify-center">
+                    <button
+                      onClick={() => setShowSenderList(true)}
+                      className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                      Select Sender
+                    </button>
+                    <button
+                      onClick={() => setShowForm(true)}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                    >
+                      Verify New Email
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+                    <p className="text-xs font-medium text-blue-900 mb-1">
+                      Select from verified senders</p>
+                    <p className="text-xs text-blue-700">
+                      These emails are already verified in SendGrid. Select one to use.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {availableSenders.map((sender, idx) => {
+                      const email = sender.from?.email || sender.email;
+                      const name = sender.from?.name || sender.name || email;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleSelectSender(sender)}
+                          disabled={selectingSender}
+                          className="w-full text-left rounded-md border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 hover:border-red-300 transition disabled:opacity-50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-gray-900">{name}</p>
+                              <p className="text-xs text-gray-500">{email}</p>
+                            </div>
+                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setShowSenderList(false);
+                        setShowForm(true);
+                      }}
+                      className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                    >
+                      Verify New Email Instead
+                    </button>
+                    <button
+                      onClick={() => setShowSenderList(false)}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : !showForm ? (
+            // No verified senders available - show form to start verification
             <div className="text-center py-4">
               <Mail className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-4">No verified sender configured</p>
+              <p className="text-sm font-medium text-gray-700 mb-1">Add a verified sender email with SendGrid</p>
+              <p className="text-xs text-gray-500 mb-4">Verify your business email to start sending</p>
               <button
                 onClick={() => setShowForm(true)}
                 className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
