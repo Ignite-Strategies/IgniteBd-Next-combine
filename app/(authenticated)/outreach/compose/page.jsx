@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, Mail, Loader2, CheckCircle2, Clock, Eye, MousePointerClick, FileText, User, Sparkles, Settings, Megaphone, Plus, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
+import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
@@ -38,14 +39,10 @@ function ComposeContent() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('compose');
   
-  // Verified sender state
+  // Verified sender state (for display only - SenderIdentityPanel manages verification)
   const [senderEmail, setSenderEmail] = useState('');
   const [senderName, setSenderName] = useState('');
   const [loadingSender, setLoadingSender] = useState(true);
-  const [showSenderSettings, setShowSenderSettings] = useState(false);
-  const [newSenderEmail, setNewSenderEmail] = useState('');
-  const [newSenderName, setNewSenderName] = useState('');
-  const [savingSender, setSavingSender] = useState(false);
   
   // Quick contact creation modal
   const [showQuickContactModal, setShowQuickContactModal] = useState(false);
@@ -83,52 +80,25 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load verified sender from API
+  // Load verified sender from API (for display only)
   const loadVerifiedSender = async () => {
     try {
       setLoadingSender(true);
       const response = await api.get('/api/outreach/verified-senders');
       if (response.data?.success) {
-        setSenderEmail(response.data.email || response.data.verifiedEmail || '');
-        setSenderName(response.data.name || response.data.verifiedName || '');
-        setNewSenderEmail(response.data.email || response.data.verifiedEmail || '');
-        setNewSenderName(response.data.name || response.data.verifiedName || '');
+        // Only use verified sender - never Gmail sign-in email
+        const email = response.data.verifiedEmail || null;
+        const name = response.data.verifiedName || null;
+        
+        setSenderEmail(email || '');
+        setSenderName(name || '');
       }
     } catch (err) {
       console.error('Failed to load verified sender:', err);
-      // Fallback to env vars
-      setSenderEmail(process.env.NEXT_PUBLIC_SENDGRID_FROM_EMAIL || 'adam@ignitestrategies.co');
-      setSenderName(process.env.NEXT_PUBLIC_SENDGRID_FROM_NAME || 'Adam - Ignite Strategies');
+      setSenderEmail('');
+      setSenderName('');
     } finally {
       setLoadingSender(false);
-    }
-  };
-
-  // Save verified sender
-  const handleSaveSender = async () => {
-    if (!newSenderEmail) {
-      setError('Email is required');
-      return;
-    }
-
-    try {
-      setSavingSender(true);
-      const response = await api.put('/api/outreach/verified-senders', {
-        email: newSenderEmail,
-        name: newSenderName || undefined,
-      });
-
-      if (response.data?.success) {
-        setSenderEmail(response.data.verifiedEmail);
-        setSenderName(response.data.verifiedName || newSenderName);
-        setShowSenderSettings(false);
-        setError(null);
-      }
-    } catch (err) {
-      console.error('Failed to save verified sender:', err);
-      setError(err.response?.data?.error || 'Failed to save verified sender');
-    } finally {
-      setSavingSender(false);
     }
   };
 
@@ -375,98 +345,21 @@ function ComposeContent() {
               )}
 
               <form onSubmit={handleSend} className="space-y-4">
-                {/* Sender with Settings */}
+                {/* Sender Identity Panel */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700">
-                      From
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowSenderSettings(!showSenderSettings)}
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      <Settings className="h-3 w-3" />
-                      {showSenderSettings ? 'Hide' : 'Change'}
-                    </button>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    From
+                  </label>
+                  <SenderIdentityPanel />
                   
-                  {showSenderSettings ? (
-                    <div className="space-y-3 rounded-md border border-gray-300 bg-gray-50 p-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Verified Email <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="email"
-                          value={newSenderEmail}
-                          onChange={(e) => setNewSenderEmail(e.target.value)}
-                          placeholder="your-email@example.com"
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                        />
-                        <p className="mt-1 text-xs text-gray-500">
-                          This email must be verified in SendGrid
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Display Name (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={newSenderName}
-                          onChange={(e) => setNewSenderName(e.target.value)}
-                          placeholder="Your Name"
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleSaveSender}
-                          disabled={savingSender || !newSenderEmail}
-                          className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {savingSender ? (
-                            <>
-                              <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
-                              Saving...
-                            </>
-                          ) : (
-                            'Save'
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowSenderSettings(false);
-                            setNewSenderEmail(senderEmail);
-                            setNewSenderName(senderName);
-                          }}
-                          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                  {/* Show current sender email if verified */}
+                  {senderEmail && (
+                    <div className="mt-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                      {senderName ? `${senderName} <${senderEmail}>` : senderEmail}
                     </div>
-                  ) : (
-                    <>
-                      {loadingSender ? (
-                        <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-400">
-                          <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
-                          Loading sender...
-                        </div>
-                      ) : (
-                        <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                          {senderName ? `${senderName} <${senderEmail}>` : senderEmail}
-                        </div>
-                      )}
-                      <p className="mt-1 text-xs text-gray-500">
-                        Verified sender identity
-                      </p>
-                    </>
                   )}
                 </div>
+                
 
                 {/* Contact Selector */}
                 <div>

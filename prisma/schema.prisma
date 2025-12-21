@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
   // Optional: Direct connection for migrations (bypasses pooler)
   // If DIRECT_DATABASE_URL is not set, Prisma will use DATABASE_URL for migrations
   // Set DIRECT_DATABASE_URL in Vercel to use direct connection (recommended for Neon)
@@ -221,7 +221,7 @@ model company_hqs {
   templates                                     templates[]
   template_bases                                template_bases[]
   campaigns                                     campaigns[]
-  email_sequences                                email_sequences[]
+  email_sequences                               email_sequences[]
   platform                                      platform?                 @relation(fields: [platformId], references: [id])
 
   @@index([platformId])
@@ -275,8 +275,8 @@ model contact_lists {
   companyId     String
   name          String
   description   String?
-  type          String       @default("static") // static, smart, manual
-  filters       Json?       // For smart lists: { audienceType: "...", stages: [...], tags: [...] }
+  type          String      @default("static") // static, smart, manual
+  filters       Json? // For smart lists: { audienceType: "...", stages: [...], tags: [...] }
   totalContacts Int         @default(0)
   lastUpdated   DateTime    @default(now())
   isActive      Boolean     @default(true)
@@ -286,9 +286,9 @@ model contact_lists {
   contacts      Contact[]
   campaigns     campaigns[]
 
+  @@unique([companyId, name])
   @@index([companyId])
   @@index([isActive])
-  @@unique([companyId, name])
 }
 
 model Contact {
@@ -438,26 +438,26 @@ model ecosystem_orgs {
 }
 
 model email_activities {
-  id            String    @id @default(uuid())
-  owner_id      String
-  contact_id    String?
-  tenant_id     String?
-  campaign_id   String?
-  sequence_id   String?
-  sequence_step_id String?
-  email         String
-  subject       String
-  body          String
-  event         String?   // Latest event: sent, delivered, opened, clicked, replied, bounce, etc.
-  messageId     String    @unique
+  id                  String           @id @default(uuid())
+  owner_id            String
+  contact_id          String?
+  tenant_id           String?
+  campaign_id         String?
+  sequence_id         String?
+  sequence_step_id    String?
+  email               String
+  subject             String
+  body                String
+  event               String? // Latest event: sent, delivered, opened, clicked, replied, bounce, etc.
+  messageId           String           @unique
   reply_to_message_id String? // If this is a reply, link to original email
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime
-  owners        owners    @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  campaigns     campaigns? @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
-  email_sequences email_sequences? @relation(fields: [sequence_id], references: [id], onDelete: SetNull)
-  sequence_steps sequence_steps? @relation(fields: [sequence_step_id], references: [id], onDelete: SetNull)
-  email_events  email_events[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime
+  owners              owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  campaigns           campaigns?       @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
+  email_sequences     email_sequences? @relation(fields: [sequence_id], references: [id], onDelete: SetNull)
+  sequence_steps      sequence_steps?  @relation(fields: [sequence_step_id], references: [id], onDelete: SetNull)
+  email_events        email_events[]
 
   @@index([contact_id])
   @@index([messageId])
@@ -469,41 +469,41 @@ model email_activities {
 
 // Campaigns - Apollo-like campaign management
 model campaigns {
-  id              String            @id @default(uuid())
-  owner_id        String
-  company_hq_id   String?
-  name            String
-  description     String?
-  status          CampaignStatus    @default(DRAFT) // DRAFT, SCHEDULED, ACTIVE, PAUSED, COMPLETED, CANCELLED
-  type            CampaignType      @default(EMAIL) // EMAIL, SEQUENCE, ONE_OFF
+  id               String             @id @default(uuid())
+  owner_id         String
+  company_hq_id    String?
+  name             String
+  description      String?
+  status           CampaignStatus     @default(DRAFT) // DRAFT, SCHEDULED, ACTIVE, PAUSED, COMPLETED, CANCELLED
+  type             CampaignType       @default(EMAIL) // EMAIL, SEQUENCE, ONE_OFF
   // WHO - Contact list (reusable, modular)
-  contact_list_id String?
-  contact_lists   contact_lists?   @relation(fields: [contact_list_id], references: [id], onDelete: SetNull)
+  contact_list_id  String?
+  contact_lists    contact_lists?     @relation(fields: [contact_list_id], references: [id], onDelete: SetNull)
   // Email content (optional - can be in sequences)
-  subject         String?
-  preview_text    String?
-  from_email      String?
-  from_name       String?
-  scheduled_for   DateTime?
-  started_at      DateTime?
-  completed_at    DateTime?
-  total_recipients Int             @default(0)
-  emails_sent     Int              @default(0)
-  emails_delivered Int             @default(0)
-  emails_opened   Int              @default(0)
-  emails_clicked  Int              @default(0)
-  emails_replied  Int              @default(0)
-  emails_bounced  Int              @default(0)
-  open_rate       Float?
-  click_rate      Float?
-  reply_rate      Float?
-  bounce_rate     Float?
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @updatedAt
-  owners          owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  company_hqs     company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
+  subject          String?
+  preview_text     String?
+  from_email       String?
+  from_name        String?
+  scheduled_for    DateTime?
+  started_at       DateTime?
+  completed_at     DateTime?
+  total_recipients Int                @default(0)
+  emails_sent      Int                @default(0)
+  emails_delivered Int                @default(0)
+  emails_opened    Int                @default(0)
+  emails_clicked   Int                @default(0)
+  emails_replied   Int                @default(0)
+  emails_bounced   Int                @default(0)
+  open_rate        Float?
+  click_rate       Float?
+  reply_rate       Float?
+  bounce_rate      Float?
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+  owners           owners             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  company_hqs      company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
   email_activities email_activities[]
-  email_sequences email_sequences[]
+  email_sequences  email_sequences[]
 
   @@index([owner_id])
   @@index([company_hq_id])
@@ -529,29 +529,29 @@ enum CampaignType {
 
 // Email Sequences - Multi-step email flows (Apollo-like)
 model email_sequences {
-  id              String            @id @default(uuid())
-  campaign_id     String?
-  owner_id        String
-  company_hq_id   String?
-  name            String
-  description     String?
-  status          SequenceStatus   @default(DRAFT) // DRAFT, ACTIVE, PAUSED, COMPLETED
-  auto_pause_on_reply Boolean       @default(true)
-  total_recipients Int             @default(0)
-  emails_sent     Int              @default(0)
-  emails_opened   Int              @default(0)
-  emails_clicked  Int              @default(0)
-  emails_replied  Int              @default(0)
-  open_rate       Float?
-  click_rate      Float?
-  reply_rate      Float?
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @updatedAt
-  campaigns       campaigns?       @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
-  owners          owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  company_hqs     company_hqs?     @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
-  sequence_steps  sequence_steps[]
-  email_activities email_activities[]
+  id                  String             @id @default(uuid())
+  campaign_id         String?
+  owner_id            String
+  company_hq_id       String?
+  name                String
+  description         String?
+  status              SequenceStatus     @default(DRAFT) // DRAFT, ACTIVE, PAUSED, COMPLETED
+  auto_pause_on_reply Boolean            @default(true)
+  total_recipients    Int                @default(0)
+  emails_sent         Int                @default(0)
+  emails_opened       Int                @default(0)
+  emails_clicked      Int                @default(0)
+  emails_replied      Int                @default(0)
+  open_rate           Float?
+  click_rate          Float?
+  reply_rate          Float?
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+  campaigns           campaigns?         @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
+  owners              owners             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  company_hqs         company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
+  sequence_steps      sequence_steps[]
+  email_activities    email_activities[]
 
   @@index([owner_id])
   @@index([campaign_id])
@@ -567,45 +567,45 @@ enum SequenceStatus {
 
 // Sequence Steps - Individual emails in a sequence
 model sequence_steps {
-  id                String            @id @default(uuid())
-  sequence_id       String
-  step_number       Int               // Order in sequence (1, 2, 3, ...)
-  name              String?
-  subject           String
-  body              String
-  delay_days        Int               @default(0) // Days to wait before sending this step
-  delay_hours       Int               @default(0) // Additional hours
-  conditions        Json?             // Conditional logic: { if_opened: true, if_clicked: false, if_replied: false }
-  from_email        String?
-  from_name         String?
-  total_sent        Int               @default(0)
-  total_opened      Int               @default(0)
-  total_clicked     Int               @default(0)
-  total_replied     Int               @default(0)
-  open_rate         Float?
-  click_rate        Float?
-  reply_rate        Float?
-  created_at        DateTime          @default(now())
-  updated_at        DateTime          @updatedAt
-  email_sequences   email_sequences    @relation(fields: [sequence_id], references: [id], onDelete: Cascade)
-  email_activities  email_activities[]
+  id               String             @id @default(uuid())
+  sequence_id      String
+  step_number      Int // Order in sequence (1, 2, 3, ...)
+  name             String?
+  subject          String
+  body             String
+  delay_days       Int                @default(0) // Days to wait before sending this step
+  delay_hours      Int                @default(0) // Additional hours
+  conditions       Json? // Conditional logic: { if_opened: true, if_clicked: false, if_replied: false }
+  from_email       String?
+  from_name        String?
+  total_sent       Int                @default(0)
+  total_opened     Int                @default(0)
+  total_clicked    Int                @default(0)
+  total_replied    Int                @default(0)
+  open_rate        Float?
+  click_rate       Float?
+  reply_rate       Float?
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+  email_sequences  email_sequences    @relation(fields: [sequence_id], references: [id], onDelete: Cascade)
+  email_activities email_activities[]
 
+  @@unique([sequence_id, step_number])
   @@index([sequence_id])
   @@index([sequence_id, step_number])
-  @@unique([sequence_id, step_number])
 }
 
 // Email Events - Detailed tracking of all email events (multiple opens/clicks per email)
 model email_events {
-  id                String            @id @default(uuid())
+  id                String           @id @default(uuid())
   email_activity_id String
-  event_type        EmailEventType    // OPEN, CLICK, REPLY, BOUNCE, DROP, DELIVERED, etc.
-  event_data        Json?             // Additional event data (click URL, bounce reason, etc.)
+  event_type        EmailEventType // OPEN, CLICK, REPLY, BOUNCE, DROP, DELIVERED, etc.
+  event_data        Json? // Additional event data (click URL, bounce reason, etc.)
   ip_address        String?
   user_agent        String?
-  location          String?           // Geographic location if available
-  occurred_at       DateTime          @default(now())
-  email_activities  email_activities  @relation(fields: [email_activity_id], references: [id], onDelete: Cascade)
+  location          String? // Geographic location if available
+  occurred_at       DateTime         @default(now())
+  email_activities  email_activities @relation(fields: [email_activity_id], references: [id], onDelete: Cascade)
 
   @@index([email_activity_id])
   @@index([event_type])

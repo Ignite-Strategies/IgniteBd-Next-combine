@@ -35,12 +35,9 @@ export async function GET(request) {
       success: true,
       verifiedEmail: owner.sendgridVerifiedEmail,
       verifiedName: owner.sendgridVerifiedName,
-      // Fallback to owner's email/name if no verified sender set
-      email: owner.sendgridVerifiedEmail || owner.email,
-      name: owner.sendgridVerifiedName || 
-            (owner.firstName && owner.lastName 
-              ? `${owner.firstName} ${owner.lastName}` 
-              : owner.firstName || owner.lastName || ''),
+      // Only use verified sender or env defaults - NEVER use owner.email (Gmail sign-in)
+      email: owner.sendgridVerifiedEmail || process.env.SENDGRID_FROM_EMAIL || null,
+      name: owner.sendgridVerifiedName || process.env.SENDGRID_FROM_NAME || null,
     });
   } catch (error) {
     console.error('Get verified sender error:', error);

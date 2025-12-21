@@ -57,12 +57,21 @@ export async function POST(request) {
 
     const ownerId = owner.id;
     
-    // Get verified sender email/name from owner, with fallbacks
-    const fromEmail = owner.sendgridVerifiedEmail || owner.email || process.env.SENDGRID_FROM_EMAIL || 'adam@ignitestrategies.co';
-    const fromName = owner.sendgridVerifiedName || 
-                     (owner.firstName && owner.lastName ? `${owner.firstName} ${owner.lastName}` : owner.firstName || owner.lastName || '') ||
-                     process.env.SENDGRID_FROM_NAME || 
-                     'Adam - Ignite Strategies';
+    // Get verified sender email/name from owner
+    // ENFORCEMENT: Only use verified sender - never fallback to auth email
+    const fromEmail = owner.sendgridVerifiedEmail;
+    const fromName = owner.sendgridVerifiedName;
+    
+    // Strict enforcement: sender must be verified
+    if (!fromEmail) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Sender not verified. Please verify your sender identity before sending emails. Go to compose page and click "Change" next to From field to verify your sender.' 
+        },
+        { status: 400 }
+      );
+    }
 
     // Parse request body
     const body = await request.json();
