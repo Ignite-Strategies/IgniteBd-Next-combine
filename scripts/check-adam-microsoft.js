@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+require('dotenv').config({ path: '.env.local' });
+const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
@@ -97,5 +98,7 @@ async function checkAdamMicrosoft() {
   }
 }
 
-checkAdamMicrosoft();
+checkAdamMicrosoft()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());
 

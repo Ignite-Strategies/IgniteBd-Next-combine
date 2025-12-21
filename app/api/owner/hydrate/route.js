@@ -96,24 +96,17 @@ export async function GET(request) {
     const companyHQ = primaryMembership?.company_hqs || null;
 
     // Compute Microsoft connection status server-side (NO tokens sent to frontend)
-    const now = new Date();
-    const expiresAt = owner.microsoftExpiresAt ? new Date(owner.microsoftExpiresAt) : null;
+    // Connection is valid if we have refresh token (can always refresh access token)
+    // Access token expiration doesn't matter - we can refresh it automatically
+    const microsoftConnected = !!(
+      owner.microsoftAccessToken &&
+      owner.microsoftRefreshToken
+    );
     
     // Debug logging
     console.log('🔍 Microsoft Connection Check:');
     console.log(`  Has Access Token: ${!!owner.microsoftAccessToken}`);
     console.log(`  Has Refresh Token: ${!!owner.microsoftRefreshToken}`);
-    console.log(`  Expires At: ${expiresAt ? expiresAt.toISOString() : 'NULL'}`);
-    console.log(`  Current Time: ${now.toISOString()}`);
-    console.log(`  Is Expired: ${expiresAt ? (expiresAt <= now ? 'YES' : 'NO') : 'N/A'}`);
-    
-    const microsoftConnected = !!(
-      owner.microsoftAccessToken &&
-      owner.microsoftRefreshToken &&
-      expiresAt &&
-      expiresAt > now
-    );
-    
     console.log(`  Final Status: ${microsoftConnected ? '✅ CONNECTED' : '❌ NOT CONNECTED'}`);
 
     // Return owner with memberships (NO tokens - only safe data)

@@ -157,40 +157,29 @@ export default function MicrosoftEmailIngest() {
         <div className="bg-white p-6 rounded-lg shadow border mb-6">
           <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
           
-          {!isMicrosoftConnected ? (
+          {isMicrosoftConnected ? (
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
-                <div>
-                  <p className="text-gray-600 font-medium">Not connected</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Connect your Microsoft account to import contacts from Outlook
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleConnect}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm hover:shadow transition-all"
-              >
-                Connect Microsoft Account
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mr-3" />
-                <div>
-                  <p className="font-medium text-green-700">Connected</p>
-                  {microsoftEmail && (
-                    <p className="text-sm text-gray-500">Connected as {microsoftEmail}</p>
-                  )}
-                </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <span className="text-gray-700">Connected{microsoftEmail ? ` as ${microsoftEmail}` : ''}</span>
               </div>
               <button
                 onClick={handleDisconnect}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+                className="text-sm text-gray-600 hover:text-gray-900"
               >
                 Disconnect
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-gray-600 mb-4">
+                Connect your Microsoft account to import contacts from Outlook.
+              </p>
+              <button
+                onClick={handleConnect}
+                className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Connect Microsoft
               </button>
             </div>
           )}
@@ -382,16 +371,6 @@ export default function MicrosoftEmailIngest() {
           </div>
         )}
 
-        {/* Help Text */}
-        {!isMicrosoftConnected && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>How it works:</strong> Connect your Microsoft account to scan your recent email metadata. 
-              We extract contact signals from people you email in Outlook (no message content is read). 
-              You can then select which contacts to import into your CRM.
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
