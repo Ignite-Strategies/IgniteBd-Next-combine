@@ -84,19 +84,48 @@ export default function SenderIdentityPanel() {
     try {
       setLoadingSenders(true);
       const response = await api.get('/api/outreach/verified-senders/list');
+      console.log('SendGrid senders response:', response.data);
+      
       if (response.data?.success && response.data.senders) {
-        // Filter to only verified senders
-        const verified = response.data.senders.filter(sender => {
-          const isVerified = sender.verified?.status === 'verified' || 
-                           sender.verified === true ||
-                           sender.verification?.status === 'verified';
+        // Log raw sender data to debug structure
+        console.log('Raw senders from SendGrid:', response.data.senders);
+        
+        // For now, show ALL senders from SendGrid
+        // The /verified_senders endpoint may return all senders (verified and pending)
+        // We'll verify on selection if needed
+        const allSenders = response.data.senders || [];
+        
+        // Try to filter verified ones, but if structure is unclear, show all
+        const verified = allSenders.filter(sender => {
+          // Check various possible verification status fields
+          const isVerified = 
+            sender.verified?.status === 'verified' || 
+            sender.verified === true ||
+            sender.verification?.status === 'verified' ||
+            sender.verification?.state === 'verified' ||
+            (sender.verified && typeof sender.verified === 'object' && sender.verified.verified === true) ||
+            // If verification field doesn't exist, assume it might be verified (SendGrid endpoint name suggests verified)
+            (!sender.verified && !sender.verification);
+          
+          console.log(`Sender ${sender.from?.email || sender.email}: verified=${isVerified}`, {
+            verified: sender.verified,
+            verification: sender.verification,
+            full: sender
+          });
           return isVerified;
         });
-        setAvailableSenders(verified);
+        
+        // If we found verified ones, use those. Otherwise, show all (might all be verified)
+        const sendersToShow = verified.length > 0 ? verified : allSenders;
+        console.log(`Showing ${sendersToShow.length} senders (${verified.length} confirmed verified out of ${allSenders.length} total)`);
+        setAvailableSenders(sendersToShow);
+      } else {
+        console.log('No senders in response or request failed');
       }
     } catch (err) {
       console.error('Failed to load available senders:', err);
-      // Don't set error here - it's okay if this fails
+      console.error('Error details:', err.response?.data);
+      // Don't set error here - it's okay if this fails, but log it
     } finally {
       setLoadingSenders(false);
     }

@@ -13,12 +13,18 @@ export async function GET(request) {
 
     const result = await listVerifiedSenders();
     
+    console.log(`✅ Retrieved ${result.senders?.length || 0} senders from SendGrid`);
+    if (result.senders && result.senders.length > 0) {
+      console.log('Sample sender structure:', JSON.stringify(result.senders[0], null, 2));
+    }
+    
     return NextResponse.json({
       success: true,
-      senders: result.senders,
+      senders: result.senders || [],
     });
   } catch (error) {
     console.error('List verified senders error:', error);
+    console.error('Error details:', error.message, error.stack);
     return NextResponse.json(
       {
         success: false,
