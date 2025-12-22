@@ -84,7 +84,7 @@ export default function CompanyDetailPage({ params }) {
             <p className="text-lg font-semibold text-red-600">{error || 'Company not found.'}</p>
             <button
               type="button"
-              onClick={() => router.push('/contacts')}
+              onClick={() => router.push('/people')}
               className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
             >
               Back to People Hub
@@ -102,7 +102,7 @@ export default function CompanyDetailPage({ params }) {
         <PageHeader
           title={company.companyName}
           subtitle="Company intelligence, stats, and related contacts"
-          backTo="/contacts"
+          backTo="/people"
           backLabel="Back to People Hub"
         />
 

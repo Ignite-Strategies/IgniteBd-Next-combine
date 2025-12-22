@@ -98,7 +98,7 @@ export default function DealPipelinesPage() {
         <PageHeader
           title="Deal Pipelines"
           subtitle="Track contacts through prospect, client, collaborator, and institution flows."
-          backTo="/contacts"
+          backTo="/people"
           backLabel="Back to People Hub"
         />
 

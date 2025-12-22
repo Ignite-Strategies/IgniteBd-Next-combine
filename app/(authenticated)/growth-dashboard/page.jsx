@@ -371,7 +371,7 @@ export default function GrowthDashboardPage() {
           </button>
 
           <button
-            onClick={() => router.push('/contacts')}
+            onClick={() => router.push('/people')}
             className="group flex items-center gap-4 rounded-lg border-2 border-purple-200 bg-purple-50 p-4 text-left transition hover:border-purple-300 hover:bg-purple-100"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500 transition-transform group-hover:scale-110">

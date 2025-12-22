@@ -40,7 +40,7 @@ export default function CompaniesPage() {
         <PageHeader
           title="Companies"
           subtitle="Review firms synced from Dynamics 365 and their engagement health."
-          backTo="/contacts"
+          backTo="/people"
           backLabel="Back to People Hub"
           actions={
             companies.length > 0 ? (
@@ -131,7 +131,7 @@ export default function CompaniesPage() {
 
                   <button
                     type="button"
-                    onClick={() => router.push('/contacts')}
+                    onClick={() => router.push('/people')}
                     className="mt-6 w-full rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
                   >
                     View in People Hub

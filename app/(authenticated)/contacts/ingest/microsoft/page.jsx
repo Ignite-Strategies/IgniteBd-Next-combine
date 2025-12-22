@@ -149,7 +149,7 @@ export default function MicrosoftEmailIngest() {
         {/* Header */}
         <div className="mb-6">
           <button
-            onClick={() => router.push('/contacts')}
+            onClick={() => router.push('/people')}
             className="mb-4 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -282,7 +282,7 @@ export default function MicrosoftEmailIngest() {
                   <button
                     onClick={() => {
                       setSaveResult(null);
-                      router.push('/contacts');
+                      router.push('/people');
                     }}
                     className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-medium transition-colors"
                   >

@@ -398,7 +398,7 @@ export default function ContactsViewPage() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/contacts')}
+                onClick={() => router.push('/people')}
                 className="rounded-lg bg-gray-600 px-4 py-2 text-white transition hover:bg-gray-700"
               >
                 ← Back to People Hub

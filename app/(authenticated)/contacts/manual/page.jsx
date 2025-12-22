@@ -386,7 +386,7 @@ export default function ContactManualPage() {
           <span className="text-gray-400">|</span>
           <button
             type="button"
-            onClick={() => router.push('/contacts')}
+            onClick={() => router.push('/people')}
             className="flex items-center gap-2 text-gray-600 transition hover:text-gray-900"
           >
             <Users className="h-5 w-5" />
@@ -582,7 +582,7 @@ export default function ContactManualPage() {
             <div className="flex gap-3 border-t pt-6">
               <button
                 type="button"
-                onClick={() => router.push('/contacts')}
+                onClick={() => router.push('/people')}
                 className="flex-1 rounded-lg bg-gray-100 px-6 py-3 font-medium text-gray-700 transition hover:bg-gray-200"
               >
                 Cancel
