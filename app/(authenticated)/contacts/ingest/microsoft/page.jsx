@@ -355,12 +355,12 @@ export default function MicrosoftEmailIngest() {
 
             {preview.items.length > 0 ? (
               <>
-                <div className="max-h-96 overflow-y-auto space-y-2 mb-4 border rounded-lg p-2">
+                <div className="max-h-[600px] overflow-y-auto mb-4 border rounded">
                   {preview.items.map((item) => (
                     <div
                       key={item.previewId}
-                      className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
-                        selectedIds.has(item.previewId) ? 'bg-blue-50 border-2 border-blue-300' : 'border border-gray-200'
+                      className={`flex items-center gap-2 px-2 py-1 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
+                        selectedIds.has(item.previewId) ? 'bg-blue-50' : ''
                       }`}
                       onClick={() => toggleSelect(item.previewId)}
                     >
@@ -369,33 +369,26 @@ export default function MicrosoftEmailIngest() {
                         checked={selectedIds.has(item.previewId)}
                         onChange={() => toggleSelect(item.previewId)}
                         onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                        className="h-3.5 w-3.5 text-blue-600 rounded flex-shrink-0"
                       />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
-                          {item.displayName || item.email}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">{item.email}</p>
-                        <div className="flex gap-4 mt-1 text-xs text-gray-400">
-                          <span className="font-medium">{item.domain}</span>
-                          {item.stats?.messageCount !== undefined && (
-                            <span>{item.stats.messageCount} message{item.stats.messageCount !== 1 ? 's' : ''}</span>
-                          )}
-                          {item.stats?.lastSeenAt && (
-                            <span>
-                              Last: {new Date(item.stats.lastSeenAt).toLocaleDateString()}
-                            </span>
-                          )}
-                          {item.companyName && (
-                            <span className="text-blue-600">{item.companyName}</span>
-                          )}
-                          {item.jobTitle && (
-                            <span className="text-gray-500">{item.jobTitle}</span>
-                          )}
-                          {item.alreadyExists && (
-                            <span className="text-orange-600 font-medium">Already exists</span>
-                          )}
-                        </div>
+                      <div className="flex-1 min-w-0 flex items-center gap-2 text-xs">
+                        <span className="font-medium text-gray-900 truncate w-[140px]">
+                          {item.displayName || item.email.split('@')[0]}
+                        </span>
+                        <span className="text-gray-500 truncate w-[200px]">{item.email}</span>
+                        <span className="text-gray-400 w-[100px] truncate">{item.domain}</span>
+                        {item.stats?.messageCount !== undefined && (
+                          <span className="text-gray-400 w-[50px]">{item.stats.messageCount}</span>
+                        )}
+                        {item.companyName && (
+                          <span className="text-blue-600 truncate w-[120px]">{item.companyName}</span>
+                        )}
+                        {item.jobTitle && (
+                          <span className="text-gray-500 truncate w-[120px]">{item.jobTitle}</span>
+                        )}
+                        {item.alreadyExists && (
+                          <span className="text-orange-600 font-medium ml-auto">Exists</span>
+                        )}
                       </div>
                     </div>
                   ))}
