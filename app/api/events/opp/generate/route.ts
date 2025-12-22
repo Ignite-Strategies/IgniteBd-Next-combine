@@ -211,7 +211,7 @@ Guidelines:
       if (!event) continue;
 
       // Check if BDEventOpp already exists for this event + persona
-      const existing = await prisma.bdEventOpp.findFirst({
+      const existing = await prisma.bdEventopIntel.findFirst({
         where: {
           eventMetaId: event.id,
           personaId: personaId,
@@ -221,7 +221,7 @@ Guidelines:
 
       if (existing) {
         // Update existing
-        const updated = await prisma.bdEventOpp.update({
+        const updated = await prisma.bdEventopIntel.update({
           where: { id: existing.id },
           data: {
             personaAlignment: score.personaAlignment || null,
@@ -235,7 +235,7 @@ Guidelines:
         bdEventOpps.push(updated);
       } else {
         // Create new
-        const bdOpp = await prisma.bdEventOpp.create({
+        const bdOpp = await prisma.bdEventopIntel.create({
           data: {
             companyHQId,
             ownerId,

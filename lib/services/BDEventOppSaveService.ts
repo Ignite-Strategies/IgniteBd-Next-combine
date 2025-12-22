@@ -4,7 +4,7 @@ import { BDEventOppSchema } from "@/lib/schemas/BDEventOppSchema";
 export async function saveBDEventOpp(eventOpp: any) {
   const parsed = BDEventOppSchema.parse(eventOpp);
 
-  const saved = await prisma.bdEventOpp.create({
+  const saved = await prisma.bdEventopIntel.create({
     data: {
       companyHQId: parsed.companyHQId,
       ownerId: parsed.ownerId,

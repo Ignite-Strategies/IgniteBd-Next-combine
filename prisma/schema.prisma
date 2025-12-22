@@ -46,7 +46,7 @@ model assessments {
   @@index([ownerId])
 }
 
-model bd_event_opps {
+model bd_eventop_intel {
   id               String         @id
   companyHQId      String
   ownerId          String
@@ -61,12 +61,14 @@ model bd_event_opps {
   status           EventOppStatus @default(CONSIDERING)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime
+  event_metas      event_metas    @relation(fields: [eventMetaId], references: [id])
 
   @@index([companyHQId])
   @@index([eventMetaId])
   @@index([ownerId])
   @@index([personaId])
   @@index([status])
+  @@map("bd_eventop_intel")
 }
 
 model bd_intels {
@@ -645,10 +647,45 @@ model event_metas {
   sourceType  EventSourceType @default(AI)
   rawJson     Json?
   createdAt   DateTime        @default(now())
+  bd_eventop_intel bd_eventop_intel[]
 
   @@index([eventType])
   @@index([name])
   @@index([organizerId])
+}
+
+model bd_event_ops {
+  id           String         @id @default(uuid())
+  companyHQId  String
+  ownerId      String
+  eventPlanId  String?
+  title        String
+  description  String?
+  whyGo        String?
+  eventType    EventType
+  startDate    DateTime?
+  endDate      DateTime?
+  city         String?
+  state        String?
+  country      String?
+  costBand     String?
+  source       EventSource    @default(MANUAL)
+  status       EventOppStatus @default(CONSIDERING)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  event_plan_opps event_plan_opps[]
+
+  @@index([companyHQId])
+  @@index([ownerId])
+  @@index([eventPlanId])
+  @@index([status])
+  @@index([source])
+}
+
+enum EventSource {
+  PERSONA
+  USER_PREF
+  MANUAL
 }
 
 model event_plan_opps {
@@ -657,6 +694,7 @@ model event_plan_opps {
   bdEventOppId String
   order        Int?
   createdAt    DateTime @default(now())
+  bd_event_ops bd_event_ops? @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
 
   @@unique([eventPlanId, bdEventOppId])
   @@index([bdEventOppId])

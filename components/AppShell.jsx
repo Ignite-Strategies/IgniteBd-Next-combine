@@ -50,6 +50,7 @@ const CRM_ROUTES = [
 
 // Public routes that should NOT show navigation
 const PUBLIC_ROUTES = [
+  '/',
   '/signin',
   '/signup',
   '/splash',

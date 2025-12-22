@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users,
@@ -33,7 +34,7 @@ function ActionCard({ name, description, icon: Icon, route, color }) {
 }
 
 export default function CRMDashboardPage() {
-  const { companyHQId } = useCompanyHQ();
+  const { companyHQId, loading: companyLoading, hydrated: companyHydrated } = useCompanyHQ();
   const { data, loading, hydrated, refresh } = useCompanyHydration(companyHQId);
   
   const companyHQ = data.companyHQ;
@@ -43,6 +44,14 @@ export default function CRMDashboardPage() {
   const companyName = companyHQ?.companyName ?? 'Your Company';
 
   const contactCount = Array.isArray(contacts) ? contacts.length : 0;
+
+  // If no companyHQId and company is hydrated, redirect to welcome to select company
+  useEffect(() => {
+    if (!companyLoading && companyHydrated && !companyHQId) {
+      console.warn('CRMDashboard: No companyHQId, redirecting to welcome');
+      router.push('/welcome');
+    }
+  }, [companyHQId, companyLoading, companyHydrated, router]);
 
   const actionCards = [
     {
@@ -82,7 +91,8 @@ export default function CRMDashboardPage() {
     },
   ];
 
-  if (loading || !hydrated) {
+  // Show loading if companyHQ is not ready or data is loading
+  if (companyLoading || !companyHydrated || loading || (!hydrated && companyHQId)) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -93,6 +103,11 @@ export default function CRMDashboardPage() {
         </div>
       </div>
     );
+  }
+
+  // If no companyHQId after hydration, show message (redirect will happen via useEffect)
+  if (!companyHQId) {
+    return null;
   }
 
   return (
