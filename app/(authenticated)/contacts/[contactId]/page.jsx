@@ -2,11 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
-import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
 import ContactOutlook from '@/components/enrichment/ContactOutlook';
 import CompanySelector from '@/components/CompanySelector';
 
@@ -96,7 +95,8 @@ export default function ContactDetailPage({ params }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactId]);
 
-  const [showEnrichmentModal, setShowEnrichmentModal] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState('');
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [rawJSON, setRawJSON] = useState(null);
   const [editingCompany, setEditingCompany] = useState(false);
@@ -118,6 +118,52 @@ export default function ContactDetailPage({ params }) {
       'Contact'
     );
   }, [contact]);
+
+  const handleEnrichContact = async () => {
+    if (!contactId || !contact?.email) {
+      setEnrichError('Contact must have an email address to enrich');
+      return;
+    }
+
+    setEnriching(true);
+    setEnrichError('');
+
+    try {
+      // Step 1: Enrich by email
+      const enrichResponse = await api.post('/api/contacts/enrich/by-email', {
+        contactId,
+      });
+
+      if (!enrichResponse.data?.success || !enrichResponse.data?.redisKey) {
+        throw new Error(enrichResponse.data?.error || 'Enrichment failed');
+      }
+
+      // Step 2: Automatically save the enrichment
+      const saveResponse = await api.post('/api/contacts/enrich/save', {
+        contactId,
+        redisKey: enrichResponse.data.redisKey,
+      });
+
+      if (!saveResponse.data?.success) {
+        throw new Error(saveResponse.data?.error || 'Failed to save enrichment');
+      }
+
+      // Step 3: Refresh contact data
+      const updatedContactResponse = await api.get(`/api/contacts/${contactId}`);
+      if (updatedContactResponse.data?.success && updatedContactResponse.data?.contact) {
+        setContact(updatedContactResponse.data.contact);
+        setNotesText(updatedContactResponse.data.contact.notes || '');
+        if (refreshContacts) {
+          refreshContacts();
+        }
+      }
+    } catch (err: any) {
+      console.error('Enrichment error:', err);
+      setEnrichError(err.response?.data?.error || err.message || 'Failed to enrich contact');
+    } finally {
+      setEnriching(false);
+    }
+  };
 
 
   if (loading) {
@@ -302,26 +348,26 @@ export default function ContactDetailPage({ params }) {
         </div>
 
         <div className="space-y-6">
-          {/* Enrichment Banner */}
-          {contact.enrichmentRedisKey && !contact.enrichmentFetchedAt && (
-            <div className="rounded-xl border-2 border-yellow-200 bg-yellow-50 p-4">
+          {/* Enrichment Error */}
+          {enrichError && (
+            <div className="rounded-xl border-2 border-red-200 bg-red-50 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Sparkles className="h-5 w-5 text-yellow-600" />
+                  <X className="h-5 w-5 text-red-600" />
                   <div>
-                    <p className="text-sm font-semibold text-yellow-900">
-                      Unsaved enrichment available
+                    <p className="text-sm font-semibold text-red-900">
+                      Enrichment failed
                     </p>
-                    <p className="text-xs text-yellow-700">
-                      Enrichment data is ready to be saved to this contact
+                    <p className="text-xs text-red-700">
+                      {enrichError}
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowEnrichmentModal(true)}
-                  className="rounded-lg bg-yellow-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-yellow-700"
+                  onClick={() => setEnrichError('')}
+                  className="rounded-lg p-1 text-red-600 transition hover:bg-red-100"
                 >
-                  Review & Save
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -333,11 +379,21 @@ export default function ContactDetailPage({ params }) {
                 Contact Information
               </h3>
               <button
-                onClick={() => setShowEnrichmentModal(true)}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                onClick={handleEnrichContact}
+                disabled={enriching || !contact?.email}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Sparkles className="h-4 w-4" />
-                Enrich Contact
+                {enriching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Enriching...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Enrich Contact
+                  </>
+                )}
               </button>
             </div>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -578,56 +634,6 @@ export default function ContactDetailPage({ params }) {
           {/* This is a special UX that should be handled in a dedicated client portal management area */}
         </div>
 
-        {/* Enrichment Modal */}
-        <EnrichmentModal
-          isOpen={showEnrichmentModal}
-          onClose={() => setShowEnrichmentModal(false)}
-          contactId={contactId || contact?.id}
-          contactEmail={contact?.email}
-          onEnrichmentSaved={(updatedContact) => {
-            try {
-              // Use the contact data from the save response if available
-              if (updatedContact && typeof updatedContact === 'object') {
-                setContact(updatedContact);
-                setNotesText(updatedContact.notes || '');
-                // Refresh contacts list to show updated data
-                if (refreshContacts) {
-                  refreshContacts();
-                }
-              } else if (contactId) {
-                // Fallback: refresh from API if no contact data provided
-                api.get(`/api/contacts/${contactId}`)
-                  .then((response) => {
-                    if (response.data?.success && response.data.contact) {
-                      setContact(response.data.contact);
-                      setNotesText(response.data.contact.notes || '');
-                      if (refreshContacts) {
-                        refreshContacts();
-                      }
-                    }
-                  })
-                  .catch((err) => {
-                    console.error('Error refreshing contact after enrichment:', err);
-                  });
-              }
-            } catch (error) {
-              console.error('Error handling enrichment save callback:', error);
-              // Still try to refresh from API as fallback
-              if (contactId) {
-                api.get(`/api/contacts/${contactId}`)
-                  .then((response) => {
-                    if (response.data?.success && response.data.contact) {
-                      setContact(response.data.contact);
-                      setNotesText(response.data.contact.notes || '');
-                    }
-                  })
-                  .catch((err) => {
-                    console.error('Error refreshing contact after enrichment (fallback):', err);
-                  });
-              }
-            }
-          }}
-        />
 
         {/* Raw JSON Modal */}
         {showRawJSON && rawJSON && (

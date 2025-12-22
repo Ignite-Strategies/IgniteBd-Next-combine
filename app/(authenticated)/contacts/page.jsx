@@ -10,7 +10,6 @@ import {
   Filter,
   ArrowRight,
   RefreshCw,
-  Sparkles,
   Mail,
 } from 'lucide-react';
 import api from '@/lib/api';
@@ -75,16 +74,6 @@ const CORE_ACTIONS = [
     containerClasses:
       'from-orange-50 to-orange-100 border-orange-200 hover:border-orange-400',
     iconClasses: 'bg-orange-500 text-white',
-  },
-  {
-    id: 'enrich',
-    title: 'Enrich Existing Contacts',
-    description: 'Deep dive on contacts you already have - get intelligence scores and company data',
-    route: '/contacts/enrich',
-    icon: Sparkles,
-    containerClasses:
-      'from-cyan-50 to-cyan-100 border-cyan-200 hover:border-cyan-400',
-    iconClasses: 'bg-cyan-500 text-white',
   },
   {
     id: 'ingest-microsoft',

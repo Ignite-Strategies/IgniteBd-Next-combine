@@ -233,17 +233,17 @@ function PersonasPageContent() {
 
               {/* Build from Enrichment */}
               <div
-                onClick={() => router.push('/contacts/enrich?returnTo=persona')}
+                onClick={() => router.push('/contacts/enrich/linkedin?returnTo=persona')}
                 className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-orange-300"
               >
                 <div className="mb-4 flex items-center gap-3">
                   <div className="rounded-lg bg-orange-100 p-2">
                     <UserCircle className="h-5 w-5 text-orange-600" />
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900">Build from Enrichment</h3>
+                  <h3 className="text-lg font-bold text-gray-900">Build from LinkedIn</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Generate persona from LinkedIn profile or enriched contact data
+                  Discover contacts from LinkedIn and generate persona from enriched data
                 </p>
               </div>
 

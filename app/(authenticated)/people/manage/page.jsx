@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import {
   Edit,
-  Sparkles,
   Link2,
   ArrowRight,
   Users,
@@ -26,21 +25,6 @@ const MANAGE_OPTIONS = [
       { label: 'Edit contact fields', route: '/contacts/view' },
       { label: 'Batch edit contacts', route: '/contacts/view' },
       { label: 'Change deal stage', route: '/contacts/deal-pipelines' },
-    ],
-  },
-  {
-    id: 'enrich',
-    title: 'Enrich',
-    description: 'Enrich existing contacts with additional data',
-    route: '/contacts/enrich',
-    icon: Sparkles,
-    containerClasses:
-      'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
-    iconClasses: 'bg-purple-500 text-white',
-    actions: [
-      { label: 'Enrich existing contacts', route: '/contacts/enrich/existing' },
-      { label: 'Bulk enrich from CSV', route: '/contacts/enrich/csv' },
-      { label: 'Enrich from LinkedIn', route: '/contacts/enrich/linkedin' },
     ],
   },
 ];
@@ -149,3 +133,4 @@ export default function ManagePage() {
     </div>
   );
 }
+

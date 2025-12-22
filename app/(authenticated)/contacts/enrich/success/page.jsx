@@ -74,10 +74,10 @@ export default function EnrichSuccessPage() {
             </p>
             <button
               type="button"
-              onClick={() => router.push('/contacts/enrich')}
+              onClick={() => router.push('/contacts/view')}
               className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
             >
-              Back to Enrich
+              View Contacts
             </button>
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function EnrichSuccessPage() {
         <div className="mb-8">
           <button
             type="button"
-            onClick={() => router.push('/contacts/enrich')}
+            onClick={() => router.push('/contacts/view')}
             className="mb-4 flex items-center text-gray-600 transition hover:text-gray-900"
           >
             <ArrowLeft className="mr-2 h-5 w-5" />
@@ -274,13 +274,6 @@ export default function EnrichSuccessPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-center gap-4">
-          <button
-            type="button"
-            onClick={() => router.push('/contacts/enrich')}
-            className="rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50"
-          >
-            Enrich More Contacts
-          </button>
           <button
             type="button"
             onClick={() => router.push('/contacts/view')}

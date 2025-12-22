@@ -72,8 +72,8 @@ export async function GET(request) {
       );
     }
 
-    // Fetch contacts from Microsoft Graph
-    const graphUrl = 'https://graph.microsoft.com/v1.0/me/contacts?$top=1000&$select=displayName,emailAddresses,companyName,jobTitle';
+    // Fetch contacts from Microsoft Graph - get enough to ensure 50 after filtering
+    const graphUrl = 'https://graph.microsoft.com/v1.0/me/contacts?$top=200&$select=displayName,emailAddresses,companyName,jobTitle';
     
     let contactsResponse;
     try {
@@ -205,14 +205,15 @@ export async function GET(request) {
       });
     }
 
-    // Convert map to array
-    const itemsArray = Array.from(contactMap.values());
+    // Convert map to array and take first 50
+    const allItems = Array.from(contactMap.values());
+    const items = allItems.slice(0, 50);
 
     // Prepare preview data
     const previewData = {
       generatedAt: new Date().toISOString(),
-      limit: 1000,
-      items: itemsArray,
+      limit: 50,
+      items,
       source: 'contacts', // Indicates this is from Microsoft Contacts, not email messages
     };
 

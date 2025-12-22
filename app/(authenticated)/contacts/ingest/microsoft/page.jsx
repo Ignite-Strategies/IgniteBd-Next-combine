@@ -316,15 +316,7 @@ export default function MicrosoftEmailIngest() {
                   </h2>
                 </div>
                 <p className="text-sm text-gray-500">
-                  {preview.items.length} unique {preview.items.length === 1 ? 'contact' : 'contacts'}
-                  {preview.source === 'contacts' 
-                    ? ' from Microsoft Contacts'
-                    : ` from ${preview.limit} recent emails`}
-                  {preview.generatedAt && (
-                    <span className="ml-2">
-                      • Generated {new Date(preview.generatedAt).toLocaleString()}
-                    </span>
-                  )}
+                  {preview.items.length} {preview.items.length === 1 ? 'contact' : 'contacts'} available
                 </p>
               </div>
               <div className="flex gap-2">

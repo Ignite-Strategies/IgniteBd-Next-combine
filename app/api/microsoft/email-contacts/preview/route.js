@@ -80,8 +80,8 @@ export async function GET(request) {
       );
     }
 
-    // Fetch 50 messages from Microsoft Graph
-    const graphUrl = 'https://graph.microsoft.com/v1.0/me/messages?$select=from,receivedDateTime&$top=50&$orderby=receivedDateTime desc';
+    // Fetch messages from Microsoft Graph - fetch more to ensure we get 50 unique contacts
+    const graphUrl = 'https://graph.microsoft.com/v1.0/me/messages?$select=from,receivedDateTime&$top=200&$orderby=receivedDateTime desc';
     
     let messagesResponse;
     try {
@@ -317,10 +317,11 @@ export async function GET(request) {
       }
     }
 
-    // Convert map to array
-    const items = Array.from(contactMap.values());
+    // Convert map to array and take first 50
+    const allItems = Array.from(contactMap.values());
+    const items = allItems.slice(0, 50);
 
-    // Prepare preview data
+    // Prepare preview data - always show 50 (or fewer if we don't have that many unique contacts)
     const previewData = {
       generatedAt: new Date().toISOString(),
       limit: 50,
