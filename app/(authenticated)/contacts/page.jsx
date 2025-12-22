@@ -78,8 +78,8 @@ const CORE_ACTIONS = [
   },
   {
     id: 'enrich',
-    title: 'Enrich Contacts',
-    description: 'Get more details on your contacts with Apollo',
+    title: 'Enrich Existing Contacts',
+    description: 'Deep dive on contacts you already have - get intelligence scores and company data',
     route: '/contacts/enrich',
     icon: Sparkles,
     containerClasses:

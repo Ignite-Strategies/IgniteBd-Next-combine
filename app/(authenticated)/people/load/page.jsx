@@ -24,10 +24,10 @@ const LOAD_OPTIONS = [
     primary: true,
   },
   {
-    id: 'enrich-loader',
-    title: 'Enrich as Loader',
-    description: 'Apollo-style enrichment that creates contacts',
-    route: '/contacts/enrich',
+    id: 'discover-linkedin',
+    title: 'Discover from LinkedIn',
+    description: 'Find people in your network and add them as contacts',
+    route: '/contacts/enrich/linkedin',
     icon: Sparkles,
     containerClasses:
       'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
@@ -171,3 +171,4 @@ export default function LoadUpPage() {
     </div>
   );
 }
+
