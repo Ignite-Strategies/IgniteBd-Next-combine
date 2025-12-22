@@ -149,7 +149,7 @@ export default function MicrosoftEmailIngest() {
             className="mb-4 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Contacts
+            Back to People Hub
           </button>
           <div className="flex items-center gap-3 mb-2">
             <Mail className="h-8 w-8 text-blue-600" />

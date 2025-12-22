@@ -87,7 +87,7 @@ export default function CompanyDetailPage({ params }) {
               onClick={() => router.push('/contacts')}
               className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
             >
-              Back to Contacts
+              Back to People Hub
             </button>
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function CompanyDetailPage({ params }) {
           title={company.companyName}
           subtitle="Company intelligence, stats, and related contacts"
           backTo="/contacts"
-          backLabel="Back to Contacts"
+          backLabel="Back to People Hub"
         />
 
         <div className="mb-6 flex items-center gap-4">

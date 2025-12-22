@@ -160,7 +160,7 @@ export default function ContactDetailPage({ params }) {
           title={displayName}
           subtitle="Full profile, pipeline status, and relationship notes."
           backTo="/contacts/view"
-          backLabel="Back to Contacts"
+          backLabel="Back to People Hub"
         />
 
         <div className="mb-6 flex flex-wrap items-center gap-4 text-sm text-gray-500">
