@@ -67,10 +67,33 @@ export default function SettingsPage() {
   const loadAllOwners = async () => {
     try {
       setLoadingOwners(true);
-      const response = await api.get('/api/admin/owners/list');
-      if (response.data?.success) {
-        setOwnersList(response.data.owners || []);
+      // Call platform-manager API (SuperAdmin routes)
+      // Platform-manager sets in DB, IgniteBd-Next-combine reads from DB
+      const platformUrl = process.env.NEXT_PUBLIC_PLATFORM_MANAGER_URL || 'http://localhost:3002';
+      const token = await getAuthToken();
+      if (!token) {
+        setSenderError('Not authenticated');
+        return;
       }
+      const response = await fetch(`${platformUrl}/api/platform/owners`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load owners');
+      }
+      
+      // Map to expected format
+      // Platform-manager writes to DB, IgniteBd-Next-combine reads from DB
+      const owners = (data.owners || []).map(owner => ({
+        id: owner.id,
+        email: owner.email,
+        name: owner.name || `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.email,
+        hasVerifiedSender: !!(owner.sendgridVerifiedEmail), // Check if verified sender is set in DB
+      }));
+      setOwnersList(owners);
     } catch (err) {
       console.error('Failed to load owners:', err);
       setSenderError('Failed to load owners list');
@@ -937,21 +960,40 @@ export default function SettingsPage() {
                                     try {
                                       setVerifyingSender(true);
                                       setSenderError(null);
-                                      const response = await api.post('/api/admin/senders/verify', {
-                                        email: senderEmail,
+                                      // Call platform-manager API (SuperAdmin routes)
+                                      // Platform-manager sets in DB, IgniteBd-Next-combine reads from DB
+                                      const platformUrl = process.env.NEXT_PUBLIC_PLATFORM_MANAGER_URL || 'http://localhost:3002';
+                                      const token = await getAuthToken();
+                                      if (!token) {
+                                        setSenderError('Not authenticated');
+                                        return;
+                                      }
+                                      const response = await fetch(`${platformUrl}/api/platform/senders/verify`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'Authorization': `Bearer ${token}`,
+                                        },
+                                        body: JSON.stringify({ email: senderEmail }),
                                       });
-                                      if (response.data?.success) {
-                                        if (response.data.verified) {
-                                          setVerifiedSender(response.data.sender);
-                                          setSenderName(response.data.sender.name || '');
+                                      const data = await response.json();
+                                      if (!response.ok) {
+                                        throw new Error(data.error || 'Failed to verify sender');
+                                      }
+                                      
+                                      // Use the response data
+                                      if (data.success) {
+                                        if (data.verified) {
+                                          setVerifiedSender(data.sender);
+                                          setSenderName(data.sender.name || '');
                                         } else {
                                           setSenderError('Sender found but not verified in SendGrid');
                                         }
                                       } else {
-                                        setSenderError(response.data?.error || 'Failed to verify sender');
+                                        setSenderError(data.error || 'Failed to verify sender');
                                       }
                                     } catch (err) {
-                                      setSenderError(err.response?.data?.error || err.message || 'Failed to verify sender');
+                                      setSenderError(err.message || 'Failed to verify sender');
                                     } finally {
                                       setVerifyingSender(false);
                                     }
@@ -1091,11 +1133,46 @@ export default function SettingsPage() {
                                       try {
                                         setAssigningSender(true);
                                         setSenderError(null);
-                                        const response = await api.post('/api/admin/senders/assign', {
-                                          ownerId: ownerIdToAssign,
-                                          email: verifiedSender.email,
-                                          name: senderName || undefined,
+                                        // Call platform-manager API (SuperAdmin routes)
+                                        // Platform-manager sets in DB, IgniteBd-Next-combine reads from DB
+                                        const platformUrl = process.env.NEXT_PUBLIC_PLATFORM_MANAGER_URL || 'http://localhost:3002';
+                                        const token = await getAuthToken();
+                                        if (!token) {
+                                          setSenderError('Not authenticated');
+                                          return;
+                                        }
+                                        const response = await fetch(`${platformUrl}/api/platform/senders/assign`, {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${token}`,
+                                          },
+                                          body: JSON.stringify({
+                                            ownerId: ownerIdToAssign,
+                                            email: verifiedSender.email,
+                                            name: senderName || undefined,
+                                          }),
                                         });
+                                        const data = await response.json();
+                                        if (!response.ok) {
+                                          throw new Error(data.error || 'Failed to assign sender');
+                                        }
+                                        
+                                        // Use the response data
+                                        if (data.success) {
+                                          setSenderError(null);
+                                          alert(`✅ Sender assigned successfully!`);
+                                          // Reload owners to refresh verified sender status
+                                          await loadAllOwners();
+                                          // Reset form
+                                          setSenderEmail('');
+                                          setSenderName('');
+                                          setOwnerIdToAssign('');
+                                          setOwnerSearch('');
+                                          setVerifiedSender(null);
+                                        } else {
+                                          setSenderError(data.error || 'Failed to assign sender');
+                                        }
                                         if (response.data?.success) {
                                           setSenderError(null);
                                           alert(`✅ Sender assigned successfully!`);
