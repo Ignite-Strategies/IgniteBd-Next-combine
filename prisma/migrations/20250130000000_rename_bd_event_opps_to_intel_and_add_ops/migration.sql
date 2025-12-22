@@ -1,8 +1,13 @@
--- Rename bd_event_opps to bd_eventop_intel
-ALTER TABLE "bd_event_opps" RENAME TO "bd_eventop_intel";
+-- Rename bd_event_opps to bd_eventop_intel (if table exists and not already renamed)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bd_event_opps') THEN
+        ALTER TABLE "bd_event_opps" RENAME TO "bd_eventop_intel";
+    END IF;
+END $$;
 
--- Create new bd_event_ops table
-CREATE TABLE "bd_event_ops" (
+-- Create new bd_event_ops table (if it doesn't exist)
+CREATE TABLE IF NOT EXISTS "bd_event_ops" (
     "id" TEXT NOT NULL,
     "companyHQId" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
@@ -32,15 +37,25 @@ EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 
--- Add indexes for bd_event_ops
-CREATE INDEX "bd_event_ops_companyHQId_idx" ON "bd_event_ops"("companyHQId");
-CREATE INDEX "bd_event_ops_ownerId_idx" ON "bd_event_ops"("ownerId");
-CREATE INDEX "bd_event_ops_eventPlanId_idx" ON "bd_event_ops"("eventPlanId");
-CREATE INDEX "bd_event_ops_status_idx" ON "bd_event_ops"("status");
-CREATE INDEX "bd_event_ops_source_idx" ON "bd_event_ops"("source");
+-- Add indexes for bd_event_ops (if they don't exist)
+CREATE INDEX IF NOT EXISTS "bd_event_ops_companyHQId_idx" ON "bd_event_ops"("companyHQId");
+CREATE INDEX IF NOT EXISTS "bd_event_ops_ownerId_idx" ON "bd_event_ops"("ownerId");
+CREATE INDEX IF NOT EXISTS "bd_event_ops_eventPlanId_idx" ON "bd_event_ops"("eventPlanId");
+CREATE INDEX IF NOT EXISTS "bd_event_ops_status_idx" ON "bd_event_ops"("status");
+CREATE INDEX IF NOT EXISTS "bd_event_ops_source_idx" ON "bd_event_ops"("source");
 
--- Add foreign key relation from event_plan_opps to bd_event_ops
-ALTER TABLE "event_plan_opps" ADD CONSTRAINT "event_plan_opps_bdEventOppId_fkey" FOREIGN KEY ("bdEventOppId") REFERENCES "bd_event_ops"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Add foreign key relation from event_plan_opps to bd_event_ops (if it doesn't exist)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'event_plan_opps_bdEventOppId_fkey'
+    ) THEN
+        ALTER TABLE "event_plan_opps" 
+        ADD CONSTRAINT "event_plan_opps_bdEventOppId_fkey" 
+        FOREIGN KEY ("bdEventOppId") REFERENCES "bd_event_ops"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- Add foreign key relation from bd_eventop_intel to event_metas (if not already exists)
 DO $$ 
