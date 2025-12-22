@@ -15,6 +15,7 @@ import {
   Building2,
   X,
   Check,
+  Edit2,
 } from 'lucide-react';
 import api from '@/lib/api';
 import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
@@ -753,6 +754,17 @@ export default function ContactsViewPage() {
                       <td className="px-6 py-4">{getStageBadge(contact)}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              router.push(`/contacts/${contact.id}`);
+                            }}
+                            className="rounded-lg p-2 bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
+                            title="Edit contact"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
                           <button
                             type="button"
                             onClick={(event) => {

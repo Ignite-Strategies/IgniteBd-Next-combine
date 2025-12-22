@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight, Shield } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
@@ -44,6 +44,15 @@ export default function SettingsPage() {
     yearsInBusiness: '',
     teamSize: '',
   });
+
+  // Sender verification state (SuperAdmin only)
+  const [senderEmail, setSenderEmail] = useState('');
+  const [senderName, setSenderName] = useState('');
+  const [ownerIdToAssign, setOwnerIdToAssign] = useState('');
+  const [verifyingSender, setVerifyingSender] = useState(false);
+  const [assigningSender, setAssigningSender] = useState(false);
+  const [verifiedSender, setVerifiedSender] = useState(null);
+  const [senderError, setSenderError] = useState(null);
 
   // Get Microsoft connection status from owner hook (no API call needed)
   // owner.microsoftAccessToken is the source of truth
@@ -863,13 +872,179 @@ export default function SettingsPage() {
                           SuperAdmin active
                         </p>
                       </div>
-                      <button
-                        onClick={() => router.push('/superadmin/switchboard')}
-                        className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                      >
-                        Open Tenant Switchboard
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => router.push('/superadmin/switchboard')}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                        >
+                          Open Tenant Switchboard
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </button>
+                        
+                        {/* Sender Verification Section */}
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <h4 className="text-sm font-semibold text-gray-900 mb-3">SendGrid Sender Verification</h4>
+                          
+                          {/* Step 1: Verify Sender */}
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Step 1: Verify Sender Email
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="email"
+                                  value={senderEmail}
+                                  onChange={(e) => {
+                                    setSenderEmail(e.target.value);
+                                    setVerifiedSender(null);
+                                    setSenderError(null);
+                                  }}
+                                  placeholder="user@example.com"
+                                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                />
+                                <button
+                                  onClick={async () => {
+                                    if (!senderEmail) {
+                                      setSenderError('Email is required');
+                                      return;
+                                    }
+                                    try {
+                                      setVerifyingSender(true);
+                                      setSenderError(null);
+                                      const response = await api.post('/api/admin/senders/verify', {
+                                        email: senderEmail,
+                                      });
+                                      if (response.data?.success) {
+                                        if (response.data.verified) {
+                                          setVerifiedSender(response.data.sender);
+                                          setSenderName(response.data.sender.name || '');
+                                        } else {
+                                          setSenderError('Sender found but not verified in SendGrid');
+                                        }
+                                      } else {
+                                        setSenderError(response.data?.error || 'Failed to verify sender');
+                                      }
+                                    } catch (err) {
+                                      setSenderError(err.response?.data?.error || err.message || 'Failed to verify sender');
+                                    } finally {
+                                      setVerifyingSender(false);
+                                    }
+                                  }}
+                                  disabled={verifyingSender || !senderEmail}
+                                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {verifyingSender ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                      Verifying...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Search className="h-4 w-4 mr-2" />
+                                      Verify
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Verified Sender Display */}
+                            {verifiedSender && (
+                              <div className="rounded-md bg-green-50 border border-green-200 p-3">
+                                <div className="flex items-start gap-2">
+                                  <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-green-900">
+                                      {verifiedSender.name || verifiedSender.email}
+                                    </p>
+                                    <p className="text-xs text-green-700 mt-1">{verifiedSender.email}</p>
+                                    <p className="text-xs text-green-600 mt-1">✅ Verified in SendGrid</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Step 2: Assign to Owner */}
+                            {verifiedSender && (
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Step 2: Assign to Owner ID
+                                </label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={ownerIdToAssign}
+                                    onChange={(e) => setOwnerIdToAssign(e.target.value)}
+                                    placeholder="owner-id-here"
+                                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={senderName}
+                                    onChange={(e) => setSenderName(e.target.value)}
+                                    placeholder="Display Name (optional)"
+                                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      if (!ownerIdToAssign) {
+                                        setSenderError('Owner ID is required');
+                                        return;
+                                      }
+                                      try {
+                                        setAssigningSender(true);
+                                        setSenderError(null);
+                                        const response = await api.post('/api/admin/senders/assign', {
+                                          ownerId: ownerIdToAssign,
+                                          email: verifiedSender.email,
+                                          name: senderName || undefined,
+                                        });
+                                        if (response.data?.success) {
+                                          setSenderError(null);
+                                          alert(`✅ Sender assigned successfully to owner ${ownerIdToAssign}`);
+                                          // Reset form
+                                          setSenderEmail('');
+                                          setSenderName('');
+                                          setOwnerIdToAssign('');
+                                          setVerifiedSender(null);
+                                        } else {
+                                          setSenderError(response.data?.error || 'Failed to assign sender');
+                                        }
+                                      } catch (err) {
+                                        setSenderError(err.response?.data?.error || err.message || 'Failed to assign sender');
+                                      } finally {
+                                        setAssigningSender(false);
+                                      }
+                                    }}
+                                    disabled={assigningSender || !ownerIdToAssign}
+                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {assigningSender ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        Assigning...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Assign
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Error Display */}
+                            {senderError && (
+                              <div className="rounded-md bg-red-50 border border-red-200 p-3">
+                                <p className="text-xs text-red-800">{senderError}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">

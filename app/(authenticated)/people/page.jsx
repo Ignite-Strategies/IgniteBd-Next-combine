@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Upload,
-  Settings,
   List,
   ArrowRight,
   RefreshCw,
@@ -21,16 +20,6 @@ const ACTION_CARDS = [
     containerClasses:
       'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
     iconClasses: 'bg-blue-500 text-white',
-  },
-  {
-    id: 'manage',
-    title: 'Manage',
-    description: 'Modify, enrich, or update existing contacts.',
-    route: '/people/manage',
-    icon: Settings,
-    containerClasses:
-      'from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-400',
-    iconClasses: 'bg-indigo-500 text-white',
   },
   {
     id: 'outreach-prep',
