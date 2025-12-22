@@ -11,6 +11,7 @@ export default function MicrosoftEmailIngest() {
   const { ownerId, isMicrosoftConnected, microsoftEmail } = useOwner();
   
   const [companyHQId, setCompanyHQId] = useState('');
+  const [source, setSource] = useState('email'); // 'email' or 'contacts'
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -26,19 +27,22 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Auto-load preview when connected (only once)
+  // Auto-load preview when connected (only once per source)
   useEffect(() => {
     if (isMicrosoftConnected && !preview && !previewLoading && !hasLoadedOnce) {
       handleLoadPreview();
     }
-  }, [isMicrosoftConnected]); // Only depend on connection status
+  }, [isMicrosoftConnected, source]); // Reset when source changes
 
   // Load preview function
   async function handleLoadPreview() {
     setPreviewLoading(true);
     setHasLoadedOnce(true);
     try {
-      const response = await api.get('/api/microsoft/email-contacts/preview');
+      const endpoint = source === 'email' 
+        ? '/api/microsoft/email-contacts/preview'
+        : '/api/microsoft/contacts/preview';
+      const response = await api.get(endpoint);
       if (response.data?.success) {
         setPreview(response.data);
         setSelectedIds(new Set());
@@ -113,7 +117,10 @@ export default function MicrosoftEmailIngest() {
 
     setSaving(true);
     try {
-      const response = await api.post('/api/microsoft/email-contacts/save', {
+      const endpoint = source === 'email'
+        ? '/api/microsoft/email-contacts/save'
+        : '/api/microsoft/contacts/save';
+      const response = await api.post(endpoint, {
         previewIds: Array.from(selectedIds),
         companyHQId,
       });
@@ -146,10 +153,10 @@ export default function MicrosoftEmailIngest() {
           </button>
           <div className="flex items-center gap-3 mb-2">
             <Mail className="h-8 w-8 text-blue-600" />
-            <h1 className="text-3xl font-bold">Import People from Email</h1>
+            <h1 className="text-3xl font-bold">Import Contacts from Microsoft</h1>
           </div>
           <p className="text-gray-600">
-            Extract contact signals from people you email in Outlook
+            Import contacts from your Outlook email or Microsoft Contacts address book
           </p>
         </div>
 
@@ -185,6 +192,50 @@ export default function MicrosoftEmailIngest() {
           )}
         </div>
 
+        {/* Source Tabs */}
+        {isMicrosoftConnected && (
+          <div className="bg-white p-6 rounded-lg shadow border mb-6">
+            <h2 className="text-lg font-semibold mb-4">Import Source</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setSource('email');
+                  setPreview(null);
+                  setHasLoadedOnce(false);
+                }}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  source === 'email'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Mail className="h-4 w-4 inline mr-2" />
+                Email Contacts
+              </button>
+              <button
+                onClick={() => {
+                  setSource('contacts');
+                  setPreview(null);
+                  setHasLoadedOnce(false);
+                }}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  source === 'contacts'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Users className="h-4 w-4 inline mr-2" />
+                Microsoft Contacts
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mt-3">
+              {source === 'email' 
+                ? 'Import people you\'ve emailed recently from your inbox'
+                : 'Import contacts from your Microsoft Contacts address book'}
+            </p>
+          </div>
+        )}
+
         {/* Loading State */}
         {isMicrosoftConnected && previewLoading && !preview && (
           <div className="bg-white p-12 rounded-lg shadow border mb-6">
@@ -211,7 +262,11 @@ export default function MicrosoftEmailIngest() {
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center gap-2"
               >
                 <Download className="h-5 w-5" />
-                {previewLoading ? 'Loading...' : 'Load Contacts from Email'}
+                {previewLoading 
+                  ? 'Loading...' 
+                  : source === 'email' 
+                    ? 'Load Contacts from Email'
+                    : 'Load Microsoft Contacts'}
               </button>
             </div>
           </div>
@@ -267,7 +322,10 @@ export default function MicrosoftEmailIngest() {
                   Preview Contacts
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  {preview.items.length} unique {preview.items.length === 1 ? 'person' : 'people'} from {preview.limit} recent emails
+                  {preview.items.length} unique {preview.items.length === 1 ? 'contact' : 'contacts'}
+                  {preview.source === 'contacts' 
+                    ? ' from Microsoft Contacts'
+                    : ` from ${preview.limit} recent emails`}
                   {preview.generatedAt && (
                     <span className="ml-2">
                       • Generated {new Date(preview.generatedAt).toLocaleString()}
@@ -320,11 +378,22 @@ export default function MicrosoftEmailIngest() {
                         <p className="text-xs text-gray-500 truncate">{item.email}</p>
                         <div className="flex gap-4 mt-1 text-xs text-gray-400">
                           <span className="font-medium">{item.domain}</span>
-                          <span>{item.stats.messageCount} message{item.stats.messageCount !== 1 ? 's' : ''}</span>
-                          {item.stats.lastSeenAt && (
+                          {item.stats?.messageCount !== undefined && (
+                            <span>{item.stats.messageCount} message{item.stats.messageCount !== 1 ? 's' : ''}</span>
+                          )}
+                          {item.stats?.lastSeenAt && (
                             <span>
                               Last: {new Date(item.stats.lastSeenAt).toLocaleDateString()}
                             </span>
+                          )}
+                          {item.companyName && (
+                            <span className="text-blue-600">{item.companyName}</span>
+                          )}
+                          {item.jobTitle && (
+                            <span className="text-gray-500">{item.jobTitle}</span>
+                          )}
+                          {item.alreadyExists && (
+                            <span className="text-orange-600 font-medium">Already exists</span>
                           )}
                         </div>
                       </div>
