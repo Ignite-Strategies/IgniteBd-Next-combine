@@ -157,9 +157,10 @@ export default function ContactDetailPage({ params }) {
           refreshContacts();
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Enrichment error:', err);
-      setEnrichError(err.response?.data?.error || err.message || 'Failed to enrich contact');
+      const errorMessage = err?.response?.data?.error || err?.message || 'Failed to enrich contact';
+      setEnrichError(errorMessage);
     } finally {
       setEnriching(false);
     }
