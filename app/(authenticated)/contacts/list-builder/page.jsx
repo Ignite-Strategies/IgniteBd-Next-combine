@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Users, Building2, Mail, CheckCircle } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
+import { useContactLists } from '../ContactListsContext';
 
 const LIST_OPTIONS = [
   {
@@ -14,15 +15,9 @@ const LIST_OPTIONS = [
     icon: Users,
   },
   {
-    id: 'org_members',
-    name: 'Organization Members',
-    description: 'Focus on members tied to your company HQ.',
-    icon: Building2,
-  },
-  {
-    id: 'event_contacts',
-    name: 'Event Contacts',
-    description: 'Start with attendees captured from events and conferences.',
+    id: 'by_company',
+    name: 'By Company',
+    description: 'Filter contacts by specific companies.',
     icon: Building2,
   },
   {
@@ -35,6 +30,7 @@ const LIST_OPTIONS = [
 
 export default function ContactListBuilderPage() {
   const router = useRouter();
+  const { addList } = useContactLists();
   const [selectedType, setSelectedType] = useState('');
   const [listName, setListName] = useState('');
   const [listDescription, setListDescription] = useState('');
@@ -59,7 +55,7 @@ export default function ContactListBuilderPage() {
     try {
       // Map frontend list type to backend type
       let backendType = 'static';
-      if (selectedType === 'all_contacts' || selectedType === 'org_members' || selectedType === 'event_contacts') {
+      if (selectedType === 'all_contacts' || selectedType === 'by_company') {
         backendType = 'smart';
       } else if (selectedType === 'custom') {
         backendType = 'manual';
@@ -72,7 +68,9 @@ export default function ContactListBuilderPage() {
         filters: selectedType !== 'custom' ? { audienceType: selectedType } : null,
       });
 
-      if (response.data?.success) {
+      if (response.data?.success && response.data.list) {
+        // Add to context (which updates localStorage)
+        addList(response.data.list);
         router.push('/contacts/list-manager');
       } else {
         setError(response.data?.error || 'Failed to create list');

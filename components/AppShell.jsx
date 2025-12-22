@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
+import CRMSidebar from './CRMSidebar';
 import Navigation from './Navigation';
 
 const ROUTES_WITH_SIDEBAR = [
@@ -28,6 +29,23 @@ const ROUTES_WITH_SIDEBAR = [
   '/client-operations/execution',
   '/billing',
   '/template',
+  '/crmdashboard',
+  '/people',
+  '/companies',
+];
+
+// CRM-only routes that use CRMSidebar instead of full Sidebar
+const CRM_ROUTES = [
+  '/crmdashboard',
+  '/people',
+  '/people/lists',
+  '/outreach',
+  '/pipelines',
+  '/companies',
+  '/personas',
+  '/products',
+  '/bd-intelligence',
+  '/ecosystem',
 ];
 
 // Public routes that should NOT show navigation
@@ -49,6 +67,11 @@ export default function AppShell({ children }) {
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
+  const isCRMRoute = useMemo(() => {
+    if (!pathname) return false;
+    return CRM_ROUTES.some((route) => pathname.startsWith(route));
+  }, [pathname]);
+
   const showNavigation = useMemo(() => {
     if (!pathname) return false;
     // Show navigation on all routes EXCEPT public routes
@@ -68,7 +91,7 @@ export default function AppShell({ children }) {
           <div className="flex min-h-[calc(100vh-3.5rem)]">
             {/* Desktop Sidebar */}
             <div className="hidden lg:block">
-              <Sidebar />
+              {isCRMRoute ? <CRMSidebar /> : <Sidebar />}
             </div>
             {/* Main Content Area */}
             <div className="flex-1 lg:ml-64">

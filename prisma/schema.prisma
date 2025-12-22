@@ -199,6 +199,7 @@ model company_hqs {
   companyAnnualRev                              String?
   yearsInBusiness                               String?
   platformId                                    String?
+  hasGrowthAccess                               Boolean?              @default(false)
   assessments                                   assessments[]
   blogs                                         blogs[]
   companies                                     companies[]

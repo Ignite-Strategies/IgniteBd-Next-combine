@@ -11,6 +11,7 @@ import {
   ArrowRight,
   RefreshCw,
   Mail,
+  Sparkles,
 } from 'lucide-react';
 import api from '@/lib/api';
 

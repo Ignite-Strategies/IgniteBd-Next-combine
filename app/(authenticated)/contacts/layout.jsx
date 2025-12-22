@@ -9,14 +9,20 @@ import {
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 import { ContactsContext } from './ContactsContext';
+import { ContactListsContext } from './ContactListsContext';
 
 export default function ContactsLayout({ children }) {
   const { companyHQId } = useCompanyHQ(); // Get companyHQId from hook
   const [contacts, setContacts] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
+  
+  // Contact Lists state (local-first)
+  const [lists, setLists] = useState([]);
+  const [listsHydrated, setListsHydrated] = useState(false);
+  const [listsHydrating, setListsHydrating] = useState(false);
 
-  // Step 1: Check localStorage cache on mount
+  // Step 1: Check localStorage cache on mount for contacts
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -30,6 +36,24 @@ export default function ContactsLayout({ children }) {
         }
       } catch (error) {
         console.warn('Failed to parse cached contacts', error);
+      }
+    }
+  }, []);
+
+  // Step 1: Check localStorage cache on mount for contact lists
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const cached = window.localStorage.getItem('contactLists');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setLists(parsed);
+          setListsHydrated(true);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached contact lists', error);
       }
     }
   }, []);
@@ -73,6 +97,77 @@ export default function ContactsLayout({ children }) {
 
   // No auto-fetch - only use localStorage. Use refreshContacts() manually via sync button
 
+  // Contact Lists: Refresh from API (manual sync only)
+  const refreshLists = useCallback(async () => {
+    if (!companyHQId) {
+      console.warn('⚠️ refreshLists called without companyHQId');
+      return;
+    }
+
+    setListsHydrating(true);
+    try {
+      console.log('🔄 Fetching contact lists for companyHQId:', companyHQId);
+      const response = await api.get('/api/contact-lists');
+      
+      if (response.data?.success && Array.isArray(response.data.lists)) {
+        const fetchedLists = response.data.lists;
+        console.log('✅ Fetched contact lists:', fetchedLists.length);
+        setLists(fetchedLists);
+        
+        // Store in localStorage
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('contactLists', JSON.stringify(fetchedLists));
+        }
+        setListsHydrated(true);
+      } else {
+        console.warn('⚠️ API response missing success or lists array:', response.data);
+        const fetchedLists = response.data?.lists ?? [];
+        setLists(fetchedLists);
+        setListsHydrated(true);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching contact lists:', error);
+      // Don't clear lists on error - keep cached data
+    } finally {
+      setListsHydrating(false);
+    }
+  }, [companyHQId]);
+
+  // Helper: Add a new list to state and localStorage
+  const addList = useCallback((list) => {
+    setLists((prev) => {
+      const updated = [...prev, list];
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('contactLists', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
+
+  // Helper: Update a list in state and localStorage
+  const updateList = useCallback((listId, updates) => {
+    setLists((prev) => {
+      const updated = prev.map((list) =>
+        list.id === listId ? { ...list, ...updates } : list
+      );
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('contactLists', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
+
+  // Helper: Remove a list from state and localStorage
+  const removeList = useCallback((listId) => {
+    setLists((prev) => {
+      const updated = prev.filter((list) => list.id !== listId);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('contactLists', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
+
   // Helper: Update a single contact in state and localStorage
   const updateContact = useCallback((contactId, updates) => {
     setContacts((prev) => {
@@ -108,7 +203,7 @@ export default function ContactsLayout({ children }) {
     });
   }, []);
 
-  const contextValue = useMemo(
+  const contactsContextValue = useMemo(
     () => ({
       contacts,
       setContacts,
@@ -123,9 +218,26 @@ export default function ContactsLayout({ children }) {
     [contacts, companyHQId, hydrated, hydrating, refreshContacts, updateContact, addContact, removeContact],
   );
 
+  const contactListsContextValue = useMemo(
+    () => ({
+      lists,
+      setLists,
+      companyHQId,
+      hydrated: listsHydrated,
+      hydrating: listsHydrating,
+      refreshLists,
+      addList,
+      updateList,
+      removeList,
+    }),
+    [lists, companyHQId, listsHydrated, listsHydrating, refreshLists, addList, updateList, removeList],
+  );
+
   return (
-    <ContactsContext.Provider value={contextValue}>
-      {children}
+    <ContactsContext.Provider value={contactsContextValue}>
+      <ContactListsContext.Provider value={contactListsContextValue}>
+        {children}
+      </ContactListsContext.Provider>
     </ContactsContext.Provider>
   );
 }

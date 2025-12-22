@@ -3,59 +3,34 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  TrendingUp,
   Users,
   MessageSquare,
-  FileText,
-  Map,
-  Settings,
-  UserCircle,
-  FileCheck,
-  Brain,
-  Package,
-  BarChart,
-  Palette,
-  Rocket,
-  Mail,
-  Calendar,
-  Share2,
   List,
   GitBranch,
-  Sparkles,
-  Box,
-  Layers,
-  Receipt,
-  PlayCircle,
-  Network,
-  Edit,
   Building2,
+  Settings,
+  UserCircle,
+  Package,
+  Brain,
+  Network,
 } from 'lucide-react';
 
-// Home link - Growth Dashboard
+// Home link - CRM Dashboard
 const homeLink = {
-  name: 'Growth Dashboard',
-  path: '/growth-dashboard',
-  icon: TrendingUp,
+  name: 'CRM Dashboard',
+  path: '/crmdashboard',
+  icon: Users,
 };
 
+// CRM navigation: Engage items + Growth Ops (but NOT BD Roadmap)
 const navigationGroups = [
   {
     name: 'Growth Ops',
     items: [
-      { name: 'BD Roadmap', path: '/pipelines/roadmap', icon: Map },
       { name: 'Personas', path: '/personas', icon: UserCircle },
       { name: 'Products', path: '/products', icon: Package },
       { name: 'BD Intelligence', path: '/bd-intelligence', icon: Brain },
       { name: 'Ecosystem Intelligence', path: '/ecosystem/associations', icon: Network },
-    ],
-  },
-  {
-    name: 'Attract',
-    hubPath: '/branding-hub',
-    items: [
-      { name: 'Ads & SEO', path: '/ads', icon: BarChart },
-      { name: 'Content', path: '/content', icon: FileText },
-      { name: 'Events', path: '/events', icon: Calendar },
     ],
   },
   {
@@ -65,27 +40,8 @@ const navigationGroups = [
       { name: 'People', path: '/people', icon: Users },
       { name: 'Lists', path: '/people/lists', icon: List },
       { name: 'Outreach', path: '/outreach', icon: MessageSquare },
-      { name: 'Pipeline', path: '/pipelines', icon: GitBranch },
+      { name: 'Pipeline', path: '/pipelines/roadmap', icon: GitBranch },
       { name: 'Company Hub', path: '/companies', icon: Building2 },
-    ],
-  },
-  {
-    name: 'Nurture',
-    disabled: true,
-    items: [
-      { name: 'Email Marketing', path: '#', icon: Mail, disabled: true },
-      { name: 'Social Media', path: '#', icon: Share2, disabled: true },
-    ],
-  },
-  {
-    name: 'Client Operations',
-    items: [
-      { name: 'Proposal Templates', path: '/templates', icon: Layers },
-      { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
-      { name: 'Work Packages', path: '/workpackages', icon: Box },
-      { name: 'Execution', path: '/client-operations/execution', icon: PlayCircle },
-      { name: 'Billing', path: '/billing', icon: Receipt },
-      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket, exact: true },
     ],
   },
   {
@@ -96,16 +52,13 @@ const navigationGroups = [
   },
 ];
 
-function Sidebar() {
+function CRMSidebar() {
   const pathname = usePathname();
 
   const isActive = (path, exact = false) => {
     if (exact) {
-      // Exact match only
       return pathname === path;
     }
-    // For non-exact paths, check if pathname starts with path
-    // But also ensure it's not a parent path matching a child route
     if (pathname === path) return true;
     if (pathname.startsWith(path + '/')) return true;
     return false;
@@ -114,7 +67,7 @@ function Sidebar() {
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-3.5rem)] fixed left-0 top-14 overflow-y-auto">
       <div className="p-4 border-b border-gray-200">
-        <Link href="/growth-dashboard" className="flex items-center gap-3">
+        <Link href="/crmdashboard" className="flex items-center gap-3">
           <span className="text-2xl">🔥</span>
           <span className="text-lg font-semibold text-gray-900">
             Ignite BD
@@ -123,7 +76,7 @@ function Sidebar() {
       </div>
 
       <nav className="p-4 space-y-6">
-        {/* Home Link - Growth Dashboard */}
+        {/* Home Link - CRM Dashboard */}
         <div>
           <ul className="space-y-1">
             <li>
@@ -153,11 +106,7 @@ function Sidebar() {
           const hubActive = group.hubPath ? isActive(group.hubPath) : false;
           return (
             <div key={group.name}>
-              {group.disabled ? (
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 opacity-50">
-                  {group.name}
-                </h3>
-              ) : group.hubPath ? (
+              {group.hubPath ? (
                 <Link
                   href={group.hubPath}
                   className={`mb-3 block text-xs font-semibold uppercase tracking-wider transition-colors ${
@@ -177,30 +126,19 @@ function Sidebar() {
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.path, item.exact);
-                  const disabled = item.disabled;
                   return (
                     <li key={item.path}>
-                      {disabled ? (
-                        <div
-                          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-400 opacity-50 cursor-not-allowed"
-                          title="Coming soon"
-                        >
-                          <Icon className="h-5 w-5" />
-                          <span>{item.name}</span>
-                        </div>
-                      ) : (
-                        <Link
-                          href={item.path}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                            active
-                              ? 'border border-red-200 bg-red-50 text-red-700'
-                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" />
-                          <span>{item.name}</span>
-                        </Link>
-                      )}
+                      <Link
+                        href={item.path}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          active
+                            ? 'border border-red-200 bg-red-50 text-red-700'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                      </Link>
                     </li>
                   );
                 })}
@@ -213,4 +151,5 @@ function Sidebar() {
   );
 }
 
-export default Sidebar;
+export default CRMSidebar;
+

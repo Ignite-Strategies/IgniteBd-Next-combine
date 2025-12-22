@@ -2,37 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Trash2, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
+import { useContactLists } from '../ContactListsContext';
 
 export default function ContactListManagerPage() {
   const router = useRouter();
-  const [lists, setLists] = useState([]);
+  const { lists, hydrated, hydrating, refreshLists, removeList: removeListFromContext } = useContactLists();
   const [campaigns, setCampaigns] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Load from localStorage on mount (no API call)
   useEffect(() => {
-    const fetchLists = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/api/contact-lists');
-        if (response.data?.success) {
-          setLists(response.data.lists || []);
-        } else {
-          setError(response.data?.error || 'Failed to load contact lists');
-        }
-      } catch (err) {
-        console.error('Error fetching contact lists:', err);
-        setError(err.response?.data?.error || 'Failed to load contact lists');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLists();
+    // Lists are already loaded from localStorage via context
+    // No auto-fetch - user can manually refresh if needed
   }, []);
 
   const filteredLists = useMemo(() => {
@@ -46,7 +31,8 @@ export default function ContactListManagerPage() {
       try {
         const response = await api.delete(`/api/contact-lists/${listId}`);
         if (response.data?.success) {
-          setLists(lists.filter((list) => list.id !== listId));
+          // Remove from context (which updates localStorage)
+          removeListFromContext(listId);
         } else {
           alert(response.data?.error || 'Failed to delete list');
         }
@@ -75,14 +61,29 @@ export default function ContactListManagerPage() {
           backTo="/people"
           backLabel="Back to People Hub"
           actions={
-            <button
-              type="button"
-              onClick={() => router.push('/contacts/list-builder')}
-              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-            >
-              <Plus className="h-4 w-4" />
-              Create New List
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={refreshLists}
+                disabled={hydrating}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  hydrating
+                    ? 'cursor-not-allowed bg-gray-300 text-gray-500'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <RefreshCw className={hydrating ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+                {hydrating ? 'Syncing...' : 'Sync'}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/contacts/list-builder')}
+                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                <Plus className="h-4 w-4" />
+                Create New List
+              </button>
+            </div>
           }
         />
 
@@ -99,9 +100,14 @@ export default function ContactListManagerPage() {
           </div>
         </div>
 
-        {loading ? (
+        {!hydrated && !hydrating ? (
           <div className="rounded-2xl bg-white p-12 text-center shadow">
-            <p className="text-lg font-semibold text-gray-800">Loading contact lists...</p>
+            <p className="text-lg font-semibold text-gray-800">No contact lists cached</p>
+            <p className="mt-2 text-sm text-gray-500">Click "Sync" to load from server</p>
+          </div>
+        ) : hydrating ? (
+          <div className="rounded-2xl bg-white p-12 text-center shadow">
+            <p className="text-lg font-semibold text-gray-800">Syncing contact lists...</p>
           </div>
         ) : error ? (
           <div className="rounded-2xl bg-white p-12 text-center shadow">
@@ -120,15 +126,19 @@ export default function ContactListManagerPage() {
               {searchTerm ? 'No lists match your search' : 'No contact lists yet'}
             </p>
             <p className="mt-2 text-sm text-gray-500">
-              Create a new list to segment contacts for campaigns.
+              {searchTerm 
+                ? 'Try a different search term'
+                : 'Create a new list to segment contacts for campaigns.'}
             </p>
-            <button
-              type="button"
-              onClick={() => router.push('/contacts/list-builder')}
-              className="mt-6 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-700"
-            >
-              Create New List
-            </button>
+            {!searchTerm && (
+              <button
+                type="button"
+                onClick={() => router.push('/contacts/list-builder')}
+                className="mt-6 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-700"
+              >
+                Create New List
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
