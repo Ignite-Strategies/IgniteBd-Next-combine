@@ -4,36 +4,30 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { resolveMembership } from '@/lib/membership';
 
 /**
- * Helper: Get owner's companyHQId from Firebase token and verify membership
+ * Helper: Get owner and verify membership for companyHQId
+ * companyHQId should come from request (query param or body), not from old FK
  */
-async function getOwnerCompanyHQId(firebaseUser) {
+async function getOwnerAndVerifyMembership(firebaseUser, companyHQId) {
+  if (!companyHQId) {
+    throw new Error('companyHQId is required');
+  }
+
   const owner = await prisma.owners.findUnique({
     where: { firebaseId: firebaseUser.uid },
-    include: {
-      company_hqs_company_hqs_ownerIdToowners: {
-        take: 1,
-        select: { id: true },
-      },
-    },
+    select: { id: true },
   });
 
   if (!owner) {
     throw new Error('Owner not found for Firebase user');
   }
 
-  const companyHQId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
-  
-  if (!companyHQId) {
-    throw new Error('Owner has no associated CompanyHQ');
-  }
-
-  // Membership guard
+  // Membership guard - verify owner has access to this CompanyHQ
   const { membership } = await resolveMembership(owner.id, companyHQId);
   if (!membership) {
     throw new Error('Forbidden: No membership in this CompanyHQ');
   }
 
-  return companyHQId;
+  return { owner, companyHQId };
 }
 
 /**
@@ -55,8 +49,20 @@ export async function DELETE(request, { params }) {
   }
 
   try {
-    const companyHQId = await getOwnerCompanyHQId(firebaseUser);
     const { listId } = params;
+    
+    // Get companyHQId from query params (frontend should send this from localStorage)
+    const { searchParams } = new URL(request.url);
+    const companyHQId = searchParams.get('companyHQId');
+    
+    if (!companyHQId) {
+      return NextResponse.json(
+        { success: false, error: 'companyHQId is required' },
+        { status: 400 },
+      );
+    }
+
+    await getOwnerAndVerifyMembership(firebaseUser, companyHQId);
 
     if (!listId) {
       return NextResponse.json(

@@ -44,18 +44,10 @@ export async function GET(request) {
 
     // Fetch all data in parallel
     const [companyHQ, personas, contacts, products, pipelines, proposals, phaseTemplates, deliverableTemplates, workPackages, presentations, blogs, templates, landingPages] = await Promise.all([
-      // CompanyHQ
+      // CompanyHQ (no longer using owner FK - use memberships instead)
       prisma.companyHQ.findUnique({
         where: { id: companyHQId },
-        include: {
-          owner: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
+        // Removed owner FK include - use memberships to get owner info if needed
       }),
 
       // Personas

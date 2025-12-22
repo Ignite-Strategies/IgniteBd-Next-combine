@@ -28,15 +28,21 @@ export async function POST(request) {
   }
 
   try {
+    const body = await request.json();
+    
+    // Get companyHQId from request body (frontend should send this from localStorage)
+    const crmId = body.crmId;
+    if (!crmId) {
+      return NextResponse.json(
+        { success: false, error: 'crmId (companyHQId) is required in request body' },
+        { status: 400 },
+      );
+    }
+
     // Get owner from Firebase user
     const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
-      include: {
-        company_hqs_company_hqs_ownerIdToowners: {
-          take: 1,
-          select: { id: true },
-        },
-      },
+      select: { id: true },
     });
 
     if (!owner) {
@@ -46,16 +52,7 @@ export async function POST(request) {
       );
     }
 
-    // Get companyHQId from owner
-    const crmId = owner.company_hqs_company_hqs_ownerIdToowners?.[0]?.id;
-    if (!crmId) {
-      return NextResponse.json(
-        { success: false, error: 'CompanyHQ not found for owner' },
-        { status: 404 },
-      );
-    }
-
-    // Membership guard
+    // Membership guard - verify owner has access to this CompanyHQ
     const { membership } = await resolveMembership(owner.id, crmId);
     if (!membership) {
       return NextResponse.json(
@@ -63,8 +60,6 @@ export async function POST(request) {
         { status: 403 },
       );
     }
-
-    const body = await request.json();
     const { firstName, lastName, email } = body;
 
     // Validate required fields

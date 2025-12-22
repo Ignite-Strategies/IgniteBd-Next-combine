@@ -45,13 +45,25 @@ export default function CRMDashboardPage() {
 
   const contactCount = Array.isArray(contacts) ? contacts.length : 0;
 
-  // If no companyHQId and company is hydrated, redirect to welcome to select company
-  useEffect(() => {
-    if (!companyLoading && companyHydrated && !companyHQId) {
-      console.warn('CRMDashboard: No companyHQId, redirecting to welcome');
-      router.push('/welcome');
-    }
-  }, [companyHQId, companyLoading, companyHydrated, router]);
+  // If no companyHQId, show message (don't redirect - let 404 show for debugging)
+  if (!companyLoading && companyHydrated && !companyHQId) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-yellow-900 mb-2">No Company Selected</h2>
+          <p className="text-yellow-800 mb-4">
+            Please select a company from the welcome page.
+          </p>
+          <button
+            onClick={() => router.push('/welcome')}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg"
+          >
+            Go to Welcome
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const actionCards = [
     {
