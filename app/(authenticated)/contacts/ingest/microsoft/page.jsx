@@ -11,7 +11,7 @@ export default function MicrosoftEmailIngest() {
   const { ownerId, isMicrosoftConnected, microsoftEmail } = useOwner();
   
   const [companyHQId, setCompanyHQId] = useState('');
-  const [source, setSource] = useState('email'); // 'email' or 'contacts'
+  const [source, setSource] = useState(null); // null = landing page, 'email' or 'contacts'
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -27,19 +27,17 @@ export default function MicrosoftEmailIngest() {
     }
   }, []);
 
-  // Auto-load preview when connected (only once per source)
-  useEffect(() => {
-    if (isMicrosoftConnected && !preview && !previewLoading && !hasLoadedOnce) {
-      handleLoadPreview();
-    }
-  }, [isMicrosoftConnected, source]); // Reset when source changes
+  // Don't auto-load - user selects source first
 
   // Load preview function
-  async function handleLoadPreview() {
+  async function handleLoadPreview(selectedSource) {
+    const sourceToUse = selectedSource || source;
+    if (!sourceToUse) return;
+    
     setPreviewLoading(true);
     setHasLoadedOnce(true);
     try {
-      const endpoint = source === 'email' 
+      const endpoint = sourceToUse === 'email' 
         ? '/api/microsoft/email-contacts/preview'
         : '/api/microsoft/contacts/preview';
       const response = await api.get(endpoint);
@@ -56,6 +54,12 @@ export default function MicrosoftEmailIngest() {
     } finally {
       setPreviewLoading(false);
     }
+  }
+
+  // Select source and load
+  function handleSelectSource(selectedSource) {
+    setSource(selectedSource);
+    handleLoadPreview(selectedSource);
   }
 
   // Connect button
@@ -192,47 +196,49 @@ export default function MicrosoftEmailIngest() {
           )}
         </div>
 
-        {/* Source Tabs */}
-        {isMicrosoftConnected && (
-          <div className="bg-white p-6 rounded-lg shadow border mb-6">
-            <h2 className="text-lg font-semibold mb-4">Import Source</h2>
-            <div className="flex gap-2">
+        {/* Landing Page - Source Selection */}
+        {isMicrosoftConnected && !source && !preview && (
+          <div className="bg-white p-8 rounded-lg shadow border mb-6">
+            <h2 className="text-xl font-semibold mb-6 text-center">Choose Import Source</h2>
+            <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
               <button
-                onClick={() => {
-                  setSource('email');
-                  setPreview(null);
-                  setHasLoadedOnce(false);
-                }}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  source === 'email'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                onClick={() => handleSelectSource('email')}
+                className="group p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
               >
-                <Mail className="h-4 w-4 inline mr-2" />
-                Email Contacts
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="h-12 w-12 rounded-lg bg-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Mail className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Ingest from Emails</h3>
+                    <p className="text-sm text-gray-500">Extract contacts from people you email</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Scan your recent Outlook emails to find people you've been in contact with. 
+                  Shows message count and last contact date.
+                </p>
               </button>
+
               <button
-                onClick={() => {
-                  setSource('contacts');
-                  setPreview(null);
-                  setHasLoadedOnce(false);
-                }}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  source === 'contacts'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                onClick={() => handleSelectSource('contacts')}
+                className="group p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
               >
-                <Users className="h-4 w-4 inline mr-2" />
-                Microsoft Contacts
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="h-12 w-12 rounded-lg bg-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Users className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Ingest from Contacts</h3>
+                    <p className="text-sm text-gray-500">Import from Microsoft Contacts</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Import contacts directly from your Microsoft Contacts address book. 
+                  Includes company names and job titles when available.
+                </p>
               </button>
             </div>
-            <p className="text-sm text-gray-500 mt-3">
-              {source === 'email' 
-                ? 'Import people you\'ve emailed recently from your inbox'
-                : 'Import contacts from your Microsoft Contacts address book'}
-            </p>
           </div>
         )}
 
@@ -247,30 +253,6 @@ export default function MicrosoftEmailIngest() {
           </div>
         )}
 
-        {/* Empty State - Connected but no preview loaded */}
-        {isMicrosoftConnected && !previewLoading && !preview && (
-          <div className="bg-white p-12 rounded-lg shadow border mb-6">
-            <div className="flex flex-col items-center justify-center text-center">
-              <Users className="h-16 w-16 text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Import Contacts</h3>
-              <p className="text-gray-600 mb-6 max-w-md">
-                Click the button below to scan your recent emails and find people you've been in contact with.
-              </p>
-              <button
-                onClick={handleLoadPreview}
-                disabled={previewLoading}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 flex items-center gap-2"
-              >
-                <Download className="h-5 w-5" />
-                {previewLoading 
-                  ? 'Loading...' 
-                  : source === 'email' 
-                    ? 'Load Contacts from Email'
-                    : 'Load Microsoft Contacts'}
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Success Message */}
         {saveResult && (
@@ -316,12 +298,24 @@ export default function MicrosoftEmailIngest() {
         {isMicrosoftConnected && preview && preview.items && (
           <div className="bg-white p-6 rounded-lg shadow border mb-6">
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  Preview Contacts
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <button
+                    onClick={() => {
+                      setSource(null);
+                      setPreview(null);
+                      setHasLoadedOnce(false);
+                    }}
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    ← Change Source
+                  </button>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    Preview Contacts
+                  </h2>
+                </div>
+                <p className="text-sm text-gray-500">
                   {preview.items.length} unique {preview.items.length === 1 ? 'contact' : 'contacts'}
                   {preview.source === 'contacts' 
                     ? ' from Microsoft Contacts'
@@ -343,7 +337,7 @@ export default function MicrosoftEmailIngest() {
                   </button>
                 )}
                 <button
-                  onClick={handleLoadPreview}
+                  onClick={() => handleLoadPreview()}
                   disabled={previewLoading}
                   className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 transition-colors flex items-center gap-1.5"
                 >
@@ -355,43 +349,79 @@ export default function MicrosoftEmailIngest() {
 
             {preview.items.length > 0 ? (
               <>
-                <div className="max-h-[600px] overflow-y-auto mb-4 border rounded">
-                  {preview.items.map((item) => (
-                    <div
-                      key={item.previewId}
-                      className={`flex items-center gap-2 px-2 py-1 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
-                        selectedIds.has(item.previewId) ? 'bg-blue-50' : ''
-                      }`}
-                      onClick={() => toggleSelect(item.previewId)}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(item.previewId)}
-                        onChange={() => toggleSelect(item.previewId)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-3.5 w-3.5 text-blue-600 rounded flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0 flex items-center gap-2 text-xs">
-                        <span className="font-medium text-gray-900 truncate w-[140px]">
-                          {item.displayName || item.email.split('@')[0]}
-                        </span>
-                        <span className="text-gray-500 truncate w-[200px]">{item.email}</span>
-                        <span className="text-gray-400 w-[100px] truncate">{item.domain}</span>
-                        {item.stats?.messageCount !== undefined && (
-                          <span className="text-gray-400 w-[50px]">{item.stats.messageCount}</span>
-                        )}
-                        {item.companyName && (
-                          <span className="text-blue-600 truncate w-[120px]">{item.companyName}</span>
-                        )}
-                        {item.jobTitle && (
-                          <span className="text-gray-500 truncate w-[120px]">{item.jobTitle}</span>
-                        )}
-                        {item.alreadyExists && (
-                          <span className="text-orange-600 font-medium ml-auto">Exists</span>
-                        )}
+                <div className="max-h-[calc(100vh-400px)] overflow-y-auto mb-4 border rounded">
+                  <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600">
+                    <div className="w-4"></div>
+                    <div>Name</div>
+                    <div className="text-right">Last Send</div>
+                    <div className="text-center">Status</div>
+                    <div className="w-16"></div>
+                  </div>
+                  {preview.items.map((item) => {
+                    // Determine status color based on last contact
+                    let statusColor = 'gray';
+                    let statusText = 'New';
+                    if (item.stats?.lastSeenAt) {
+                      const daysSince = Math.floor((new Date() - new Date(item.stats.lastSeenAt)) / (1000 * 60 * 60 * 24));
+                      if (daysSince <= 7) {
+                        statusColor = 'green';
+                        statusText = 'Recent';
+                      } else if (daysSince <= 30) {
+                        statusColor = 'yellow';
+                        statusText = 'Active';
+                      } else {
+                        statusColor = 'red';
+                        statusText = 'Stale';
+                      }
+                    }
+                    if (item.alreadyExists) {
+                      statusColor = 'blue';
+                      statusText = 'Exists';
+                    }
+
+                    return (
+                      <div
+                        key={item.previewId}
+                        className={`grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 items-center px-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
+                          selectedIds.has(item.previewId) ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={() => toggleSelect(item.previewId)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.previewId)}
+                          onChange={() => toggleSelect(item.previewId)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-3.5 w-3.5 text-blue-600 rounded flex-shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm text-gray-900 truncate">
+                            {item.displayName || item.email.split('@')[0]}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">{item.email}</div>
+                        </div>
+                        <div className="text-xs text-gray-500 text-right whitespace-nowrap">
+                          {item.stats?.lastSeenAt 
+                            ? new Date(item.stats.lastSeenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            : item.companyName || '-'}
+                        </div>
+                        <div className="flex justify-center">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            statusColor === 'green' ? 'bg-green-100 text-green-700' :
+                            statusColor === 'yellow' ? 'bg-yellow-100 text-yellow-700' :
+                            statusColor === 'red' ? 'bg-red-100 text-red-700' :
+                            statusColor === 'blue' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {statusText}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 text-right w-16">
+                          {item.stats?.messageCount ? `${item.stats.messageCount}` : ''}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t">

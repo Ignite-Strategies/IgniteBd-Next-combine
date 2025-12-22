@@ -28,13 +28,6 @@ export default function SenderIdentityPanel() {
   const [loadingSenders, setLoadingSenders] = useState(false);
   const [showSenderList, setShowSenderList] = useState(false);
   const [selectingSender, setSelectingSender] = useState(false);
-  
-  // Form state for new sender
-  const [showForm, setShowForm] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [newName, setNewName] = useState('');
-  const [startingVerification, setStartingVerification] = useState(false);
-  const [verificationStarted, setVerificationStarted] = useState(false);
   const [error, setError] = useState(null);
 
   // Load current sender status
@@ -49,31 +42,54 @@ export default function SenderIdentityPanel() {
       setLoading(true);
       setError(null);
       
-      const response = await api.get('/api/outreach/verified-senders');
+      console.log('🔍 Loading sender status...');
+      
+      // Use find-or-create endpoint
+      const response = await api.post('/api/outreach/verified-senders/find-or-create');
+      
+      console.log('📦 Find-or-create response:', response.data);
+      
       if (response.data?.success) {
-        const email = response.data.verifiedEmail;
-        const name = response.data.verifiedName;
+        const { action, sender, senders } = response.data;
         
-        if (email) {
-          setSenderEmail(email);
-          setSenderName(name);
-          // Check if it's actually verified in SendGrid
-          await checkVerificationStatus(email);
-        } else {
+        console.log(`✅ Action: ${action}`, { sender, sendersCount: senders?.length });
+        
+        if (action === 'found' && sender) {
+          // Owner has a verified sender
+          console.log('✅ Found existing sender:', sender);
+          setSenderEmail(sender.email);
+          setSenderName(sender.name);
+          setVerified(sender.verified || false);
+          setAvailableSenders([]);
+          setShowSenderList(false);
+        } else if (action === 'select' && senders && senders.length > 0) {
+          // Found verified senders in SendGrid - show selection
+          console.log(`✅ Found ${senders.length} verified senders in SendGrid`);
+          setAvailableSenders(senders);
           setSenderEmail(null);
           setSenderName(null);
           setVerified(false);
-          // If no sender configured, check SendGrid for available verified senders
-          await loadAvailableSenders();
+          setShowSenderList(false); // Don't auto-show list, show button first
+        } else if (action === 'create') {
+          // No verified senders found - show create form
+          console.log('⚠️ No verified senders found - showing create form');
+          setAvailableSenders([]);
+          setSenderEmail(null);
+          setSenderName(null);
+          setVerified(false);
+          setShowSenderList(false);
+          setShowForm(false); // Show initial prompt, not form yet
         }
       } else {
-        // If no sender configured, check SendGrid for available verified senders
+        console.error('❌ Response not successful:', response.data);
+        setError(response.data?.error || 'Failed to load sender status');
+        // Fallback: try to load available senders directly
         await loadAvailableSenders();
       }
     } catch (err) {
-      console.error('Failed to load sender status:', err);
-      setError('Failed to load sender status');
-      // Still try to load available senders
+      console.error('❌ Failed to load sender status:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to load sender status');
+      // Fallback: try to load available senders directly
       await loadAvailableSenders();
     } finally {
       setLoading(false);
@@ -87,45 +103,19 @@ export default function SenderIdentityPanel() {
       console.log('SendGrid senders response:', response.data);
       
       if (response.data?.success && response.data.senders) {
-        // Log raw sender data to debug structure
-        console.log('Raw senders from SendGrid:', response.data.senders);
-        
-        // For now, show ALL senders from SendGrid
-        // The /verified_senders endpoint may return all senders (verified and pending)
-        // We'll verify on selection if needed
-        const allSenders = response.data.senders || [];
-        
-        // Try to filter verified ones, but if structure is unclear, show all
-        const verified = allSenders.filter(sender => {
-          // Check various possible verification status fields
-          const isVerified = 
-            sender.verified?.status === 'verified' || 
-            sender.verified === true ||
-            sender.verification?.status === 'verified' ||
-            sender.verification?.state === 'verified' ||
-            (sender.verified && typeof sender.verified === 'object' && sender.verified.verified === true) ||
-            // If verification field doesn't exist, assume it might be verified (SendGrid endpoint name suggests verified)
-            (!sender.verified && !sender.verification);
-          
-          console.log(`Sender ${sender.from?.email || sender.email}: verified=${isVerified}`, {
-            verified: sender.verified,
-            verification: sender.verification,
-            full: sender
-          });
-          return isVerified;
-        });
-        
-        // If we found verified ones, use those. Otherwise, show all (might all be verified)
-        const sendersToShow = verified.length > 0 ? verified : allSenders;
-        console.log(`Showing ${sendersToShow.length} senders (${verified.length} confirmed verified out of ${allSenders.length} total)`);
-        setAvailableSenders(sendersToShow);
+        // API already filters for verified === true, but double-check client-side
+        const verifiedSenders = response.data.senders.filter(sender => sender.verified === true);
+        console.log(`✅ Found ${verifiedSenders.length} verified senders`);
+        setAvailableSenders(verifiedSenders);
       } else {
-        console.log('No senders in response or request failed');
+        console.log('No verified senders in response');
+        setAvailableSenders([]);
       }
     } catch (err) {
       console.error('Failed to load available senders:', err);
       console.error('Error details:', err.response?.data);
-      // Don't set error here - it's okay if this fails, but log it
+      setError(err.response?.data?.error || 'Failed to load senders from SendGrid');
+      setAvailableSenders([]);
     } finally {
       setLoadingSenders(false);
     }
@@ -136,10 +126,10 @@ export default function SenderIdentityPanel() {
       setSelectingSender(true);
       setError(null);
       
-      const senderEmail = sender.from?.email || sender.email;
-      const senderName = sender.from?.name || sender.name;
+      const senderEmail = sender.email || sender.from?.email;
+      const senderName = sender.name || sender.from?.name;
       
-      // Update Owner with selected sender
+      // NO SendGrid API call - just save to Owner model
       const response = await api.put('/api/outreach/verified-senders', {
         email: senderEmail,
         name: senderName,
@@ -153,7 +143,7 @@ export default function SenderIdentityPanel() {
       }
     } catch (err) {
       console.error('Failed to select sender:', err);
-      setError(err.response?.data?.error || 'Failed to select sender');
+      setError(err.response?.data?.error || 'Failed to save sender selection');
     } finally {
       setSelectingSender(false);
     }
@@ -180,36 +170,10 @@ export default function SenderIdentityPanel() {
     }
   };
 
-  const handleStartVerification = async () => {
-    if (!newEmail) {
-      setError('Email is required');
-      return;
-    }
-
-    try {
-      setStartingVerification(true);
-      setError(null);
-      
-      const response = await api.post('/api/email/sender/start', {
-        email: newEmail,
-        name: newName || undefined,
-      });
-
-      if (response.data?.success) {
-        setVerificationStarted(true);
-        setSenderEmail(newEmail);
-        setSenderName(newName);
-        setVerified(false);
-        setShowForm(false);
-        setNewEmail('');
-        setNewName('');
-      }
-    } catch (err) {
-      console.error('Failed to start verification:', err);
-      setError(err.response?.data?.error || 'Failed to start verification');
-    } finally {
-      setStartingVerification(false);
-    }
+  // Refresh senders from SendGrid
+  const handleRefreshSenders = async () => {
+    await loadAvailableSenders();
+    await loadSenderStatus();
   };
 
   if (loading) {
@@ -259,10 +223,21 @@ export default function SenderIdentityPanel() {
                       Select Sender
                     </button>
                     <button
-                      onClick={() => setShowForm(true)}
-                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                      onClick={handleRefreshSenders}
+                      disabled={loadingSenders}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
                     >
-                      Verify New Email
+                      {loadingSenders ? (
+                        <>
+                          <Loader2 className="inline h-4 w-4 animate-spin mr-1" />
+                          Refreshing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="inline h-4 w-4 mr-1" />
+                          Refresh
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -277,124 +252,98 @@ export default function SenderIdentityPanel() {
                   </div>
                   
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {availableSenders.map((sender, idx) => {
-                      const email = sender.from?.email || sender.email;
-                      const name = sender.from?.name || sender.name || email;
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleSelectSender(sender)}
-                          disabled={selectingSender}
-                          className="w-full text-left rounded-md border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 hover:border-red-300 transition disabled:opacity-50"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-gray-900">{name}</p>
-                              <p className="text-xs text-gray-500">{email}</p>
+                    {availableSenders.length > 0 ? (
+                      availableSenders.map((sender, idx) => {
+                        // Handle both API response structure (from.name, from.email) and mapped structure (name, email)
+                        const email = sender.email || sender.from?.email;
+                        const name = sender.name || sender.from?.name || email;
+                        const senderId = sender.id;
+                        return (
+                          <button
+                            key={senderId || idx}
+                            onClick={() => handleSelectSender(sender)}
+                            disabled={selectingSender}
+                            className="w-full text-left rounded-md border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 hover:border-red-300 transition disabled:opacity-50"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-gray-900">{name}</p>
+                                <p className="text-xs text-gray-500">{email}</p>
+                              </div>
+                              <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
                             </div>
-                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          </div>
-                        </button>
-                      );
-                    })}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-4 text-sm text-gray-500">
+                        No verified senders found. Please verify a new email in SendGrid.
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        setShowSenderList(false);
-                        setShowForm(true);
-                      }}
+                      onClick={() => setShowSenderList(false)}
                       className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                     >
-                      Verify New Email Instead
+                      Cancel
                     </button>
                     <button
-                      onClick={() => setShowSenderList(false)}
-                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                      onClick={handleRefreshSenders}
+                      disabled={loadingSenders}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
                     >
-                      Cancel
+                      {loadingSenders ? (
+                        <>
+                          <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
+                          Refreshing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="inline h-3 w-3 mr-1" />
+                          Refresh
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
               )}
             </div>
-          ) : !showForm ? (
-            // No verified senders available - show form to start verification
-            <div className="text-center py-4">
-              <Mail className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-700 mb-1">Add a verified sender email with SendGrid</p>
-              <p className="text-xs text-gray-500 mb-4">Verify your business email to start sending</p>
-              <button
-                onClick={() => setShowForm(true)}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-              >
-                Verify Sender Email
-              </button>
-            </div>
           ) : (
+            // No verified senders available - show instructions
             <div className="space-y-3">
               <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
-                <p className="text-xs font-medium text-blue-900 mb-1">
-                  Use Your Business Email</p>
-                <p className="text-xs text-blue-700">
-                  Do NOT use your Gmail sign-in email. Use your business email address (e.g., adam@ignitestrategies.co).
+                <p className="text-xs font-medium text-blue-900 mb-2">
+                  How to verify a new sender email
+                </p>
+                <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                  <li>Go to SendGrid Dashboard → Settings → Sender Authentication</li>
+                  <li>Add and verify your business email address</li>
+                  <li>Return here and click "Refresh Verified Senders"</li>
+                </ol>
+                <p className="text-xs text-blue-600 mt-2">
+                  Note: Sender verification must be done in SendGrid. This cannot be automated via API.
                 </p>
               </div>
               
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Email Address <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="your-email@yourdomain.com"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Display Name (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Your Name"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleStartVerification}
-                  disabled={startingVerification || !newEmail}
-                  className="flex-1 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {startingVerification ? (
-                    <>
-                      <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Verification Email'
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowForm(false);
-                    setNewEmail('');
-                    setNewName('');
-                    setError(null);
-                  }}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
+              <button
+                onClick={handleRefreshSenders}
+                disabled={loadingSenders}
+                className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingSenders ? (
+                  <>
+                    <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="inline h-4 w-4 mr-2" />
+                    Refresh Verified Senders
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
