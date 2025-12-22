@@ -49,10 +49,35 @@ export default function SettingsPage() {
   const [senderEmail, setSenderEmail] = useState('');
   const [senderName, setSenderName] = useState('');
   const [ownerIdToAssign, setOwnerIdToAssign] = useState('');
+  const [ownerSearch, setOwnerSearch] = useState('');
+  const [ownersList, setOwnersList] = useState([]);
+  const [loadingOwners, setLoadingOwners] = useState(false);
   const [verifyingSender, setVerifyingSender] = useState(false);
   const [assigningSender, setAssigningSender] = useState(false);
   const [verifiedSender, setVerifiedSender] = useState(null);
   const [senderError, setSenderError] = useState(null);
+
+  // Load all owners when verified sender is ready (Step 2)
+  useEffect(() => {
+    if (verifiedSender && isSuperAdmin) {
+      loadAllOwners();
+    }
+  }, [verifiedSender, isSuperAdmin]);
+
+  const loadAllOwners = async () => {
+    try {
+      setLoadingOwners(true);
+      const response = await api.get('/api/admin/owners/list');
+      if (response.data?.success) {
+        setOwnersList(response.data.owners || []);
+      }
+    } catch (err) {
+      console.error('Failed to load owners:', err);
+      setSenderError('Failed to load owners list');
+    } finally {
+      setLoadingOwners(false);
+    }
+  };
 
   // Get Microsoft connection status from owner hook (no API call needed)
   // owner.microsoftAccessToken is the source of truth
@@ -969,27 +994,98 @@ export default function SettingsPage() {
                             {verifiedSender && (
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Step 2: Assign to Owner ID
+                                  Step 2: Assign to Owner
                                 </label>
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    value={ownerIdToAssign}
-                                    onChange={(e) => setOwnerIdToAssign(e.target.value)}
-                                    placeholder="owner-id-here"
-                                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
-                                  />
+                                <div className="space-y-2">
+                                  {/* Owner Search/Select */}
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={ownerSearch}
+                                      onChange={(e) => {
+                                        const search = e.target.value;
+                                        setOwnerSearch(search);
+                                        setOwnerIdToAssign('');
+                                        
+                                        // Filter existing list
+                                        if (search.length >= 2) {
+                                          // Filter the already-loaded owners list
+                                          const filtered = ownersList.filter(owner =>
+                                            owner.email?.toLowerCase().includes(search.toLowerCase()) ||
+                                            owner.name?.toLowerCase().includes(search.toLowerCase())
+                                          );
+                                          // If we have results, show them (already loaded)
+                                          // Otherwise could trigger API search if needed
+                                        }
+                                      }}
+                                      placeholder="Search owners by email or name..."
+                                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                    />
+                                    {loadingOwners && (
+                                      <div className="absolute right-3 top-2">
+                                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                      </div>
+                                    )}
+                                    
+                                    {/* Owner Dropdown - Show all or filtered */}
+                                    {ownersList.length > 0 && (
+                                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                        {(ownerSearch.length >= 2
+                                          ? ownersList.filter(owner =>
+                                              owner.email?.toLowerCase().includes(ownerSearch.toLowerCase()) ||
+                                              owner.name?.toLowerCase().includes(ownerSearch.toLowerCase())
+                                            )
+                                          : ownersList
+                                        ).map((owner) => (
+                                          <button
+                                            key={owner.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setOwnerIdToAssign(owner.id);
+                                              setOwnerSearch(owner.email);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                                              ownerIdToAssign === owner.id ? 'bg-yellow-50' : ''
+                                            }`}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <div>
+                                                <p className="font-medium text-gray-900">{owner.name}</p>
+                                                <p className="text-xs text-gray-500">{owner.email}</p>
+                                              </div>
+                                              {owner.hasVerifiedSender && (
+                                                <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" title="Has verified sender" />
+                                              )}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Display Name */}
                                   <input
                                     type="text"
                                     value={senderName}
                                     onChange={(e) => setSenderName(e.target.value)}
                                     placeholder="Display Name (optional)"
-                                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
                                   />
+
+                                  {/* Selected Owner Display */}
+                                  {ownerIdToAssign && (
+                                    <div className="rounded-md bg-blue-50 border border-blue-200 p-2 text-xs">
+                                      <p className="text-blue-900">
+                                        Selected: {ownersList.find(o => o.id === ownerIdToAssign)?.email || ownerIdToAssign}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Assign Button */}
                                   <button
                                     onClick={async () => {
                                       if (!ownerIdToAssign) {
-                                        setSenderError('Owner ID is required');
+                                        setSenderError('Please select an owner');
                                         return;
                                       }
                                       try {
@@ -1002,11 +1098,14 @@ export default function SettingsPage() {
                                         });
                                         if (response.data?.success) {
                                           setSenderError(null);
-                                          alert(`✅ Sender assigned successfully to owner ${ownerIdToAssign}`);
+                                          alert(`✅ Sender assigned successfully!`);
+                                          // Reload owners to refresh verified sender status
+                                          await loadAllOwners();
                                           // Reset form
                                           setSenderEmail('');
                                           setSenderName('');
                                           setOwnerIdToAssign('');
+                                          setOwnerSearch('');
                                           setVerifiedSender(null);
                                         } else {
                                           setSenderError(response.data?.error || 'Failed to assign sender');
@@ -1018,7 +1117,7 @@ export default function SettingsPage() {
                                       }
                                     }}
                                     disabled={assigningSender || !ownerIdToAssign}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     {assigningSender ? (
                                       <>
@@ -1028,7 +1127,7 @@ export default function SettingsPage() {
                                     ) : (
                                       <>
                                         <Send className="h-4 w-4 mr-2" />
-                                        Assign
+                                        Assign to Owner
                                       </>
                                     )}
                                   </button>
