@@ -163,7 +163,6 @@ export async function GET(request) {
     );
 
     // Transform contacts to preview format
-    const items = [];
     const contactMap = new Map();
 
     for (const contact of contacts) {
