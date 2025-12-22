@@ -46,6 +46,7 @@
     "@types/react": "19.2.4",
     "eslint": "^9",
     "eslint-config-next": "15.4.8",
+    "pg": "^8.16.3",
     "tailwindcss": "^4"
   }
 }
