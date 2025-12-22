@@ -342,12 +342,12 @@ export default function MicrosoftEmailIngest() {
             {preview.items.length > 0 ? (
               <>
                 <div className="max-h-[calc(100vh-400px)] overflow-y-auto mb-4 border rounded">
-                  <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600">
+                  <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
                     <div className="w-4"></div>
                     <div>Name</div>
                     <div className="text-right">Last Send</div>
                     <div className="text-center">Status</div>
-                    <div className="w-16"></div>
+                    <div className="text-right w-16">Times Contacted</div>
                   </div>
                   {preview.items.map((item) => {
                     // Determine status color based on last contact
