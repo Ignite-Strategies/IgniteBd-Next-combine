@@ -201,7 +201,7 @@ model company_hqs {
   companyAnnualRev                              String?
   yearsInBusiness                               String?
   platformId                                    String?
-  hasGrowthAccess                               Boolean?              @default(false)
+  hasGrowthAccess                               Boolean?                  @default(false)
   assessments                                   assessments[]
   blogs                                         blogs[]
   companies                                     companies[]
@@ -629,23 +629,23 @@ enum EmailEventType {
 }
 
 model event_metas {
-  id          String          @id
-  name        String
-  seriesName  String?
-  eventType   EventType
-  organizerId String?
-  city        String?
-  state       String?
-  country     String?
-  startDate   DateTime?
-  endDate     DateTime?
-  dateRange   String?
-  costMin     Int?
-  costMax     Int?
-  currency    String?
-  sourceType  EventSourceType @default(AI)
-  rawJson     Json?
-  createdAt   DateTime        @default(now())
+  id               String             @id
+  name             String
+  seriesName       String?
+  eventType        EventType
+  organizerId      String?
+  city             String?
+  state            String?
+  country          String?
+  startDate        DateTime?
+  endDate          DateTime?
+  dateRange        String?
+  costMin          Int?
+  costMax          Int?
+  currency         String?
+  sourceType       EventSourceType    @default(AI)
+  rawJson          Json?
+  createdAt        DateTime           @default(now())
   bd_eventop_intel bd_eventop_intel[]
 
   @@index([eventType])
@@ -654,45 +654,114 @@ model event_metas {
 }
 
 model bd_event_ops {
-  id           String         @id @default(uuid())
-  companyHQId  String
-  ownerId      String
-  eventPlanId  String?
-  title        String
-  description  String?
-  whyGo        String?
-  eventType    EventType
-  startDate    DateTime?
-  endDate      DateTime?
-  city         String?
-  state        String?
-  country      String?
-  costBand     String?
-  source       EventSource    @default(MANUAL)
-  status       EventOppStatus @default(CONSIDERING)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id              String            @id @default(uuid())
+  companyHQId     String
+  ownerId         String
+  eventPlanId     String?
+  eventTunerId    String?
+  title           String
+  description     String?
+  whyGo           String?
+  eventType       EventType
+  startDate       DateTime?
+  endDate         DateTime?
+  city            String?
+  state           String?
+  country         String?
+  costBand        String?
+  source          EventSource       @default(MANUAL)
+  prioritySource  String? // "BD_INTEL" if from BD intelligence
+  status          EventOppStatus    @default(CONSIDERING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   event_plan_opps event_plan_opps[]
+  event_tuners    event_tuners?     @relation(fields: [eventTunerId], references: [id], onDelete: SetNull)
 
   @@index([companyHQId])
   @@index([ownerId])
   @@index([eventPlanId])
+  @@index([eventTunerId])
   @@index([status])
   @@index([source])
+  @@index([prioritySource])
 }
 
 enum EventSource {
   PERSONA
   USER_PREF
   MANUAL
+  BD_INTEL
+}
+
+enum EventCostRange {
+  FREE
+  LOW_0_500
+  MEDIUM_500_2000
+  HIGH_2000_5000
+  PREMIUM_5000_PLUS
+  NO_LIMIT
+}
+
+enum TravelDistance {
+  LOCAL
+  REGIONAL
+  DOMESTIC
+  INTERNATIONAL
+  NO_LIMIT
+}
+
+model event_tuners {
+  id                    String                 @id @default(uuid())
+  companyHQId           String
+  ownerId               String
+  name                  String
+  conferencesPerQuarter Int?
+  costRange             EventCostRange?
+  eventSearchRawText    String?
+  travelDistance        TravelDistance?
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  preferredStates       event_tuner_states[]
+  event_tuner_personas  event_tuner_personas[]
+  bd_event_ops          bd_event_ops[]
+
+  @@index([companyHQId])
+  @@index([ownerId])
+  @@index([isActive])
+}
+
+model event_tuner_states {
+  id           String       @id @default(uuid())
+  eventTunerId String
+  state        String
+  createdAt    DateTime     @default(now())
+  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
+
+  @@unique([eventTunerId, state])
+  @@index([eventTunerId])
+  @@index([state])
+}
+
+model event_tuner_personas {
+  id           String       @id @default(uuid())
+  eventTunerId String
+  personaId    String
+  createdAt    DateTime     @default(now())
+  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
+  personas     personas     @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@unique([eventTunerId, personaId])
+  @@index([eventTunerId])
+  @@index([personaId])
 }
 
 model event_plan_opps {
-  id           String   @id
+  id           String        @id
   eventPlanId  String
   bdEventOppId String
   order        Int?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime      @default(now())
   bd_event_ops bd_event_ops? @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
 
   @@unique([eventPlanId, bdEventOppId])
@@ -869,31 +938,32 @@ model payments {
 }
 
 model personas {
-  id              String        @id
-  companyHQId     String
-  personName      String        @default("")
-  title           String
-  headline        String?
-  seniority       String?
-  industry        String?
-  subIndustries   String[]
-  company         String?
-  companySize     String?
-  annualRevenue   String?
-  location        String?
-  description     String?
-  whatTheyWant    String?
-  painPoints      String[]
-  risks           String[]
-  decisionDrivers String[]
-  buyerTriggers   String[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime
-  productId       String?
-  bd_intels       bd_intels?
-  company_hqs     company_hqs   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  products        products?     @relation(fields: [productId], references: [id])
-  product_fits    product_fits?
+  id                   String                 @id
+  companyHQId          String
+  personName           String                 @default("")
+  title                String
+  headline             String?
+  seniority            String?
+  industry             String?
+  subIndustries        String[]
+  company              String?
+  companySize          String?
+  annualRevenue        String?
+  location             String?
+  description          String?
+  whatTheyWant         String?
+  painPoints           String[]
+  risks                String[]
+  decisionDrivers      String[]
+  buyerTriggers        String[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  productId            String?
+  bd_intels            bd_intels?
+  company_hqs          company_hqs            @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  products             products?              @relation(fields: [productId], references: [id])
+  product_fits         product_fits?
+  event_tuner_personas event_tuner_personas[]
 }
 
 model phase_deliverable_templates {
