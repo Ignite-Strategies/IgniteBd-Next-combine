@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import CRMSidebar from './CRMSidebar';
@@ -80,6 +80,18 @@ export default function AppShell({ children }) {
     return !PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
+  // Debug: Log sidebar state
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('AppShell Debug:', {
+        pathname,
+        showSidebar,
+        isCRMRoute,
+        showNavigation,
+      });
+    }
+  }, [pathname, showSidebar, isCRMRoute, showNavigation]);
+
   // If we should show navigation, always include it
   if (showNavigation) {
     return (
@@ -88,23 +100,16 @@ export default function AppShell({ children }) {
         <Navigation />
         
         {/* Sidebar + Content Layout */}
-        {showSidebar ? (
-          <div className="flex min-h-[calc(100vh-3.5rem)]">
-            {/* Desktop Sidebar */}
-            <aside className="hidden md:block">
-              {isCRMRoute ? <CRMSidebar /> : <Sidebar />}
-            </aside>
-            {/* Main Content Area */}
-            <main className="flex-1 md:ml-64">
-              {children}
-            </main>
-          </div>
-        ) : (
-          /* Content without sidebar */
-          <div className="min-h-[calc(100vh-3.5rem)]">
-            {children}
-          </div>
+        {showSidebar && (
+          <>
+            {/* Sidebar - Fixed positioned, always rendered when showSidebar is true */}
+            {isCRMRoute ? <CRMSidebar /> : <Sidebar />}
+          </>
         )}
+        {/* Main Content Area */}
+        <main className={showSidebar ? 'flex-1 ml-64 min-h-[calc(100vh-3.5rem)]' : 'min-h-[calc(100vh-3.5rem)]'}>
+          {children}
+        </main>
       </div>
     );
   }
