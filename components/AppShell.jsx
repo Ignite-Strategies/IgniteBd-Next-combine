@@ -80,15 +80,17 @@ export default function AppShell({ children }) {
     return !PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  // Debug: Log sidebar state (always log for debugging)
+  // Debug: Log sidebar state (development only)
   useEffect(() => {
-    console.log('AppShell Debug:', {
-      pathname,
-      showSidebar,
-      isCRMRoute,
-      showNavigation,
-      matchingRoute: pathname ? ROUTES_WITH_SIDEBAR.find(route => pathname.startsWith(route)) : null,
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('AppShell:', {
+        pathname,
+        showSidebar,
+        isCRMRoute,
+        showNavigation,
+        matchingRoute: pathname ? ROUTES_WITH_SIDEBAR.find(route => pathname.startsWith(route)) : null,
+      });
+    }
   }, [pathname, showSidebar, isCRMRoute, showNavigation]);
 
   // If we should show navigation, always include it
