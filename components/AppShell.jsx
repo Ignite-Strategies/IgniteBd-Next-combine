@@ -80,16 +80,15 @@ export default function AppShell({ children }) {
     return !PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  // Debug: Log sidebar state
+  // Debug: Log sidebar state (always log for debugging)
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('AppShell Debug:', {
-        pathname,
-        showSidebar,
-        isCRMRoute,
-        showNavigation,
-      });
-    }
+    console.log('AppShell Debug:', {
+      pathname,
+      showSidebar,
+      isCRMRoute,
+      showNavigation,
+      matchingRoute: pathname ? ROUTES_WITH_SIDEBAR.find(route => pathname.startsWith(route)) : null,
+    });
   }, [pathname, showSidebar, isCRMRoute, showNavigation]);
 
   // If we should show navigation, always include it
@@ -99,13 +98,8 @@ export default function AppShell({ children }) {
         {/* Top Navigation Bar - Always visible on authenticated pages */}
         <Navigation />
         
-        {/* Sidebar + Content Layout */}
-        {showSidebar && (
-          <>
-            {/* Sidebar - Fixed positioned, always rendered when showSidebar is true */}
-            {isCRMRoute ? <CRMSidebar /> : <Sidebar />}
-          </>
-        )}
+        {/* Sidebar - Always render when showSidebar is true, independent of page loading state */}
+        {showSidebar && (isCRMRoute ? <CRMSidebar /> : <Sidebar />)}
         {/* Main Content Area */}
         <main className={showSidebar ? 'flex-1 ml-64 min-h-[calc(100vh-3.5rem)]' : 'min-h-[calc(100vh-3.5rem)]'}>
           {children}
