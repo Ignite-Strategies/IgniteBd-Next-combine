@@ -4,43 +4,41 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 import { useOwner } from '@/hooks/useOwner';
-import { resolveEnabledFeatures } from '@/lib/product/resolveFeatures';
-import { ProductTier } from '@/lib/product/tiers';
-import { Settings } from 'lucide-react';
+import { SIDEBAR_ITEMS } from '@/lib/navigation/sidebarItems';
+import { tierAllows } from '@/lib/navigation/tierUtils';
 
 function Sidebar() {
   const pathname = usePathname();
   const { owner } = useOwner();
 
   // Get user's tier - default to 'foundation' if not set
-  // TODO: Add tier field to Owner model and hydrate it
-  const tier: ProductTier = (owner?.tier as ProductTier) || 'foundation';
+  const tier = owner?.tier || 'foundation';
 
-  // Resolve enabled features based on tier
-  const enabledFeatures = useMemo(() => {
-    return resolveEnabledFeatures(tier);
+  // Filter sidebar items by tier
+  const visibleItems = useMemo(() => {
+    return SIDEBAR_ITEMS.filter((item) => tierAllows(tier, item.minTier));
   }, [tier]);
 
-  // Group features by their group property for display
-  const groupedFeatures = useMemo(() => {
-    const groups: Record<string, typeof enabledFeatures> = {};
-    const ungrouped: typeof enabledFeatures = [];
+  // Group items by their group property for display
+  const groupedItems = useMemo(() => {
+    const groups = {};
+    const ungrouped = [];
 
-    enabledFeatures.forEach((feature) => {
-      if (feature.group) {
-        if (!groups[feature.group]) {
-          groups[feature.group] = [];
+    visibleItems.forEach((item) => {
+      if (item.group) {
+        if (!groups[item.group]) {
+          groups[item.group] = [];
         }
-        groups[feature.group].push(feature);
+        groups[item.group].push(item);
       } else {
-        ungrouped.push(feature);
+        ungrouped.push(item);
       }
     });
 
     return { groups, ungrouped };
-  }, [enabledFeatures]);
+  }, [visibleItems]);
 
-  const isActive = (path: string, exact = false) => {
+  const isActive = (path, exact = false) => {
     if (exact) {
       return pathname === path;
     }
@@ -49,8 +47,8 @@ function Sidebar() {
     return false;
   };
 
-  // Get dashboard feature (always show first)
-  const dashboardFeature = enabledFeatures.find((f) => f.key === 'dashboard');
+  // Get dashboard item (always show first)
+  const dashboardItem = visibleItems.find((item) => item.key === 'dashboard');
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-3.5rem)] fixed left-0 top-14 overflow-y-auto z-30">
@@ -65,16 +63,16 @@ function Sidebar() {
 
       <nav className="p-4 space-y-6">
         {/* Dashboard Link - Always first if enabled */}
-        {dashboardFeature && (
+        {dashboardItem && (
           <div>
             <ul className="space-y-1">
               <li>
                 {(() => {
-                  const Icon = dashboardFeature.icon;
-                  const active = isActive(dashboardFeature.route);
+                  const Icon = dashboardItem.icon;
+                  const active = isActive(dashboardItem.href);
                   return (
                     <Link
-                      href={dashboardFeature.route}
+                      href={dashboardItem.href}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                         active
                           ? 'border border-red-200 bg-red-50 text-red-700'
@@ -82,7 +80,7 @@ function Sidebar() {
                       }`}
                     >
                       <Icon className="h-5 w-5" />
-                      <span>{dashboardFeature.label}</span>
+                      <span>{dashboardItem.label}</span>
                     </Link>
                   );
                 })()}
@@ -91,10 +89,10 @@ function Sidebar() {
           </div>
         )}
 
-        {/* Grouped Features */}
-        {Object.entries(groupedFeatures.groups).map(([groupName, features]) => {
-          // Find hub path for this group (first feature's route or group-specific)
-          const hubPath = features[0]?.route;
+        {/* Grouped Items */}
+        {Object.entries(groupedItems.groups).map(([groupName, items]) => {
+          // Find hub path for this group (first item's href or group-specific)
+          const hubPath = items[0]?.href;
           const hubActive = hubPath ? isActive(hubPath) : false;
 
           return (
@@ -116,13 +114,13 @@ function Sidebar() {
                 </h3>
               )}
               <ul className="space-y-1">
-                {features.map((feature) => {
-                  const Icon = feature.icon;
-                  const active = isActive(feature.route);
+                {items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.href);
                   return (
-                    <li key={feature.key}>
+                    <li key={item.key}>
                       <Link
-                        href={feature.route}
+                        href={item.href}
                         className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                           active
                             ? 'border border-red-200 bg-red-50 text-red-700'
@@ -130,7 +128,7 @@ function Sidebar() {
                         }`}
                       >
                         <Icon className="h-5 w-5" />
-                        <span>{feature.label}</span>
+                        <span>{item.label}</span>
                       </Link>
                     </li>
                   );
@@ -140,17 +138,17 @@ function Sidebar() {
           );
         })}
 
-        {/* Ungrouped Features (like Settings) */}
-        {groupedFeatures.ungrouped.length > 0 && (
+        {/* Ungrouped Items (like Settings) */}
+        {groupedItems.ungrouped.length > 0 && (
           <div>
             <ul className="space-y-1">
-              {groupedFeatures.ungrouped.map((feature) => {
-                const Icon = feature.icon;
-                const active = isActive(feature.route);
+              {groupedItems.ungrouped.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
                 return (
-                  <li key={feature.key}>
+                  <li key={item.key}>
                     <Link
-                      href={feature.route}
+                      href={item.href}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                         active
                           ? 'border border-red-200 bg-red-50 text-red-700'
@@ -158,7 +156,7 @@ function Sidebar() {
                       }`}
                     >
                       <Icon className="h-5 w-5" />
-                      <span>{feature.label}</span>
+                      <span>{item.label}</span>
                     </Link>
                   </li>
                 );
