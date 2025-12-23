@@ -896,6 +896,7 @@ model owners {
   email                                     String?
   photoURL                                  String?
   teamSize                                  String?
+  tier                                      String?               @default("foundation") // Product tier: foundation, growth, scale
   microsoftAccessToken                      String?
   microsoftRefreshToken                     String?
   microsoftExpiresAt                        DateTime?

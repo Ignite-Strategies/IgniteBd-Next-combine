@@ -2,114 +2,55 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  TrendingUp,
-  Users,
-  MessageSquare,
-  FileText,
-  Map,
-  Settings,
-  UserCircle,
-  FileCheck,
-  Brain,
-  Package,
-  BarChart,
-  Palette,
-  Rocket,
-  Mail,
-  Calendar,
-  Share2,
-  List,
-  GitBranch,
-  Sparkles,
-  Box,
-  Layers,
-  Receipt,
-  PlayCircle,
-  Network,
-  Edit,
-  Building2,
-} from 'lucide-react';
-
-// Home link - Growth Dashboard
-const homeLink = {
-  name: 'Growth Dashboard',
-  path: '/growth-dashboard',
-  icon: TrendingUp,
-};
-
-const navigationGroups = [
-  {
-    name: 'Growth Ops',
-    items: [
-      { name: 'BD Roadmap', path: '/pipelines/roadmap', icon: Map },
-      { name: 'Personas', path: '/personas', icon: UserCircle },
-      { name: 'Products', path: '/products', icon: Package },
-      { name: 'BD Intelligence', path: '/bd-intelligence', icon: Brain },
-      { name: 'Ecosystem Intelligence', path: '/ecosystem/associations', icon: Network },
-    ],
-  },
-  {
-    name: 'Attract',
-    hubPath: '/branding-hub',
-    items: [
-      { name: 'Ads & SEO', path: '/ads', icon: BarChart },
-      { name: 'Content', path: '/content', icon: FileText },
-      { name: 'Events', path: '/events', icon: Calendar },
-    ],
-  },
-  {
-    name: 'Engage',
-    hubPath: '/people',
-    items: [
-      { name: 'People', path: '/people', icon: Users },
-      { name: 'Lists', path: '/people/lists', icon: List },
-      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
-      { name: 'Pipeline', path: '/pipelines', icon: GitBranch },
-      { name: 'Company Hub', path: '/companies', icon: Building2 },
-    ],
-  },
-  {
-    name: 'Nurture',
-    disabled: true,
-    items: [
-      { name: 'Email Marketing', path: '#', icon: Mail, disabled: true },
-      { name: 'Social Media', path: '#', icon: Share2, disabled: true },
-    ],
-  },
-  {
-    name: 'Client Operations',
-    items: [
-      { name: 'Proposal Templates', path: '/templates', icon: Layers },
-      { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
-      { name: 'Work Packages', path: '/workpackages', icon: Box },
-      { name: 'Execution', path: '/client-operations/execution', icon: PlayCircle },
-      { name: 'Billing', path: '/billing', icon: Receipt },
-      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket, exact: true },
-    ],
-  },
-  {
-    name: 'Settings',
-    items: [
-      { name: 'Settings', path: '/settings', icon: Settings },
-    ],
-  },
-];
+import { useMemo } from 'react';
+import { useOwner } from '@/hooks/useOwner';
+import { resolveEnabledFeatures } from '@/lib/product/resolveFeatures';
+import { ProductTier } from '@/lib/product/tiers';
+import { Settings } from 'lucide-react';
 
 function Sidebar() {
   const pathname = usePathname();
+  const { owner } = useOwner();
 
-  const isActive = (path, exact = false) => {
+  // Get user's tier - default to 'foundation' if not set
+  // TODO: Add tier field to Owner model and hydrate it
+  const tier: ProductTier = (owner?.tier as ProductTier) || 'foundation';
+
+  // Resolve enabled features based on tier
+  const enabledFeatures = useMemo(() => {
+    return resolveEnabledFeatures(tier);
+  }, [tier]);
+
+  // Group features by their group property for display
+  const groupedFeatures = useMemo(() => {
+    const groups: Record<string, typeof enabledFeatures> = {};
+    const ungrouped: typeof enabledFeatures = [];
+
+    enabledFeatures.forEach((feature) => {
+      if (feature.group) {
+        if (!groups[feature.group]) {
+          groups[feature.group] = [];
+        }
+        groups[feature.group].push(feature);
+      } else {
+        ungrouped.push(feature);
+      }
+    });
+
+    return { groups, ungrouped };
+  }, [enabledFeatures]);
+
+  const isActive = (path: string, exact = false) => {
     if (exact) {
-      // Exact match only
       return pathname === path;
     }
-    // For non-exact paths, check if pathname starts with path
-    // But also ensure it's not a parent path matching a child route
     if (pathname === path) return true;
-    if (pathname.startsWith(path + '/')) return true;
+    if (pathname?.startsWith(path + '/')) return true;
     return false;
   };
+
+  // Get dashboard feature (always show first)
+  const dashboardFeature = enabledFeatures.find((f) => f.key === 'dashboard');
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-3.5rem)] fixed left-0 top-14 overflow-y-auto z-30">
@@ -123,84 +64,74 @@ function Sidebar() {
       </div>
 
       <nav className="p-4 space-y-6">
-        {/* Home Link - Growth Dashboard */}
-        <div>
-          <ul className="space-y-1">
-            <li>
-              {(() => {
-                const HomeIcon = homeLink.icon;
-                const active = isActive(homeLink.path);
-                return (
-                  <Link
-                    href={homeLink.path}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      active
-                        ? 'border border-red-200 bg-red-50 text-red-700'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                  >
-                    <HomeIcon className="h-5 w-5" />
-                    <span>{homeLink.name}</span>
-                  </Link>
-                );
-              })()}
-            </li>
-          </ul>
-        </div>
+        {/* Dashboard Link - Always first if enabled */}
+        {dashboardFeature && (
+          <div>
+            <ul className="space-y-1">
+              <li>
+                {(() => {
+                  const Icon = dashboardFeature.icon;
+                  const active = isActive(dashboardFeature.route);
+                  return (
+                    <Link
+                      href={dashboardFeature.route}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        active
+                          ? 'border border-red-200 bg-red-50 text-red-700'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span>{dashboardFeature.label}</span>
+                    </Link>
+                  );
+                })()}
+              </li>
+            </ul>
+          </div>
+        )}
 
-        {/* Navigation Groups */}
-        {navigationGroups.map((group) => {
-          const hubActive = group.hubPath ? isActive(group.hubPath) : false;
+        {/* Grouped Features */}
+        {Object.entries(groupedFeatures.groups).map(([groupName, features]) => {
+          // Find hub path for this group (first feature's route or group-specific)
+          const hubPath = features[0]?.route;
+          const hubActive = hubPath ? isActive(hubPath) : false;
+
           return (
-            <div key={group.name}>
-              {group.disabled ? (
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 opacity-50">
-                  {group.name}
-                </h3>
-              ) : group.hubPath ? (
+            <div key={groupName}>
+              {hubPath ? (
                 <Link
-                  href={group.hubPath}
+                  href={hubPath}
                   className={`mb-3 block text-xs font-semibold uppercase tracking-wider transition-colors ${
                     hubActive
                       ? 'text-red-600 hover:text-red-700'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {group.name}
+                  {groupName}
                 </Link>
               ) : (
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  {group.name}
+                  {groupName}
                 </h3>
               )}
               <ul className="space-y-1">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.path, item.exact);
-                  const disabled = item.disabled;
+                {features.map((feature) => {
+                  const Icon = feature.icon;
+                  const active = isActive(feature.route);
                   return (
-                    <li key={item.path}>
-                      {disabled ? (
-                        <div
-                          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-400 opacity-50 cursor-not-allowed"
-                          title="Coming soon"
-                        >
-                          <Icon className="h-5 w-5" />
-                          <span>{item.name}</span>
-                        </div>
-                      ) : (
-                        <Link
-                          href={item.path}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                            active
-                              ? 'border border-red-200 bg-red-50 text-red-700'
-                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" />
-                          <span>{item.name}</span>
-                        </Link>
-                      )}
+                    <li key={feature.key}>
+                      <Link
+                        href={feature.route}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          active
+                            ? 'border border-red-200 bg-red-50 text-red-700'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span>{feature.label}</span>
+                      </Link>
                     </li>
                   );
                 })}
@@ -208,6 +139,33 @@ function Sidebar() {
             </div>
           );
         })}
+
+        {/* Ungrouped Features (like Settings) */}
+        {groupedFeatures.ungrouped.length > 0 && (
+          <div>
+            <ul className="space-y-1">
+              {groupedFeatures.ungrouped.map((feature) => {
+                const Icon = feature.icon;
+                const active = isActive(feature.route);
+                return (
+                  <li key={feature.key}>
+                    <Link
+                      href={feature.route}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        active
+                          ? 'border border-red-200 bg-red-50 text-red-700'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span>{feature.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </nav>
     </div>
   );

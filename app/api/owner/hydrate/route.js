@@ -44,6 +44,7 @@ export async function GET(request) {
         name: true,
         email: true,
         photoURL: true,
+        tier: true, // Product tier for feature access
         createdAt: true,
         updatedAt: true,
         // Microsoft OAuth fields (for connection status check only - NOT returned to frontend)
