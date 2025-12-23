@@ -70,7 +70,7 @@ export async function GET(request) {
     }
 
     // Get ALL memberships for this owner
-    const memberships = await prisma.company_memberships.findMany({
+    let memberships = await prisma.company_memberships.findMany({
       where: { userId: owner.id },
       include: {
         company_hqs: {
@@ -84,17 +84,31 @@ export async function GET(request) {
         }
       },
       orderBy: [
-        { isPrimary: 'desc' }, // Primary first
-        { createdAt: 'asc' },   // Then by oldest
+        { createdAt: 'asc' },   // First by creation date
       ]
+    });
+
+    // Sort by role priority: OWNER first, then MANAGER, then others
+    const getRolePriority = (role) => {
+      const upperRole = (role || '').toUpperCase();
+      if (upperRole === 'OWNER') return 1;
+      if (upperRole === 'MANAGER') return 2;
+      return 3;
+    };
+    memberships = memberships.sort((a, b) => {
+      const priorityA = getRolePriority(a.role);
+      const priorityB = getRolePriority(b.role);
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB; // Lower priority number = higher in list
+      }
+      // Same priority, sort by createdAt (oldest first)
+      return new Date(a.createdAt) - new Date(b.createdAt);
     });
 
     console.log(`✅ OWNER HYDRATE: Found ${memberships.length} membership(s) for owner ${owner.id}`);
 
-    // Get primary/default CompanyHQ
-    const primaryMembership = memberships.find(m => m.isPrimary) || memberships[0];
-    const companyHQId = primaryMembership?.companyHqId || null;
-    const companyHQ = primaryMembership?.company_hqs || null;
+    // Get default CompanyHQ (first one after role-based sorting: OWNER > MANAGER > others)
+    const defaultMembership = memberships[0];
 
     // Compute Microsoft connection status server-side (NO tokens sent to frontend)
     // Connection is valid if we have refresh token (can always refresh access token)
@@ -123,9 +137,9 @@ export async function GET(request) {
 
     const ownerWithMemberships = {
       ...ownerSafe,
-      companyHQId,        // Default/primary CompanyHQ
-      companyHQ,          // Full CompanyHQ object
-      memberships,        // Array of all memberships
+      companyHQId: defaultMembership?.companyHqId || null,        // Default CompanyHQ (first after role sorting)
+      companyHQ: defaultMembership?.company_hqs || null,          // Full CompanyHQ object
+      memberships,        // Array of all memberships (sorted by role)
       // Microsoft connection state (computed server-side, no tokens)
       microsoftConnected,
       microsoftEmail: owner.microsoftEmail || null,

@@ -91,13 +91,13 @@ export default function AppShell({ children }) {
         {showSidebar ? (
           <div className="flex min-h-[calc(100vh-3.5rem)]">
             {/* Desktop Sidebar */}
-            <div className="hidden lg:block">
+            <aside className="hidden md:block">
               {isCRMRoute ? <CRMSidebar /> : <Sidebar />}
-            </div>
+            </aside>
             {/* Main Content Area */}
-            <div className="flex-1 lg:ml-64">
+            <main className="flex-1 md:ml-64">
               {children}
-            </div>
+            </main>
           </div>
         ) : (
           /* Content without sidebar */

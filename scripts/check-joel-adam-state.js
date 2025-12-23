@@ -41,7 +41,7 @@ async function checkState() {
 
       console.log(`      Memberships: ${joelMemberships.length}`);
       joelMemberships.forEach(m => {
-        console.log(`         • ${m.company_hqs.companyName}: ${m.role}${m.isPrimary ? ' (Primary)' : ''}`);
+        console.log(`         • ${m.company_hqs.companyName}: ${m.role}`);
       });
     }
 
@@ -72,14 +72,13 @@ async function checkState() {
           }
         },
         orderBy: [
-          { isPrimary: 'desc' },
           { createdAt: 'asc' },
         ]
       });
 
       console.log(`      Memberships: ${adamMemberships.length}`);
       adamMemberships.forEach(m => {
-        console.log(`         • ${m.company_hqs.companyName}: ${m.role}${m.isPrimary ? ' (Primary)' : ''}`);
+        console.log(`         • ${m.company_hqs.companyName}: ${m.role}`);
       });
     }
 
@@ -109,7 +108,7 @@ async function checkState() {
 
       console.log(`      Total memberships: ${companyMemberships.length}`);
       companyMemberships.forEach(m => {
-        console.log(`         • ${m.owners.email} (${m.owners.firebaseId}): ${m.role}${m.isPrimary ? ' (Primary)' : ''}`);
+        console.log(`         • ${m.owners.email} (${m.owners.firebaseId}): ${m.role}`);
       });
     }
 
@@ -124,3 +123,4 @@ async function checkState() {
 }
 
 checkState();
+

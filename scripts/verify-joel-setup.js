@@ -87,8 +87,8 @@ async function verifySetup() {
       process.exit(1);
     }
 
-    console.log(`  ✅ Joel: ${joelMembership.role}${joelMembership.isPrimary ? ' (Primary)' : ''}`);
-    console.log(`  ✅ Adam: ${adamMembership.role}${adamMembership.isPrimary ? ' (Primary)' : ''}`);
+    console.log(`  ✅ Joel: ${joelMembership.role}`);
+    console.log(`  ✅ Adam: ${adamMembership.role}`);
 
     // =====================================================
     // 4️⃣ TEST resolveMembership (Import simulation)
@@ -149,14 +149,12 @@ async function verifySetup() {
 
     console.log(`  ✅ Joel membership resolved:`, {
       role: joelResolve.role,
-      isPrimary: joelResolve.isPrimary,
       companyName: joelResolve.company_hqs.companyName,
       ownerEmail: joelResolve.owners.email,
     });
 
     console.log(`  ✅ Adam membership resolved:`, {
       role: adamResolve.role,
-      isPrimary: adamResolve.isPrimary,
       companyName: adamResolve.company_hqs.companyName,
       ownerEmail: adamResolve.owners.email,
     });
@@ -180,7 +178,6 @@ async function verifySetup() {
         }
       },
       orderBy: [
-        { isPrimary: 'desc' },
         { createdAt: 'asc' },
       ]
     });
@@ -199,19 +196,38 @@ async function verifySetup() {
         }
       },
       orderBy: [
-        { isPrimary: 'desc' },
         { createdAt: 'asc' },
       ]
     });
 
-    console.log(`  ✅ Joel has ${joelAllMemberships.length} membership(s):`);
-    joelAllMemberships.forEach(m => {
-      console.log(`     • ${m.company_hqs.companyName}: ${m.role}${m.isPrimary ? ' (Primary)' : ''}`);
+    // Sort by role priority for display
+    const getRolePriority = (role) => {
+      const upperRole = (role || '').toUpperCase();
+      if (upperRole === 'OWNER') return 1;
+      if (upperRole === 'MANAGER') return 2;
+      return 3;
+    };
+    const sortedJoel = [...joelAllMemberships].sort((a, b) => {
+      const priorityA = getRolePriority(a.role);
+      const priorityB = getRolePriority(b.role);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    });
+    const sortedAdam = [...adamAllMemberships].sort((a, b) => {
+      const priorityA = getRolePriority(a.role);
+      const priorityB = getRolePriority(b.role);
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return new Date(a.createdAt) - new Date(b.createdAt);
     });
 
-    console.log(`  ✅ Adam has ${adamAllMemberships.length} membership(s):`);
-    adamAllMemberships.forEach(m => {
-      console.log(`     • ${m.company_hqs.companyName}: ${m.role}${m.isPrimary ? ' (Primary)' : ''}`);
+    console.log(`  ✅ Joel has ${sortedJoel.length} membership(s):`);
+    sortedJoel.forEach(m => {
+      console.log(`     • ${m.company_hqs.companyName}: ${m.role}`);
+    });
+
+    console.log(`  ✅ Adam has ${sortedAdam.length} membership(s):`);
+    sortedAdam.forEach(m => {
+      console.log(`     • ${m.company_hqs.companyName}: ${m.role}`);
     });
 
     // =====================================================

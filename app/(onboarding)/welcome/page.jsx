@@ -37,20 +37,20 @@ export default function WelcomePage() {
           const owner = hydrateData.owner;
           const memberships = hydrateData.memberships || [];
           const hasMemberships = memberships.length > 0;
-          const primaryMembership = memberships.find(m => m.isPrimary) || memberships[0];
+          // Memberships are already sorted by role (OWNER first, then MANAGER, then others)
+          const defaultMembership = memberships[0];
           
           // Map memberships for display (include full company_hqs object with hasGrowthAccess)
           const mappedMemberships = memberships.map(m => ({
             id: m.id,
             companyHqId: m.companyHqId,
             role: m.role,
-            isPrimary: m.isPrimary,
             companyName: m.company_hqs?.companyName || null,
             companyHQ: m.company_hqs || null, // Full companyHQ object with hasGrowthAccess
           }));
           
-          // Set selected company to primary or first
-          const defaultCompanyHqId = primaryMembership?.companyHqId || memberships[0]?.companyHqId;
+          // Set selected company to first (already sorted by role priority)
+          const defaultCompanyHqId = defaultMembership?.companyHqId || memberships[0]?.companyHqId;
           setSelectedCompanyHqId(defaultCompanyHqId);
           
           // Set membership data for display/routing
@@ -64,10 +64,10 @@ export default function WelcomePage() {
               name: owner.name,
             },
             memberships: mappedMemberships,
-            primaryMembership: primaryMembership ? {
-              companyHqId: primaryMembership.companyHqId,
-              companyName: primaryMembership.company_hqs?.companyName || null,
-              role: primaryMembership.role,
+            defaultMembership: defaultMembership ? {
+              companyHqId: defaultMembership.companyHqId,
+              companyName: defaultMembership.company_hqs?.companyName || null,
+              role: defaultMembership.role,
             } : null,
           });
           
@@ -184,7 +184,7 @@ export default function WelcomePage() {
   const selectedMembership = membershipData?.memberships?.find(
     m => m.companyHqId === selectedCompanyHqId
   );
-  const displayCompany = selectedMembership?.companyName || membershipData?.primaryMembership?.companyName;
+  const displayCompany = selectedMembership?.companyName || membershipData?.defaultMembership?.companyName;
   
   const displayName = owner?.firstName 
     ? owner.firstName 
@@ -220,7 +220,6 @@ export default function WelcomePage() {
                     className="bg-red-800 text-white"
                   >
                     {membership.companyName || 'Unnamed Company'} ({membership.role})
-                    {membership.isPrimary ? ' - Primary' : ''}
                   </option>
                 ))}
               </select>

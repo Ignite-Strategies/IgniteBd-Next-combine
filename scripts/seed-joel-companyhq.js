@@ -106,14 +106,12 @@ async function seedJoelCompanyHQ() {
       },
       update: { 
         role: 'OWNER',
-        isPrimary: true,
       },
       create: {
         id: randomUUID(),
         userId: joel.id,
         companyHqId: company.id,
         role: 'OWNER',
-        isPrimary: true,
       },
     });
     console.log(`  ✅ Joel → OWNER (${joelMembership.id})`);
@@ -128,14 +126,12 @@ async function seedJoelCompanyHQ() {
       },
       update: { 
         role: 'MANAGER',
-        isPrimary: false,
       },
       create: {
         id: randomUUID(),
         userId: adam.id,
         companyHqId: company.id,
         role: 'MANAGER',
-        isPrimary: false,
       },
     });
     console.log(`  ✅ Adam → MANAGER (${adamMembership.id})`);
@@ -159,7 +155,7 @@ async function seedJoelCompanyHQ() {
 
     console.log(`  Found ${memberships.length} memberships:`);
     memberships.forEach(m => {
-      console.log(`    • ${m.owners.email}: ${m.role}${m.isPrimary ? ' (Primary)' : ''}`);
+      console.log(`    • ${m.owners.email}: ${m.role}`);
     });
 
     // =====================================================

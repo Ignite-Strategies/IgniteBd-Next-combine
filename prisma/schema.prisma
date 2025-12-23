@@ -235,7 +235,6 @@ model company_memberships {
   userId      String // owner.id (not firebaseId)
   companyHqId String
   role        String
-  isPrimary   Boolean     @default(false)
   createdAt   DateTime    @default(now())
   owners      owners      @relation(fields: [userId], references: [id], onDelete: Cascade)
   company_hqs company_hqs @relation(fields: [companyHqId], references: [id], onDelete: Cascade)

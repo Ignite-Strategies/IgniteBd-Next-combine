@@ -57,8 +57,7 @@ async function backfillMemberships() {
             id: randomUUID(),
             userId: hq.ownerId,
             companyHqId: hq.id,
-            role: 'OWNER',
-            isPrimary: true,
+            role: 'OWNER', // OWNER role will be sorted first automatically
           }
         });
         console.log(`  ✅ Created: ${hq.companyName} (${hq.ownerId})`);
