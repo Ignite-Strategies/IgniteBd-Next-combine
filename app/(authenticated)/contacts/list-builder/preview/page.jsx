@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Users, Building2, Filter, Check, X, ArrowLeft, Save } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -10,7 +10,7 @@ import { useContacts } from '../../ContactsContext';
 import CompanySelector from '@/components/CompanySelector';
 import { OFFICIAL_PIPELINES, PIPELINE_STAGES } from '@/lib/config/pipelineConfig';
 
-export default function ContactListPreviewPage() {
+function ContactListPreviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterType = searchParams.get('filter') || 'all';
@@ -394,6 +394,25 @@ export default function ContactListPreviewPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ContactListPreviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600 mx-auto mb-4" />
+              <p className="text-gray-600">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <ContactListPreviewContent />
+    </Suspense>
   );
 }
 
