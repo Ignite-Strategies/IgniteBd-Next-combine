@@ -9,7 +9,7 @@ import { generatePersonaBDIntelligence } from '@/lib/services/PersonaBDIntellige
  */
 export async function GET(
   request: Request,
-  { params }: { params: { personaId: string } }
+  { params }: { params: Promise<{ personaId: string }> }
 ) {
   try {
     await verifyFirebaseToken(request);
@@ -21,7 +21,7 @@ export async function GET(
   }
 
   try {
-    const { personaId } = params;
+    const { personaId } = await params;
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '10', 10);
 

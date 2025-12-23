@@ -9,7 +9,7 @@ import { generateSelectableEvents } from '@/lib/services/EventSelectionService';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { tunerId: string } }
+  { params }: { params: Promise<{ tunerId: string }> }
 ) {
   try {
     await verifyFirebaseToken(request);
@@ -21,7 +21,7 @@ export async function GET(
   }
 
   try {
-    const { tunerId } = params;
+    const { tunerId } = await params;
 
     if (!tunerId) {
       return NextResponse.json(
