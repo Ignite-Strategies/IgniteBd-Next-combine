@@ -8,13 +8,8 @@ import api from '@/lib/api';
  * Welcome Page - Company Selection + Routing
  * 
  * Shows company selection based on memberships.
- * Routes based on selected companyHQ.hasGrowthAccess:
- * - true → /growth-dashboard (full Ignite BD)
- * - false/null → /crmdashboard (CRM-only)
- * 
- * This allows the same owner to have different access levels in different companies:
- * - Adam in Ignite Strategies → Full Growth Dashboard
- * - Adam in BusinessPoint Law → CRM Dashboard
+ * Routes to /growth-dashboard after company selection.
+ * No access gating - all users get full access.
  */
 export default function WelcomePage() {
   const router = useRouter();
@@ -125,14 +120,8 @@ export default function WelcomePage() {
           }
         }
         
-        // Route based on selected company's hasGrowthAccess
-        const hasGrowthAccess = selectedMembership.companyHQ?.hasGrowthAccess === true;
-        
-        if (hasGrowthAccess) {
-          router.push('/growth-dashboard');
-        } else {
-          router.push('/crmdashboard');
-        }
+        // Route to growth dashboard (no gating)
+        router.push('/growth-dashboard');
       }
     } else {
       // No memberships - go to onboarding flow

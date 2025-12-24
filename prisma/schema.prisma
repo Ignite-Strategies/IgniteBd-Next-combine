@@ -201,7 +201,7 @@ model company_hqs {
   companyAnnualRev                              String?
   yearsInBusiness                               String?
   platformId                                    String?
-  hasGrowthAccess                               Boolean?                  @default(false)
+  tier                                          String?                  // Product tier for future use (not gated)
   assessments                                   assessments[]
   blogs                                         blogs[]
   companies                                     companies[]

@@ -80,7 +80,7 @@ export async function GET(request) {
             companyName: true,
             companyWebsite: true,
             companyIndustry: true,
-            hasGrowthAccess: true,
+            tier: true,
           }
         }
       },
