@@ -17,6 +17,8 @@ const nextConfig = {
       },
     ];
   },
+  // Optimize font loading to reduce preload warnings
+  optimizeFonts: true,
   webpack: (config, { isServer }) => {
     // Exclude Node.js-only packages from client-side bundles
     if (!isServer) {

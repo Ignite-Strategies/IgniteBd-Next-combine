@@ -666,6 +666,28 @@ export default function TemplateBuildPage() {
 
   // FORM STEP - Step 2
   if (step === 'form') {
+    // If path is null, redirect back to landing
+    if (!path) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="text-center py-12">
+              <p className="text-gray-600 mb-4">No template path selected.</p>
+              <button
+                onClick={() => {
+                  setStep('landing');
+                  setPath(null);
+                }}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white"
+              >
+                Go to Template Builder
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
