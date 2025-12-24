@@ -6,12 +6,25 @@ import { sendOutreachEmail } from '@/lib/services/outreachSendService';
 /**
  * POST /api/outreach/send
  * 
- * Send 1-to-1 outreach email via SendGrid
+ * SendGrid Email Send Route
+ * 
+ * Flow:
+ * 1. Authenticates user via Firebase
+ * 2. Gets owner record from database
+ * 3. Grabs verified sender email (owner.sendgridVerifiedEmail)
+ * 4. Grabs verified sender name (owner.sendgridVerifiedName)
+ * 5. Takes subject line from request body
+ * 6. Calls SendGrid email generator service (sendOutreachEmail)
+ * 7. Service pushes email via SendGrid API
+ * 8. Logs email activity in database
+ * 
  * Requires Firebase authentication
+ * Requires verified sender (owner.sendgridVerifiedEmail must be set)
  * 
  * Request body:
  * {
  *   "to": "prospect@example.com",
+ *   "toName": "John Doe", (optional)
  *   "subject": "Quick intro",
  *   "body": "Hey, saw your work on...",
  *   "contactId": "c_123", (optional)
