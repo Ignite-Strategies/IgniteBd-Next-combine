@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import TemplateTestService from '@/lib/services/templateTestService';
+
+// Prevent prerendering - this page requires client-side state
+export const dynamic = 'force-dynamic';
 
 const RELATIONSHIP_OPTIONS = [
   { value: 'COLD', label: 'Cold' },
@@ -24,6 +27,12 @@ const TYPE_OF_PERSON_OPTIONS = [
 ];
 
 export default function RelationshipHelperPage() {
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const router = useRouter();
   const { companyHQId } = useCompanyHQ();
   const [form, setForm] = useState({
@@ -210,11 +219,18 @@ export default function RelationshipHelperPage() {
               />
             </div>
 
-            {preview.content && (
+            {mounted && preview.content && preview.content.trim() && (
               <div className="rounded-lg border border-green-200 bg-green-50 p-6">
                 <h2 className="mb-4 text-lg font-semibold text-gray-900">Preview (with sample data)</h2>
                 <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                  {TemplateTestService.generatePreview(preview.content, { formData: form }).hydratedContent}
+                  {(() => {
+                    try {
+                      return TemplateTestService.generatePreview(preview.content, { formData: form }).hydratedContent;
+                    } catch (error) {
+                      console.error('Preview generation error:', error);
+                      return preview.content;
+                    }
+                  })()}
                 </div>
               </div>
             )}

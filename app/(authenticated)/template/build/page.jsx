@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles, FileText, Edit, ArrowRight, Users } from 'lucide-react';
 
+// Prevent prerendering - this page requires client-side routing
+export const dynamic = 'force-dynamic';
+
 const TEMPLATE_PATHS = [
   {
     id: 'manual',

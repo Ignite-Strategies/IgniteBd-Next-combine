@@ -8,7 +8,16 @@ import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import { extractVariables } from '@/lib/templateVariables';
 import TemplateTestService from '@/lib/services/templateTestService';
 
+// Prevent prerendering - this page requires client-side state
+export const dynamic = 'force-dynamic';
+
 export default function TemplatesPage() {
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const router = useRouter();
   const { companyHQId } = useCompanyHQ();
   const [existingTemplates, setExistingTemplates] = useState([]);
@@ -130,11 +139,18 @@ export default function TemplatesPage() {
               />
             </div>
 
-            {preview.content && (
+            {mounted && preview.content && preview.content.trim() && (
               <div className="rounded-lg border border-green-200 bg-green-50 p-6">
                 <h2 className="mb-4 text-lg font-semibold text-gray-900">Preview (with sample data)</h2>
                 <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                  {TemplateTestService.generatePreview(preview.content, { formData: form }).hydratedContent}
+                  {(() => {
+                    try {
+                      return TemplateTestService.generatePreview(preview.content, { formData: form }).hydratedContent;
+                    } catch (error) {
+                      console.error('Preview generation error:', error);
+                      return preview.content;
+                    }
+                  })()}
                 </div>
               </div>
             )}

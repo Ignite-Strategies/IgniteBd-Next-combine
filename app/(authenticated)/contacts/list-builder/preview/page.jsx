@@ -16,6 +16,7 @@ function ContactListPreviewContent() {
   const searchParams = useSearchParams();
   const filterType = searchParams.get('filter') || 'all';
   const selectAllParam = searchParams.get('selectAll') === 'true';
+  const returnTo = searchParams.get('returnTo');
   
   const { contacts } = useContacts();
   const { addList } = useContactLists();
@@ -146,7 +147,12 @@ function ContactListPreviewContent() {
 
       if (response.data?.success && response.data.list) {
         addList(response.data.list);
-        router.push('/contacts/list-manager');
+        // If returnTo is provided, redirect there; otherwise go to list manager
+        if (returnTo) {
+          router.push(returnTo);
+        } else {
+          router.push('/contacts/list-manager');
+        }
       } else {
         setError(response.data?.error || 'Failed to create list');
         setIsCreating(false);

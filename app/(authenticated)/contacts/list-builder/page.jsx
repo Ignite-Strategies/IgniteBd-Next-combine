@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Users, Building2, Filter, CheckCircle, ArrowRight } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 
@@ -28,6 +28,8 @@ const FILTER_OPTIONS = [
 
 export default function ContactListBuilderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   const [selectedFilter, setSelectedFilter] = useState('');
   const [selectAll, setSelectAll] = useState(false);
 
@@ -37,10 +39,13 @@ export default function ContactListBuilderPage() {
       return;
     }
 
-    // Navigate to selection page with filter params
+    // Navigate to selection page with filter params and returnTo
     const params = new URLSearchParams({ filter: selectedFilter });
     if (selectAll) {
       params.append('selectAll', 'true');
+    }
+    if (returnTo) {
+      params.append('returnTo', returnTo);
     }
     router.push(`/contacts/list-builder/preview?${params.toString()}`);
   };
