@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Users } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { useOwner } from '@/hooks/useOwner';
 
 /**
  * ContactSelector Component - SEARCH FIRST
@@ -20,6 +21,7 @@ export default function ContactSelector({
   companyId, // Optional: filter contacts by company
 }) {
   const { companyHQId, hydrated: companyHydrated, refresh: refreshCompanyHQ } = useCompanyHQ();
+  const { ownerId, hydrated: ownerHydrated } = useOwner();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contactSearch, setContactSearch] = useState('');
@@ -30,10 +32,16 @@ export default function ContactSelector({
     console.log('🔍 ContactSelector companyId prop:', companyId);
   }, [companyId]);
 
-  // Fetch contacts from API
+  // Fetch contacts from API - WAIT FOR AUTH
   useEffect(() => {
     const fetchContacts = async () => {
       if (typeof window === 'undefined') return;
+      
+      // CRITICAL: Wait for auth to be ready before making API calls
+      if (!ownerId || !ownerHydrated) {
+        // Auth not ready yet - wait
+        return;
+      }
       
       // If companyHQId is not available yet, try to refresh it
       if (!companyHQId && companyHydrated) {
@@ -168,7 +176,7 @@ export default function ContactSelector({
     };
 
     fetchContacts();
-  }, [companyHQId, companyHydrated, refreshCompanyHQ, companyId]); // companyId in deps so it re-fetches when company changes
+  }, [companyHQId, companyHydrated, refreshCompanyHQ, companyId, ownerId, ownerHydrated]); // Wait for auth before fetching
 
   // Initialize from props only
   useEffect(() => {
