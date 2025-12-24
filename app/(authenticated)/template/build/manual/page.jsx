@@ -6,7 +6,6 @@ import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import { extractVariables } from '@/lib/templateVariables';
-import TemplateTestService from '@/lib/services/templateTestService';
 
 // Prevent prerendering - this page requires client-side state
 export const dynamic = 'force-dynamic';
@@ -198,23 +197,7 @@ export default function ManualTemplatePage() {
             )}
           </div>
 
-          {/* COMMENTED OUT: Preview generation temporarily disabled due to firstName variable issues during prerendering */}
-          {/* {manualContent && (() => {
-            try {
-              const previewData = TemplateTestService.generatePreview(manualContent, {});
-              return (
-                <div className="rounded-lg border border-green-200 bg-green-50 p-6">
-                  <h2 className="mb-4 text-lg font-semibold text-gray-900">Preview (with sample data)</h2>
-                  <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                    {previewData.hydratedContent}
-                  </div>
-                </div>
-              );
-            } catch (error) {
-              console.error('Preview generation error:', error);
-              return null;
-            }
-          })()} */}
+          {/* Preview disabled to prevent build errors */}
 
           <div className="flex gap-3">
             <button

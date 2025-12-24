@@ -6,7 +6,6 @@ import { RefreshCw, Code, Building2, Calendar, Target } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import { extractVariables } from '@/lib/templateVariables';
-import TemplateTestService from '@/lib/services/templateTestService';
 
 export default function TemplateSavedPage() {
   const router = useRouter();
@@ -360,25 +359,7 @@ export default function TemplateSavedPage() {
                             </div>
                           </div>
 
-                          {/* COMMENTED OUT: Preview generation temporarily disabled due to firstName variable issues during prerendering */}
-                          {/* Preview with Sample Data */}
-                          {/* {variables.length > 0 && (
-                            <div className="rounded-md border border-green-200 bg-green-50 p-4">
-                              <div className="mb-2 text-xs font-semibold uppercase text-green-700">
-                                Preview (with sample data)
-                              </div>
-                              <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                                {TemplateTestService.getQuickPreview(template.content, {
-                                  relationship: base.relationship,
-                                  typeOfPerson: base.typeOfPerson,
-                                  timeHorizon: base.timeHorizon,
-                                  desiredOutcome: base.desiredOutcome,
-                                  myBusinessDescription: base.myBusinessDescription,
-                                  knowledgeOfBusiness: base.knowledgeOfBusiness,
-                                })}
-                              </div>
-                            </div>
-                          )} */}
+                          {/* Preview disabled to prevent build errors */}
                         </div>
                       </div>
                     );
