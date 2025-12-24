@@ -44,7 +44,7 @@ export async function GET(request) {
         name: true,
         email: true,
         photoURL: true,
-        tier: true, // Product tier for feature access
+        // tier: true, // Product tier for feature access - COMMENTED OUT: tier field removed from DB
         createdAt: true,
         updatedAt: true,
         // Microsoft OAuth fields (for connection status check only - NOT returned to frontend)
@@ -80,7 +80,7 @@ export async function GET(request) {
             companyName: true,
             companyWebsite: true,
             companyIndustry: true,
-            tier: true,
+            // tier: true, // COMMENTED OUT: tier field removed from DB
           }
         }
       },
