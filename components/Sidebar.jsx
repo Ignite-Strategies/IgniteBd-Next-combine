@@ -14,6 +14,7 @@ import {
   FileText,
   Calendar,
   Settings,
+  FileCode,
 } from 'lucide-react';
 
 function Sidebar() {
@@ -48,6 +49,7 @@ function Sidebar() {
       items: [
         { key: 'people', label: 'People', href: '/people', icon: Users },
         { key: 'outreach', label: 'Outreach', href: '/outreach', icon: MessageSquare },
+        { key: 'templates', label: 'Templates', href: '/template', icon: FileCode },
         { key: 'pipelines', label: 'Pipeline', href: '/pipelines', icon: GitBranch },
         { key: 'companies', label: 'Company Hub', href: '/companies', icon: Building2 },
       ],

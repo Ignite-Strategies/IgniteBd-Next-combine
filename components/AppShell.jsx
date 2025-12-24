@@ -6,7 +6,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 import Sidebar from './Sidebar';
-import CRMSidebar from './CRMSidebar';
 import Navigation from './Navigation';
 
 const ROUTES_WITH_SIDEBAR = [
@@ -35,18 +34,6 @@ const ROUTES_WITH_SIDEBAR = [
   '/companies',
 ];
 
-// CRM-only routes that use CRMSidebar instead of full Sidebar
-const CRM_ROUTES = [
-  '/people',
-  '/people/lists',
-  '/outreach',
-  '/pipelines',
-  '/companies',
-  '/personas',
-  '/products',
-  '/bd-intelligence',
-  '/ecosystem',
-];
 
 // Public routes that should NOT show navigation
 const PUBLIC_ROUTES = [
@@ -125,11 +112,6 @@ export default function AppShell({ children }) {
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  const isCRMRoute = useMemo(() => {
-    if (!pathname) return false;
-    return CRM_ROUTES.some((route) => pathname.startsWith(route));
-  }, [pathname]);
-
   // MVP1: Global navbar - show whenever authenticated, period
   // No pathname checking - just auth state
   const showNavigation = isAuthenticated;
@@ -142,7 +124,7 @@ export default function AppShell({ children }) {
         <Navigation />
         
         {/* Sidebar - Only render when showSidebar is true */}
-        {showSidebar && (isCRMRoute ? <CRMSidebar /> : <Sidebar />)}
+        {showSidebar && <Sidebar />}
         {/* Main Content Area */}
         <main className={showSidebar ? 'flex-1 ml-64 min-h-[calc(100vh-3.5rem)]' : 'min-h-[calc(100vh-3.5rem)]'}>
           {children}
