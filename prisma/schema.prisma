@@ -459,7 +459,6 @@ model email_activities {
   campaigns           campaigns?       @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
   email_sequences     email_sequences? @relation(fields: [sequence_id], references: [id], onDelete: SetNull)
   sequence_steps      sequence_steps?  @relation(fields: [sequence_step_id], references: [id], onDelete: SetNull)
-  email_events        email_events[]
 
   @@index([contact_id])
   @@index([messageId])
@@ -602,36 +601,20 @@ model sequence_steps {
   @@index([sequence_id, step_number])
 }
 
-// Email Events - Detailed tracking of all email events (multiple opens/clicks per email)
-model email_events {
-  id                String           @id @default(uuid())
-  email_activity_id String
-  event_type        EmailEventType // OPEN, CLICK, REPLY, BOUNCE, DROP, DELIVERED, etc.
-  event_data        Json? // Additional event data (click URL, bounce reason, etc.)
-  ip_address        String?
-  user_agent        String?
-  location          String? // Geographic location if available
-  occurred_at       DateTime         @default(now())
-  email_activities  email_activities @relation(fields: [email_activity_id], references: [id], onDelete: Cascade)
-
-  @@index([email_activity_id])
-  @@index([event_type])
-  @@index([occurred_at])
-  @@index([email_activity_id, event_type])
-}
-
-enum EmailEventType {
-  SENT
-  DELIVERED
-  OPEN
-  CLICK
-  REPLY
-  BOUNCE
-  DROP
-  DEFERRED
-  UNSUBSCRIBE
-  SPAM_REPORT
-}
+// Email Events - REMOVED for MVP1 (deprecated - using email_activities.event instead)
+// Migration will drop this table - keeping enum commented for reference
+// enum EmailEventType {
+//   SENT
+//   DELIVERED
+//   OPEN
+//   CLICK
+//   REPLY
+//   BOUNCE
+//   DROP
+//   DEFERRED
+//   UNSUBSCRIBE
+//   SPAM_REPORT
+// }
 
 model event_metas {
   id               String             @id
