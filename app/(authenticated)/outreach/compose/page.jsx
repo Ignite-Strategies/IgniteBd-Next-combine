@@ -170,10 +170,7 @@ function ComposeContent() {
       setTenantId(companyHQId);
     }
     
-    // If template is selected, auto-hydrate
-    if (selectedTemplate) {
-      hydrateTemplate(contact);
-    }
+    // NO AUTO-HYDRATION - user must click hydrate button manually
   };
   
   // Load templates
@@ -199,13 +196,10 @@ function ComposeContent() {
     setSubject(template.template_bases?.title || '');
     setBody(template.content || '');
     
-    // If contact is selected, auto-hydrate
-    if (selectedContact) {
-      hydrateTemplate(selectedContact, template);
-    }
+    // NO AUTO-HYDRATION - user must click hydrate button manually
   };
   
-  // Hydrate template with contact data
+  // Hydrate template with contact data - MANUAL ONLY, no auto-hydration
   const hydrateTemplate = async (contact, template = selectedTemplate) => {
     if (!template || !contact) return;
     
@@ -220,7 +214,6 @@ function ComposeContent() {
         setHydratedContent(response.data.hydratedContent);
         setBody(response.data.hydratedContent);
         
-        // Update subject if template has one
         if (template.template_bases?.title) {
           setSubject(template.template_bases.title);
         }
@@ -261,36 +254,27 @@ function ComposeContent() {
     setSuccess(false);
 
     try {
-      // Replace variables in subject and body
-      // Always provide contactData (even if empty) to prevent undefined errors
-      const contactData = selectedContact ? {
-        firstName: selectedContact.firstName || '',
-        lastName: selectedContact.lastName || '',
-        fullName: selectedContact.fullName || `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || '',
-        companyName: selectedContact.companyName || selectedContact.company?.companyName || '',
-        company: selectedContact.companyName || selectedContact.company?.companyName || '', // Alias for company
-        email: selectedContact.email || '',
-        title: selectedContact.title || '',
-      } : {
-        // Default empty values when no contact is selected
-        firstName: '',
-        lastName: '',
-        fullName: '',
-        companyName: '',
-        company: '',
-        email: '',
-        title: '',
-      };
+      // Replace variables only if contact is selected
+      let finalSubject = subject;
+      let finalBody = body;
       
-      // Replace variables in subject (always call, even with empty data)
-      let finalSubject = replaceTemplateVariables(subject, contactData);
-      // Also handle {{company}} as alias for {{companyName}}
-      finalSubject = finalSubject.replace(/\{\{company\}\}/g, contactData.companyName || '');
-      
-      // Replace variables in body (always call, even with empty data)
-      let finalBody = replaceTemplateVariables(body, contactData);
-      // Also handle {{company}} as alias for {{companyName}}
-      finalBody = finalBody.replace(/\{\{company\}\}/g, contactData.companyName || '');
+      if (selectedContact) {
+        const contactData = {
+          firstName: selectedContact.firstName || '',
+          lastName: selectedContact.lastName || '',
+          fullName: selectedContact.fullName || `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || '',
+          companyName: selectedContact.companyName || selectedContact.company?.companyName || '',
+          company: selectedContact.companyName || selectedContact.company?.companyName || '',
+          email: selectedContact.email || '',
+          title: selectedContact.title || '',
+        };
+        
+        finalSubject = replaceTemplateVariables(subject, contactData);
+        finalSubject = finalSubject.replace(/\{\{company\}\}/g, contactData.companyName || '');
+        
+        finalBody = replaceTemplateVariables(body, contactData);
+        finalBody = finalBody.replace(/\{\{company\}\}/g, contactData.companyName || '');
+      }
 
       const response = await api.post('/api/outreach/send', {
         to,

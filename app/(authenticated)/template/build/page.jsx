@@ -91,8 +91,8 @@ const TEMPLATE_PATHS = [
   },
   {
     id: 'TEMPLATES',
-    title: 'From Templates',
-    description: 'Use templates you\'ve already built',
+    title: 'Build from Saved',
+    description: 'Start from a template you\'ve already built and customize it',
     icon: FileText,
     color: 'green',
   },
@@ -727,14 +727,14 @@ export default function TemplateBuildPage() {
               {path === 'AI' && aiSubPath === 'QUICK_IDEA' && 'Type Your Template Idea'}
               {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && 'Relationship-Aware Template Builder'}
               {path === 'AI' && aiSubPath === 'USE_PRESET' && 'Choose a Preset Template'}
-              {path === 'TEMPLATES' && 'Choose Existing Template'}
+              {path === 'TEMPLATES' && 'Build from Saved Template'}
             </h1>
             <p className="mt-2 text-sm text-gray-600">
               {path === 'MANUAL' && 'Type your message and insert variables as needed'}
               {path === 'AI' && aiSubPath === 'QUICK_IDEA' && 'Describe your idea and AI will create the template quickly'}
               {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && 'Build a relationship-aware template with full context'}
               {path === 'AI' && aiSubPath === 'USE_PRESET' && 'Select a preset template as a starting point'}
-              {path === 'TEMPLATES' && 'Select a template you\'ve already built'}
+              {path === 'TEMPLATES' && 'Select a saved template to customize and rebuild'}
             </p>
           </div>
 
@@ -800,8 +800,8 @@ export default function TemplateBuildPage() {
                   <div className="text-center py-8 text-gray-500">Loading templates...</div>
                 ) : existingTemplates.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No templates found.</p>
-                    <p className="text-sm mt-2">Create a template first using Manual or AI Generate.</p>
+                    <p>No saved templates found.</p>
+                    <p className="text-sm mt-2">Create a template first using Manual or AI Generate, then you can build from it here.</p>
                   </div>
                 ) : (
                   <>
@@ -832,7 +832,7 @@ export default function TemplateBuildPage() {
                     {selectedExistingTemplate && (
                       <div className="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4">
                         <p className="text-sm text-blue-700">
-                          ✓ Template selected. Review and edit below, then click "Continue to Preview".
+                          ✓ Saved template selected. The form below is pre-filled with its context. Edit as needed, then continue to preview.
                         </p>
                       </div>
                     )}
