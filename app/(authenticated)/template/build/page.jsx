@@ -73,7 +73,7 @@ const PREDEFINED_TEMPLATES = [
   },
 ];
 
-// Three clear paths
+// Four clear paths
 const TEMPLATE_PATHS = [
   {
     id: 'MANUAL',
@@ -83,17 +83,24 @@ const TEMPLATE_PATHS = [
     color: 'blue',
   },
   {
-    id: 'AI',
-    title: 'AI Generate',
-    description: 'AI creates your template - choose Quick Idea, Relationship Helper, or Use Preset',
+    id: 'QUICK_IDEA',
+    title: 'Quick Idea',
+    description: 'Type a template idea and AI creates it quickly',
     icon: Sparkles,
     color: 'purple',
   },
   {
-    id: 'RELATIONSHIP_CONTEXT',
-    title: 'Use Relationship Context',
-    description: 'Choose a relationship type and we\'ll pre-fill the form for you',
+    id: 'RELATIONSHIP_HELPER',
+    title: 'Relationship Helper',
+    description: 'Relationship-aware AI template builder with full context',
     icon: Users,
+    color: 'indigo',
+  },
+  {
+    id: 'TEMPLATES',
+    title: 'From Templates',
+    description: 'Use templates you\'ve already built',
+    icon: FileText,
     color: 'green',
   },
 ];
