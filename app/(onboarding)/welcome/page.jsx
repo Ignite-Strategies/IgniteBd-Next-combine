@@ -39,56 +39,56 @@ export default function WelcomePage() {
           const response = await api.get('/api/owner/hydrate');
           
           if (response.data?.success) {
-          const hydrateData = response.data;
-          const owner = hydrateData.owner;
-          const memberships = hydrateData.memberships || [];
-          const hasMemberships = memberships.length > 0;
-          // Memberships are already sorted by role (OWNER first, then MANAGER, then others)
-          const defaultMembership = memberships[0];
-          
-          // Map memberships for display (include full company_hqs object)
-          const mappedMemberships = memberships.map(m => ({
-            id: m.id,
-            companyHqId: m.companyHqId,
-            role: m.role,
-            companyName: m.company_hqs?.companyName || null,
-            companyHQ: m.company_hqs || null, // Full companyHQ object
-          }));
-          
-          // Set selected company to first (already sorted by role priority)
-          const defaultCompanyHqId = defaultMembership?.companyHqId || memberships[0]?.companyHqId;
-          setSelectedCompanyHqId(defaultCompanyHqId);
-          
-          // Set membership data for display/routing
-          setMembershipData({
-            hasMemberships,
-            owner: {
-              id: owner.id,
-              email: owner.email,
-              firstName: owner.firstName,
-              lastName: owner.lastName,
-              name: owner.name,
-            },
-            memberships: mappedMemberships,
-            defaultMembership: defaultMembership ? {
-              companyHqId: defaultMembership.companyHqId,
-              companyName: defaultMembership.company_hqs?.companyName || null,
-              role: defaultMembership.role,
-            } : null,
-          });
-          
-          // Save hydrate data to localStorage
-          localStorage.setItem('owner', JSON.stringify(owner));
-          localStorage.setItem('ownerId', owner.id);
-          localStorage.setItem('memberships', JSON.stringify(memberships));
-          if (owner.companyHQId) {
-            localStorage.setItem('companyHQId', owner.companyHQId);
-          }
-          if (owner.companyHQ) {
-            localStorage.setItem('companyHQ', JSON.stringify(owner.companyHQ));
-          }
-          
-          console.log(`✅ Welcome: User has ${memberships.length} membership(s)`);
+            const hydrateData = response.data;
+            const owner = hydrateData.owner;
+            const memberships = hydrateData.memberships || [];
+            const hasMemberships = memberships.length > 0;
+            // Memberships are already sorted by role (OWNER first, then MANAGER, then others)
+            const defaultMembership = memberships[0];
+            
+            // Map memberships for display (include full company_hqs object)
+            const mappedMemberships = memberships.map(m => ({
+              id: m.id,
+              companyHqId: m.companyHqId,
+              role: m.role,
+              companyName: m.company_hqs?.companyName || null,
+              companyHQ: m.company_hqs || null, // Full companyHQ object
+            }));
+            
+            // Set selected company to first (already sorted by role priority)
+            const defaultCompanyHqId = defaultMembership?.companyHqId || memberships[0]?.companyHqId;
+            setSelectedCompanyHqId(defaultCompanyHqId);
+            
+            // Set membership data for display/routing
+            setMembershipData({
+              hasMemberships,
+              owner: {
+                id: owner.id,
+                email: owner.email,
+                firstName: owner.firstName,
+                lastName: owner.lastName,
+                name: owner.name,
+              },
+              memberships: mappedMemberships,
+              defaultMembership: defaultMembership ? {
+                companyHqId: defaultMembership.companyHqId,
+                companyName: defaultMembership.company_hqs?.companyName || null,
+                role: defaultMembership.role,
+              } : null,
+            });
+            
+            // Save hydrate data to localStorage
+            localStorage.setItem('owner', JSON.stringify(owner));
+            localStorage.setItem('ownerId', owner.id);
+            localStorage.setItem('memberships', JSON.stringify(memberships));
+            if (owner.companyHQId) {
+              localStorage.setItem('companyHQId', owner.companyHQId);
+            }
+            if (owner.companyHQ) {
+              localStorage.setItem('companyHQ', JSON.stringify(owner.companyHQ));
+            }
+            
+            console.log(`✅ Welcome: User has ${memberships.length} membership(s)`);
           } else {
             setError(response.data?.error || 'Failed to check memberships');
           }
