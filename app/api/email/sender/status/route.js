@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { listVerifiedSenders } from '@/lib/sendgridSendersApi';
+import { listSenders } from '@/lib/sendgridSendersApi';
 
 /**
  * GET /api/email/sender/status
@@ -10,13 +10,20 @@ import { listVerifiedSenders } from '@/lib/sendgridSendersApi';
  * If verified, update Owner model with verified sender info
  * 
  * Query params:
- * - email: (optional) Check specific email, otherwise checks owner's pending sender
+ * - email: (required) Email to check verification status for
  */
 export async function GET(request) {
   try {
     const firebaseUser = await verifyFirebaseToken(request);
     const { searchParams } = new URL(request.url);
     const emailParam = searchParams.get('email');
+
+    if (!emailParam) {
+      return NextResponse.json(
+        { success: false, error: 'Email parameter is required' },
+        { status: 400 }
+      );
+    }
 
     // Get owner
     const owner = await prisma.owners.findUnique({
@@ -25,7 +32,6 @@ export async function GET(request) {
         id: true,
         sendgridVerifiedEmail: true,
         sendgridVerifiedName: true,
-        email: true, // For reference only, not used
       },
     });
 
@@ -36,44 +42,29 @@ export async function GET(request) {
       );
     }
 
-    // Get all verified senders from SendGrid
-    const sendersResult = await listVerifiedSenders();
-    const senders = sendersResult.senders || [];
+    // Get all senders from SendGrid (verified and unverified)
+    const sendersResult = await listSenders();
+    const allSenders = sendersResult.senders || [];
 
-    // If email param provided, check that specific email
-    // Otherwise, check if owner already has a verified email
-    const emailToCheck = emailParam || owner.sendgridVerifiedEmail;
-
-    if (!emailToCheck) {
-      return NextResponse.json({
-        success: true,
-        email: null,
-        verified: false,
-        message: 'No sender email to check',
-      });
-    }
-
-    // Find sender in SendGrid list
-    const sender = senders.find(
-      (s) => (s.from?.email || s.email)?.toLowerCase() === emailToCheck.toLowerCase()
+    // Find sender in SendGrid list by email
+    const sender = allSenders.find(
+      (s) => (s.from?.email || s.email)?.toLowerCase() === emailParam.toLowerCase()
     );
 
     if (!sender) {
       return NextResponse.json({
         success: true,
-        email: emailToCheck,
+        email: emailParam,
         verified: false,
-        message: 'Sender not found in SendGrid',
+        message: 'Sender not found in SendGrid. Please send verification email first.',
       });
     }
 
     // Check verification status
-    const isVerified = sender.verified?.status === 'verified' || 
-                       sender.verified === true ||
-                       sender.verification?.status === 'verified';
+    const isVerified = sender.verified === true;
 
     // If verified and not yet saved to Owner, update Owner
-    if (isVerified && owner.sendgridVerifiedEmail !== emailToCheck) {
+    if (isVerified && owner.sendgridVerifiedEmail !== emailParam) {
       const senderEmail = sender.from?.email || sender.email;
       const senderName = sender.from?.name || sender.name;
 
@@ -90,9 +81,14 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      email: emailToCheck,
+      email: emailParam,
       verified: isVerified,
-      sender: sender,
+      sender: {
+        id: sender.id,
+        email: sender.from?.email || sender.email,
+        name: sender.from?.name || sender.name,
+        verified: isVerified,
+      },
     });
   } catch (error) {
     console.error('Check sender status error:', error);
