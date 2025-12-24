@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SIDEBAR_ITEMS } from '@/lib/navigation/sidebarItems';
+import { TrendingUp, Users, FileText } from 'lucide-react';
 
 function Sidebar() {
   const pathname = usePathname();
@@ -12,6 +12,13 @@ function Sidebar() {
     if (pathname?.startsWith(path + '/')) return true;
     return false;
   };
+
+  const sidebarItems = [
+    { key: 'dashboard', label: 'Dashboard', href: '/growth-dashboard', icon: TrendingUp },
+    { key: 'crm', label: 'CRM', href: '/crmdashboard', icon: Users },
+    { key: 'contacts', label: 'Contacts', href: '/contacts', icon: Users },
+    { key: 'content', label: 'Content', href: '/content', icon: FileText },
+  ];
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-3.5rem)] fixed left-0 top-14 overflow-y-auto z-30">
@@ -25,7 +32,7 @@ function Sidebar() {
       </div>
 
       <nav className="p-4 space-y-1">
-        {SIDEBAR_ITEMS.map((item) => {
+        {sidebarItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
           return (
