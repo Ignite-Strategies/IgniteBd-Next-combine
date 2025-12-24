@@ -57,15 +57,14 @@ export default function SenderIdentityPanel() {
     );
   }
 
-  // If sender found in DB, show it inline
+  // If sender found in DB, show it inline - clean, no helper text
   if (senderEmail) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
         <span className="text-gray-900 font-medium">
           {senderName || senderEmail}
         </span>
-        <span className="text-gray-500">({senderEmail})</span>
+        <span className="text-gray-500">&lt;{senderEmail}&gt;</span>
       </div>
     );
   }

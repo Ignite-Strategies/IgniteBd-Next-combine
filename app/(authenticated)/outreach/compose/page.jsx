@@ -9,6 +9,7 @@ import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { hydrateTemplate } from '@/lib/templateVariables';
 
 // Component that uses useSearchParams - needs to be separate for Suspense
 function ComposeContent() {
@@ -87,11 +88,20 @@ function ComposeContent() {
       const response = await api.get('/api/outreach/verified-senders');
       if (response.data?.success) {
         // Only use verified sender - never Gmail sign-in email
-        const email = response.data.verifiedEmail || null;
-        const name = response.data.verifiedName || null;
+        const email = response.data.verifiedEmail;
+        const name = response.data.verifiedName;
         
-        setSenderEmail(email || '');
-        setSenderName(name || '');
+        // Set state only if we actually have a verified email
+        if (email) {
+          setSenderEmail(email);
+          setSenderName(name || '');
+        } else {
+          setSenderEmail('');
+          setSenderName('');
+        }
+      } else {
+        setSenderEmail('');
+        setSenderName('');
       }
     } catch (err) {
       console.error('Failed to load verified sender:', err);
@@ -237,16 +247,51 @@ function ComposeContent() {
       return;
     }
 
+    // Check for verified sender - reload if not set
+    if (!senderEmail) {
+      await loadVerifiedSender();
+      if (!senderEmail) {
+        setError('Please verify your sender email before sending. Click "Add" next to From field.');
+        return;
+      }
+    }
+
     setSending(true);
     setError(null);
     setSuccess(false);
 
     try {
+      // Replace variables in subject and body if contact is selected
+      let finalSubject = subject;
+      let finalBody = body;
+      
+      if (selectedContact) {
+        const contactData = {
+          firstName: selectedContact.firstName || '',
+          lastName: selectedContact.lastName || '',
+          fullName: selectedContact.fullName || `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || '',
+          companyName: selectedContact.companyName || selectedContact.company?.companyName || '',
+          company: selectedContact.companyName || selectedContact.company?.companyName || '', // Alias for company
+          email: selectedContact.email || '',
+          title: selectedContact.title || '',
+        };
+        
+        // Replace variables in subject
+        finalSubject = hydrateTemplate(subject, contactData);
+        // Also handle {{company}} as alias for {{companyName}}
+        finalSubject = finalSubject.replace(/\{\{company\}\}/g, contactData.companyName || '');
+        
+        // Replace variables in body
+        finalBody = hydrateTemplate(body, contactData);
+        // Also handle {{company}} as alias for {{companyName}}
+        finalBody = finalBody.replace(/\{\{company\}\}/g, contactData.companyName || '');
+      }
+
       const response = await api.post('/api/outreach/send', {
         to,
         toName: toName || undefined,
-        subject,
-        body,
+        subject: finalSubject,
+        body: finalBody,
         contactId: contactId || undefined,
         tenantId: tenantId || undefined,
       });
@@ -345,7 +390,7 @@ function ComposeContent() {
               )}
 
               <form onSubmit={handleSend} className="space-y-4">
-                {/* Sender Identity Panel - Show prominently when blank */}
+                {/* Sender Identity - Clean inline display */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     From
@@ -368,15 +413,7 @@ function ComposeContent() {
                       </div>
                     </div>
                   ) : (
-                    <>
-                      <SenderIdentityPanel />
-                      {/* Show current sender email if verified */}
-                      {senderEmail && (
-                        <div className="mt-2 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                          {senderName ? `${senderName} <${senderEmail}>` : senderEmail}
-                        </div>
-                      )}
-                    </>
+                    <SenderIdentityPanel />
                   )}
                 </div>
                 
@@ -515,6 +552,36 @@ function ComposeContent() {
                       </span>
                     )}
                   </label>
+                  
+                  {/* Template Variables Helper */}
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <span className="text-xs text-gray-500">Variables:</span>
+                    {['firstName', 'lastName', 'fullName', 'company', 'email'].map((varName) => (
+                      <button
+                        key={varName}
+                        type="button"
+                        onClick={() => {
+                          const cursorPos = document.getElementById('body')?.selectionStart || body.length;
+                          const textBefore = body.substring(0, cursorPos);
+                          const textAfter = body.substring(cursorPos);
+                          setBody(`${textBefore}{{${varName}}}${textAfter}`);
+                          // Set cursor position after inserted variable
+                          setTimeout(() => {
+                            const textarea = document.getElementById('body');
+                            if (textarea) {
+                              const newPos = cursorPos + `{{${varName}}}`.length;
+                              textarea.setSelectionRange(newPos, newPos);
+                              textarea.focus();
+                            }
+                          }, 0);
+                        }}
+                        className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50 transition"
+                      >
+                        {`{{${varName}}}`}
+                      </button>
+                    ))}
+                  </div>
+                  
                   <textarea
                     id="body"
                     value={body}
@@ -525,12 +592,10 @@ function ComposeContent() {
                     required
                     rows={10}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    placeholder="Hey, saw your work on... (or select a template to auto-fill)"
+                    placeholder="Hey {{firstName}}, saw your work at {{company}}..."
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    {selectedTemplate 
-                      ? 'Template loaded. Variables will be filled when you select a contact.'
-                      : 'HTML is supported. Plain text will be auto-formatted. Select a template to use variables.'}
+                    Use variables like {{firstName}}, {{company}}, etc. They'll be replaced when sending.
                   </p>
                 </div>
 
@@ -539,18 +604,13 @@ function ComposeContent() {
                 <div className="flex justify-end pt-4">
                   <button
                     type="submit"
-                    disabled={sending || !ownerId || !senderEmail}
+                    disabled={sending || !ownerId}
                     className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {sending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Sending...
-                      </>
-                    ) : !senderEmail ? (
-                      <>
-                        <Mail className="h-4 w-4" />
-                        Verify Sender First
                       </>
                     ) : (
                       <>
