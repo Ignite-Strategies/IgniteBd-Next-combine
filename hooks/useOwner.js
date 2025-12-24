@@ -5,6 +5,10 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 
+// Global hydration state - ensures hydration only happens once across all hook instances
+let globalHydrationPromise = null;
+let globalHasHydrated = false;
+
 /**
  * useOwner Hook
  * 
@@ -13,6 +17,8 @@ import api from '@/lib/api';
  * 
  * IMPORTANT: Waits for Firebase auth to initialize before calling hydrate API.
  * This prevents 401 errors when hook mounts before Firebase is ready.
+ * 
+ * CRITICAL: Hydration happens globally once - all hook instances share the same hydration state.
  * 
  * @returns {Object} { ownerId, owner, companyHQId, companyHQ, memberships, loading, hydrated, error }
  */
@@ -25,13 +31,11 @@ export function useOwner() {
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
-  const hasHydratedRef = useRef(false);
 
-  // Load from localStorage first (instant)
-  useEffect(() => {
+  // Helper function to load from localStorage and update state
+  const loadFromLocalStorage = () => {
     if (typeof window === 'undefined') return;
-
+    
     const storedOwnerId = localStorage.getItem('ownerId');
     const storedOwner = localStorage.getItem('owner');
     const storedCompanyHQId = localStorage.getItem('companyHQId');
@@ -54,11 +58,11 @@ export function useOwner() {
         } else if (storedMemberships) {
           setMemberships(JSON.parse(storedMemberships));
         }
+        setHydrated(true);
       } catch (error) {
         console.warn('Failed to parse stored owner', error);
       }
-    }
-    if (storedCompanyHQId && !storedOwner) {
+    } else if (storedCompanyHQId) {
       setCompanyHQId(storedCompanyHQId);
     }
     if (storedCompanyHQ && !storedOwner) {
@@ -75,78 +79,95 @@ export function useOwner() {
         console.warn('Failed to parse stored memberships', error);
       }
     }
+  };
 
+  // Load from localStorage first (instant)
+  useEffect(() => {
+    loadFromLocalStorage();
     setLoading(false);
   }, []);
 
-  // Wait for Firebase auth to initialize before hydrating
-  // CRITICAL: This prevents 401 errors when hook mounts before Firebase is ready
+  // Global hydration - only happens once across all hook instances
   useEffect(() => {
-    // Only set up listener once
-    if (hasHydratedRef.current) return;
+    // If already hydrated globally, just load from localStorage
+    if (globalHasHydrated) {
+      loadFromLocalStorage();
+      return;
+    }
     
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      // Only hydrate once, even if auth state changes
-      if (hasHydratedRef.current) return;
-      
-      // Mark as initialized (whether user is logged in or not)
-      setAuthInitialized(true);
-      
-      // Hydrate immediately when auth state is known
-      if (!hasHydratedRef.current) {
-        hasHydratedRef.current = true;
-        
-        const hydrate = async () => {
-          try {
-            setLoading(true);
-            console.log('🚀 useOwner: Hydrating owner (uses Firebase ID from token)');
-            const response = await api.get('/api/owner/hydrate');
+    // If hydration is already in progress, wait for it then load from localStorage
+    if (globalHydrationPromise) {
+      globalHydrationPromise.then(() => {
+        loadFromLocalStorage();
+        setLoading(false);
+      });
+      return;
+    }
+    
+    // Start global hydration - only one instance will execute this
+    globalHydrationPromise = (async () => {
+      try {
+        // Wait for Firebase auth to initialize
+        return new Promise((resolve) => {
+          const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            unsubscribe(); // Only listen once
             
-            if (response.data?.success) {
-              const ownerData = response.data.owner;
-              const membershipsData = response.data.memberships || ownerData.memberships || [];
-              
-              // Set state from full owner object
-              setOwnerId(ownerData.id);
-              setOwner(ownerData);
-              setCompanyHQId(ownerData.companyHQId || null);
-              setCompanyHQ(ownerData.companyHQ || null);
-              setMemberships(membershipsData);
-
-              // Set to localStorage
-              localStorage.setItem('owner', JSON.stringify(ownerData));
-              localStorage.setItem('ownerId', ownerData.id);
-              localStorage.setItem('memberships', JSON.stringify(membershipsData));
-              
-              if (ownerData.companyHQId) {
-                localStorage.setItem('companyHQId', ownerData.companyHQId);
-              }
-              if (ownerData.companyHQ) {
-                localStorage.setItem('companyHQ', JSON.stringify(ownerData.companyHQ));
-              }
-
-              console.log(`✅ useOwner: Hydrated with ${membershipsData.length} membership(s)`);
-              setHydrated(true);
-            } else {
-              setError(response.data?.error || 'Failed to hydrate owner');
+            if (!firebaseUser) {
+              // Not authenticated - mark as hydrated (no data)
+              globalHasHydrated = true;
+              globalHydrationPromise = null;
+              resolve();
+              return;
             }
-          } catch (err) {
-            console.error('Error hydrating owner:', err);
-            // Don't set error on 401 - that's expected when not authenticated
-            if (err.response?.status !== 401) {
-              setError(err.message || 'Failed to hydrate owner data');
+            
+            try {
+              console.log('🚀 useOwner: Hydrating owner (uses Firebase ID from token) - GLOBAL');
+              const response = await api.get('/api/owner/hydrate');
+              
+              if (response.data?.success) {
+                const ownerData = response.data.owner;
+                const membershipsData = response.data.memberships || ownerData.memberships || [];
+                
+                // Set to localStorage (all instances will read from here)
+                localStorage.setItem('owner', JSON.stringify(ownerData));
+                localStorage.setItem('ownerId', ownerData.id);
+                localStorage.setItem('memberships', JSON.stringify(membershipsData));
+                
+                if (ownerData.companyHQId) {
+                  localStorage.setItem('companyHQId', ownerData.companyHQId);
+                }
+                if (ownerData.companyHQ) {
+                  localStorage.setItem('companyHQ', JSON.stringify(ownerData.companyHQ));
+                }
+
+                console.log(`✅ useOwner: Hydrated with ${membershipsData.length} membership(s) - GLOBAL`);
+              }
+            } catch (err) {
+              console.error('Error hydrating owner:', err);
+              // Don't set error on 401 - that's expected when not authenticated
+              if (err.response?.status !== 401) {
+                setError(err.message || 'Failed to hydrate owner data');
+              }
+            } finally {
+              globalHasHydrated = true;
+              globalHydrationPromise = null;
+              resolve();
             }
-          } finally {
-            setLoading(false);
-          }
-        };
-        
-        hydrate();
+          });
+        });
+      } catch (err) {
+        console.error('Error setting up hydration:', err);
+        globalHasHydrated = true;
+        globalHydrationPromise = null;
       }
+    })();
+    
+    // Wait for hydration to complete, then load from localStorage
+    globalHydrationPromise.then(() => {
+      loadFromLocalStorage();
+      setLoading(false);
     });
-
-    return () => unsubscribe();
-  }, []); // Empty deps - only run once on mount
+  }, []); // Empty deps - only run once globally
 
   return {
     ownerId,
