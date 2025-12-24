@@ -24,7 +24,7 @@ export default function WelcomePage() {
         setLoading(true);
         console.log('🔍 Welcome: Checking memberships (via hydrate)...');
         
-        // Call hydrate - it gets owner + memberships with hasGrowthAccess
+        // Call hydrate - it gets owner + memberships
         const response = await api.get('/api/owner/hydrate');
         
         if (response.data?.success) {
@@ -35,13 +35,13 @@ export default function WelcomePage() {
           // Memberships are already sorted by role (OWNER first, then MANAGER, then others)
           const defaultMembership = memberships[0];
           
-          // Map memberships for display (include full company_hqs object with hasGrowthAccess)
+          // Map memberships for display (include full company_hqs object)
           const mappedMemberships = memberships.map(m => ({
             id: m.id,
             companyHqId: m.companyHqId,
             role: m.role,
             companyName: m.company_hqs?.companyName || null,
-            companyHQ: m.company_hqs || null, // Full companyHQ object with hasGrowthAccess
+            companyHQ: m.company_hqs || null, // Full companyHQ object
           }));
           
           // Set selected company to first (already sorted by role priority)
@@ -93,7 +93,7 @@ export default function WelcomePage() {
   }, []);
 
   const handleContinue = () => {
-    // If user has memberships, save selected company and route based on hasGrowthAccess
+    // If user has memberships, save selected company and route to dashboard
     if (membershipData?.hasMemberships && selectedCompanyHqId) {
       // Find the selected membership
       const selectedMembership = membershipData.memberships.find(
