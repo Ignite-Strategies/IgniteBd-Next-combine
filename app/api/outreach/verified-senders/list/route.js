@@ -1,41 +1,57 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { listSenders } from '@/lib/sendgridSendersApi';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/outreach/verified-senders/list
  * 
- * List all senders from SendGrid
- * Client should filter for verified === true
- * 
- * Uses GET /v3/senders (the only endpoint we should use)
+ * Get verified sender for the authenticated owner from database
+ * Returns owner's verified sender email/name if they have one configured
  */
 export async function GET(request) {
   try {
-    await verifyFirebaseToken(request);
+    const firebaseUser = await verifyFirebaseToken(request);
 
-    const result = await listSenders();
-    const allSenders = result.senders || [];
-    
-    console.log(`✅ Retrieved ${allSenders.length} senders from SendGrid`);
-    if (allSenders.length > 0) {
-      console.log('Sample sender structure:', JSON.stringify(allSenders[0], null, 2));
-      
-      // Filter verified senders server-side for convenience
-      const verifiedSenders = allSenders.filter(sender => sender.verified === true);
-      console.log(`✅ Found ${verifiedSenders.length} verified senders`);
-      
+    // Get owner's verified sender from database
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: {
+        id: true,
+        sendgridVerifiedEmail: true,
+        sendgridVerifiedName: true,
+      },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 }
+      );
+    }
+
+    // If owner has a verified sender, return it in the format expected by frontend
+    if (owner.sendgridVerifiedEmail) {
+      const sender = {
+        id: owner.id, // Use owner id as sender id
+        email: owner.sendgridVerifiedEmail,
+        name: owner.sendgridVerifiedName || owner.sendgridVerifiedEmail,
+        verified: true,
+        from: {
+          email: owner.sendgridVerifiedEmail,
+          name: owner.sendgridVerifiedName || owner.sendgridVerifiedEmail,
+        },
+      };
+
       return NextResponse.json({
         success: true,
-        senders: verifiedSenders, // Return only verified ones
-        allSenders: allSenders, // Also return all for debugging
+        senders: [sender], // Return as array to match frontend expectations
       });
     }
-    
+
+    // No verified sender configured
     return NextResponse.json({
       success: true,
       senders: [],
-      allSenders: [],
     });
   } catch (error) {
     console.error('List senders error:', error);

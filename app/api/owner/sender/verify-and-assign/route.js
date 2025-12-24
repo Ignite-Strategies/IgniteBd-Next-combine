@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { listSenders } from '@/lib/sendgridSendersApi';
 import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/owner/sender/verify-and-assign
  * 
- * User-facing: Verify sender in SendGrid and auto-assign if verified
- * Dual path: verify success it assigns - no separate lookup needed
+ * User-facing: Assign sender to authenticated owner from database
+ * No SendGrid verification - just assign based on what's in owner's db record
  * 
  * Body:
  * {
@@ -39,43 +38,6 @@ export async function POST(request) {
       );
     }
 
-    // Step 1: Check SendGrid for verified sender
-    const sendersResult = await listSenders();
-    const allSenders = sendersResult.senders || [];
-    
-    // Find sender by email
-    const sender = allSenders.find(
-      (s) => (s.from?.email || s.email)?.toLowerCase() === email.toLowerCase()
-    );
-
-    if (!sender) {
-      return NextResponse.json({
-        success: false,
-        error: 'Sender not found in SendGrid. Please verify this email in SendGrid dashboard first.',
-        verified: false,
-        assigned: false,
-      });
-    }
-
-    // Check verification status
-    const isVerified = sender.verified === true;
-
-    if (!isVerified) {
-      return NextResponse.json({
-        success: false,
-        error: 'Sender found but not verified in SendGrid. Please complete verification in SendGrid dashboard first.',
-        verified: false,
-        assigned: false,
-        sender: {
-          id: sender.id,
-          email: sender.from?.email || sender.email,
-          name: sender.from?.name || sender.name,
-          verified: false,
-        },
-      });
-    }
-
-    // Step 2: Auto-assign to authenticated owner (verify success it assigns)
     // Get or find Owner record
     let owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
@@ -99,12 +61,12 @@ export async function POST(request) {
       });
     }
 
-    // Update owner with verified sender info
+    // Update owner with sender info (assign directly to database)
     const updated = await prisma.owners.update({
       where: { id: owner.id },
       data: {
-        sendgridVerifiedEmail: sender.from?.email || sender.email,
-        sendgridVerifiedName: name || sender.from?.name || sender.name || null,
+        sendgridVerifiedEmail: email,
+        sendgridVerifiedName: name || null,
       },
       select: {
         id: true,
@@ -114,7 +76,7 @@ export async function POST(request) {
       },
     });
 
-    console.log(`✅ User verified and assigned sender to their own account (${owner.id}):`, {
+    console.log(`✅ User assigned sender to their own account (${owner.id}):`, {
       email: updated.sendgridVerifiedEmail,
       name: updated.sendgridVerifiedName,
     });
@@ -124,21 +86,21 @@ export async function POST(request) {
       verified: true,
       assigned: true,
       sender: {
-        id: sender.id,
-        email: sender.from?.email || sender.email,
-        name: sender.from?.name || sender.name,
+        id: owner.id,
+        email: updated.sendgridVerifiedEmail,
+        name: updated.sendgridVerifiedName || updated.sendgridVerifiedEmail,
         verified: true,
       },
       owner: updated,
-      message: 'Sender verified and assigned successfully',
+      message: 'Sender assigned successfully',
     });
   } catch (error) {
-    console.error('Verify and assign sender error:', error);
+    console.error('Assign sender error:', error);
     
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to verify and assign sender',
+        error: error.message || 'Failed to assign sender',
         verified: false,
         assigned: false,
       },

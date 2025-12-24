@@ -45,6 +45,18 @@ const CRM_ROUTES = [
   '/ecosystem',
 ];
 
+// Public routes that should NOT show navigation
+const PUBLIC_ROUTES = [
+  '/',
+  '/signin',
+  '/signup',
+  '/splash',
+  '/login',
+  '/welcome',
+  '/company',
+  '/profilesetup',
+];
+
 export default function AppShell({ children }) {
   const pathname = usePathname();
 
@@ -58,18 +70,29 @@ export default function AppShell({ children }) {
     return CRM_ROUTES.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  // ALWAYS show navigation - no guards, no auth checks
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation Bar - Always visible */}
-      <Navigation />
-      
-      {/* Sidebar - Always render when showSidebar is true */}
-      {showSidebar && (isCRMRoute ? <CRMSidebar /> : <Sidebar />)}
-      {/* Main Content Area */}
-      <main className={showSidebar ? 'flex-1 ml-64 min-h-[calc(100vh-3.5rem)]' : 'min-h-[calc(100vh-3.5rem)]'}>
-        {children}
-      </main>
-    </div>
-  );
+  const showNavigation = useMemo(() => {
+    if (!pathname) return false;
+    // Don't show navigation on public routes (splash, login, welcome, etc.)
+    return !PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+  }, [pathname]);
+
+  // Show navigation only on authenticated routes
+  if (showNavigation) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Top Navigation Bar - Only on authenticated pages */}
+        <Navigation />
+        
+        {/* Sidebar - Only render when showSidebar is true */}
+        {showSidebar && (isCRMRoute ? <CRMSidebar /> : <Sidebar />)}
+        {/* Main Content Area */}
+        <main className={showSidebar ? 'flex-1 ml-64 min-h-[calc(100vh-3.5rem)]' : 'min-h-[calc(100vh-3.5rem)]'}>
+          {children}
+        </main>
+      </div>
+    );
+  }
+
+  // For public routes (splash, login, welcome), render children without navigation
+  return <>{children}</>;
 }

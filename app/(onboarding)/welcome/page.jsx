@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
 
 /**
@@ -19,15 +21,24 @@ export default function WelcomePage() {
   const [selectedCompanyHqId, setSelectedCompanyHqId] = useState(null);
 
   useEffect(() => {
-    const checkMemberships = async () => {
-      try {
-        setLoading(true);
-        console.log('🔍 Welcome: Checking memberships (via hydrate)...');
-        
-        // Call hydrate - it gets owner + memberships
-        const response = await api.get('/api/owner/hydrate');
-        
-        if (response.data?.success) {
+    // Wait for Firebase auth to initialize before making API call
+    // This prevents 401 errors when page loads before Firebase is ready
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        console.log('⚠️ Welcome: No Firebase user, redirecting to signup');
+        router.push('/signup');
+        return;
+      }
+
+      const checkMemberships = async () => {
+        try {
+          setLoading(true);
+          console.log('🔍 Welcome: Checking memberships (via hydrate)...');
+          
+          // Call hydrate - it gets owner + memberships
+          const response = await api.get('/api/owner/hydrate');
+          
+          if (response.data?.success) {
           const hydrateData = response.data;
           const owner = hydrateData.owner;
           const memberships = hydrateData.memberships || [];
@@ -78,19 +89,22 @@ export default function WelcomePage() {
           }
           
           console.log(`✅ Welcome: User has ${memberships.length} membership(s)`);
-        } else {
-          setError(response.data?.error || 'Failed to check memberships');
+          } else {
+            setError(response.data?.error || 'Failed to check memberships');
+          }
+        } catch (err) {
+          console.error('❌ Welcome: Error checking memberships:', err);
+          setError(err.response?.data?.error || err.message || 'Failed to check memberships');
+        } finally {
+          setLoading(false);
         }
-      } catch (err) {
-        console.error('❌ Welcome: Error checking memberships:', err);
-        setError(err.response?.data?.error || err.message || 'Failed to check memberships');
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
-    checkMemberships();
-  }, []);
+      checkMemberships();
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const handleContinue = () => {
     // If user has memberships, save selected company and route to dashboard

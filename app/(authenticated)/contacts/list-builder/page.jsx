@@ -29,6 +29,7 @@ const FILTER_OPTIONS = [
 export default function ContactListBuilderPage() {
   const router = useRouter();
   const [selectedFilter, setSelectedFilter] = useState('');
+  const [selectAll, setSelectAll] = useState(false);
 
   const handleContinue = () => {
     if (!selectedFilter) {
@@ -36,8 +37,11 @@ export default function ContactListBuilderPage() {
       return;
     }
 
-    // Navigate to preview page with filter params
+    // Navigate to selection page with filter params
     const params = new URLSearchParams({ filter: selectedFilter });
+    if (selectAll) {
+      params.append('selectAll', 'true');
+    }
     router.push(`/contacts/list-builder/preview?${params.toString()}`);
   };
 
@@ -98,6 +102,25 @@ export default function ContactListBuilderPage() {
           </div>
         </div>
 
+        {selectedFilter && (
+          <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectAll}
+                onChange={(e) => setSelectAll(e.target.checked)}
+                className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <div>
+                <span className="font-semibold text-gray-900">Select All</span>
+                <p className="text-sm text-gray-600 mt-1">
+                  Automatically select all contacts matching your filter
+                </p>
+              </div>
+            </label>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button
             type="button"
@@ -112,7 +135,7 @@ export default function ContactListBuilderPage() {
             disabled={!selectedFilter}
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Continue to Preview
+            Continue to Selection
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

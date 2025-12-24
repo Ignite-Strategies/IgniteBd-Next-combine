@@ -15,6 +15,7 @@ function ContactListPreviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterType = searchParams.get('filter') || 'all';
+  const selectAllParam = searchParams.get('selectAll') === 'true';
   
   const { contacts } = useContacts();
   const { addList } = useContactLists();
@@ -78,12 +79,12 @@ function ContactListPreviewContent() {
     return filtered;
   }, [contacts, filterType, selectedCompanyId, selectedPipeline, selectedStage, searchQuery]);
 
-  // Auto-select all when filter changes (for convenience)
+  // Auto-select all if selectAll param is true
   useEffect(() => {
-    if (filteredContacts.length > 0 && selectedContacts.size === 0) {
-      // Don't auto-select - let user choose
+    if (selectAllParam && filteredContacts.length > 0 && selectedContacts.size === 0) {
+      setSelectedContacts(new Set(filteredContacts.map((c) => c.id)));
     }
-  }, [filteredContacts.length]);
+  }, [selectAllParam, filteredContacts, selectedContacts.size]);
 
   const handleToggleContact = (contactId) => {
     setSelectedContacts((prev) => {
@@ -112,16 +113,18 @@ function ContactListPreviewContent() {
     }
     if (!listName.trim()) {
       alert('Please enter a list name.');
+      setError('List name is required');
+      return;
+    }
+
+    if (!companyHQId) {
+      alert('Company HQ ID not found. Please refresh the page.');
+      setError('Company HQ ID not found');
       return;
     }
 
     setIsCreating(true);
     setError(null);
-
-    if (!companyHQId) {
-      alert('Company HQ ID not found. Please refresh the page.');
-      return;
-    }
 
     try {
       const contactIds = Array.from(selectedContacts);
@@ -164,11 +167,54 @@ function ContactListPreviewContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Preview & Select Contacts"
-          subtitle={`${filteredContacts.length} contact${filteredContacts.length !== 1 ? 's' : ''} found`}
+          title="Create Contact List"
+          subtitle="Name your list and select contacts"
           backTo="/contacts/list-builder"
           backLabel="Back to Filters"
         />
+
+        {/* List Details - MOVED TO TOP */}
+        <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg border-2 border-indigo-200">
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">List Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                List Name *
+              </label>
+              <input
+                type="text"
+                value={listName}
+                onChange={(e) => {
+                  setListName(e.target.value);
+                  setError(null); // Clear error when typing
+                }}
+                className={`w-full rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 ${
+                  !listName.trim() && selectedContacts.size > 0
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500'
+                }`}
+                placeholder="Enter list name"
+                required
+                autoFocus
+              />
+              {!listName.trim() && (
+                <p className="mt-1 text-sm text-gray-500">Give your list a name to continue</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Description (optional)
+              </label>
+              <input
+                type="text"
+                value={listDescription}
+                onChange={(e) => setListDescription(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Describe this list"
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Filter Controls */}
         <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
@@ -257,37 +303,6 @@ function ContactListPreviewContent() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* List Details */}
-        <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">List Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                List Name *
-              </label>
-              <input
-                type="text"
-                value={listName}
-                onChange={(e) => setListName(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter list name"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Description (optional)
-              </label>
-              <input
-                type="text"
-                value={listDescription}
-                onChange={(e) => setListDescription(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Describe this list"
-              />
-            </div>
           </div>
         </div>
 
