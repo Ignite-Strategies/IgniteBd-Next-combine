@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Code, Building2, Calendar, Target } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { extractVariables } from '@/lib/templateVariables';
+import TemplateTestService from '@/lib/services/templateTestService';
 
 export default function TemplateSavedPage() {
   const router = useRouter();
@@ -217,7 +219,7 @@ export default function TemplateSavedPage() {
                     onClick={() => setExpandedId(isExpanded ? null : template.id)}
                   >
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <div className="text-sm font-semibold text-gray-900">
                           {base.title || `${getRelationshipLabel(base.relationship)} • ${getTypeOfPersonLabel(base.typeOfPerson)}`}
                         </div>
@@ -228,9 +230,29 @@ export default function TemplateSavedPage() {
                         }`}>
                           {template.mode}
                         </span>
+                        {(() => {
+                          const variables = extractVariables(template.content);
+                          const hasBusinessContext = base.timeSinceConnected || base.timeHorizon || base.myBusinessDescription || base.desiredOutcome;
+                          return (
+                            <>
+                              {variables.length > 0 && (
+                                <span className="flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
+                                  <Code className="h-3 w-3" />
+                                  {variables.length} var{variables.length !== 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {hasBusinessContext && (
+                                <span className="flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700">
+                                  <Building2 className="h-3 w-3" />
+                                  Context
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
-                        Created {formatDate(template.createdAt)}
+                        {getRelationshipLabel(base.relationship)} • {getTypeOfPersonLabel(base.typeOfPerson)} • Created {formatDate(template.createdAt)}
                       </div>
                     </div>
                     <div className="text-sm text-gray-500">
@@ -238,36 +260,128 @@ export default function TemplateSavedPage() {
                     </div>
                   </div>
 
-                  {isExpanded && (
-                    <div className="border-t border-gray-200 p-4">
-                      <div className="space-y-4">
-                        <div>
-                          <div className="mb-1 text-xs font-semibold uppercase text-gray-500">
-                            Why Reaching Out
-                          </div>
-                          <div className="text-sm text-gray-800">{base.whyReachingOut}</div>
-                        </div>
+                  {isExpanded && (() => {
+                    // Extract variables from content
+                    const variables = extractVariables(template.content);
+                    const hasBusinessContext = base.timeSinceConnected || base.timeHorizon || base.myBusinessDescription || base.desiredOutcome;
+                    
+                    return (
+                      <div className="border-t border-gray-200 p-4">
+                        <div className="space-y-4">
+                          {/* Basic Context */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="mb-1 text-xs font-semibold uppercase text-gray-500">
+                                Why Reaching Out
+                              </div>
+                              <div className="text-sm text-gray-800">{base.whyReachingOut}</div>
+                            </div>
 
-                        {base.whatWantFromThem && (
+                            {base.whatWantFromThem && (
+                              <div>
+                                <div className="mb-1 text-xs font-semibold uppercase text-gray-500">
+                                  What Want From Them
+                                </div>
+                                <div className="text-sm text-gray-800">{base.whatWantFromThem}</div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Business Context */}
+                          {hasBusinessContext && (
+                            <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4">
+                              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-indigo-700">
+                                <Building2 className="h-3 w-3" />
+                                Business Context
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 text-sm">
+                                {base.timeSinceConnected && (
+                                  <div>
+                                    <span className="font-medium text-indigo-700">Time Since Connected:</span>{' '}
+                                    <span className="text-gray-800">{base.timeSinceConnected}</span>
+                                  </div>
+                                )}
+                                {base.timeHorizon && (
+                                  <div>
+                                    <span className="font-medium text-indigo-700">Time Horizon:</span>{' '}
+                                    <span className="text-gray-800">{base.timeHorizon}</span>
+                                  </div>
+                                )}
+                                {base.myBusinessDescription && (
+                                  <div className="col-span-2">
+                                    <span className="font-medium text-indigo-700">Business Description:</span>{' '}
+                                    <span className="text-gray-800">{base.myBusinessDescription}</span>
+                                  </div>
+                                )}
+                                {base.desiredOutcome && (
+                                  <div className="col-span-2">
+                                    <span className="font-medium text-indigo-700">Desired Outcome:</span>{' '}
+                                    <span className="text-gray-800">{base.desiredOutcome}</span>
+                                  </div>
+                                )}
+                                {base.knowledgeOfBusiness !== null && (
+                                  <div>
+                                    <span className="font-medium text-indigo-700">They Know Business:</span>{' '}
+                                    <span className="text-gray-800">{base.knowledgeOfBusiness ? 'Yes' : 'No'}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Variables */}
+                          {variables.length > 0 && (
+                            <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
+                              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-blue-700">
+                                <Code className="h-3 w-3" />
+                                Variables ({variables.length})
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {variables.map((variable) => (
+                                  <span
+                                    key={variable.name}
+                                    className="inline-block rounded bg-blue-100 px-2 py-1 text-xs font-mono text-blue-800"
+                                    title={variable.description}
+                                  >
+                                    {`{{${variable.name}}}`}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Template Content */}
                           <div>
                             <div className="mb-1 text-xs font-semibold uppercase text-gray-500">
-                              What Want From Them
+                              Template Content
                             </div>
-                            <div className="text-sm text-gray-800">{base.whatWantFromThem}</div>
+                            <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 whitespace-pre-wrap font-mono">
+                              {template.content}
+                            </div>
                           </div>
-                        )}
 
-                        <div>
-                          <div className="mb-1 text-xs font-semibold uppercase text-gray-500">
-                            Message Preview
-                          </div>
-                          <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 whitespace-pre-wrap">
-                            {template.content}
-                          </div>
+                          {/* Preview with Sample Data */}
+                          {variables.length > 0 && (
+                            <div className="rounded-md border border-green-200 bg-green-50 p-4">
+                              <div className="mb-2 text-xs font-semibold uppercase text-green-700">
+                                Preview (with sample data)
+                              </div>
+                              <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                                {TemplateTestService.getQuickPreview(template.content, {
+                                  relationship: base.relationship,
+                                  typeOfPerson: base.typeOfPerson,
+                                  timeHorizon: base.timeHorizon,
+                                  desiredOutcome: base.desiredOutcome,
+                                  myBusinessDescription: base.myBusinessDescription,
+                                  knowledgeOfBusiness: base.knowledgeOfBusiness,
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}

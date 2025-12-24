@@ -14,7 +14,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { templateBaseId, content, mode } = body ?? {};
+    const { templateBaseId, content, subjectLine, mode, companyHQId } = body ?? {};
 
     if (!templateBaseId) {
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function POST(request) {
       );
     }
 
-    // Verify templateBase exists
+    // Verify templateBase exists and get companyHQId
     const templateBase = await prisma.template_bases.findUnique({
       where: { id: templateBaseId },
     });
@@ -49,7 +49,29 @@ export async function POST(request) {
       );
     }
 
-    const template = await prisma.outreach_templates.create({
+    const tenantId = companyHQId || templateBase.companyHQId;
+
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: 'companyHQId is required' },
+        { status: 400 },
+      );
+    }
+
+    // Save to templates model with: title (name), subjectline (subject), templatecontent (body), datecreated (createdAt)
+    const template = await prisma.templates.create({
+      data: {
+        companyHQId: tenantId,
+        name: templateBase.title, // title -> name
+        subject: subjectLine?.trim() || null, // subjectline -> subject
+        body: content.trim(), // templatecontent -> body
+        type: 'outreach',
+        published: false,
+      },
+    });
+
+    // Also save to outreach_templates for backward compatibility
+    const outreachTemplate = await prisma.outreach_templates.create({
       data: {
         templateBaseId,
         content: content.trim(),
@@ -63,7 +85,14 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: true,
-        template,
+        template: {
+          id: template.id,
+          title: template.name,
+          subjectLine: template.subject,
+          templateContent: template.body,
+          dateCreated: template.createdAt,
+        },
+        outreachTemplate, // Keep for backward compatibility
       },
       { status: 201 },
     );

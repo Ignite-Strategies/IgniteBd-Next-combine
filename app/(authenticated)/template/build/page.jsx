@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, Edit, Save, ArrowLeft } from 'lucide-react';
+import { Sparkles, FileText, Edit, ArrowLeft, ArrowRight, Users, Zap } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
-import { hydrateTemplate, extractVariables, getDefaultVariableValues } from '@/lib/templateVariables';
+import { hydrateTemplate, extractVariables } from '@/lib/templateVariables';
+import TemplateTestService from '@/lib/services/templateTestService';
 
 const RELATIONSHIP_OPTIONS = [
   { value: 'COLD', label: 'Cold' },
@@ -72,29 +73,90 @@ const PREDEFINED_TEMPLATES = [
   },
 ];
 
+// Three clear paths
+const TEMPLATE_PATHS = [
+  {
+    id: 'MANUAL',
+    title: 'Manual',
+    description: 'Type your own message and insert variables as needed',
+    icon: Edit,
+    color: 'blue',
+  },
+  {
+    id: 'AI',
+    title: 'AI Generate',
+    description: 'AI creates your template - choose Quick Idea, Relationship Helper, or Use Preset',
+    icon: Sparkles,
+    color: 'purple',
+  },
+  {
+    id: 'TEMPLATES',
+    title: 'From Templates',
+    description: 'Use templates you\'ve already built',
+    icon: FileText,
+    color: 'green',
+  },
+];
+
+// AI sub-options (shown after selecting AI Generate)
+const AI_SUB_OPTIONS = [
+  {
+    id: 'QUICK_IDEA',
+    title: 'Quick Idea',
+    description: 'Type a template idea and AI creates it quickly',
+    icon: Sparkles,
+    color: 'purple',
+  },
+  {
+    id: 'RELATIONSHIP_HELPER',
+    title: 'Relationship Helper',
+    description: 'Relationship-aware AI template builder with full context',
+    icon: Users,
+    color: 'indigo',
+  },
+  {
+    id: 'USE_PRESET',
+    title: 'Use Preset',
+    description: 'Choose from predefined templates as a starting point',
+    icon: Zap,
+    color: 'orange',
+  },
+];
+
 export default function TemplateBuildPage() {
   const router = useRouter();
   const { companyHQId } = useCompanyHQ();
-  const [mode, setMode] = useState('MANUAL'); // 'MANUAL' | 'TEMPLATE' | 'IDEA' | 'VARIABLES'
+  
+  // Step management
+  const [step, setStep] = useState('landing'); // 'landing' | 'ai-choose' | 'form' | 'preview'
+  const [path, setPath] = useState(null); // 'MANUAL' | 'AI' | 'TEMPLATES'
+  const [aiSubPath, setAiSubPath] = useState(null); // 'QUICK_IDEA' | 'RELATIONSHIP_HELPER' | 'USE_PRESET'
+  
+  // Form state
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedExistingTemplate, setSelectedExistingTemplate] = useState(null);
+  const [existingTemplates, setExistingTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [idea, setIdea] = useState('');
-  const [parsing, setParsing] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [manualContent, setManualContent] = useState('');
   const [form, setForm] = useState({
     title: '',
     relationship: '',
     typeOfPerson: '',
     whyReachingOut: '',
     whatWantFromThem: '',
-    // Template-specific context fields
     timeSinceConnected: '',
     timeHorizon: '',
     knowledgeOfBusiness: false,
     myBusinessDescription: '',
     desiredOutcome: '',
   });
+  
+  // Preview state
   const [preview, setPreview] = useState({
     content: '',
+    subjectLine: '',
     sections: {
       opening: '',
       context: '',
@@ -102,14 +164,25 @@ export default function TemplateBuildPage() {
       close: '',
     },
   });
+  const [templateContent, setTemplateContent] = useState('');
+  const [extractedVariables, setExtractedVariables] = useState([]);
+
+  // Available variables for manual insertion
+  const AVAILABLE_VARIABLES = [
+    { name: 'firstName', description: "Contact's first name" },
+    { name: 'lastName', description: "Contact's last name" },
+    { name: 'companyName', description: "Contact's current company" },
+    { name: 'title', description: "Contact's job title" },
+    { name: 'timeSinceConnected', description: "Time since last connected" },
+    { name: 'myBusinessName', description: "Your business name" },
+    { name: 'myRole', description: "Your name/role" },
+  ];
+  
+  // Save state
   const [templateBaseId, setTemplateBaseId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [hydrating, setHydrating] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const [extractedVariables, setExtractedVariables] = useState([]);
-  const [viewMode, setViewMode] = useState('build'); // 'build' | 'preview'
-  const [templateContent, setTemplateContent] = useState(''); // Direct template content editor (for VARIABLES mode)
 
   // Generate title from form fields
   const generateTitle = (typeOfPerson) => {
@@ -132,71 +205,106 @@ export default function TemplateBuildPage() {
       [name]: value,
     }));
     setError(null);
-    // Clear template selection when manually editing
-    if (selectedTemplate) {
-      setSelectedTemplate(null);
+  };
+
+  // Step 1: Choose path
+  const handlePathSelect = async (pathId) => {
+    setPath(pathId);
+    
+    // If AI path, show sub-options
+    if (pathId === 'AI') {
+      setStep('ai-choose');
+    } else {
+      setStep('form');
+      
+      // Load existing templates if TEMPLATES path
+      if (pathId === 'TEMPLATES' && companyHQId) {
+        await loadExistingTemplates();
+      }
     }
   };
 
-  const handleTemplateSelect = (template) => {
-    setSelectedTemplate(template.id);
-    setMode('TEMPLATE');
-    const autoTitle = generateTitle(template.typeOfPerson);
-    setForm({
-      title: autoTitle,
-      relationship: template.relationship,
-      typeOfPerson: template.typeOfPerson,
-      whyReachingOut: template.whyReachingOut,
-      whatWantFromThem: template.whatWantFromThem || '',
-    });
-    setError(null);
+  // Step 1.5: Choose AI sub-option
+  const handleAiSubPathSelect = async (subPathId) => {
+    setAiSubPath(subPathId);
+    setStep('form');
+    
+    // If USE_PRESET, templates are already defined, no need to load
+    // If QUICK_IDEA or RELATIONSHIP_HELPER, proceed to form
   };
 
-  const handleSwitchToManual = () => {
-    setMode('MANUAL');
-    setSelectedTemplate(null);
-    setIdea('');
-    // Keep form values, just switch mode
-  };
-
-  const handleParse = async () => {
-    if (!idea.trim()) {
-      setError('Please enter an idea first');
-      return;
-    }
-
-    setError(null);
-    setParsing(true);
-
+  // Load existing templates
+  const loadExistingTemplates = async () => {
+    if (!companyHQId) return;
+    
+    setLoadingTemplates(true);
     try {
-      const response = await api.post('/api/template/parse', {
-        idea: idea.trim(),
-      });
-
-      if (response.data?.success && response.data?.inferredFields) {
-        const inferred = response.data.inferredFields;
-        const autoTitle = generateTitle(inferred.typeOfPerson);
-        setForm({
-          title: autoTitle,
-          relationship: inferred.relationship,
-          typeOfPerson: inferred.typeOfPerson,
-          whyReachingOut: inferred.whyReachingOut,
-          whatWantFromThem: inferred.whatWantFromThem || '',
-        });
-        setMode('IDEA'); // Switch to idea mode after parsing
-      } else {
-        throw new Error('Failed to parse idea');
+      const response = await api.get(`/api/template/saved?companyHQId=${companyHQId}`);
+      if (response.data?.success && response.data?.templates) {
+        setExistingTemplates(response.data.templates);
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Failed to parse idea');
+      console.error('Failed to load templates:', err);
+      setError('Failed to load existing templates');
     } finally {
-      setParsing(false);
+      setLoadingTemplates(false);
     }
   };
 
-  const handleGenerateMessage = async () => {
-    if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
-      setError('Please fill in all required fields or parse an idea first');
+  // Insert variable into manual content
+  const insertVariable = (variableName) => {
+    const textarea = document.querySelector('[name="manualContent"]');
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = manualContent;
+      const before = text.substring(0, start);
+      const after = text.substring(end);
+      const variable = `{{${variableName}}}`;
+      setManualContent(before + variable + after);
+      
+      // Set cursor position after inserted variable
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + variable.length, start + variable.length);
+      }, 0);
+    } else {
+      setManualContent(prev => prev + `{{${variableName}}}`);
+    }
+  };
+
+  // Step 2: Handle existing template selection (for TEMPLATES path)
+  const handleExistingTemplateSelect = (template) => {
+    setSelectedExistingTemplate(template.id);
+    setPreview({
+      content: template.content,
+      sections: {},
+    });
+    // Extract variables from template content
+    const vars = extractVariables(template.content);
+    setExtractedVariables(vars);
+    // Pre-fill form from template base
+    if (template.template_bases) {
+      const base = template.template_bases;
+      setForm({
+        title: base.title,
+        relationship: base.relationship,
+        typeOfPerson: base.typeOfPerson,
+        whyReachingOut: base.whyReachingOut,
+        whatWantFromThem: base.whatWantFromThem || '',
+        timeSinceConnected: base.timeSinceConnected || '',
+        timeHorizon: base.timeHorizon || '',
+        knowledgeOfBusiness: base.knowledgeOfBusiness || false,
+        myBusinessDescription: base.myBusinessDescription || '',
+        desiredOutcome: base.desiredOutcome || '',
+      });
+    }
+  };
+
+  // Step 2: Generate quick template (for QUICK_IDEA path - infers and generates in one step)
+  const handleGenerateQuick = async () => {
+    if (!idea.trim()) {
+      setError('Please enter an idea first');
       return;
     }
 
@@ -204,92 +312,104 @@ export default function TemplateBuildPage() {
     setGenerating(true);
 
     try {
-      // Use different API based on mode
-      const endpoint = mode === 'VARIABLES' 
-        ? '/api/template/generate-with-variables'
-        : '/api/template/generate';
-      
-      const response = await api.post(endpoint, {
-        relationship: form.relationship,
-        typeOfPerson: form.typeOfPerson,
-        whyReachingOut: form.whyReachingOut.trim(),
-        whatWantFromThem: form.whatWantFromThem?.trim() || null,
-        // Template context fields (only for VARIABLES mode)
-        ...(mode === 'VARIABLES' && {
-          timeSinceConnected: form.timeSinceConnected?.trim() || null,
-          timeHorizon: form.timeHorizon?.trim() || null,
-          knowledgeOfBusiness: form.knowledgeOfBusiness || false,
-          myBusinessDescription: form.myBusinessDescription?.trim() || null,
-          desiredOutcome: form.desiredOutcome?.trim() || null,
-        }),
+      // Generate directly from idea - inference happens internally
+      const response = await api.post('/api/template/generate-quick', {
+        idea: idea.trim(),
       });
 
       if (response.data?.success) {
-        if (mode === 'VARIABLES') {
-          // For variable templates
-          const generatedContent = response.data.template;
-          setTemplateContent(generatedContent);
-          setPreview({
-            content: generatedContent,
-            sections: {},
-          });
-          setExtractedVariables(response.data.variables || []);
-          setViewMode('build'); // Switch to build mode to edit
-        } else {
-          // For regular templates
-          setPreview({
-            content: response.data.message,
-            sections: response.data.sections || {},
+        // Set preview with generated template
+        setPreview({
+          content: response.data.template,
+          sections: {},
+          variables: response.data.variables || [],
+        });
+        
+        // Store inferred data for later use in template base creation
+        if (response.data.inferred) {
+          const inferred = response.data.inferred;
+          // Auto-generate a simple title from the inferred relationship
+          const relationshipLabels = {
+            COLD: 'Cold Outreach',
+            WARM: 'Warm Outreach',
+            ESTABLISHED: 'Friend/Contact',
+            DORMANT: 'Reconnection',
+          };
+          const title = relationshipLabels[inferred.relationship] || 'Quick Note';
+          
+          setForm({
+            title,
+            relationship: inferred.relationship || 'WARM',
+            typeOfPerson: 'FRIEND_OF_FRIEND', // Default for quick notes
+            whyReachingOut: inferred.intent || idea.trim(),
+            whatWantFromThem: inferred.ask || '',
+            timeSinceConnected: '',
+            timeHorizon: '',
+            knowledgeOfBusiness: false,
+            myBusinessDescription: '',
+            desiredOutcome: inferred.ask || '',
           });
         }
+        
+        setStep('preview');
       } else {
-        throw new Error('Failed to generate message');
+        throw new Error('Failed to generate template');
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Failed to generate message');
+      setError(err.response?.data?.error || err.message || 'Failed to generate template');
     } finally {
       setGenerating(false);
     }
   };
 
-  // Auto-generate title when typeOfPerson changes (only if title is empty)
-  useEffect(() => {
-    if (form.typeOfPerson && (!form.title || form.title.startsWith('Outreach to'))) {
-      const autoTitle = generateTitle(form.typeOfPerson);
-      // Only update if current title is empty or is the auto-generated one
-      if (!form.title || form.title === autoTitle || form.title.startsWith('Outreach to')) {
-        setForm((prev) => ({ ...prev, title: autoTitle }));
+  // Step 2: Generate template (for RELATIONSHIP_HELPER path)
+  const handleGenerate = async () => {
+    if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setError(null);
+    setGenerating(true);
+
+    try {
+      // RELATIONSHIP_HELPER uses relationship-aware endpoint with logic rules
+      if (path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER') {
+        const response = await api.post('/api/template/generate-relationship-aware', {
+          relationship: form.relationship,
+          typeOfPerson: form.typeOfPerson,
+          whyReachingOut: form.whyReachingOut.trim(),
+          whatWantFromThem: form.whatWantFromThem?.trim() || null,
+          // Template context fields for relationship-aware generation
+          timeSinceConnected: form.timeSinceConnected?.trim() || null,
+          timeHorizon: form.timeHorizon?.trim() || null,
+          knowledgeOfBusiness: form.knowledgeOfBusiness || false,
+          myBusinessDescription: form.myBusinessDescription?.trim() || null,
+          desiredOutcome: form.desiredOutcome?.trim() || null,
+        });
+
+        if (response.data?.success) {
+          setPreview({
+            content: response.data.template,
+            sections: {},
+            variables: response.data.variables || [],
+          });
+          setStep('preview');
+        } else {
+          throw new Error('Failed to generate template');
+        }
+      } else {
+        // For other paths (shouldn't reach here, but fallback)
+        throw new Error('Invalid path for generation');
       }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to generate template');
+    } finally {
+      setGenerating(false);
     }
-  }, [form.typeOfPerson]);
+  };
 
-  // Auto-hydrate preview when form changes - client-side only, no API calls (only for MANUAL mode)
-  useEffect(() => {
-    // Only auto-hydrate in MANUAL mode - IDEA and TEMPLATE modes use AI generation
-    if (mode === 'MANUAL' && form.relationship && form.typeOfPerson && form.whyReachingOut.trim()) {
-      // Use client-side hydration for instant preview - no API call needed
-      const tempBase = {
-        relationship: form.relationship,
-        typeOfPerson: form.typeOfPerson,
-        whyReachingOut: form.whyReachingOut.trim(),
-        whatWantFromThem: form.whatWantFromThem?.trim() || null,
-      };
-      const hydrated = hydrateMessage(tempBase);
-      setPreview(hydrated);
-    } else if (mode === 'MANUAL' && (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim())) {
-      // Clear preview if form is incomplete (only in MANUAL mode)
-      setPreview({
-        content: '',
-        sections: {
-          opening: '',
-          context: '',
-          releaseValve: '',
-          close: '',
-        },
-      });
-    }
-  }, [form.relationship, form.typeOfPerson, form.whyReachingOut, form.whatWantFromThem, mode]);
-
+  // Step 3: Build template base
   const handleBuild = async () => {
     if (!companyHQId) {
       setError('Company context is required. Please refresh the page.');
@@ -297,12 +417,12 @@ export default function TemplateBuildPage() {
     }
 
     if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
-      setError('Please fill in all required fields: Relationship, Type of Person, and Why Reaching Out.');
+      setError('Please fill in all required fields');
       return;
     }
 
-    if (!preview.content.trim()) {
-      setError('Please generate or create a message preview first.');
+    if (!preview.content?.trim()) {
+      setError('Please generate a template first');
       return;
     }
 
@@ -317,7 +437,6 @@ export default function TemplateBuildPage() {
         typeOfPerson: form.typeOfPerson,
         whyReachingOut: form.whyReachingOut.trim(),
         whatWantFromThem: form.whatWantFromThem?.trim() || null,
-        // Template context fields
         timeSinceConnected: form.timeSinceConnected?.trim() || null,
         timeHorizon: form.timeHorizon?.trim() || null,
         knowledgeOfBusiness: form.knowledgeOfBusiness || false,
@@ -327,170 +446,26 @@ export default function TemplateBuildPage() {
 
       if (response.data?.success && response.data?.templateBase) {
         setTemplateBaseId(response.data.templateBase.id);
-        // If we have preview content, save it directly (for AI-generated or manual)
-        if (preview.content.trim()) {
-          await handleSave();
-        } else {
-          // Otherwise hydrate from template base
-          await handleHydrate(response.data.templateBase.id);
-        }
+        await handleSave(response.data.templateBase.id);
       } else {
         throw new Error('Failed to create template base');
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to build template');
-    } finally {
       setSaving(false);
     }
   };
 
-  const handleHydrate = async (baseId = null) => {
+  // Step 3: Save template
+  const handleSave = async (baseId = null) => {
     const idToUse = baseId || templateBaseId;
     if (!idToUse) {
-      // For manual mode, use client-side hydration (already handled in useEffect)
+      await handleBuild();
       return;
     }
 
-    setHydrating(true);
-    setError(null);
-
-    try {
-      const response = await api.post('/api/template/hydrate', {
-        templateBaseId: idToUse,
-      });
-
-      if (response.data?.success) {
-        setPreview({
-          content: response.data.message,
-          sections: response.data.sections || {},
-        });
-      } else {
-        throw new Error('Failed to hydrate template');
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Failed to hydrate template');
-    } finally {
-      setHydrating(false);
-    }
-  };
-
-  // Deterministic hydration function (client-side preview)
-  const hydrateMessage = (templateBase) => {
-    const { whyReachingOut, relationship, whatWantFromThem } = templateBase;
-
-    const opening = whyReachingOut.trim();
-
-    let context = '';
-    switch (relationship) {
-      case 'COLD':
-        context = "I'd love to connect and learn more about what you're working on.";
-        break;
-      case 'WARM':
-        context = "It's been a while since we last connected.";
-        break;
-      case 'ESTABLISHED':
-        context = "I wanted to reach out and see how things are going.";
-        break;
-      case 'DORMANT':
-        context = "I know it's been a while, but I wanted to reconnect.";
-        break;
-      default:
-        context = "I wanted to reach out and say hello.";
-    }
-
-    const releaseValveOptions = [
-      "No agenda — just wanted to check in.",
-      "No pressure at all.",
-      "Thought I'd reach out and say hello.",
-      "Just wanted to touch base — no expectations.",
-    ];
-    const releaseValve = releaseValveOptions[0]; // Use first for consistency
-
-    let close = '';
-    if (whatWantFromThem && whatWantFromThem.trim() !== '') {
-      close = `If you're open to it, ${whatWantFromThem.trim().toLowerCase()}. But again, no pressure — just wanted to put it out there.`;
-    } else {
-      close = "Hope you're doing well!";
-    }
-
-    const content = [opening, context, releaseValve, close].join(' ');
-
-    return {
-      content,
-      sections: {
-        opening,
-        context,
-        releaseValve,
-        close,
-      },
-    };
-  };
-
-  // Get preview with filler text
-  const getPreviewWithFiller = () => {
-    if (!templateContent && !preview.content) return '';
-    const content = templateContent || preview.content;
-    const defaultValues = getDefaultVariableValues();
-    return hydrateTemplate(content, defaultValues, {
-      timeHorizon: form.timeHorizon || defaultValues.timeHorizon,
-      desiredOutcome: form.desiredOutcome || defaultValues.desiredOutcome,
-      myBusinessName: form.myBusinessDescription || defaultValues.myBusinessName,
-      myRole: defaultValues.myRole,
-      knowledgeOfBusiness: form.knowledgeOfBusiness,
-    });
-  };
-
-  // Update extracted variables when template content changes
-  useEffect(() => {
-    if (mode === 'VARIABLES' && templateContent) {
-      const vars = extractVariables(templateContent);
-      setExtractedVariables(vars);
-      setPreview({ content: templateContent, sections: {} });
-    }
-  }, [templateContent, mode]);
-
-  const handleSave = async () => {
-    // If no templateBaseId yet, create it first
-    if (!templateBaseId) {
-      if (!companyHQId) {
-        setError('Company context is required. Please refresh the page.');
-        return;
-      }
-
-      if (!form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()) {
-        setError('Please fill in all required fields first.');
-        return;
-      }
-
-      try {
-        const buildResponse = await api.post('/api/template/build', {
-          companyHQId,
-          title: form.title?.trim() || generateTitle(form.typeOfPerson),
-          relationship: form.relationship,
-          typeOfPerson: form.typeOfPerson,
-          whyReachingOut: form.whyReachingOut.trim(),
-          whatWantFromThem: form.whatWantFromThem?.trim() || null,
-          // Template context fields
-          timeSinceConnected: form.timeSinceConnected?.trim() || null,
-          timeHorizon: form.timeHorizon?.trim() || null,
-          knowledgeOfBusiness: form.knowledgeOfBusiness || false,
-          myBusinessDescription: form.myBusinessDescription?.trim() || null,
-          desiredOutcome: form.desiredOutcome?.trim() || null,
-        });
-
-        if (buildResponse.data?.success && buildResponse.data?.templateBase) {
-          setTemplateBaseId(buildResponse.data.templateBase.id);
-        } else {
-          throw new Error('Failed to create template base');
-        }
-      } catch (err) {
-        setError(err.response?.data?.error || err.message || 'Failed to create template base');
-        return;
-      }
-    }
-
-    if (!preview.content.trim()) {
-      setError('No content to save. Please generate or create a message first.');
+    if (!preview.content || !preview.content.trim()) {
+      setError('No content to save');
       return;
     }
 
@@ -498,28 +473,21 @@ export default function TemplateBuildPage() {
     setSaving(true);
 
     try {
-      const finalMode = mode === 'IDEA' ? 'AI' : mode === 'TEMPLATE' ? 'MANUAL' : 'MANUAL';
+      // Determine mode based on path
+      let finalMode = 'MANUAL';
+      if (path === 'QUICK_IDEA' || path === 'RELATIONSHIP_HELPER') {
+        finalMode = 'AI';
+      }
       const response = await api.post('/api/template/save', {
-        templateBaseId,
-        content: preview.content,
+        templateBaseId: idToUse,
+        content: preview.content.trim(),
+        subjectLine: preview.subjectLine?.trim() || null,
         mode: finalMode,
+        companyHQId,
+        companyHQId,
       });
 
       if (response.data?.success) {
-        // Update localStorage cache
-        if (typeof window !== 'undefined' && companyHQId) {
-          try {
-            const cachedKey = `outreachTemplates_${companyHQId}`;
-            const cached = localStorage.getItem(cachedKey);
-            const existingTemplates = cached ? JSON.parse(cached) : [];
-            const updatedTemplates = [response.data.template, ...existingTemplates];
-            localStorage.setItem(cachedKey, JSON.stringify(updatedTemplates));
-            console.log('✅ Cached saved template to localStorage');
-          } catch (e) {
-            console.warn('Failed to cache template to localStorage:', e);
-          }
-        }
-        
         setSuccess(true);
         setTimeout(() => {
           router.push('/template/saved');
@@ -529,166 +497,502 @@ export default function TemplateBuildPage() {
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to save template');
-    } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-semibold text-gray-900">Build Outreach Template</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Create a human, low-pressure outreach message to re-enter or maintain relationships.
-          </p>
+  // Auto-generate title when typeOfPerson changes
+  useEffect(() => {
+    if (form.typeOfPerson && (!form.title || form.title.startsWith('Outreach to'))) {
+      const autoTitle = generateTitle(form.typeOfPerson);
+      if (!form.title || form.title === autoTitle || form.title.startsWith('Outreach to')) {
+        setForm((prev) => ({ ...prev, title: autoTitle }));
+      }
+    }
+  }, [form.typeOfPerson]);
+
+  // Update extracted variables when manual content changes
+  useEffect(() => {
+    if (path === 'MANUAL' && manualContent) {
+      const vars = extractVariables(manualContent);
+      setExtractedVariables(vars);
+    }
+  }, [manualContent, path]);
+
+
+  // Handle preset template selection (for USE_PRESET)
+  const handlePresetSelect = async (preset) => {
+    setSelectedTemplate(preset.id);
+    const autoTitle = generateTitle(preset.typeOfPerson);
+    setForm({
+      title: autoTitle,
+      relationship: preset.relationship,
+      typeOfPerson: preset.typeOfPerson,
+      whyReachingOut: preset.whyReachingOut,
+      whatWantFromThem: preset.whatWantFromThem || '',
+      timeSinceConnected: '',
+      timeHorizon: '',
+      knowledgeOfBusiness: false,
+      myBusinessDescription: '',
+      desiredOutcome: '',
+    });
+    
+    // Auto-generate after selecting preset
+    setGenerating(true);
+    try {
+      const response = await api.post('/api/template/generate', {
+        relationship: preset.relationship,
+        typeOfPerson: preset.typeOfPerson,
+        whyReachingOut: preset.whyReachingOut,
+        whatWantFromThem: preset.whatWantFromThem || null,
+      });
+
+      if (response.data?.success) {
+        setPreview({
+          content: response.data.message,
+          sections: response.data.sections || {},
+        });
+        setStep('preview');
+      } else {
+        throw new Error('Failed to generate template');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to generate template');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // LANDING PAGE - Step 1
+  if (step === 'landing') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Build Outreach Template</h1>
+            <p className="text-lg text-gray-600">
+              Choose how you want to create your outreach template
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {TEMPLATE_PATHS.map((templatePath) => {
+              const Icon = templatePath.icon;
+              const getIconBgClass = (color) => {
+                if (color === 'blue') return 'bg-blue-100';
+                if (color === 'purple') return 'bg-purple-100';
+                if (color === 'green') return 'bg-green-100';
+                if (color === 'indigo') return 'bg-indigo-100';
+                if (color === 'orange') return 'bg-orange-100';
+                return 'bg-gray-100';
+              };
+              const getIconColorClass = (color) => {
+                if (color === 'blue') return 'text-blue-600';
+                if (color === 'purple') return 'text-purple-600';
+                if (color === 'green') return 'text-green-600';
+                if (color === 'indigo') return 'text-indigo-600';
+                if (color === 'orange') return 'text-orange-600';
+                return 'text-gray-600';
+              };
+              return (
+                <button
+                  key={templatePath.id}
+                  onClick={() => handlePathSelect(templatePath.id)}
+                  className="group relative rounded-lg border-2 border-gray-200 bg-white p-8 text-left shadow-sm transition-all hover:border-red-500 hover:shadow-md"
+                >
+                  <div className={`mb-4 inline-flex rounded-lg p-3 ${getIconBgClass(templatePath.color)}`}>
+                    <Icon className={`h-6 w-6 ${getIconColorClass(templatePath.color)}`} />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    {templatePath.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {templatePath.description}
+                  </p>
+                  <div className="mt-4 flex items-center text-sm font-medium text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Get started
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
+      </div>
+    );
+  }
 
-
-        {error && (
-          <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
+  // AI SUB-OPTIONS STEP - Step 1.5 (when AI Generate is selected)
+  if (step === 'ai-choose') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="mb-6">
+            <button
+              onClick={() => {
+                setStep('landing');
+                setPath(null);
+                setAiSubPath(null);
+                setError(null);
+              }}
+              className="mb-4 flex items-center text-sm text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to choices
+            </button>
+            <h1 className="text-3xl font-semibold text-gray-900">AI Generate Options</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Choose how you want AI to create your template
+            </p>
           </div>
-        )}
 
-        {success && (
-          <div className="mb-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-            Template saved successfully! Redirecting...
-          </div>
-        )}
+          {error && (
+            <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
-        {/* Mode Toggle */}
-        <div className="mb-6 flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4">
-          <span className="text-sm font-medium text-gray-700">Mode:</span>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleSwitchToManual}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'MANUAL'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('IDEA');
-                setSelectedTemplate(null);
-              }}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'IDEA'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Create with AI
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('VARIABLES');
-                setSelectedTemplate(null);
-                setIdea('');
-              }}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'VARIABLES'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Variables
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('TEMPLATE');
-                setIdea('');
-              }}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'TEMPLATE'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Use Template
-            </button>
+          <div className="grid gap-6 md:grid-cols-3">
+            {AI_SUB_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const getIconBgClass = (color) => {
+                if (color === 'purple') return 'bg-purple-100';
+                if (color === 'indigo') return 'bg-indigo-100';
+                if (color === 'orange') return 'bg-orange-100';
+                return 'bg-gray-100';
+              };
+              const getIconColorClass = (color) => {
+                if (color === 'purple') return 'text-purple-600';
+                if (color === 'indigo') return 'text-indigo-600';
+                if (color === 'orange') return 'text-orange-600';
+                return 'text-gray-600';
+              };
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => handleAiSubPathSelect(option.id)}
+                  className="group relative rounded-lg border-2 border-gray-200 bg-white p-8 text-left shadow-sm transition-all hover:border-red-500 hover:shadow-md"
+                >
+                  <div className={`mb-4 inline-flex rounded-lg p-3 ${getIconBgClass(option.color)}`}>
+                    <Icon className={`h-6 w-6 ${getIconColorClass(option.color)}`} />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    {option.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {option.description}
+                  </p>
+                  <div className="mt-4 flex items-center text-sm font-medium text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Get started
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Split Screen Layout */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Left Panel - Builder Inputs */}
-          <div className="space-y-6">
-            {mode === 'IDEA' ? (
-              /* Create with AI Input */
-              <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900">Create with AI</h2>
-                <p className="mb-4 text-sm text-gray-600">
-                  Describe your outreach idea and AI will infer the structured fields
-                </p>
-                <div className="space-y-4">
+  // FORM STEP - Step 2
+  if (step === 'form') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-6">
+            <button
+              onClick={() => {
+                if (path === 'AI') {
+                  setStep('ai-choose');
+                } else {
+                  setStep('landing');
+                  setPath(null);
+                }
+                setError(null);
+              }}
+              className="mb-4 flex items-center text-sm text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {path === 'AI' ? 'Back to AI options' : 'Back to choices'}
+            </button>
+            <h1 className="text-3xl font-semibold text-gray-900">
+              {path === 'MANUAL' && 'Type Your Message'}
+              {path === 'AI' && aiSubPath === 'QUICK_IDEA' && 'Type Your Template Idea'}
+              {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && 'Relationship-Aware Template Builder'}
+              {path === 'AI' && aiSubPath === 'USE_PRESET' && 'Choose a Preset Template'}
+              {path === 'TEMPLATES' && 'Choose Existing Template'}
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              {path === 'MANUAL' && 'Type your message and insert variables as needed'}
+              {path === 'AI' && aiSubPath === 'QUICK_IDEA' && 'Describe your idea and AI will create the template quickly'}
+              {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && 'Build a relationship-aware template with full context'}
+              {path === 'AI' && aiSubPath === 'USE_PRESET' && 'Select a preset template as a starting point'}
+              {path === 'TEMPLATES' && 'Select a template you\'ve already built'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            {path === 'MANUAL' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Message <span className="text-red-500">*</span>
+                  </label>
                   <textarea
-                    value={idea}
-                    onChange={(e) => setIdea(e.target.value)}
-                    placeholder="e.g., I want to reach out to my old coworker Sarah who I haven't talked to in 2 years. She moved to a new company and I'd love to catch up over coffee."
-                    rows={6}
+                    name="manualContent"
+                    value={manualContent}
+                    onChange={(e) => setManualContent(e.target.value)}
+                    placeholder="Type your message here. Use the buttons below to insert variables like {{firstName}} or {{companyName}}."
+                    rows={10}
                     className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                   />
-                  <button
-                    type="button"
-                    onClick={handleParse}
-                    disabled={parsing || !idea.trim()}
-                    className="w-full rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                  >
-                    {parsing ? 'Parsing...' : 'Parse'}
-                  </button>
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-2">Insert variables:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {AVAILABLE_VARIABLES.map((variable) => (
+                        <button
+                          key={variable.name}
+                          type="button"
+                          onClick={() => insertVariable(variable.name)}
+                          className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-mono text-gray-700 hover:bg-gray-50"
+                          title={variable.description}
+                        >
+                          {`{{${variable.name}}}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {manualContent && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">Detected variables:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {extractVariables(manualContent).map((variable) => (
+                          <span
+                            key={variable.name}
+                            className="inline-block rounded bg-blue-100 px-2 py-1 text-xs font-mono text-blue-800"
+                          >
+                            {`{{${variable.name}}}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            ) : mode === 'TEMPLATE' ? (
-              /* Template Selector */
-              <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-lg font-semibold text-gray-900">Choose a Template</h2>
-                <p className="mb-4 text-sm text-gray-600">
-                  Select a template to auto-fill the form fields
-                </p>
+            )}
+
+            {path === 'TEMPLATES' && (
+              <div className="space-y-4">
+                {loadingTemplates ? (
+                  <div className="text-center py-8 text-gray-500">Loading templates...</div>
+                ) : existingTemplates.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No templates found.</p>
+                    <p className="text-sm mt-2">Create a template first using Manual or AI Generate.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      {existingTemplates.map((template) => (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => handleExistingTemplateSelect(template)}
+                          className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
+                            selectedExistingTemplate === template.id
+                              ? 'border-red-500 bg-red-50'
+                              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="font-semibold text-gray-900">
+                            {template.template_bases?.title || 'Untitled Template'}
+                          </div>
+                          <div className="mt-1 text-sm text-gray-600">
+                            {template.template_bases?.typeOfPerson} • {template.template_bases?.relationship}
+                          </div>
+                          <div className="mt-2 text-xs text-gray-500 line-clamp-2">
+                            {template.content.substring(0, 100)}...
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedExistingTemplate && (
+                      <div className="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4">
+                        <p className="text-sm text-blue-700">
+                          ✓ Template selected. Review and edit below, then click "Continue to Preview".
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {path === 'AI' && aiSubPath === 'USE_PRESET' && (
+              <div className="space-y-4">
+                <div className="rounded-md border border-orange-200 bg-orange-50 p-4">
+                  <p className="text-sm text-orange-700">
+                    <strong>Preset Templates:</strong> Choose a template below. It will auto-fill the form and generate a template you can customize.
+                  </p>
+                </div>
                 <div className="space-y-3">
-                  {PREDEFINED_TEMPLATES.map((template) => (
+                  {PREDEFINED_TEMPLATES.map((preset) => (
                     <button
-                      key={template.id}
+                      key={preset.id}
                       type="button"
-                      onClick={() => handleTemplateSelect(template)}
+                      onClick={() => handlePresetSelect(preset)}
+                      disabled={generating}
                       className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
-                        selectedTemplate === template.id
+                        selectedTemplate === preset.id
                           ? 'border-red-500 bg-red-50'
                           : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                      }`}
+                      } ${generating ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      <div className="font-semibold text-gray-900">{template.name}</div>
-                      <div className="mt-1 text-sm text-gray-600">{template.description}</div>
+                      <div className="font-semibold text-gray-900">{preset.name}</div>
+                      <div className="mt-1 text-sm text-gray-600">{preset.description}</div>
                     </button>
                   ))}
                 </div>
+                {generating && (
+                  <div className="text-center py-4 text-sm text-gray-500">
+                    Generating template...
+                  </div>
+                )}
               </div>
-            ) : null}
+            )}
 
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">Builder Inputs</h2>
-              
-              {mode === 'IDEA' && form.whyReachingOut && (
-                <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-                  ✓ Fields inferred. Edit them if needed, then generate the message.
-                </div>
-              )}
-              {mode === 'TEMPLATE' && selectedTemplate && (
-                <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-                  ✓ Template selected - fields are auto-filled. Feel free to customize them.
-                </div>
-              )}
-
+            {path === 'AI' && aiSubPath === 'QUICK_IDEA' && (
               <div className="space-y-4">
+                <div className="rounded-md border border-purple-200 bg-purple-50 p-4">
+                  <p className="text-sm text-purple-700">
+                    <strong>Quick Note Builder:</strong> Describe what you want to say and we'll create a warm, friendly note with variables.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your idea
+                  </label>
+                  <textarea
+                    value={idea}
+                    onChange={(e) => setIdea(e.target.value)}
+                    placeholder="e.g., build me a quick note to a friend and tell him I want to meet"
+                    rows={6}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  />
+                  <p className="mt-2 text-xs text-gray-500">
+                    The AI will infer the relationship, what you want, and create a warm note with variables like {{firstName}}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateQuick}
+                  disabled={generating || !idea.trim()}
+                  className="w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  {generating ? 'Generating...' : 'Generate Quick Note'}
+                </button>
+              </div>
+            )}
+
+            {path === 'RELATIONSHIP_HELPER' && (
+              <div className="space-y-6">
+                <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4">
+                  <p className="text-sm text-indigo-700">
+                    <strong>Relationship-Aware Builder:</strong> Fill in the relationship context below. The AI will use this information to create a personalized template with proper variables.
+                  </p>
+                </div>
+                
+                {/* Relationship context fields will be shown below in the shared form section */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Time Since Connected
+                      </label>
+                      <input
+                        type="text"
+                        name="timeSinceConnected"
+                        value={form.timeSinceConnected}
+                        onChange={handleChange}
+                        placeholder="e.g., a long time, 2 years, a while"
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Time Horizon
+                      </label>
+                      <input
+                        type="text"
+                        name="timeHorizon"
+                        value={form.timeHorizon}
+                        onChange={handleChange}
+                        placeholder="e.g., 2026, Q1 2025, soon"
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      My Business Description
+                    </label>
+                    <textarea
+                      name="myBusinessDescription"
+                      value={form.myBusinessDescription}
+                      onChange={handleChange}
+                      placeholder="e.g., my own NDA house, a consulting firm, a design agency"
+                      rows={2}
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Desired Outcome
+                    </label>
+                    <textarea
+                      name="desiredOutcome"
+                      value={form.desiredOutcome}
+                      onChange={handleChange}
+                      placeholder="e.g., see if we can collaborate, catch up over coffee, explore partnership opportunities"
+                      rows={2}
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="knowledgeOfBusiness"
+                      checked={form.knowledgeOfBusiness}
+                      onChange={(e) => handleChange({ target: { name: 'knowledgeOfBusiness', value: e.target.checked } })}
+                      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                    />
+                    <label className="ml-2 block text-sm text-gray-700">
+                      They already know about your business
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Shared form fields - shown for RELATIONSHIP_HELPER, MANUAL, TEMPLATES, USE_PRESET */}
+            {((path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER') || path === 'MANUAL' || path === 'TEMPLATES' || (path === 'AI' && aiSubPath === 'USE_PRESET')) && (
+              <div className="mt-6 space-y-4 border-t border-gray-200 pt-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Title <span className="text-red-500">*</span>
@@ -702,9 +1006,6 @@ export default function TemplateBuildPage() {
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Name for this template base (auto-generated from type, but you can customize)
-                  </p>
                 </div>
 
                 <div>
@@ -717,7 +1018,6 @@ export default function TemplateBuildPage() {
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
-                    disabled={false}
                   >
                     <option value="">Select relationship</option>
                     {RELATIONSHIP_OPTIONS.map((opt) => (
@@ -738,7 +1038,6 @@ export default function TemplateBuildPage() {
                     onChange={handleChange}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
-                    disabled={false}
                   >
                     <option value="">Select type</option>
                     {TYPE_OF_PERSON_OPTIONS.map((opt) => (
@@ -757,15 +1056,11 @@ export default function TemplateBuildPage() {
                     name="whyReachingOut"
                     value={form.whyReachingOut}
                     onChange={handleChange}
-                    placeholder="e.g., Saw you moved to a new firm, Noticed you had a baby, Haven't connected in a while, Saw your company in the news"
+                    placeholder="e.g., Saw you moved to a new firm, Haven't connected in a while"
                     rows={3}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                     required
-                    disabled={false}
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Free-text human observation about why you're reaching out
-                  </p>
                 </div>
 
                 <div>
@@ -776,249 +1071,303 @@ export default function TemplateBuildPage() {
                     name="whatWantFromThem"
                     value={form.whatWantFromThem}
                     onChange={handleChange}
-                    placeholder="e.g., I'd love to grab coffee, Would be great to catch up, etc."
+                    placeholder="e.g., I'd love to grab coffee"
                     rows={2}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    disabled={false}
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Optional and often empty in early outreach
-                  </p>
-                </div>
-
-                {/* Template Context Fields - Only show in VARIABLES mode */}
-                {mode === 'VARIABLES' && (
-                  <>
-                    <div className="col-span-full mt-4 border-t border-gray-200 pt-4">
-                      <h3 className="mb-3 text-sm font-semibold text-gray-900">Template Context</h3>
-                      <p className="mb-4 text-xs text-gray-600">
-                        These fields define the context for this template. They'll be baked into the template content, 
-                        while contact-specific info like names will be filled in later.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Time Since Connected
-                      </label>
-                      <input
-                        type="text"
-                        name="timeSinceConnected"
-                        value={form.timeSinceConnected}
-                        onChange={handleChange}
-                        placeholder="e.g., a long time, 2 years, a while"
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        How long since you last connected? (e.g., "a long time", "2 years")
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Time Horizon
-                      </label>
-                      <input
-                        type="text"
-                        name="timeHorizon"
-                        value={form.timeHorizon}
-                        onChange={handleChange}
-                        placeholder="e.g., 2026, Q1 2025, soon"
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        When do you want to connect? (e.g., "2026", "early next year")
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        My Business Description
-                      </label>
-                      <input
-                        type="text"
-                        name="myBusinessDescription"
-                        value={form.myBusinessDescription}
-                        onChange={handleChange}
-                        placeholder="e.g., my own NDA house, Ignite Growth Partners"
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        How you want to describe your business in this template
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Desired Outcome
-                      </label>
-                      <input
-                        type="text"
-                        name="desiredOutcome"
-                        value={form.desiredOutcome}
-                        onChange={handleChange}
-                        placeholder="e.g., see if we can collaborate and get some NDA work"
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        What you want from this person
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          name="knowledgeOfBusiness"
-                          checked={form.knowledgeOfBusiness}
-                          onChange={(e) => setForm(prev => ({ ...prev, knowledgeOfBusiness: e.target.checked }))}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-sm font-medium text-gray-700">They already know about my business</span>
-                      </label>
-                      <p className="mt-1 ml-6 text-xs text-gray-500">
-                        Check if you don't need to introduce your business
-                      </p>
-                    </div>
-                  </>
-                )}
-
-
-                <div className="flex gap-2">
-                  {(mode === 'IDEA' || mode === 'VARIABLES') && !preview.content ? (
-                    <button
-                      type="button"
-                      onClick={handleGenerateMessage}
-                      disabled={generating || !form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()}
-                      className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                    >
-                      {generating ? 'Generating...' : mode === 'VARIABLES' ? 'Generate Template' : 'Generate Message'}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleBuild}
-                        disabled={saving || !form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()}
-                        className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                      >
-                        {saving ? 'Building...' : 'Build Template'}
-                      </button>
-                      {templateBaseId && (
-                        <button
-                          type="button"
-                          onClick={() => handleHydrate()}
-                          disabled={hydrating}
-                          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
-                        >
-                          {hydrating ? 'Hydrating...' : 'Refresh Preview'}
-                        </button>
-                      )}
-                      {(mode === 'IDEA' || mode === 'VARIABLES') && (
-                        <button
-                          type="button"
-                          onClick={handleGenerateMessage}
-                          disabled={generating}
-                          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100"
-                        >
-                          {generating ? 'Generating...' : 'Regenerate'}
-                        </button>
-                      )}
-                    </>
-                  )}
                 </div>
               </div>
-            </div>
+            )}
+
+
+            {/* Action buttons - different for each path */}
+            {path !== 'QUICK_IDEA' && (
+              <div className="flex gap-3 pt-4 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('landing');
+                    setPath(null);
+                    setError(null);
+                  }}
+                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && (
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={
+                      generating || 
+                      !form.relationship || 
+                      !form.typeOfPerson || 
+                      !form.whyReachingOut.trim()
+                    }
+                    className="flex-1 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  >
+                    {generating ? 'Generating...' : 'Generate & Preview'}
+                  </button>
+                )}
+                {path === 'AI' && aiSubPath === 'USE_PRESET' && selectedTemplate && (
+                  <button
+                    type="button"
+                    onClick={() => setStep('preview')}
+                    disabled={!preview.content}
+                    className="flex-1 rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  >
+                    Continue to Preview
+                  </button>
+                )}
+                {(path === 'MANUAL' || path === 'TEMPLATES') && (
+                  <button
+                    type="button"
+                    onClick={path === 'TEMPLATES' ? () => setStep('preview') : () => {
+                      setPreview({ content: manualContent, sections: {} });
+                      const vars = extractVariables(manualContent);
+                      setExtractedVariables(vars);
+                      setStep('preview');
+                    }}
+                    disabled={
+                      (path === 'MANUAL' && !manualContent.trim()) ||
+                      (path === 'TEMPLATES' && !selectedExistingTemplate)
+                    }
+                    className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  >
+                    {path === 'TEMPLATES' ? 'Continue to Preview' : 'Continue to Preview'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // PREVIEW STEP - Step 3
+  if (step === 'preview') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-6">
+            <button
+              onClick={() => {
+                setStep('form');
+                setError(null);
+              }}
+              className="mb-4 flex items-center text-sm text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to form
+            </button>
+            <h1 className="text-3xl font-semibold text-gray-900">Preview Template</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Review your template and make any final edits before saving
+            </p>
           </div>
 
-          {/* Right Panel - Live Preview */}
+          {error && (
+            <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+              Template saved successfully! Redirecting...
+            </div>
+          )}
+
           <div className="space-y-6">
+            {/* Subject Line Field */}
             <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">Live Preview</h2>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Subject Line (Optional)
+              </label>
+              <input
+                type="text"
+                value={preview.subjectLine || ''}
+                onChange={(e) => setPreview({ ...preview, subjectLine: e.target.value })}
+                placeholder="e.g., Quick check-in, Catching up, etc."
+                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Optional: Add a subject line for this template. You can use variables like {{firstName}}.
+              </p>
+            </div>
 
-              {preview.content ? (
-                <div className="space-y-4">
-                  {mode === 'VARIABLES' && extractedVariables.length > 0 && (
-                    <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
-                      <div className="mb-2 text-xs font-semibold uppercase text-blue-700">Detected Variables</div>
-                      <div className="space-y-2">
-                        {extractedVariables.map((variable) => (
-                          <div key={variable.name} className="flex items-start gap-2 text-sm">
-                            <span className="inline-block rounded bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-800">
-                              {`{{${variable.name}}}`}
-                            </span>
-                            <span className="text-gray-600">{variable.description}</span>
-                          </div>
-                        ))}
-                      </div>
+            {(path === 'MANUAL' || path === 'TEMPLATES') && extractedVariables.length > 0 && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
+                <div className="mb-2 text-xs font-semibold uppercase text-blue-700">Detected Variables</div>
+                <div className="space-y-2">
+                  {extractedVariables.map((variable) => (
+                    <div key={variable.name} className="flex items-start gap-2 text-sm">
+                      <span className="inline-block rounded bg-blue-100 px-2 py-0.5 font-mono text-xs text-blue-800">
+                        {`{{${variable.name}}}`}
+                      </span>
+                      <span className="text-gray-600">{variable.description}</span>
                     </div>
-                  )}
-                  
-                  {mode !== 'VARIABLES' && (preview.sections.opening || preview.sections.context) && (
-                    <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
-                      <div className="space-y-3 text-sm text-gray-800">
-                        {preview.sections.opening && (
-                          <div>
-                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Opening</div>
-                            <div>{preview.sections.opening}</div>
-                          </div>
-                        )}
-                        {preview.sections.context && (
-                          <div>
-                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Context</div>
-                            <div>{preview.sections.context}</div>
-                          </div>
-                        )}
-                        {preview.sections.releaseValve && (
-                          <div>
-                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Release Valve</div>
-                            <div>{preview.sections.releaseValve}</div>
-                          </div>
-                        )}
-                        {preview.sections.close && (
-                          <div>
-                            <div className="mb-1 text-xs font-semibold uppercase text-gray-500">Close</div>
-                            <div>{preview.sections.close}</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  ))}
+                </div>
+              </div>
+            )}
 
-                  <div className="rounded-md border border-gray-200 bg-white p-4">
-                    <div className="mb-2 text-xs font-semibold uppercase text-gray-500">
-                      {mode === 'VARIABLES' ? 'Template with Variables' : 'Full Message'}
-                    </div>
-                    <div className="text-sm text-gray-800 whitespace-pre-wrap font-mono" style={{ fontFamily: mode === 'VARIABLES' ? 'monospace' : 'inherit' }}>
-                      {preview.content}
+            {path === 'MANUAL' ? (
+              <>
+                <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-lg font-semibold text-gray-900">Your Template</h2>
+                  <textarea
+                    value={preview.content}
+                    onChange={(e) => {
+                      setPreview({ content: e.target.value, sections: {} });
+                      const vars = extractVariables(e.target.value);
+                      setExtractedVariables(vars);
+                    }}
+                    rows={12}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    placeholder="Template content with {{variableName}} tags..."
+                  />
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-2">Insert variables:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {AVAILABLE_VARIABLES.map((variable) => (
+                        <button
+                          key={variable.name}
+                          type="button"
+                          onClick={() => {
+                            const textarea = document.querySelector('textarea');
+                            if (textarea) {
+                              const start = textarea.selectionStart;
+                              const end = textarea.selectionEnd;
+                              const text = preview.content;
+                              const before = text.substring(0, start);
+                              const after = text.substring(end);
+                              const variable = `{{${variable.name}}}`;
+                              const newContent = before + variable + after;
+                              setPreview({ content: newContent, sections: {} });
+                              const vars = extractVariables(newContent);
+                              setExtractedVariables(vars);
+                              setTimeout(() => {
+                                textarea.focus();
+                                textarea.setSelectionRange(start + variable.length, start + variable.length);
+                              }, 0);
+                            }
+                          }}
+                          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-mono text-gray-700 hover:bg-gray-50"
+                          title={variable.description}
+                        >
+                          {`{{${variable.name}}}`}
+                        </button>
+                      ))}
                     </div>
                   </div>
+                </div>
+                {preview.content && (() => {
+                  const previewData = TemplateTestService.generatePreview(preview.content, { formData: form });
+                  return (
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-6">
+                      <h2 className="mb-4 text-lg font-semibold text-gray-900">Preview (with sample data)</h2>
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {previewData.hydratedContent}
+                      </div>
+                      <div className="mt-3 text-xs text-gray-500">
+                        Sample: {previewData.testData?.contactData?.firstName} {previewData.testData?.contactData?.lastName} at {previewData.testData?.contactData?.companyName}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            ) : path === 'TEMPLATES' ? (
+              <>
+                <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-lg font-semibold text-gray-900">Template Content</h2>
+                  <textarea
+                    value={preview.content}
+                    onChange={(e) => {
+                      setPreview({ content: e.target.value, sections: {} });
+                      const vars = extractVariables(e.target.value);
+                      setExtractedVariables(vars);
+                    }}
+                    rows={12}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  />
+                </div>
+                {preview.content && (() => {
+                  const previewData = TemplateTestService.generatePreview(preview.content, { formData: form });
+                  return (
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-6">
+                      <h2 className="mb-4 text-lg font-semibold text-gray-900">Preview (with sample data)</h2>
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {previewData.hydratedContent}
+                      </div>
+                      <div className="mt-3 text-xs text-gray-500">
+                        Sample: {previewData.testData?.contactData?.firstName} {previewData.testData?.contactData?.lastName} at {previewData.testData?.contactData?.companyName}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-lg font-semibold text-gray-900">
+                    {(path === 'AI' && aiSubPath === 'QUICK_IDEA') ? 'Quick Note Template' : (path === 'AI' && aiSubPath === 'USE_PRESET') ? 'Preset Template' : 'Generated Template'}
+                  </h2>
+                  <textarea
+                    value={preview.content}
+                    onChange={(e) => {
+                      setPreview({ content: e.target.value, sections: {} });
+                      const vars = extractVariables(e.target.value);
+                      setExtractedVariables(vars);
+                    }}
+                    rows={12}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    placeholder="Template content with {{variableName}} tags..."
+                  />
+                </div>
+                {preview.content && (() => {
+                  const previewData = TemplateTestService.generatePreview(preview.content, { formData: form });
+                  return (
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-6">
+                      <h2 className="mb-4 text-lg font-semibold text-gray-900">Preview (with sample data)</h2>
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {previewData.hydratedContent}
+                      </div>
+                      <div className="mt-3 text-xs text-gray-500">
+                        Sample: {previewData.testData?.contactData?.firstName} {previewData.testData?.contactData?.lastName} at {previewData.testData?.contactData?.companyName}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
 
-                  {templateBaseId && (
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      disabled={saving || !preview.content.trim()}
-                      className="w-full rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                    >
-                      {saving ? 'Saving...' : 'Save Template'}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-md border border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
-                  {templateBaseId
-                    ? 'Click "Refresh Preview" to generate the message'
-                    : mode === 'VARIABLES'
-                      ? 'Fill in the form and click "Generate Template" to create a template with variable tags'
-                      : 'Fill in the form and click "Build Template" to see a preview'}
-                </div>
-              )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('form');
+                  setError(null);
+                }}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={handleBuild}
+                disabled={saving}
+                className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {saving ? 'Saving...' : 'Save Template'}
+              </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
+  return null;
+}

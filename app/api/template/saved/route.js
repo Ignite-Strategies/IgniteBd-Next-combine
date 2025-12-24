@@ -19,7 +19,7 @@ export async function GET(request) {
       );
     }
 
-    // Get all saved templates for this company, with their template bases
+    // Get all saved templates for this company, with their template bases, variables, and business context
     const templates = await prisma.outreach_templates.findMany({
       where: {
         template_bases: {
@@ -35,8 +35,24 @@ export async function GET(request) {
             typeOfPerson: true,
             whyReachingOut: true,
             whatWantFromThem: true,
+            // Business context fields
+            timeSinceConnected: true,
+            timeHorizon: true,
+            knowledgeOfBusiness: true,
+            myBusinessDescription: true,
+            desiredOutcome: true,
+            contextNotes: true,
             createdAt: true,
             updatedAt: true,
+          },
+        },
+        template_variables: {
+          select: {
+            id: true,
+            variableName: true,
+            variableType: true,
+            description: true,
+            isRequired: true,
           },
         },
       },
