@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, Mail, Loader2, CheckCircle2, Plus, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
@@ -11,8 +10,6 @@ import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 function ComposeContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { ownerId } = useOwner();
   const { companyHQId } = useCompanyHQ();
   
