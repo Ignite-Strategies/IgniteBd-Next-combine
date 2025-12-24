@@ -9,16 +9,13 @@
 
 const { PrismaClient } = require('@prisma/client');
 
-// DATABASE_URL from env.rtf
-const DATABASE_URL = 'postgresql://ignitedb_ef0c_user:HeBA6pylnkfG2HCgBtz1FZVWflq8SF9J@dpg-d3sdl46uk2gs73c5f0ig-a.oregon-postgres.render.com/ignitedb_ef0c';
+if (!process.env.DATABASE_URL) {
+  console.error('❌ ERROR: DATABASE_URL environment variable is required');
+  console.error('   Set it in your .env.local file or export it before running this script');
+  process.exit(1);
+}
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: DATABASE_URL,
-    },
-  },
-});
+const prisma = new PrismaClient();
 
 async function duplicatePresentation() {
   const originalPresentationId = 'cmic5u0z70001lh04ixfps3bs';

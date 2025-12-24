@@ -1,12 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL || "postgresql://neondb_owner:npg_EG2wV8XQWmek@ep-summer-firefly-ad0yaaju-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
-    }
-  }
-});
+if (!process.env.DATABASE_URL) {
+  console.error('❌ ERROR: DATABASE_URL environment variable is required');
+  console.error('   Set it in your .env.local file or export it before running this script');
+  process.exit(1);
+}
+
+const prisma = new PrismaClient();
 
 async function assignVerifiedSender() {
   const firebaseId = process.argv[2]; // Get from command line
