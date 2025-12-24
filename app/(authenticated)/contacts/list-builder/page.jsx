@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Users, Building2, Filter, CheckCircle, ArrowRight } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -8,7 +8,7 @@ import PageHeader from '@/components/PageHeader.jsx';
 const FILTER_OPTIONS = [
   {
     id: 'all',
-    name: 'No Filter',
+    name: 'Contacts',
     description: 'Select from all contacts in your CRM.',
     icon: Users,
   },
@@ -26,7 +26,7 @@ const FILTER_OPTIONS = [
   },
 ];
 
-export default function ContactListBuilderPage() {
+function ContactListBuilderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo');
@@ -146,5 +146,27 @@ export default function ContactListBuilderPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ContactListBuilderPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <PageHeader
+            title="Create Contact List"
+            subtitle="Select how you want to filter contacts"
+            backTo="/contacts/list-manager"
+            backLabel="Back to Lists"
+          />
+          <div className="flex items-center justify-center py-12">
+            <div className="text-gray-500">Loading...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <ContactListBuilderContent />
+    </Suspense>
   );
 }
