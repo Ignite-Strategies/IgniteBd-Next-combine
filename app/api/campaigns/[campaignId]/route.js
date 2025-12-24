@@ -49,12 +49,6 @@ export async function GET(request, { params }) {
           },
         },
         email_activities: {
-          include: {
-            email_events: {
-              orderBy: { occurred_at: 'desc' },
-              take: 50,
-            },
-          },
           orderBy: { createdAt: 'desc' },
           take: 100,
         },
