@@ -10,8 +10,11 @@ import { useOwner } from '@/hooks/useOwner';
  * SenderIdentityPanel Component
  * 
  * Shows current verified sender with option to change/select different sender
+ * Handles all sender-related logic - parent components should not duplicate this
+ * 
+ * @param {Function} onSenderChange - Optional callback when sender state changes (hasSender: boolean)
  */
-export default function SenderIdentityPanel() {
+export default function SenderIdentityPanel({ onSenderChange }) {
   const router = useRouter();
   const { ownerId } = useOwner();
   const [senderEmail, setSenderEmail] = useState(null);
@@ -23,16 +26,41 @@ export default function SenderIdentityPanel() {
   const [changingSender, setChangingSender] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load current sender status from DB
+  // Handle auth state changes - reset sender state when ownerId changes or becomes null
   useEffect(() => {
-    if (ownerId) {
-      loadSenderStatus();
+    if (!ownerId) {
+      // Auth state changed - user logged out or not authenticated
+      setSenderEmail(null);
+      setSenderName(null);
+      setLoading(false);
+      setError(null);
+      if (onSenderChange) {
+        onSenderChange(false);
+      }
+      return;
     }
+
+    // OwnerId exists - load sender status
+    loadSenderStatus();
   }, [ownerId]);
 
+  // Notify parent when sender state changes
+  useEffect(() => {
+    if (onSenderChange) {
+      onSenderChange(!!senderEmail);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [senderEmail]); // Only depend on senderEmail, not onSenderChange (callback is stable)
+
   const loadSenderStatus = async () => {
+    if (!ownerId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
       
       // Check DB for verified sender
       const response = await api.get('/api/outreach/verified-senders');
@@ -44,10 +72,24 @@ export default function SenderIdentityPanel() {
         if (email) {
           setSenderEmail(email);
           setSenderName(name);
+        } else {
+          // No sender found - clear state
+          setSenderEmail(null);
+          setSenderName(null);
         }
+      } else {
+        // API returned error - clear sender state
+        setSenderEmail(null);
+        setSenderName(null);
       }
     } catch (err) {
       console.error('Failed to load sender status:', err);
+      // On auth errors (401), clear sender state
+      if (err.response?.status === 401) {
+        setSenderEmail(null);
+        setSenderName(null);
+      }
+      setError(err.response?.data?.error || 'Failed to load sender status');
     } finally {
       setLoading(false);
     }
@@ -101,6 +143,9 @@ export default function SenderIdentityPanel() {
         setSenderName(sender.name);
         setShowChangeModal(false);
         setAvailableSenders([]);
+        setError(null);
+        // Reload sender status to ensure consistency
+        await loadSenderStatus();
       } else {
         setError(response.data?.error || 'Failed to update sender');
       }

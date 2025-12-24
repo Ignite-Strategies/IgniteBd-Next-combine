@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import sgMail from '@sendgrid/mail';
+import { checkSenderVerification } from '@/lib/sendgridSendersApi';
 
 /**
  * POST /api/outreach/verified-senders/validate
  * 
  * Validate that an email address is verified in SendGrid
- * This attempts to send a test email to verify the sender identity
+ * Actually checks SendGrid's API to verify sender status
  * 
  * Request body:
  * {
@@ -43,29 +43,64 @@ export async function POST(request) {
       );
     }
 
-    // Try to validate by attempting to check sender identity
-    // Note: SendGrid doesn't have a direct API to list verified senders
-    // We'll validate by checking if sending would work
-    // The actual validation happens when sending - SendGrid will reject if not verified
+    console.log(`🔍 Validating sender email: ${email}`);
     
-    // For now, we'll return success if email format is valid
-    // The real validation happens when actually sending
-    // Users should verify their sender in SendGrid dashboard first
+    // Actually check SendGrid API for verification status
+    const verificationResult = await checkSenderVerification(email);
     
+    console.log(`📋 Verification result:`, JSON.stringify(verificationResult, null, 2));
+    
+    if (!verificationResult.verified) {
+      return NextResponse.json({
+        success: false,
+        verified: false,
+        email,
+        sender: verificationResult.sender,
+        details: verificationResult.details,
+        error: verificationResult.details.message || 'Sender is not verified in SendGrid',
+        message: verificationResult.details.found
+          ? 'Sender exists in SendGrid but is not verified. Please complete verification in SendGrid dashboard (Settings > Sender Authentication).'
+          : 'Sender not found in SendGrid. Please add and verify this sender in SendGrid dashboard (Settings > Sender Authentication).',
+      }, { status: 400 });
+    }
+    
+    // Sender is verified
     return NextResponse.json({
       success: true,
+      verified: true,
       email,
-      message: 'Email format is valid. Make sure this email is verified in SendGrid dashboard (Settings > Sender Authentication).',
-      note: 'SendGrid will reject emails if the sender is not verified. Verify your sender identity in SendGrid dashboard before using.',
+      sender: verificationResult.sender,
+      details: verificationResult.details,
+      message: 'Sender is verified and ready to use',
     });
   } catch (error) {
-    console.error('Validate verified sender error:', error);
+    console.error('❌ Validate verified sender error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+    
+    // Provide helpful error messages
+    let errorMessage = error.message || 'Failed to validate verified sender';
+    let statusCode = 500;
+    
+    if (errorMessage.includes('Unauthorized') || errorMessage.includes('authentication')) {
+      statusCode = 401;
+    } else if (errorMessage.includes('forbidden') || errorMessage.includes('access')) {
+      statusCode = 403;
+      errorMessage = 
+        'SendGrid API key permissions issue. ' +
+        'Your API key needs "Sender Management" or "Full Access" permissions. ' +
+        'Please update your API key in SendGrid Settings → API Keys. ' +
+        'Original error: ' + errorMessage;
+    }
+    
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to validate verified sender',
+        error: errorMessage,
       },
-      { status: error.message?.includes('Unauthorized') ? 401 : 500 }
+      { status: statusCode }
     );
   }
 }

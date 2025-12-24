@@ -10,7 +10,27 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(request) {
   try {
-    const firebaseUser = await verifyFirebaseToken(request);
+    console.log('📧 GET /api/outreach/verified-senders - Request received');
+    
+    let firebaseUser;
+    try {
+      firebaseUser = await verifyFirebaseToken(request);
+      console.log('✅ Firebase token verified:', firebaseUser.uid);
+    } catch (authError) {
+      console.error('❌ Firebase authentication failed:', {
+        message: authError.message,
+        name: authError.name,
+        code: authError.code,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Authentication failed. Please sign in again.',
+          details: authError.message,
+        },
+        { status: 401 }
+      );
+    }
 
     const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
@@ -25,11 +45,18 @@ export async function GET(request) {
     });
 
     if (!owner) {
+      console.log('❌ Owner not found for firebaseId:', firebaseUser.uid);
       return NextResponse.json(
         { success: false, error: 'Owner not found' },
         { status: 404 }
       );
     }
+
+    console.log('✅ Owner found:', {
+      id: owner.id,
+      hasVerifiedEmail: !!owner.sendgridVerifiedEmail,
+      verifiedEmail: owner.sendgridVerifiedEmail,
+    });
 
     return NextResponse.json({
       success: true,
@@ -40,13 +67,31 @@ export async function GET(request) {
       name: owner.sendgridVerifiedName || process.env.SENDGRID_FROM_NAME || null,
     });
   } catch (error) {
-    console.error('Get verified sender error:', error);
+    console.error('❌ Get verified sender error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+    });
+    
+    // Don't double-handle auth errors (already handled above)
+    if (error.message?.includes('No authorization token') || 
+        error.message?.includes('Authentication failed')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Authentication failed. Please sign in again.',
+        },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       {
         success: false,
         error: error.message || 'Failed to get verified sender',
       },
-      { status: error.message?.includes('Unauthorized') ? 401 : 500 }
+      { status: 500 }
     );
   }
 }
@@ -63,7 +108,25 @@ export async function GET(request) {
  */
 export async function PUT(request) {
   try {
-    const firebaseUser = await verifyFirebaseToken(request);
+    let firebaseUser;
+    try {
+      firebaseUser = await verifyFirebaseToken(request);
+    } catch (authError) {
+      console.error('❌ Firebase authentication failed:', {
+        message: authError.message,
+        name: authError.name,
+        code: authError.code,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Authentication failed. Please sign in again.',
+          details: authError.message,
+        },
+        { status: 401 }
+      );
+    }
+    
     const body = await request.json();
     const { email, name } = body;
 
@@ -81,6 +144,35 @@ export async function PUT(request) {
         { success: false, error: 'Invalid email format' },
         { status: 400 }
       );
+    }
+
+    // Actually verify with SendGrid that this sender is verified
+    console.log(`🔍 Verifying sender ${email} with SendGrid before setting...`);
+    try {
+      // Lazy import to avoid module-level issues
+      const { checkSenderVerification } = await import('@/lib/sendgridSendersApi');
+      const verificationResult = await checkSenderVerification(email);
+      
+      if (!verificationResult.verified) {
+        console.log(`❌ Sender ${email} is not verified in SendGrid`);
+        return NextResponse.json(
+          {
+            success: false,
+            error: verificationResult.details.found
+              ? 'This sender exists in SendGrid but is not verified. Please complete verification in SendGrid dashboard (Settings > Sender Authentication) before using.'
+              : 'This sender is not found or verified in SendGrid. Please add and verify this sender in SendGrid dashboard (Settings > Sender Authentication) before using.',
+            details: verificationResult.details,
+          },
+          { status: 400 }
+        );
+      }
+      
+      console.log(`✅ Sender ${email} is verified in SendGrid`);
+    } catch (verificationError) {
+      console.error('❌ Failed to verify sender with SendGrid:', verificationError);
+      // If verification check fails (e.g., API permissions), still allow setting
+      // but log a warning - the actual send will fail if not verified
+      console.warn('⚠️ Could not verify sender with SendGrid API. Setting sender anyway, but actual sending may fail if not verified.');
     }
 
     const owner = await prisma.owners.update({

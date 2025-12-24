@@ -81,12 +81,32 @@ export async function POST(request) {
     const fromEmail = owner.sendgridVerifiedEmail;
     const fromName = owner.sendgridVerifiedName;
     
+    console.log('📋 Verified sender from DB:', {
+      fromEmail,
+      fromName,
+      ownerId: owner.id,
+    });
+    
     // Strict enforcement: sender must be verified
     if (!fromEmail) {
+      console.error('❌ No verified sender email found in owner record');
       return NextResponse.json(
         { 
           success: false, 
           error: 'Sender not verified. Please verify your sender identity before sending emails. Go to compose page and click "Change" next to From field to verify your sender.' 
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(fromEmail)) {
+      console.error('❌ Invalid email format in verified sender:', fromEmail);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Invalid sender email format: ${fromEmail}. Please verify your sender identity again.` 
         },
         { status: 400 }
       );
@@ -123,6 +143,34 @@ export async function POST(request) {
         { success: false, error: 'to, subject, and body are required' },
         { status: 400 }
       );
+    }
+
+    // Optional: Double-check sender is verified in SendGrid before sending
+    // This helps catch cases where sender was removed or unverified in SendGrid
+    try {
+      const { checkSenderVerification } = await import('@/lib/sendgridSendersApi');
+      console.log('🔍 Double-checking sender verification with SendGrid before sending...');
+      const verificationCheck = await checkSenderVerification(fromEmail);
+      
+      if (!verificationCheck.verified) {
+        console.error('❌ Sender verification check failed:', verificationCheck.details);
+        return NextResponse.json(
+          {
+            success: false,
+            error: verificationCheck.details.found
+              ? 'This sender exists in SendGrid but is not verified. Please complete verification in SendGrid dashboard (Settings > Sender Authentication) before sending.'
+              : 'This sender is not found or verified in SendGrid. Please add and verify this sender in SendGrid dashboard (Settings > Sender Authentication) before sending.',
+            details: verificationCheck.details,
+          },
+          { status: 400 }
+        );
+      }
+      console.log('✅ Sender verification confirmed with SendGrid');
+    } catch (verificationError) {
+      // If verification check fails (e.g., API permissions), log warning but continue
+      // The actual send will fail if not verified, but at least we tried
+      console.warn('⚠️ Could not verify sender with SendGrid API before sending:', verificationError.message);
+      console.warn('⚠️ Proceeding with send - SendGrid will reject if sender is not verified');
     }
 
     // Send email via SendGrid

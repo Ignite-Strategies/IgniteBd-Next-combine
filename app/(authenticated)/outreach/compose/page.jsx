@@ -27,9 +27,8 @@ function ComposeContent() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   
-  // Verified sender state (for display only - SenderIdentityPanel manages verification)
-  const [senderEmail, setSenderEmail] = useState('');
-  const [loadingSender, setLoadingSender] = useState(true);
+  // Verified sender state - managed by SenderIdentityPanel, we just track it for validation
+  const [hasVerifiedSender, setHasVerifiedSender] = useState(false);
   
   // Quick contact creation modal
   const [showQuickContactModal, setShowQuickContactModal] = useState(false);
@@ -41,32 +40,14 @@ function ComposeContent() {
   const [savingQuickContact, setSavingQuickContact] = useState(false);
   const [quickContactError, setQuickContactError] = useState(null);
   
-  // Load verified sender status on mount
-  const loadVerifiedSender = async () => {
-    if (!ownerId) return;
-    
-    try {
-      setLoadingSender(true);
-      const response = await api.get('/api/outreach/verified-senders');
-      
-      if (response.data?.success) {
-        const email = response.data.verifiedEmail;
-        
-        if (email) {
-          setSenderEmail(email);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load sender status:', err);
-    } finally {
-      setLoadingSender(false);
-    }
-  };
-  
-  // Load data on mount
+  // Handle auth state changes - reset form if ownerId changes
   useEffect(() => {
-    if (ownerId) {
-      loadVerifiedSender();
+    if (!ownerId) {
+      // Auth state changed - user logged out or not authenticated
+      setHasVerifiedSender(false);
+      setError(null);
+      setSuccess(false);
+      // Don't clear form fields - let user keep their work
     }
   }, [ownerId]);
   
@@ -131,13 +112,14 @@ function ComposeContent() {
       return;
     }
 
+    // Auth check - ensure user is authenticated
     if (!ownerId) {
-      setError('Owner ID not found. Please refresh the page.');
+      setError('Authentication required. Please sign in and try again.');
       return;
     }
 
-    // Check for verified sender
-    if (!senderEmail) {
+    // Check for verified sender - SenderIdentityPanel manages this, we just validate
+    if (!hasVerifiedSender) {
       setError('Please verify your sender email before sending. Click "Add" next to From field.');
       return;
     }
@@ -175,11 +157,21 @@ function ComposeContent() {
     } catch (err) {
       console.error('Send error:', err);
       const errorMessage = err.response?.data?.error || err.message || 'Failed to send email';
+      const statusCode = err.response?.status;
       
+      // Handle auth errors separately
+      if (statusCode === 401 || errorMessage.includes('Authentication failed') || errorMessage.includes('Unauthorized')) {
+        setError('Your session has expired. Please sign in again and try sending.');
+        setHasVerifiedSender(false); // Reset sender state on auth failure
+        return;
+      }
+      
+      // Handle SendGrid-specific errors
       if (errorMessage.includes('credits') || errorMessage.includes('exceeded')) {
         setError('SendGrid account has exceeded email credits. Please upgrade your plan or wait for credits to reset. Contact your administrator for help.');
-      } else if (errorMessage.includes('authentication') || errorMessage.includes('Unauthorized')) {
-        setError('SendGrid authentication failed. Please contact your administrator to check API key configuration.');
+      } else if (errorMessage.includes('not verified') || errorMessage.includes('sender')) {
+        setError(errorMessage);
+        setHasVerifiedSender(false); // Reset sender state if verification issue
       } else {
         setError(errorMessage);
       }
@@ -216,31 +208,17 @@ function ComposeContent() {
             )}
 
             <form onSubmit={handleSend} className="space-y-4">
-              {/* Sender Identity */}
+              {/* Sender Identity - SenderIdentityPanel handles all sender logic */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   From
                 </label>
-                
-                {!senderEmail && !loadingSender ? (
-                  <div className="rounded-lg border-2 border-dashed border-yellow-300 bg-yellow-50 p-4">
-                    <div className="flex items-start gap-3">
-                      <Mail className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-yellow-900 mb-1">
-                          Add a verified sender email with SendGrid
-                        </p>
-                        <p className="text-xs text-yellow-700 mb-3">
-                          You need to verify your business email address with SendGrid before sending emails. 
-                          This ensures your emails are delivered successfully.
-                        </p>
-                        <SenderIdentityPanel />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <SenderIdentityPanel />
-                )}
+                <SenderIdentityPanel 
+                  onSenderChange={(hasSender) => {
+                    // Callback to track if sender is verified
+                    setHasVerifiedSender(hasSender);
+                  }}
+                />
               </div>
               
               {/* Contact Selector */}

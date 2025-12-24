@@ -72,15 +72,18 @@ export async function POST(request) {
     
     // Filter verified senders - only verified === true
     const verifiedSenders = allSenders.filter(sender => {
-      const email = sender.from?.email || sender.email;
+      const senderEmail = sender.from?.email || sender.email;
       const isVerified = sender.verified === true;
       
-      console.log(`  ${email}: verified=${isVerified}`);
+      console.log(`  📧 ${senderEmail}: verified=${isVerified}, locked=${sender.locked || false}`);
+      if (sender.verification) {
+        console.log(`     Verification status: ${sender.verification.status || 'unknown'}, reason: ${sender.verification.reason || 'none'}`);
+      }
       
       return isVerified;
     });
     
-    console.log(`✅ Found ${verifiedSenders.length} verified senders`);
+    console.log(`✅ Found ${verifiedSenders.length} verified senders out of ${allSenders.length} total`);
 
     // STEP 3: If email provided, check if it exists in verified senders
     if (email) {
