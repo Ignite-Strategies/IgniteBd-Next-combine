@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
   display: "swap",
   preload: false, // Only preload the main font
+  adjustFontFallback: false, // Prevent font fallback preloading
 });
 
 export const metadata = {

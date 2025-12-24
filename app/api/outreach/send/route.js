@@ -32,11 +32,16 @@ import { sendOutreachEmail } from '@/lib/services/outreachSendService';
  * }
  */
 export async function POST(request) {
+  console.log('📧 POST /api/outreach/send - Request received');
+  
   try {
     // Verify Firebase authentication
+    console.log('🔐 Verifying Firebase token...');
     const firebaseUser = await verifyFirebaseToken(request);
+    console.log('✅ Firebase token verified:', firebaseUser.uid);
 
     // Get or find Owner record
+    console.log('👤 Fetching owner record...');
     let owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
       select: {
@@ -48,6 +53,7 @@ export async function POST(request) {
         lastName: true,
       },
     });
+    console.log('👤 Owner found:', owner ? { id: owner.id, hasVerifiedEmail: !!owner.sendgridVerifiedEmail } : 'NOT FOUND');
 
     if (!owner) {
       // Create owner if it doesn't exist
@@ -87,6 +93,7 @@ export async function POST(request) {
     }
 
     // Parse request body
+    console.log('📝 Parsing request body...');
     const body = await request.json();
     const { 
       to, 
@@ -99,9 +106,19 @@ export async function POST(request) {
       sequenceId,
       sequenceStepId,
     } = body;
+    
+    console.log('📝 Request body parsed:', {
+      to,
+      subject,
+      bodyLength: emailBody?.length,
+      contactId,
+      tenantId,
+      hasToName: !!toName,
+    });
 
     // Validation
     if (!to || !subject || !emailBody) {
+      console.error('❌ Validation failed:', { to: !!to, subject: !!subject, body: !!emailBody });
       return NextResponse.json(
         { success: false, error: 'to, subject, and body are required' },
         { status: 400 }
@@ -109,6 +126,7 @@ export async function POST(request) {
     }
 
     // Send email via SendGrid
+    console.log('📧 Calling sendOutreachEmail service...');
     const { statusCode, messageId } = await sendOutreachEmail({
       to,
       toName,
@@ -125,6 +143,7 @@ export async function POST(request) {
     });
 
     // Log email activity in database (Apollo-like tracking)
+    console.log('💾 Logging email activity to database...');
     const emailActivity = await prisma.email_activities.create({
       data: {
         owner_id: ownerId,
@@ -142,6 +161,7 @@ export async function POST(request) {
     });
 
     console.log(`✅ Email activity logged: ${emailActivity.id}`);
+    console.log(`✅ Email sent successfully - MessageId: ${messageId}, StatusCode: ${statusCode}`);
 
     return NextResponse.json({
       success: true,
@@ -150,7 +170,26 @@ export async function POST(request) {
       emailActivityId: emailActivity.id,
     });
   } catch (error) {
-    console.error('Outreach send error:', error);
+    // Enhanced error logging for debugging
+    console.error('❌ Outreach send error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      response: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        body: error.response.body,
+        headers: error.response.headers,
+      } : null,
+      request: {
+        url: request.url,
+        method: request.method,
+      },
+    });
+    
+    // Log full error object for Vercel
+    console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     
     // Determine appropriate status code
     let statusCode = 500;
@@ -166,6 +205,7 @@ export async function POST(request) {
       {
         success: false,
         error: error.message || 'Failed to send outreach email',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       },
       { status: statusCode }
     );
