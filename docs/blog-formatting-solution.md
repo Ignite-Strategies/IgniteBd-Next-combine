@@ -243,3 +243,4 @@ If blogs still look like big blocks of text:
 5. Verify the formatter is being imported correctly
 
 **The formatter is designed to be forgiving and handle various text formats automatically.**
+

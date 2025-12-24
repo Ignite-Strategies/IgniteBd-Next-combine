@@ -92,3 +92,4 @@ npx prisma migrate resolve --applied "20250130000000_add_email_campaigns_trackin
 ```
 
 Then push the resolved state.
+

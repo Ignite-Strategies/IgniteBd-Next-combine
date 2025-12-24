@@ -88,3 +88,4 @@ process.on('SIGTERM', async () => {
 console.log(`🌙 Keep-alive started. Pinging database every ${PING_INTERVAL / 1000 / 60} minutes...`);
 console.log('Press Ctrl+C to stop\n');
 
+

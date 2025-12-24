@@ -113,3 +113,4 @@ The callback route itself is clean. The error is likely from:
 - This is expected behavior - hook tries to hydrate, but user isn't authenticated yet
 - Solution: Frontend should wait for OAuth session before calling hydrate
 
+

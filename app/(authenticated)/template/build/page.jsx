@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Eye, Edit, Save, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { hydrateTemplate, extractVariables, getDefaultVariableValues } from '@/lib/templateVariables';
 
 const RELATIONSHIP_OPTIONS = [
   { value: 'COLD', label: 'Cold' },
@@ -106,6 +108,8 @@ export default function TemplateBuildPage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [extractedVariables, setExtractedVariables] = useState([]);
+  const [viewMode, setViewMode] = useState('build'); // 'build' | 'preview'
+  const [templateContent, setTemplateContent] = useState(''); // Direct template content editor (for VARIABLES mode)
 
   // Generate title from form fields
   const generateTitle = (typeOfPerson) => {
@@ -223,11 +227,14 @@ export default function TemplateBuildPage() {
       if (response.data?.success) {
         if (mode === 'VARIABLES') {
           // For variable templates
+          const generatedContent = response.data.template;
+          setTemplateContent(generatedContent);
           setPreview({
-            content: response.data.template,
+            content: generatedContent,
             sections: {},
           });
           setExtractedVariables(response.data.variables || []);
+          setViewMode('build'); // Switch to build mode to edit
         } else {
           // For regular templates
           setPreview({
@@ -418,6 +425,29 @@ export default function TemplateBuildPage() {
       },
     };
   };
+
+  // Get preview with filler text
+  const getPreviewWithFiller = () => {
+    if (!templateContent && !preview.content) return '';
+    const content = templateContent || preview.content;
+    const defaultValues = getDefaultVariableValues();
+    return hydrateTemplate(content, defaultValues, {
+      timeHorizon: form.timeHorizon || defaultValues.timeHorizon,
+      desiredOutcome: form.desiredOutcome || defaultValues.desiredOutcome,
+      myBusinessName: form.myBusinessDescription || defaultValues.myBusinessName,
+      myRole: defaultValues.myRole,
+      knowledgeOfBusiness: form.knowledgeOfBusiness,
+    });
+  };
+
+  // Update extracted variables when template content changes
+  useEffect(() => {
+    if (mode === 'VARIABLES' && templateContent) {
+      const vars = extractVariables(templateContent);
+      setExtractedVariables(vars);
+      setPreview({ content: templateContent, sections: {} });
+    }
+  }, [templateContent, mode]);
 
   const handleSave = async () => {
     // If no templateBaseId yet, create it first

@@ -127,3 +127,4 @@ export default function PeopleLayout({ children }) {
     </ContactsContext.Provider>
   );
 }
+

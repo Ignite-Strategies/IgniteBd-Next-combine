@@ -12,11 +12,36 @@ import crypto from 'crypto';
  * SendGrid webhook events:
  * - processed, delivered, opened, clicked, bounce, dropped, etc.
  */
+
+// Route segment config for Next.js App Router
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request) {
   try {
     // Get raw body for signature verification
     const rawBody = await request.text();
-    const body = JSON.parse(rawBody);
+    
+    // Validate raw body
+    if (!rawBody || rawBody.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Empty webhook payload' },
+        { status: 400 }
+      );
+    }
+
+    // Parse JSON with error handling
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (parseError) {
+      console.error('❌ Failed to parse webhook JSON:', parseError);
+      console.error('Raw body:', rawBody.substring(0, 500)); // Log first 500 chars
+      return NextResponse.json(
+        { success: false, error: 'Invalid JSON payload' },
+        { status: 400 }
+      );
+    }
 
     // Verify webhook signature (if SENDGRID_SIGNING_KEY is configured)
     const signingKey = process.env.SENDGRID_SIGNING_KEY;
@@ -54,26 +79,59 @@ export async function POST(request) {
         event: eventType,
         sg_message_id: messageId,
         timestamp,
-        custom_arg_owner_id: ownerId,
-        custom_arg_contact_id: contactId,
-        custom_arg_tenant_id: tenantId,
       } = event;
 
+      // Extract custom args - SendGrid sends them as custom_arg_* fields (snake_case)
+      // SendGrid converts camelCase customArgs to snake_case in webhooks
+      // e.g., customArgs: { ownerId: "123" } becomes custom_arg_owner_id: "123"
+      const ownerId = event.custom_arg_owner_id || event['custom_arg_owner_id'];
+      const contactId = event.custom_arg_contact_id || event['custom_arg_contact_id'];
+      const tenantId = event.custom_arg_tenant_id || event['custom_arg_tenant_id'];
+      const campaignId = event.custom_arg_campaign_id || event['custom_arg_campaign_id'];
+      const sequenceId = event.custom_arg_sequence_id || event['custom_arg_sequence_id'];
+      const sequenceStepId = event.custom_arg_sequence_step_id || event['custom_arg_sequence_step_id'];
+      
+      // Debug logging for custom args (only log if ownerId is missing - indicates a problem)
+      if (!ownerId && eventType !== 'spamreport' && eventType !== 'unsubscribe') {
+        console.warn('⚠️ Webhook event missing ownerId in custom args:', {
+          eventType,
+          email,
+          availableCustomArgs: Object.keys(event).filter(k => k.startsWith('custom_arg_')),
+          // Log first few custom args to see what's available
+          sampleCustomArgs: Object.entries(event)
+            .filter(([k]) => k.startsWith('custom_arg_'))
+            .slice(0, 5)
+            .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {}),
+        });
+      }
+
       // Extract messageId from sg_message_id (format: <messageId@domain>)
-      const cleanMessageId = messageId?.split('@')[0] || messageId;
+      // Handle both formats: "messageId@domain" and just "messageId"
+      let cleanMessageId = null;
+      if (messageId) {
+        if (typeof messageId === 'string' && messageId.includes('@')) {
+          cleanMessageId = messageId.split('@')[0];
+        } else {
+          cleanMessageId = messageId.toString();
+        }
+      }
 
       if (!cleanMessageId) {
-        console.warn('⚠️ Webhook event missing messageId:', event);
+        console.warn('⚠️ Webhook event missing messageId:', {
+          eventType: event?.event,
+          email: event?.email,
+          rawMessageId: messageId,
+        });
+        results.push({ 
+          messageId: null, 
+          event: eventType || 'unknown', 
+          status: 'skipped',
+          reason: 'missing_message_id'
+        });
         continue;
       }
 
       try {
-        // Extract additional custom args for campaign/sequence tracking
-        const {
-          custom_arg_campaign_id: campaignId,
-          custom_arg_sequence_id: sequenceId,
-          custom_arg_sequence_step_id: sequenceStepId,
-        } = event;
 
         // Find email activity by messageId
         const emailActivity = await prisma.email_activities.findUnique({
@@ -107,19 +165,28 @@ export async function POST(request) {
             },
           });
 
-          console.log(`✅ Updated email activity ${emailActivity.id}: ${eventType}`);
-          results.push({ messageId: cleanMessageId, event: eventType, status: 'updated' });
+          console.log(`✅ Updated email activity ${emailActivity.id}: ${eventType} for messageId ${cleanMessageId}`);
+          results.push({ 
+            messageId: cleanMessageId, 
+            event: eventType, 
+            status: 'updated',
+            emailActivityId: emailActivity.id
+          });
         } else {
           // If activity doesn't exist, create it (in case webhook arrives before DB write)
+          // IMPORTANT: ownerId is required to create activity - without it we can't track
           if (ownerId) {
+            // Convert ownerId to string if it's not already (SendGrid might send as number)
+            const ownerIdStr = ownerId.toString();
+            
             const newActivity = await prisma.email_activities.create({
               data: {
-                owner_id: ownerId,
-                contact_id: contactId || null,
-                tenant_id: tenantId || null,
-                campaign_id: campaignId || null,
-                sequence_id: sequenceId || null,
-                sequence_step_id: sequenceStepId || null,
+                owner_id: ownerIdStr,
+                contact_id: contactId ? contactId.toString() : null,
+                tenant_id: tenantId ? tenantId.toString() : null,
+                campaign_id: campaignId ? campaignId.toString() : null,
+                sequence_id: sequenceId ? sequenceId.toString() : null,
+                sequence_step_id: sequenceStepId ? sequenceStepId.toString() : null,
                 email: email || 'unknown',
                 subject: 'Unknown', // Webhook doesn't include subject
                 body: '', // Webhook doesn't include body
@@ -141,11 +208,36 @@ export async function POST(request) {
               },
             });
 
-            console.log(`✅ Created email activity ${newActivity.id} from webhook: ${eventType}`);
-            results.push({ messageId: cleanMessageId, event: eventType, status: 'created' });
+            console.log(`✅ Created email activity ${newActivity.id} from webhook: ${eventType} for messageId ${cleanMessageId}`);
+            results.push({ 
+              messageId: cleanMessageId, 
+              event: eventType, 
+              status: 'created',
+              emailActivityId: newActivity.id
+            });
           } else {
-            console.warn(`⚠️ Webhook event missing ownerId, cannot create activity: ${cleanMessageId}`);
-            results.push({ messageId: cleanMessageId, event: eventType, status: 'skipped' });
+            console.warn(`⚠️ Webhook event missing ownerId, cannot create activity:`, {
+              messageId: cleanMessageId,
+              eventType,
+              email,
+              // Log all custom args to debug
+              customArgs: {
+                ownerId: event.custom_arg_owner_id,
+                contactId: event.custom_arg_contact_id,
+                tenantId: event.custom_arg_tenant_id,
+                campaignId: event.custom_arg_campaign_id,
+                sequenceId: event.custom_arg_sequence_id,
+                sequenceStepId: event.custom_arg_sequence_step_id,
+              },
+              // Log full event for debugging (first 500 chars)
+              eventPreview: JSON.stringify(event).substring(0, 500),
+            });
+            results.push({ 
+              messageId: cleanMessageId, 
+              event: eventType, 
+              status: 'skipped',
+              reason: 'missing_owner_id'
+            });
           }
         }
       } catch (error) {
@@ -160,11 +252,13 @@ export async function POST(request) {
       results,
     });
   } catch (error) {
-    console.error('SendGrid webhook error:', error);
+    console.error('❌ SendGrid webhook error:', error);
+    console.error('Error stack:', error.stack);
     return NextResponse.json(
       {
         success: false,
         error: error.message || 'Failed to process webhook',
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
       },
       { status: 500 }
     );

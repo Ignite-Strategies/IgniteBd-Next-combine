@@ -9,7 +9,7 @@ import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
-import { hydrateTemplate } from '@/lib/templateVariables';
+import { hydrateTemplate as replaceTemplateVariables } from '@/lib/templateVariables';
 
 // Component that uses useSearchParams - needs to be separate for Suspense
 function ComposeContent() {
@@ -277,12 +277,12 @@ function ComposeContent() {
         };
         
         // Replace variables in subject
-        finalSubject = hydrateTemplate(subject, contactData);
+        finalSubject = replaceTemplateVariables(subject, contactData);
         // Also handle {{company}} as alias for {{companyName}}
         finalSubject = finalSubject.replace(/\{\{company\}\}/g, contactData.companyName || '');
         
         // Replace variables in body
-        finalBody = hydrateTemplate(body, contactData);
+        finalBody = replaceTemplateVariables(body, contactData);
         // Also handle {{company}} as alias for {{companyName}}
         finalBody = finalBody.replace(/\{\{company\}\}/g, contactData.companyName || '');
       }

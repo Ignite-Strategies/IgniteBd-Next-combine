@@ -38,3 +38,4 @@ try {
   console.error('❌ Migration failed:', error.message);
   process.exit(1);
 }
+
