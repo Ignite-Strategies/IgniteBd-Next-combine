@@ -2,14 +2,13 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send, Mail, Loader2, CheckCircle2, Sparkles, Plus, X } from 'lucide-react';
+import { Send, Mail, Loader2, CheckCircle2, Plus, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
-import { hydrateTemplate as replaceTemplateVariables } from '@/lib/templateVariables';
 
 function ComposeContent() {
   const router = useRouter();
@@ -19,18 +18,12 @@ function ComposeContent() {
   
   // Form state
   const [selectedContact, setSelectedContact] = useState(null);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [to, setTo] = useState('');
   const [toName, setToName] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [contactId, setContactId] = useState('');
   const [tenantId, setTenantId] = useState('');
-  
-  // Template & hydration state
-  const [templates, setTemplates] = useState([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
-  const [hydrating, setHydrating] = useState(false);
   
   // UI state
   const [sending, setSending] = useState(false);
@@ -39,7 +32,6 @@ function ComposeContent() {
   
   // Verified sender state (for display only - SenderIdentityPanel manages verification)
   const [senderEmail, setSenderEmail] = useState('');
-  const [senderName, setSenderName] = useState('');
   const [loadingSender, setLoadingSender] = useState(true);
   
   // Quick contact creation modal
@@ -62,11 +54,9 @@ function ComposeContent() {
       
       if (response.data?.success) {
         const email = response.data.verifiedEmail;
-        const name = response.data.verifiedName;
         
         if (email) {
           setSenderEmail(email);
-          setSenderName(name);
         }
       }
     } catch (err) {
@@ -76,32 +66,12 @@ function ComposeContent() {
     }
   };
   
-  // Load templates on mount
-  const loadTemplates = async () => {
-    if (!companyHQId) return;
-    
-    try {
-      setLoadingTemplates(true);
-      const response = await api.get(`/api/template/saved?companyHQId=${companyHQId}`);
-      if (response.data?.success && response.data.templates) {
-        setTemplates(response.data.templates);
-      }
-    } catch (err) {
-      console.error('Failed to load templates:', err);
-    } finally {
-      setLoadingTemplates(false);
-    }
-  };
-  
   // Load data on mount
   useEffect(() => {
     if (ownerId) {
       loadVerifiedSender();
     }
-    if (companyHQId) {
-      loadTemplates();
-    }
-  }, [ownerId, companyHQId]);
+  }, [ownerId]);
   
   // Quick contact creation
   const handleQuickSaveContact = async () => {
@@ -155,42 +125,6 @@ function ComposeContent() {
       setTenantId(companyHQId);
     }
   };
-  
-  // Handle template selection
-  const handleTemplateSelect = (template) => {
-    setSelectedTemplate(template);
-    setSubject(template.template_bases?.title || '');
-    setBody(template.content || '');
-  };
-  
-  // Hydrate template with contact data (manual trigger only)
-  const hydrateTemplate = async (contact, template = selectedTemplate) => {
-    if (!template || !contact) {
-      setError('Please select both a template and a contact to hydrate.');
-      return;
-    }
-    
-    try {
-      setHydrating(true);
-      const response = await api.post('/api/template/hydrate-with-contact', {
-        templateId: template.id,
-        contactId: contact.id,
-      });
-      
-      if (response.data?.success && response.data.hydratedContent) {
-        setBody(response.data.hydratedContent);
-        
-        if (template.template_bases?.title) {
-          setSubject(template.template_bases.title);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to hydrate template:', err);
-      setError('Failed to hydrate template with contact data');
-    } finally {
-      setHydrating(false);
-    }
-  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -216,42 +150,12 @@ function ComposeContent() {
     setSuccess(false);
 
     try {
-      // Replace variables in subject and body
-      // Always provide contactData (even if empty) to prevent undefined errors
-      const contactData = selectedContact ? {
-        firstName: selectedContact.firstName || '',
-        lastName: selectedContact.lastName || '',
-        fullName: selectedContact.fullName || `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || '',
-        companyName: selectedContact.companyName || selectedContact.company?.companyName || '',
-        company: selectedContact.companyName || selectedContact.company?.companyName || '', // Alias for company
-        email: selectedContact.email || '',
-        title: selectedContact.title || '',
-      } : {
-        // Default empty values when no contact is selected
-        firstName: '',
-        lastName: '',
-        fullName: '',
-        companyName: '',
-        company: '',
-        email: '',
-        title: '',
-      };
-      
-      // Replace variables in subject (always call, even with empty data)
-      let finalSubject = replaceTemplateVariables(subject, contactData);
-      // Also handle {{company}} as alias for {{companyName}}
-      finalSubject = finalSubject.replace(/\{\{company\}\}/g, contactData.companyName || '');
-      
-      // Replace variables in body (always call, even with empty data)
-      let finalBody = replaceTemplateVariables(body, contactData);
-      // Also handle {{company}} as alias for {{companyName}}
-      finalBody = finalBody.replace(/\{\{company\}\}/g, contactData.companyName || '');
-
+      // Send email directly - no template variable replacement
       const response = await api.post('/api/outreach/send', {
         to,
         toName: toName || undefined,
-        subject: finalSubject,
-        body: finalBody,
+        subject,
+        body,
         contactId: contactId || undefined,
         tenantId: tenantId || undefined,
       });
@@ -266,7 +170,6 @@ function ComposeContent() {
         setContactId('');
         setTenantId('');
         setSelectedContact(null);
-        setSelectedTemplate(null);
         
         setTimeout(() => setSuccess(false), 3000);
       } else {
@@ -287,16 +190,6 @@ function ComposeContent() {
       setSending(false);
     }
   };
-
-  const variableOptions = [
-    { name: 'firstName', label: 'First Name' },
-    { name: 'lastName', label: 'Last Name' },
-    { name: 'fullName', label: 'Full Name' },
-    { name: 'company', label: 'Company' },
-    { name: 'companyName', label: 'Company Name' },
-    { name: 'email', label: 'Email' },
-    { name: 'title', label: 'Title' },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -376,60 +269,6 @@ function ComposeContent() {
                 />
               </div>
 
-              {/* Template Selector */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Select Template (Optional)
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedTemplate?.id || ''}
-                    onChange={(e) => {
-                      const template = templates.find(t => t.id === e.target.value);
-                      if (template) {
-                        handleTemplateSelect(template);
-                      } else {
-                        setSelectedTemplate(null);
-                      }
-                    }}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-200"
-                    disabled={loadingTemplates}
-                  >
-                    <option value="">-- No template (compose manually) --</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.template_bases?.title || 'Untitled Template'}
-                      </option>
-                    ))}
-                  </select>
-                  {loadingTemplates && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                {selectedTemplate && selectedContact && (
-                  <button
-                    type="button"
-                    onClick={() => hydrateTemplate(selectedContact)}
-                    disabled={hydrating}
-                    className="mt-2 flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700"
-                  >
-                    {hydrating ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Hydrating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-3 w-3" />
-                        Re-hydrate with contact data
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-
               {/* To (auto-filled from contact) */}
               <div>
                 <label htmlFor="to" className="block text-sm font-medium text-gray-700 mb-1">
@@ -483,37 +322,6 @@ function ComposeContent() {
                   Message <span className="text-red-500">*</span>
                 </label>
                 
-                {/* Template Variables Helper */}
-                <div className="mb-2 flex flex-wrap gap-2">
-                  <span className="text-xs text-gray-500">Insert Variables:</span>
-                  {variableOptions.map((variable) => (
-                    <button
-                      key={variable.name}
-                      type="button"
-                      onClick={() => {
-                        const textarea = document.getElementById('body');
-                        if (!textarea) return;
-
-                        const variableTag = `{{${variable.name}}}`;
-                        const cursorPos = textarea.selectionStart || body.length;
-                        const textBefore = body.substring(0, cursorPos);
-                        const textAfter = body.substring(cursorPos);
-                        setBody(`${textBefore}${variableTag}${textAfter}`);
-                        
-                        setTimeout(() => {
-                          const newPos = cursorPos + variableTag.length;
-                          textarea.setSelectionRange(newPos, newPos);
-                          textarea.focus();
-                        }, 0);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition"
-                      title={`Insert ${variable.label}`}
-                    >
-                      {`{{${variable.name}}}`}
-                    </button>
-                  ))}
-                </div>
-                
                 <textarea
                   id="body"
                   value={body}
@@ -521,11 +329,8 @@ function ComposeContent() {
                   required
                   rows={10}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  placeholder="Hey {{firstName}}, saw your work at {{company}}..."
+                  placeholder="Type your message here..."
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  Use variables like {{firstName}}, {{company}}, etc. They'll be replaced when sending.
-                </p>
               </div>
 
               {/* Send Button */}
