@@ -558,33 +558,50 @@ function ComposeContent() {
                     )}
                   </label>
                   
-                  {/* Template Variables Helper */}
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    <span className="text-xs text-gray-500">Variables:</span>
-                    {['firstName', 'lastName', 'fullName', 'company', 'email'].map((varName) => (
-                      <button
-                        key={varName}
-                        type="button"
-                        onClick={() => {
-                          const cursorPos = document.getElementById('body')?.selectionStart || body.length;
-                          const textBefore = body.substring(0, cursorPos);
-                          const textAfter = body.substring(cursorPos);
-                          setBody(`${textBefore}{{${varName}}}${textAfter}`);
-                          // Set cursor position after inserted variable
-                          setTimeout(() => {
+                  {/* Variable Insertion Helper - Simple click-to-insert, no hydration */}
+                  <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-blue-900">Insert Variables:</span>
+                      <span className="text-xs text-blue-700">Click to add to your message</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { name: 'firstName', label: 'First Name' },
+                        { name: 'lastName', label: 'Last Name' },
+                        { name: 'fullName', label: 'Full Name' },
+                        { name: 'company', label: 'Company' },
+                        { name: 'companyName', label: 'Company Name' },
+                        { name: 'email', label: 'Email' },
+                        { name: 'title', label: 'Title' },
+                      ].map(({ name, label }) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
                             const textarea = document.getElementById('body');
-                            if (textarea) {
-                              const newPos = cursorPos + `{{${varName}}}`.length;
+                            if (!textarea) return;
+                            
+                            const cursorPos = textarea.selectionStart || body.length;
+                            const textBefore = body.substring(0, cursorPos);
+                            const textAfter = body.substring(cursorPos);
+                            const variableTag = `{{${name}}}`;
+                            
+                            setBody(`${textBefore}${variableTag}${textAfter}`);
+                            
+                            // Set cursor position after inserted variable
+                            setTimeout(() => {
+                              const newPos = cursorPos + variableTag.length;
                               textarea.setSelectionRange(newPos, newPos);
                               textarea.focus();
-                            }
-                          }, 0);
-                        }}
-                        className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50 transition"
-                      >
-                        {`{{${varName}}}`}
-                      </button>
-                    ))}
+                            }, 0);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition"
+                          title={`Insert ${label}`}
+                        >
+                          {`{{${name}}}`}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   
                   <textarea
@@ -600,7 +617,7 @@ function ComposeContent() {
                     placeholder="Hey {{firstName}}, saw your work at {{company}}..."
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Use variables like {{firstName}}, {{company}}, etc. They'll be replaced when sending.
+                    Variables like {{firstName}}, {{company}}, etc. will be replaced with contact data when sending.
                   </p>
                 </div>
 
