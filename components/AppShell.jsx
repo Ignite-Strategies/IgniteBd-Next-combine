@@ -53,7 +53,6 @@ const PUBLIC_ROUTES = [
   '/',
   '/signin',
   '/signup',
-  '/splash',
   '/login',
   '/welcome',
   '/company',
@@ -61,7 +60,7 @@ const PUBLIC_ROUTES = [
 ];
 
 export default function AppShell({ children }) {
-  const pathname = usePathname();
+  const pathname = usePathname(); // Only used for sidebar routing, not navbar
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const hasHydratedRef = useRef(false);
 
@@ -131,21 +130,15 @@ export default function AppShell({ children }) {
     return CRM_ROUTES.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  const showNavigation = useMemo(() => {
-    // Only hide navigation on truly public routes (signup/signin) when NOT authenticated
-    if (!isAuthenticated) {
-      return false;
-    }
-    // If authenticated, show navigation everywhere except signup/signin pages
-    if (!pathname) return false;
-    return !['/signup', '/signin', '/login'].some((route) => pathname.startsWith(route));
-  }, [pathname, isAuthenticated]);
+  // MVP1: Global navbar - show whenever authenticated, period
+  // No pathname checking - just auth state
+  const showNavigation = isAuthenticated;
 
-  // Show navigation when authenticated (except on signup/signin pages)
+  // Show navigation whenever authenticated
   if (showNavigation) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Top Navigation Bar - Only on authenticated pages */}
+        {/* Top Navigation Bar - Global component, shows on all authenticated pages */}
         <Navigation />
         
         {/* Sidebar - Only render when showSidebar is true */}
