@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Loader2, CheckCircle2, TrendingUp, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
+import { useOwner } from '@/hooks/useOwner';
 
 export default function AssessmentPage() {
   const router = useRouter();
+  const { ownerId, hydrated: ownerHydrated } = useOwner();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [companyHQId, setCompanyHQId] = useState('');
@@ -53,8 +55,13 @@ export default function AssessmentPage() {
       console.warn('Failed to parse stored company:', err);
     }
 
-    // Check for existing assessment
+    // Check for existing assessment - WAIT FOR AUTH
     const fetchExistingAssessment = async () => {
+      // CRITICAL: Wait for auth to be ready before making API calls
+      if (!ownerId || !ownerHydrated) {
+        return;
+      }
+      
       if (!storedCompanyHQId) return;
       
       try {
@@ -84,7 +91,7 @@ export default function AssessmentPage() {
     };
 
     fetchExistingAssessment();
-  }, []);
+  }, [ownerId, ownerHydrated]); // Wait for auth before fetching
 
   const handleChange = (e) => {
     const { name, value } = e.target;

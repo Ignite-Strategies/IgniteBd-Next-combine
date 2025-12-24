@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit, Trash2, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/api';
+import { useOwner } from '@/hooks/useOwner';
 
 function PersonasPageContent() {
   // TODO WEDNESDAY FIX #3: Personas must be tenant-scoped using companyHQId, not ownerId
   // All persona queries must include companyHQId parameter
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { ownerId, hydrated: ownerHydrated } = useOwner();
   const [personas, setPersonas] = useState([]);
   const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
@@ -20,9 +22,14 @@ function PersonasPageContent() {
   const [deletingId, setDeletingId] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Auto-fetch personas on mount and when companyHQId changes
+  // Auto-fetch personas on mount and when companyHQId changes - WAIT FOR AUTH
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // CRITICAL: Wait for auth to be ready before making API calls
+    if (!ownerId || !ownerHydrated) {
+      return;
+    }
 
     const storedCompanyHQId =
       window.localStorage.getItem('companyHQId') ||
@@ -74,7 +81,7 @@ function PersonasPageContent() {
     };
 
     fetchPersonas();
-  }, []);
+  }, [ownerId, ownerHydrated]); // Wait for auth before fetching
 
   // Check for success message in URL params
   useEffect(() => {

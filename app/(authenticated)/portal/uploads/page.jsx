@@ -4,18 +4,23 @@ import { UploadButton } from "@uploadthing/react";
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import api from "@/lib/api";
+import { useOwner } from "@/hooks/useOwner";
 
 export default function UploadsPage() {
+  const { ownerId, hydrated: ownerHydrated } = useOwner();
   const [uploaded, setUploaded] = useState([]);
   const [existingUploads, setExistingUploads] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch existing uploads
+    // Fetch existing uploads - WAIT FOR AUTH
     const fetchUploads = async () => {
+      // CRITICAL: Wait for auth to be ready before making API calls
+      if (!ownerId || !ownerHydrated) {
+        return;
+      }
+      
       try {
-        // Get ownerId from localStorage or use "joel" as default
-        const ownerId = localStorage.getItem("ownerId") || "joel";
         const response = await api.get(`/api/uploads?ownerId=${ownerId}`);
         if (response.data?.success) {
           setExistingUploads(response.data.uploads || []);
@@ -28,7 +33,7 @@ export default function UploadsPage() {
     };
 
     fetchUploads();
-  }, []);
+  }, [ownerId, ownerHydrated]); // Wait for auth before fetching
 
   const handleUploadComplete = (res) => {
     console.log("Upload complete:", res);
