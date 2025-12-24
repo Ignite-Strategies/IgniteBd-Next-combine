@@ -2,7 +2,19 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TrendingUp, Users, FileText } from 'lucide-react';
+import {
+  TrendingUp,
+  UserCircle,
+  Package,
+  Brain,
+  Users,
+  MessageSquare,
+  GitBranch,
+  Building2,
+  FileText,
+  Calendar,
+  Settings,
+} from 'lucide-react';
 
 function Sidebar() {
   const pathname = usePathname();
@@ -13,11 +25,46 @@ function Sidebar() {
     return false;
   };
 
-  const sidebarItems = [
-    { key: 'dashboard', label: 'Dashboard', href: '/growth-dashboard', icon: TrendingUp },
-    { key: 'crm', label: 'CRM', href: '/crmdashboard', icon: Users },
-    { key: 'contacts', label: 'Contacts', href: '/contacts', icon: Users },
-    { key: 'content', label: 'Content', href: '/content', icon: FileText },
+  // Dashboard link (always first)
+  const dashboardItem = {
+    key: 'dashboard',
+    label: 'Growth Dashboard',
+    href: '/growth-dashboard',
+    icon: TrendingUp,
+  };
+
+  // Navigation groups
+  const navigationGroups = [
+    {
+      name: 'Growth Ops',
+      items: [
+        { key: 'personas', label: 'Personas', href: '/personas', icon: UserCircle },
+        { key: 'products', label: 'Products', href: '/products', icon: Package },
+        { key: 'bd-intelligence', label: 'BD Intelligence', href: '/bd-intelligence', icon: Brain },
+      ],
+    },
+    {
+      name: 'Engage',
+      items: [
+        { key: 'contacts', label: 'Contacts', href: '/contacts', icon: Users },
+        { key: 'outreach', label: 'Outreach', href: '/outreach', icon: MessageSquare },
+        { key: 'pipelines', label: 'Pipeline', href: '/pipelines', icon: GitBranch },
+        { key: 'companies', label: 'Company Hub', href: '/companies', icon: Building2 },
+      ],
+    },
+    {
+      name: 'Attract',
+      items: [
+        { key: 'content', label: 'Content', href: '/content', icon: FileText },
+        { key: 'events', label: 'Events', href: '/events', icon: Calendar },
+      ],
+    },
+    {
+      name: 'Settings',
+      items: [
+        { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+      ],
+    },
   ];
 
   return (
@@ -31,25 +78,61 @@ function Sidebar() {
         </Link>
       </div>
 
-      <nav className="p-4 space-y-1">
-        {sidebarItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                active
-                  ? 'border border-red-200 bg-red-50 text-red-700'
-                  : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <Icon className="h-5 w-5" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+      <nav className="p-4 space-y-6">
+        {/* Dashboard Link - Always first */}
+        <div>
+          <ul className="space-y-1">
+            <li>
+              {(() => {
+                const Icon = dashboardItem.icon;
+                const active = isActive(dashboardItem.href);
+                return (
+                  <Link
+                    href={dashboardItem.href}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      active
+                        ? 'border border-red-200 bg-red-50 text-red-700'
+                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{dashboardItem.label}</span>
+                  </Link>
+                );
+              })()}
+            </li>
+          </ul>
+        </div>
+
+        {/* Navigation Groups */}
+        {navigationGroups.map((group) => (
+          <div key={group.name}>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              {group.name}
+            </h3>
+            <ul className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <li key={item.key}>
+                    <Link
+                      href={item.href}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        active
+                          ? 'border border-red-200 bg-red-50 text-red-700'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span>{item.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
     </div>
   );

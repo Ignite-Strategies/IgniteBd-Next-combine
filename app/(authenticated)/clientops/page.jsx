@@ -3,8 +3,6 @@
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
 import { 
-  FileText, 
-  Presentation, 
   Rocket, 
   FileCheck, 
   Box, 
@@ -14,65 +12,19 @@ import {
   Layers
 } from 'lucide-react';
 
-export default function ContentUXPage() {
+export default function ClientOpsPage() {
   const router = useRouter();
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Content UX"
-          subtitle="Create content: blog, branding, presentations, and manage client deliverables"
+          title="Client Operations"
+          subtitle="Manage client journey from proposal to contract sign to delivery"
         />
 
-        {/* Content Section */}
+        {/* Client Operations Section */}
         <div className="mt-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Content Studio</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Presentations */}
-            <div
-              onClick={() => router.push('/content/presentations')}
-              className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all hover:border-red-300"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="rounded-lg bg-red-100 p-3">
-                  <Presentation className="h-6 w-6 text-red-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Presentations</h3>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Draft, refine, and publish presentations for CLEs, webinars, and conferences.
-              </p>
-              <div className="flex items-center gap-2 text-sm font-semibold text-red-600">
-                <span>Get Started</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </div>
-
-            {/* Blog Posts */}
-            <div
-              onClick={() => router.push('/content/blog')}
-              className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-all hover:border-blue-300"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="rounded-lg bg-blue-100 p-3">
-                  <FileText className="h-6 w-6 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">Blog Posts</h3>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Create and manage blog content for your website.
-              </p>
-              <div className="flex items-center gap-2 text-sm font-semibold text-blue-600">
-                <span>Get Started</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Client Delivery Section */}
-        <div className="mt-12">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Client Operations</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Proposals */}
@@ -200,4 +152,3 @@ export default function ContentUXPage() {
     </div>
   );
 }
-

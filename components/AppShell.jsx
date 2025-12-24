@@ -16,7 +16,6 @@ const ROUTES_WITH_SIDEBAR = [
   '/outreach',
   '/pipelines',
   '/proposals',
-  '/ads',
   '/content',
   '/branding-hub',
   '/events',
@@ -29,14 +28,12 @@ const ROUTES_WITH_SIDEBAR = [
   '/client-operations/execution',
   '/billing',
   '/template',
-  '/crmdashboard',
   '/people',
   '/companies',
 ];
 
 // CRM-only routes that use CRMSidebar instead of full Sidebar
 const CRM_ROUTES = [
-  '/crmdashboard',
   '/people',
   '/people/lists',
   '/outreach',
