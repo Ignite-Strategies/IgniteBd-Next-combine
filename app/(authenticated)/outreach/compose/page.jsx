@@ -261,31 +261,36 @@ function ComposeContent() {
     setSuccess(false);
 
     try {
-      // Replace variables in subject and body if contact is selected
-      let finalSubject = subject;
-      let finalBody = body;
+      // Replace variables in subject and body
+      // Always provide contactData (even if empty) to prevent undefined errors
+      const contactData = selectedContact ? {
+        firstName: selectedContact.firstName || '',
+        lastName: selectedContact.lastName || '',
+        fullName: selectedContact.fullName || `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || '',
+        companyName: selectedContact.companyName || selectedContact.company?.companyName || '',
+        company: selectedContact.companyName || selectedContact.company?.companyName || '', // Alias for company
+        email: selectedContact.email || '',
+        title: selectedContact.title || '',
+      } : {
+        // Default empty values when no contact is selected
+        firstName: '',
+        lastName: '',
+        fullName: '',
+        companyName: '',
+        company: '',
+        email: '',
+        title: '',
+      };
       
-      if (selectedContact) {
-        const contactData = {
-          firstName: selectedContact.firstName || '',
-          lastName: selectedContact.lastName || '',
-          fullName: selectedContact.fullName || `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || '',
-          companyName: selectedContact.companyName || selectedContact.company?.companyName || '',
-          company: selectedContact.companyName || selectedContact.company?.companyName || '', // Alias for company
-          email: selectedContact.email || '',
-          title: selectedContact.title || '',
-        };
-        
-        // Replace variables in subject
-        finalSubject = replaceTemplateVariables(subject, contactData);
-        // Also handle {{company}} as alias for {{companyName}}
-        finalSubject = finalSubject.replace(/\{\{company\}\}/g, contactData.companyName || '');
-        
-        // Replace variables in body
-        finalBody = replaceTemplateVariables(body, contactData);
-        // Also handle {{company}} as alias for {{companyName}}
-        finalBody = finalBody.replace(/\{\{company\}\}/g, contactData.companyName || '');
-      }
+      // Replace variables in subject (always call, even with empty data)
+      let finalSubject = replaceTemplateVariables(subject, contactData);
+      // Also handle {{company}} as alias for {{companyName}}
+      finalSubject = finalSubject.replace(/\{\{company\}\}/g, contactData.companyName || '');
+      
+      // Replace variables in body (always call, even with empty data)
+      let finalBody = replaceTemplateVariables(body, contactData);
+      // Also handle {{company}} as alias for {{companyName}}
+      finalBody = finalBody.replace(/\{\{company\}\}/g, contactData.companyName || '');
 
       const response = await api.post('/api/outreach/send', {
         to,
