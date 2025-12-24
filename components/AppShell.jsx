@@ -1,10 +1,9 @@
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import api from '@/lib/api';
 import Sidebar from './Sidebar';
 import Navigation from './Navigation';
 
@@ -35,92 +34,28 @@ const ROUTES_WITH_SIDEBAR = [
 ];
 
 
-// Public routes that should NOT show navigation
-const PUBLIC_ROUTES = [
-  '/',
-  '/signin',
-  '/signup',
-  '/login',
-  '/welcome',
-  '/company',
-  '/profilesetup',
-];
-
 export default function AppShell({ children }) {
-  const pathname = usePathname(); // Only used for sidebar routing, not navbar
+  const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const hasHydratedRef = useRef(false);
 
-  // Check Firebase auth state - this is the source of truth
+  // Check Firebase auth state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsAuthenticated(!!user);
-      // Reset hydration flag when auth state changes
-      if (!user) {
-        hasHydratedRef.current = false;
-      }
     });
     return () => unsubscribe();
   }, []);
-
-  // Hydrate on every authenticated page except root, signin, signup
-  useEffect(() => {
-    // Skip hydration on root, signin, signup pages
-    if (!isAuthenticated || !pathname) return;
-    if (['/', '/signin', '/signup', '/login'].some(route => pathname === route || pathname.startsWith(`${route}/`))) {
-      return;
-    }
-
-    // Hydrate on every page navigation
-    const hydrate = async () => {
-      try {
-        console.log('🚀 AppShell: Hydrating owner data...');
-        const response = await api.get('/api/owner/hydrate');
-        
-        if (response.data?.success) {
-          const hydrateData = response.data;
-          const owner = hydrateData.owner;
-          const memberships = hydrateData.memberships || [];
-          
-          // Save to localStorage
-          localStorage.setItem('owner', JSON.stringify(owner));
-          localStorage.setItem('ownerId', owner.id);
-          localStorage.setItem('memberships', JSON.stringify(memberships));
-          
-          if (owner.companyHQId) {
-            localStorage.setItem('companyHQId', owner.companyHQId);
-          }
-          if (owner.companyHQ) {
-            localStorage.setItem('companyHQ', JSON.stringify(owner.companyHQ));
-          }
-          
-          console.log(`✅ AppShell: Hydrated with ${memberships.length} membership(s)`);
-        }
-      } catch (err) {
-        // Don't log 401 errors - expected when not authenticated
-        if (err.response?.status !== 401) {
-          console.error('❌ AppShell: Error hydrating:', err);
-        }
-      }
-    };
-
-    hydrate();
-  }, [pathname, isAuthenticated]);
 
   const showSidebar = useMemo(() => {
     if (!pathname) return false;
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  // MVP1: Global navbar - show whenever authenticated, period
-  // No pathname checking - just auth state
-  const showNavigation = isAuthenticated;
-
-  // Show navigation whenever authenticated
-  if (showNavigation) {
+  // Show navigation when authenticated
+  if (isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Top Navigation Bar - Global component, shows on all authenticated pages */}
+        {/* Top Navigation Bar - Global component */}
         <Navigation />
         
         {/* Sidebar - Only render when showSidebar is true */}
@@ -133,6 +68,6 @@ export default function AppShell({ children }) {
     );
   }
 
-  // For public routes (splash, login, welcome), render children without navigation
+  // For unauthenticated routes, render children without navigation
   return <>{children}</>;
 }
