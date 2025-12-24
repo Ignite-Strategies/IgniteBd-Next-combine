@@ -27,6 +27,27 @@ export async function GET(request, { params }) {
         owner_id: owner.id,
       },
       include: {
+        contact_lists: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            totalContacts: true,
+          },
+        },
+        outreach_template: {
+          include: {
+            template_bases: {
+              select: {
+                id: true,
+                title: true,
+                relationship: true,
+                typeOfPerson: true,
+                whyReachingOut: true,
+              },
+            },
+          },
+        },
         email_activities: {
           include: {
             email_events: {
@@ -119,8 +140,11 @@ export async function PATCH(request, { params }) {
       'name',
       'description',
       'status',
+      'contact_list_id',
+      'template_id',
       'subject',
       'preview_text',
+      'body',
       'from_email',
       'from_name',
       'scheduled_for',

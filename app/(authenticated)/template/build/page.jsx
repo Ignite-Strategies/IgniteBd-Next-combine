@@ -90,10 +90,10 @@ const TEMPLATE_PATHS = [
     color: 'purple',
   },
   {
-    id: 'TEMPLATES',
-    title: 'Build from Saved',
-    description: 'Start from a template you\'ve already built and customize it',
-    icon: FileText,
+    id: 'RELATIONSHIP_CONTEXT',
+    title: 'Use Relationship Context',
+    description: 'Choose a relationship type and we\'ll pre-fill the form for you',
+    icon: Users,
     color: 'green',
   },
 ];
@@ -129,14 +129,11 @@ export default function TemplateBuildPage() {
   
   // Step management
   const [step, setStep] = useState('landing'); // 'landing' | 'ai-choose' | 'form' | 'preview'
-  const [path, setPath] = useState(null); // 'MANUAL' | 'AI' | 'TEMPLATES'
+  const [path, setPath] = useState(null); // 'MANUAL' | 'AI' | 'RELATIONSHIP_CONTEXT'
   const [aiSubPath, setAiSubPath] = useState(null); // 'QUICK_IDEA' | 'RELATIONSHIP_HELPER' | 'USE_PRESET'
   
   // Form state
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [selectedExistingTemplate, setSelectedExistingTemplate] = useState(null);
-  const [existingTemplates, setExistingTemplates] = useState([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [idea, setIdea] = useState('');
   const [generating, setGenerating] = useState(false);
   const [manualContent, setManualContent] = useState('');
@@ -210,46 +207,14 @@ export default function TemplateBuildPage() {
   // Step 1: Choose path
   const handlePathSelect = async (pathId) => {
     setPath(pathId);
-    
-    // If AI path, show sub-options
-    if (pathId === 'AI') {
-      setStep('ai-choose');
-    } else {
-      setStep('form');
-      
-      // Load existing templates if TEMPLATES path
-      if (pathId === 'TEMPLATES' && companyHQId) {
-        await loadExistingTemplates();
-      }
-    }
-  };
-
-  // Step 1.5: Choose AI sub-option
-  const handleAiSubPathSelect = async (subPathId) => {
-    setAiSubPath(subPathId);
     setStep('form');
     
-    // If USE_PRESET, templates are already defined, no need to load
-    // If QUICK_IDEA or RELATIONSHIP_HELPER, proceed to form
-  };
-
-  // Load existing templates
-  const loadExistingTemplates = async () => {
-    if (!companyHQId) return;
-    
-    setLoadingTemplates(true);
-    try {
-      const response = await api.get(`/api/template/saved?companyHQId=${companyHQId}`);
-      if (response.data?.success && response.data?.templates) {
-        setExistingTemplates(response.data.templates);
-      }
-    } catch (err) {
-      console.error('Failed to load templates:', err);
-      setError('Failed to load existing templates');
-    } finally {
-      setLoadingTemplates(false);
+    // Load existing templates if TEMPLATES path
+    if (pathId === 'TEMPLATES' && companyHQId) {
+      await loadExistingTemplates();
     }
   };
+
 
   // Insert variable into manual content
   const insertVariable = (variableName) => {
@@ -273,32 +238,28 @@ export default function TemplateBuildPage() {
     }
   };
 
-  // Step 2: Handle existing template selection (for TEMPLATES path)
-  const handleExistingTemplateSelect = (template) => {
-    setSelectedExistingTemplate(template.id);
+  // Step 2: Handle relationship context selection (for RELATIONSHIP_CONTEXT path)
+  const handleRelationshipContextSelect = (preset) => {
+    setSelectedTemplate(preset.id);
+    const autoTitle = generateTitle(preset.typeOfPerson);
+    setForm({
+      title: autoTitle,
+      relationship: preset.relationship,
+      typeOfPerson: preset.typeOfPerson,
+      whyReachingOut: preset.whyReachingOut,
+      whatWantFromThem: preset.whatWantFromThem || '',
+      timeSinceConnected: '',
+      timeHorizon: '',
+      knowledgeOfBusiness: false,
+      myBusinessDescription: '',
+      desiredOutcome: '',
+    });
+    // Clear preview - user will generate after tweaking form
     setPreview({
-      content: template.content,
+      content: '',
+      subjectLine: '',
       sections: {},
     });
-    // Extract variables from template content
-    const vars = extractVariables(template.content);
-    setExtractedVariables(vars);
-    // Pre-fill form from template base
-    if (template.template_bases) {
-      const base = template.template_bases;
-      setForm({
-        title: base.title,
-        relationship: base.relationship,
-        typeOfPerson: base.typeOfPerson,
-        whyReachingOut: base.whyReachingOut,
-        whatWantFromThem: base.whatWantFromThem || '',
-        timeSinceConnected: base.timeSinceConnected || '',
-        timeHorizon: base.timeHorizon || '',
-        knowledgeOfBusiness: base.knowledgeOfBusiness || false,
-        myBusinessDescription: base.myBusinessDescription || '',
-        desiredOutcome: base.desiredOutcome || '',
-      });
-    }
   };
 
   // Step 2: Generate quick template (for QUICK_IDEA path - infers and generates in one step)
@@ -317,13 +278,14 @@ export default function TemplateBuildPage() {
         idea: idea.trim(),
       });
 
-      if (response.data?.success) {
-        // Set preview with generated template
-        setPreview({
-          content: response.data.template,
-          sections: {},
-          variables: response.data.variables || [],
-        });
+        if (response.data?.success) {
+          // Set preview with generated template
+          setPreview({
+            content: response.data.template,
+            subjectLine: '',
+            sections: {},
+            variables: response.data.variables || [],
+          });
         
         // Store inferred data for later use in template base creation
         if (response.data.inferred) {
@@ -374,7 +336,7 @@ export default function TemplateBuildPage() {
 
     try {
       // RELATIONSHIP_HELPER uses relationship-aware endpoint with logic rules
-      if (path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER') {
+      if (path === 'RELATIONSHIP_HELPER') {
         const response = await api.post('/api/template/generate-relationship-aware', {
           relationship: form.relationship,
           typeOfPerson: form.typeOfPerson,
@@ -391,6 +353,7 @@ export default function TemplateBuildPage() {
         if (response.data?.success) {
           setPreview({
             content: response.data.template,
+            subjectLine: '',
             sections: {},
             variables: response.data.variables || [],
           });
@@ -709,32 +672,26 @@ export default function TemplateBuildPage() {
           <div className="mb-6">
             <button
               onClick={() => {
-                if (path === 'AI') {
-                  setStep('ai-choose');
-                } else {
-                  setStep('landing');
-                  setPath(null);
-                }
+                setStep('landing');
+                setPath(null);
                 setError(null);
               }}
               className="mb-4 flex items-center text-sm text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              {path === 'AI' ? 'Back to AI options' : 'Back to choices'}
+              Back to choices
             </button>
             <h1 className="text-3xl font-semibold text-gray-900">
               {path === 'MANUAL' && 'Type Your Message'}
-              {path === 'AI' && aiSubPath === 'QUICK_IDEA' && 'Type Your Template Idea'}
-              {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && 'Relationship-Aware Template Builder'}
-              {path === 'AI' && aiSubPath === 'USE_PRESET' && 'Choose a Preset Template'}
-              {path === 'TEMPLATES' && 'Build from Saved Template'}
+              {path === 'QUICK_IDEA' && 'Type Your Template Idea'}
+              {path === 'RELATIONSHIP_HELPER' && 'Relationship-Aware Template Builder'}
+              {path === 'TEMPLATES' && 'Choose Existing Template'}
             </h1>
             <p className="mt-2 text-sm text-gray-600">
               {path === 'MANUAL' && 'Type your message and insert variables as needed'}
-              {path === 'AI' && aiSubPath === 'QUICK_IDEA' && 'Describe your idea and AI will create the template quickly'}
-              {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && 'Build a relationship-aware template with full context'}
-              {path === 'AI' && aiSubPath === 'USE_PRESET' && 'Select a preset template as a starting point'}
-              {path === 'TEMPLATES' && 'Select a saved template to customize and rebuild'}
+              {path === 'QUICK_IDEA' && 'Describe your idea and AI will create the template quickly'}
+              {path === 'RELATIONSHIP_HELPER' && 'Build a relationship-aware template with full context'}
+              {path === 'TEMPLATES' && 'Select a template you\'ve already built'}
             </p>
           </div>
 
@@ -794,54 +751,41 @@ export default function TemplateBuildPage() {
               </div>
             )}
 
-            {path === 'TEMPLATES' && (
+            {path === 'RELATIONSHIP_CONTEXT' && (
               <div className="space-y-4">
-                {loadingTemplates ? (
-                  <div className="text-center py-8 text-gray-500">Loading templates...</div>
-                ) : existingTemplates.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No saved templates found.</p>
-                    <p className="text-sm mt-2">Create a template first using Manual or AI Generate, then you can build from it here.</p>
+                <div className="rounded-md border border-green-200 bg-green-50 p-4">
+                  <p className="text-sm text-green-700">
+                    <strong>Relationship Context:</strong> Choose a relationship type below. We'll pre-fill the form fields to make it easier - you can tweak them, then generate your template.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {PREDEFINED_TEMPLATES.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleRelationshipContextSelect(preset)}
+                      className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
+                        selectedTemplate === preset.id
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-900">{preset.name}</div>
+                      <div className="mt-1 text-sm text-gray-600">{preset.description}</div>
+                    </button>
+                  ))}
+                </div>
+                {selectedTemplate && (
+                  <div className="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm text-blue-700">
+                      ✓ Relationship context selected. The form below is pre-filled. Review and tweak as needed, then click "Generate & Preview".
+                    </p>
                   </div>
-                ) : (
-                  <>
-                    <div className="space-y-3">
-                      {existingTemplates.map((template) => (
-                        <button
-                          key={template.id}
-                          type="button"
-                          onClick={() => handleExistingTemplateSelect(template)}
-                          className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
-                            selectedExistingTemplate === template.id
-                              ? 'border-red-500 bg-red-50'
-                              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="font-semibold text-gray-900">
-                            {template.template_bases?.title || 'Untitled Template'}
-                          </div>
-                          <div className="mt-1 text-sm text-gray-600">
-                            {template.template_bases?.typeOfPerson} • {template.template_bases?.relationship}
-                          </div>
-                          <div className="mt-2 text-xs text-gray-500 line-clamp-2">
-                            {template.content.substring(0, 100)}...
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    {selectedExistingTemplate && (
-                      <div className="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4">
-                        <p className="text-sm text-blue-700">
-                          ✓ Saved template selected. The form below is pre-filled with its context. Edit as needed, then continue to preview.
-                        </p>
-                      </div>
-                    )}
-                  </>
                 )}
               </div>
             )}
 
-            {path === 'AI' && aiSubPath === 'USE_PRESET' && (
+            {false && ( // USE_PRESET path removed
               <div className="space-y-4">
                 <div className="rounded-md border border-orange-200 bg-orange-50 p-4">
                   <p className="text-sm text-orange-700">
@@ -874,7 +818,7 @@ export default function TemplateBuildPage() {
               </div>
             )}
 
-            {path === 'AI' && aiSubPath === 'QUICK_IDEA' && (
+            {path === 'QUICK_IDEA' && (
               <div className="space-y-4">
                 <div className="rounded-md border border-purple-200 bg-purple-50 p-4">
                   <p className="text-sm text-purple-700">
@@ -990,8 +934,8 @@ export default function TemplateBuildPage() {
               </div>
             )}
 
-            {/* Shared form fields - shown for RELATIONSHIP_HELPER, MANUAL, TEMPLATES, USE_PRESET */}
-            {((path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER') || path === 'MANUAL' || path === 'TEMPLATES' || (path === 'AI' && aiSubPath === 'USE_PRESET')) && (
+            {/* Shared form fields - shown for RELATIONSHIP_HELPER, MANUAL, RELATIONSHIP_CONTEXT, USE_PRESET */}
+            {(path === 'RELATIONSHIP_HELPER' || path === 'MANUAL' || path === 'TEMPLATES') && (
               <div className="mt-6 space-y-4 border-t border-gray-200 pt-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -1094,7 +1038,7 @@ export default function TemplateBuildPage() {
                 >
                   Cancel
                 </button>
-                {path === 'AI' && aiSubPath === 'RELATIONSHIP_HELPER' && (
+                {path === 'RELATIONSHIP_HELPER' && (
                   <button
                     type="button"
                     onClick={handleGenerate}
@@ -1109,7 +1053,7 @@ export default function TemplateBuildPage() {
                     {generating ? 'Generating...' : 'Generate & Preview'}
                   </button>
                 )}
-                {path === 'AI' && aiSubPath === 'USE_PRESET' && selectedTemplate && (
+                {false && ( // USE_PRESET path removed
                   <button
                     type="button"
                     onClick={() => setStep('preview')}
@@ -1119,22 +1063,29 @@ export default function TemplateBuildPage() {
                     Continue to Preview
                   </button>
                 )}
-                {(path === 'MANUAL' || path === 'TEMPLATES') && (
+                {path === 'MANUAL' && (
                   <button
                     type="button"
-                    onClick={path === 'TEMPLATES' ? () => setStep('preview') : () => {
-                      setPreview({ content: manualContent, sections: {} });
+                    onClick={() => {
+                      setPreview({ content: manualContent, subjectLine: '', sections: {} });
                       const vars = extractVariables(manualContent);
                       setExtractedVariables(vars);
                       setStep('preview');
                     }}
-                    disabled={
-                      (path === 'MANUAL' && !manualContent.trim()) ||
-                      (path === 'TEMPLATES' && !selectedExistingTemplate)
-                    }
+                    disabled={!manualContent.trim()}
                     className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                   >
-                    {path === 'TEMPLATES' ? 'Continue to Preview' : 'Continue to Preview'}
+                    Continue to Preview
+                  </button>
+                )}
+                {path === 'RELATIONSHIP_CONTEXT' && (
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={generating || !selectedTemplate || !form.relationship || !form.typeOfPerson || !form.whyReachingOut.trim()}
+                    className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                  >
+                    {generating ? 'Generating...' : 'Generate & Preview'}
                   </button>
                 )}
               </div>
@@ -1197,7 +1148,7 @@ export default function TemplateBuildPage() {
               </p>
             </div>
 
-            {(path === 'MANUAL' || path === 'TEMPLATES') && extractedVariables.length > 0 && (
+            {(path === 'MANUAL' || path === 'RELATIONSHIP_CONTEXT') && extractedVariables.length > 0 && (
               <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
                 <div className="mb-2 text-xs font-semibold uppercase text-blue-700">Detected Variables</div>
                 <div className="space-y-2">
@@ -1278,7 +1229,7 @@ export default function TemplateBuildPage() {
                   );
                 })()}
               </>
-            ) : path === 'TEMPLATES' ? (
+            ) : path === 'RELATIONSHIP_CONTEXT' ? (
               <>
                 <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                   <h2 className="mb-4 text-lg font-semibold text-gray-900">Template Content</h2>
@@ -1312,7 +1263,7 @@ export default function TemplateBuildPage() {
               <>
                 <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                   <h2 className="mb-4 text-lg font-semibold text-gray-900">
-                    {(path === 'AI' && aiSubPath === 'QUICK_IDEA') ? 'Quick Note Template' : (path === 'AI' && aiSubPath === 'USE_PRESET') ? 'Preset Template' : 'Generated Template'}
+                    {path === 'QUICK_IDEA' ? 'Quick Note Template' : 'Generated Template'}
                   </h2>
                   <textarea
                     value={preview.content}

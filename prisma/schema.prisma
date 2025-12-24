@@ -481,9 +481,13 @@ model campaigns {
   // WHO - Contact list (reusable, modular)
   contact_list_id  String?
   contact_lists    contact_lists?     @relation(fields: [contact_list_id], references: [id], onDelete: SetNull)
-  // Email content (optional - can be in sequences)
+  // WHAT - Email template (optional - can be manual or from template)
+  template_id      String?
+  outreach_template outreach_templates? @relation(fields: [template_id], references: [id], onDelete: SetNull)
+  // Email content (optional - can be in sequences or from template)
   subject          String?
   preview_text     String?
+  body             String? // Email body content
   from_email       String?
   from_name        String?
   scheduled_for    DateTime?
@@ -512,6 +516,7 @@ model campaigns {
   @@index([status])
   @@index([created_at])
   @@index([contact_list_id])
+  @@index([template_id])
 }
 
 enum CampaignStatus {
@@ -1437,6 +1442,7 @@ model outreach_templates {
   updatedAt          DateTime             @updatedAt
   template_bases     template_bases       @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
   template_variables template_variables[]
+  campaigns          campaigns[]
 
   @@index([templateBaseId])
   @@index([createdAt])

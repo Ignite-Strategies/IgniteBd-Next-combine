@@ -32,6 +32,24 @@ export async function GET(request) {
       where,
       orderBy: { created_at: 'desc' },
       include: {
+        contact_lists: {
+          select: {
+            id: true,
+            name: true,
+            totalContacts: true,
+          },
+        },
+        outreach_template: {
+          select: {
+            id: true,
+            content: true,
+            template_bases: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
         email_activities: {
           select: {
             id: true,
