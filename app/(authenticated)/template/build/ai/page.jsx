@@ -2,7 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Users, ArrowRight } from 'lucide-react';
+import { Sparkles, Users, ArrowRight, ArrowLeft } from 'lucide-react';
+
+// Prevent prerendering - this page requires client-side state
+export const dynamic = 'force-dynamic';
 
 const AI_OPTIONS = [
   {
