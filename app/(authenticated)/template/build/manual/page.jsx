@@ -198,7 +198,8 @@ export default function ManualTemplatePage() {
             )}
           </div>
 
-          {manualContent && (() => {
+          {/* COMMENTED OUT: Preview generation temporarily disabled due to firstName variable issues during prerendering */}
+          {/* {manualContent && (() => {
             try {
               const previewData = TemplateTestService.generatePreview(manualContent, {});
               return (
@@ -213,7 +214,7 @@ export default function ManualTemplatePage() {
               console.error('Preview generation error:', error);
               return null;
             }
-          })()}
+          })()} */}
 
           <div className="flex gap-3">
             <button

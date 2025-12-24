@@ -184,7 +184,8 @@ export default function QuickIdeaPage() {
               />
             </div>
 
-            {mounted && preview.content && preview.content.trim() && (
+            {/* COMMENTED OUT: Preview generation temporarily disabled due to firstName variable issues during prerendering */}
+            {/* {mounted && preview.content && preview.content.trim() && (
               <div className="rounded-lg border border-green-200 bg-green-50 p-6">
                 <h2 className="mb-4 text-lg font-semibold text-gray-900">Preview (with sample data)</h2>
                 <div className="text-sm text-gray-800 whitespace-pre-wrap">
@@ -198,7 +199,7 @@ export default function QuickIdeaPage() {
                   })()}
                 </div>
               </div>
-            )}
+            )} */}
 
             <div className="flex gap-3">
               <button

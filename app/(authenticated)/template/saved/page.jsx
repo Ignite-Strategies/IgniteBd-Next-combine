@@ -360,8 +360,9 @@ export default function TemplateSavedPage() {
                             </div>
                           </div>
 
+                          {/* COMMENTED OUT: Preview generation temporarily disabled due to firstName variable issues during prerendering */}
                           {/* Preview with Sample Data */}
-                          {variables.length > 0 && (
+                          {/* {variables.length > 0 && (
                             <div className="rounded-md border border-green-200 bg-green-50 p-4">
                               <div className="mb-2 text-xs font-semibold uppercase text-green-700">
                                 Preview (with sample data)
@@ -377,7 +378,7 @@ export default function TemplateSavedPage() {
                                 })}
                               </div>
                             </div>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     );
