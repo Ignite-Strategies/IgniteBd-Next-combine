@@ -8,7 +8,7 @@ import Navigation from './Navigation';
 
 const ROUTES_WITH_SIDEBAR = [
   '/growth-dashboard',
-  '/contacts',
+  '/people',
   '/personas',
   '/persona',
   '/products',

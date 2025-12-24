@@ -46,7 +46,7 @@ function Sidebar() {
     {
       name: 'Engage',
       items: [
-        { key: 'contacts', label: 'Contacts', href: '/contacts', icon: Users },
+        { key: 'people', label: 'People', href: '/people', icon: Users },
         { key: 'outreach', label: 'Outreach', href: '/outreach', icon: MessageSquare },
         { key: 'pipelines', label: 'Pipeline', href: '/pipelines', icon: GitBranch },
         { key: 'companies', label: 'Company Hub', href: '/companies', icon: Building2 },

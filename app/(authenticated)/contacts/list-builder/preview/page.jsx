@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useContactLists } from '../../ContactListsContext';
 import { useContacts } from '../../ContactsContext';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import CompanySelector from '@/components/CompanySelector';
 import { OFFICIAL_PIPELINES, PIPELINE_STAGES } from '@/lib/config/pipelineConfig';
 
@@ -17,6 +18,7 @@ function ContactListPreviewContent() {
   
   const { contacts } = useContacts();
   const { addList } = useContactLists();
+  const { companyHQId } = useCompanyHQ();
   
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [listName, setListName] = useState('');
@@ -116,10 +118,16 @@ function ContactListPreviewContent() {
     setIsCreating(true);
     setError(null);
 
+    if (!companyHQId) {
+      alert('Company HQ ID not found. Please refresh the page.');
+      return;
+    }
+
     try {
       const contactIds = Array.from(selectedContacts);
       
       const response = await api.post('/api/contact-lists', {
+        companyHQId,
         name: listName.trim(),
         description: listDescription.trim() || undefined,
         type: 'static',

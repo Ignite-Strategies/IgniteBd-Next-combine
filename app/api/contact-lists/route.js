@@ -144,7 +144,7 @@ export async function POST(request) {
     }
 
     await getOwnerAndVerifyMembership(firebaseUser, companyHQId);
-    const { name, description, type, filters } = body;
+    const { name, description, type, filters, contactIds } = body;
 
     // Validate required fields
     if (!name || !name.trim()) {
@@ -172,9 +172,10 @@ export async function POST(request) {
     }
 
     // Create the list
+    const listId = `cl_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newList = await prisma.contact_lists.create({
       data: {
-        id: `cl_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: listId,
         companyId: companyHQId,
         name: name.trim(),
         description: description?.trim() || null,
@@ -183,6 +184,35 @@ export async function POST(request) {
         totalContacts: 0,
         isActive: true,
       },
+    });
+
+    // Associate contacts with the list if contactIds provided
+    let contactCount = 0;
+    if (contactIds && Array.isArray(contactIds) && contactIds.length > 0) {
+      // Update contacts to set their contactListId
+      // Note: This is a one-to-many relationship, so each contact can only be in one list
+      // If a contact is already in another list, we'll move them to this new list
+      const updateResult = await prisma.contact.updateMany({
+        where: {
+          id: { in: contactIds },
+          crmId: companyHQId, // Ensure contacts belong to this company
+        },
+        data: {
+          contactListId: listId,
+        },
+      });
+      contactCount = updateResult.count;
+
+      // Update the list's totalContacts count
+      await prisma.contact_lists.update({
+        where: { id: listId },
+        data: { totalContacts: contactCount },
+      });
+    }
+
+    // Fetch the list with updated count
+    const updatedList = await prisma.contact_lists.findUnique({
+      where: { id: listId },
       include: {
         _count: {
           select: {
@@ -194,13 +224,13 @@ export async function POST(request) {
 
     // Format the response
     const formattedList = {
-      id: newList.id,
-      name: newList.name,
-      description: newList.description,
-      type: newList.type,
-      totalContacts: newList._count.contacts,
-      createdAt: newList.createdAt.toISOString(),
-      updatedAt: newList.updatedAt.toISOString(),
+      id: updatedList.id,
+      name: updatedList.name,
+      description: updatedList.description,
+      type: updatedList.type,
+      totalContacts: updatedList._count.contacts,
+      createdAt: updatedList.createdAt.toISOString(),
+      updatedAt: updatedList.updatedAt.toISOString(),
     };
 
     return NextResponse.json({

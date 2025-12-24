@@ -121,7 +121,7 @@ export default function WelcomePage() {
         }
         
         // Route to growth dashboard (no gating)
-        router.push('/growth-dashboard');
+          router.push('/growth-dashboard');
       }
     } else {
       // No memberships - go to onboarding flow

@@ -8,20 +8,20 @@ import PageHeader from '@/components/PageHeader.jsx';
 const FILTER_OPTIONS = [
   {
     id: 'all',
-    name: 'All Contacts',
-    description: 'Include every contact currently in your CRM.',
+    name: 'No Filter',
+    description: 'Select from all contacts in your CRM.',
     icon: Users,
   },
   {
     id: 'company',
-    name: 'By Company',
-    description: 'Filter contacts by specific companies.',
+    name: 'Filter by Company',
+    description: 'Select contacts from specific companies.',
     icon: Building2,
   },
   {
     id: 'stage',
-    name: 'By Stage',
-    description: 'Filter contacts by pipeline stage.',
+    name: 'Filter by Stage',
+    description: 'Select contacts by pipeline stage.',
     icon: Filter,
   },
 ];
@@ -52,10 +52,10 @@ export default function ContactListBuilderPage() {
         />
 
         <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">
+          <h3 className="mb-6 text-lg font-semibold text-gray-900">
             Choose Filter Type
           </h3>
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {FILTER_OPTIONS.map((option) => {
               const Icon = option.icon;
               const active = selectedFilter === option.id;
@@ -64,13 +64,13 @@ export default function ContactListBuilderPage() {
                   key={option.id}
                   type="button"
                   onClick={() => setSelectedFilter(option.id)}
-                  className={`w-full rounded-xl border-2 p-4 text-left transition ${
+                  className={`rounded-xl border-2 p-6 text-left transition ${
                     active
                       ? 'border-indigo-500 bg-indigo-50'
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex flex-col items-start gap-4">
                     <div
                       className={`rounded-lg p-3 ${
                         active ? 'bg-indigo-100' : 'bg-gray-100'
@@ -78,16 +78,16 @@ export default function ContactListBuilderPage() {
                     >
                       <Icon className="h-6 w-6 text-gray-700" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
+                    <div className="flex-1 w-full">
+                      <div className="flex items-center justify-between mb-2">
                         <h4 className="font-semibold text-gray-900">
                           {option.name}
                         </h4>
                         {active && (
-                          <CheckCircle className="h-5 w-5 text-indigo-600" />
+                          <CheckCircle className="h-5 w-5 text-indigo-600 flex-shrink-0" />
                         )}
                       </div>
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="text-sm text-gray-600">
                         {option.description}
                       </p>
                     </div>
