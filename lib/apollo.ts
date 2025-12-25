@@ -12,10 +12,17 @@
  */
 
 const APOLLO_API_URL = 'https://api.apollo.io/api/v1';
-const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
 
-if (!APOLLO_API_KEY) {
-  console.warn('⚠️ APOLLO_API_KEY environment variable is not set');
+/**
+ * Get Apollo API key (lazy evaluation to avoid build-time execution)
+ * Environment variables should only be accessed at runtime, not during module load
+ */
+function getApolloApiKey() {
+  const apiKey = process.env.APOLLO_API_KEY;
+  if (!apiKey) {
+    throw new Error('APOLLO_API_KEY environment variable is not set');
+  }
+  return apiKey;
 }
 
 export interface ApolloPersonMatchResponse {
@@ -180,9 +187,7 @@ function normalizeLinkedInUrl(linkedinUrl: string): string {
 export async function lookupPerson(options: { linkedinUrl?: string; email?: string }): Promise<ApolloPersonMatchResponse> {
   const { linkedinUrl, email } = options;
 
-  if (!APOLLO_API_KEY) {
-    throw new Error('APOLLO_API_KEY environment variable is not set');
-  }
+  const apiKey = getApolloApiKey();
 
   if (!linkedinUrl && !email) {
     throw new Error('Either linkedinUrl or email is required');
@@ -206,7 +211,7 @@ export async function lookupPerson(options: { linkedinUrl?: string; email?: stri
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': APOLLO_API_KEY,
+        'X-Api-Key': apiKey,
       },
       body: JSON.stringify(requestBody),
     });
@@ -242,9 +247,7 @@ export async function lookupPerson(options: { linkedinUrl?: string; email?: stri
 export async function enrichPerson(options: { linkedinUrl?: string; email?: string }): Promise<ApolloPersonMatchResponse> {
   const { linkedinUrl, email } = options;
 
-  if (!APOLLO_API_KEY) {
-    throw new Error('APOLLO_API_KEY environment variable is not set');
-  }
+  const apiKey = getApolloApiKey();
 
   if (!linkedinUrl && !email) {
     throw new Error('Either linkedinUrl or email is required');
@@ -268,7 +271,7 @@ export async function enrichPerson(options: { linkedinUrl?: string; email?: stri
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': APOLLO_API_KEY,
+        'X-Api-Key': apiKey,
       },
       body: JSON.stringify(requestBody),
     });
@@ -300,9 +303,7 @@ export async function enrichPerson(options: { linkedinUrl?: string; email?: stri
  * @returns Promise<Object> Company data from Apollo
  */
 export async function searchCompanyByDomain(domain: string): Promise<Object> {
-  if (!APOLLO_API_KEY) {
-    throw new Error('APOLLO_API_KEY environment variable is not set');
-  }
+  const apiKey = getApolloApiKey();
 
   if (!domain) {
     throw new Error('Domain is required');
@@ -316,7 +317,7 @@ export async function searchCompanyByDomain(domain: string): Promise<Object> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': APOLLO_API_KEY,
+        'X-Api-Key': apiKey,
       },
       body: JSON.stringify({
         q_keywords: cleanDomain,

@@ -256,7 +256,6 @@ function ComposeContent() {
                   onChange={(e) => setTo(e.target.value)}
                   required
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  placeholder="prospect@example.com"
                 />
               </div>
 
@@ -271,7 +270,6 @@ function ComposeContent() {
                   value={toName}
                   onChange={(e) => setToName(e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  placeholder="John Doe"
                 />
               </div>
 
@@ -287,7 +285,6 @@ function ComposeContent() {
                   onChange={(e) => setSubject(e.target.value)}
                   required
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  placeholder="Quick intro"
                 />
               </div>
 
@@ -304,7 +301,6 @@ function ComposeContent() {
                   required
                   rows={10}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  placeholder="Type your message here..."
                 />
               </div>
 
@@ -358,7 +354,6 @@ function ComposeContent() {
                   onChange={(e) => setQuickContactData({ ...quickContactData, firstName: e.target.value })}
                   required
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="John"
                 />
               </div>
               <div>
@@ -370,7 +365,6 @@ function ComposeContent() {
                   onChange={(e) => setQuickContactData({ ...quickContactData, lastName: e.target.value })}
                   required
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="Doe"
                 />
               </div>
               <div>
@@ -382,7 +376,6 @@ function ComposeContent() {
                   onChange={(e) => setQuickContactData({ ...quickContactData, email: e.target.value })}
                   required
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="john.doe@example.com"
                 />
               </div>
               <div className="flex justify-end gap-3">

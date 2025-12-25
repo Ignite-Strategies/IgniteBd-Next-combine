@@ -145,34 +145,6 @@ export async function POST(request) {
       );
     }
 
-    // Optional: Double-check sender is verified in SendGrid before sending
-    // This helps catch cases where sender was removed or unverified in SendGrid
-    try {
-      const { checkSenderVerification } = await import('@/lib/sendgridSendersApi');
-      console.log('🔍 Double-checking sender verification with SendGrid before sending...');
-      const verificationCheck = await checkSenderVerification(fromEmail);
-      
-      if (!verificationCheck.verified) {
-        console.error('❌ Sender verification check failed:', verificationCheck.details);
-        return NextResponse.json(
-          {
-            success: false,
-            error: verificationCheck.details.found
-              ? 'This sender exists in SendGrid but is not verified. Please complete verification in SendGrid dashboard (Settings > Sender Authentication) before sending.'
-              : 'This sender is not found or verified in SendGrid. Please add and verify this sender in SendGrid dashboard (Settings > Sender Authentication) before sending.',
-            details: verificationCheck.details,
-          },
-          { status: 400 }
-        );
-      }
-      console.log('✅ Sender verification confirmed with SendGrid');
-    } catch (verificationError) {
-      // If verification check fails (e.g., API permissions), log warning but continue
-      // The actual send will fail if not verified, but at least we tried
-      console.warn('⚠️ Could not verify sender with SendGrid API before sending:', verificationError.message);
-      console.warn('⚠️ Proceeding with send - SendGrid will reject if sender is not verified');
-    }
-
     // Send email via SendGrid
     console.log('📧 Calling sendOutreachEmail service...');
     const { statusCode, messageId } = await sendOutreachEmail({
