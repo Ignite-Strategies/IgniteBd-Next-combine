@@ -1,3 +1,18 @@
+/**
+ * Sentry Server Configuration
+ * 
+ * This file is ONLY executed in Node.js server runtime (API routes, server components).
+ * It is automatically loaded by instrumentation.ts when NEXT_RUNTIME === 'nodejs'.
+ * 
+ * IMPORTANT: This config should NEVER be imported in:
+ * - Client components
+ * - Browser code
+ * - Client-side code
+ * 
+ * For client-side Sentry, use: sentry.client.config.ts (via SentryInit.jsx)
+ * For edge runtime Sentry, use: sentry.edge.config.ts (via instrumentation.ts)
+ */
+
 import * as Sentry from '@sentry/nextjs';
 
 Sentry.init({
@@ -17,5 +32,8 @@ Sentry.init({
       component: 'server',
     },
   },
+  
+  // Server-side does NOT include replayIntegration (client-only feature)
+  // Do NOT add replayIntegration here - it will cause errors
 });
 
