@@ -117,9 +117,17 @@ export function wrapApiHandler<T extends (...args: any[]) => Promise<any>>(
     } catch (error) {
       // Extract route from request if available
       const request = args[0];
-      const route = request?.url 
-        ? new URL(request.url).pathname 
-        : context?.route || 'unknown';
+      let route: string = 'unknown';
+      
+      if (request?.url) {
+        try {
+          route = new URL(request.url).pathname;
+        } catch {
+          route = typeof request.url === 'string' ? request.url : 'unknown';
+        }
+      } else if (context?.route) {
+        route = String(context.route);
+      }
 
       throw handleServerError(error, {
         ...context,
