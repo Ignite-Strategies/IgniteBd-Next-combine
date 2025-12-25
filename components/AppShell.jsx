@@ -2,8 +2,6 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import Sidebar from './Sidebar';
 import Navigation from './Navigation';
 
@@ -38,12 +36,29 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Check Firebase auth state
+  // Lazy load Firebase and check auth state (only in browser)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
+    if (typeof window === 'undefined') return;
+
+    let unsubscribe = null;
+
+    // Dynamically import Firebase to avoid loading during build/SSR
+    Promise.all([
+      import('firebase/auth'),
+      import('@/lib/firebase')
+    ]).then(([{ onAuthStateChanged }, firebaseModule]) => {
+      const auth = firebaseModule.auth;
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        setIsAuthenticated(!!user);
+      });
+    }).catch((err) => {
+      console.warn('Failed to initialize Firebase auth:', err);
+      setIsAuthenticated(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const showSidebar = useMemo(() => {
