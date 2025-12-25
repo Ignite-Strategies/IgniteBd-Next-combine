@@ -17,8 +17,5 @@ Sentry.init({
       component: 'server',
     },
   },
-  
-  // Capture unhandled promise rejections
-  captureUnhandledRejections: true,
 });
 

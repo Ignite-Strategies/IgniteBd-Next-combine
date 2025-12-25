@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
+import { handleServerError, getErrorStatusCode } from '@/lib/serverError';
 
 /**
  * GET /api/outreach/verified-senders
@@ -67,31 +68,20 @@ export async function GET(request) {
       name: owner.sendgridVerifiedName || process.env.SENDGRID_FROM_NAME || null,
     });
   } catch (error) {
-    console.error('❌ Get verified sender error:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      code: error.code,
+    // Handle error globally (logs to Vercel + Sentry)
+    const normalizedError = handleServerError(error, {
+      route: '/api/outreach/verified-senders',
     });
     
-    // Don't double-handle auth errors (already handled above)
-    if (error.message?.includes('No authorization token') || 
-        error.message?.includes('Authentication failed')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Authentication failed. Please sign in again.',
-        },
-        { status: 401 }
-      );
-    }
+    // Determine HTTP status code
+    const statusCode = getErrorStatusCode(normalizedError);
     
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to get verified sender',
+        error: normalizedError.message || 'Failed to get verified sender',
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }
@@ -194,13 +184,20 @@ export async function PUT(request) {
       verifiedName: owner.sendgridVerifiedName,
     });
   } catch (error) {
-    console.error('Set verified sender error:', error);
+    // Handle error globally (logs to Vercel + Sentry)
+    const normalizedError = handleServerError(error, {
+      route: '/api/outreach/verified-senders',
+    });
+    
+    // Determine HTTP status code
+    const statusCode = getErrorStatusCode(normalizedError);
+    
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to set verified sender',
+        error: normalizedError.message || 'Failed to set verified sender',
       },
-      { status: error.message?.includes('Unauthorized') ? 401 : 500 }
+      { status: statusCode }
     );
   }
 }

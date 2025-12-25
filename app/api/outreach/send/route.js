@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { sendOutreachEmail } from '@/lib/services/outreachSendService';
+import { handleServerError, getErrorStatusCode } from '@/lib/serverError';
 
 /**
  * POST /api/outreach/send
@@ -190,42 +191,22 @@ export async function POST(request) {
       emailActivityId: emailActivity.id,
     });
   } catch (error) {
-    // Enhanced error logging for debugging
-    console.error('❌ Outreach send error:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      code: error.code,
-      response: error.response ? {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        body: error.response.body,
-        headers: error.response.headers,
-      } : null,
-      request: {
-        url: request.url,
-        method: request.method,
-      },
+    // Handle error globally (logs to Vercel + Sentry)
+    const normalizedError = handleServerError(error, {
+      route: '/api/outreach/send',
+      requestUrl: request.url,
+      requestMethod: request.method,
     });
     
-    // Log full error object for Vercel
-    console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    // Determine HTTP status code
+    const statusCode = getErrorStatusCode(normalizedError);
     
-    // Determine appropriate status code
-    let statusCode = 500;
-    if (error.message?.includes('Unauthorized') || error.message?.includes('authentication')) {
-      statusCode = 401;
-    } else if (error.message?.includes('credits') || error.message?.includes('exceeded')) {
-      statusCode = 402; // Payment Required
-    } else if (error.message?.includes('permission') || error.message?.includes('Forbidden')) {
-      statusCode = 403;
-    }
-    
+    // Return proper HTTP response (error already logged/captured)
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to send outreach email',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        error: normalizedError.message || 'Failed to send outreach email',
+        details: process.env.NODE_ENV === 'development' ? normalizedError.stack : undefined,
       },
       { status: statusCode }
     );
