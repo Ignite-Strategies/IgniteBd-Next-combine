@@ -3,11 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // Optional: Direct connection for migrations (bypasses pooler)
-  // If DIRECT_DATABASE_URL is not set, Prisma will use DATABASE_URL for migrations
-  // Set DIRECT_DATABASE_URL in Vercel to use direct connection (recommended for Neon)
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model platform {
@@ -184,7 +182,7 @@ model companies {
 }
 
 model company_hqs {
-  id                                            String                    @id
+  id                                            String                          @id
   companyName                                   String
   companyStreet                                 String?
   companyCity                                   String?
@@ -193,7 +191,7 @@ model company_hqs {
   whatYouDo                                     String?
   companyIndustry                               String?
   teamSize                                      String?
-  createdAt                                     DateTime                  @default(now())
+  createdAt                                     DateTime                        @default(now())
   updatedAt                                     DateTime
   ownerId                                       String?
   contactOwnerId                                String?
@@ -201,18 +199,18 @@ model company_hqs {
   companyAnnualRev                              String?
   yearsInBusiness                               String?
   platformId                                    String?
-  tier                                          String?                  // Product tier for future use (not gated)
+  tier                                          String? // Product tier for future use (not gated)
   assessments                                   assessments[]
   blogs                                         blogs[]
   companies                                     companies[]
-  contacts_company_hqs_contactOwnerIdTocontacts Contact?                  @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
-  owners_company_hqs_managerIdToowners          owners?                   @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
-  owners_company_hqs_ownerIdToowners            owners?                   @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
+  contacts_company_hqs_contactOwnerIdTocontacts Contact?                        @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
+  owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
+  owners_company_hqs_ownerIdToowners            owners?                         @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
   company_memberships                           company_memberships[]
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
-  contacts_contacts_crmIdTocompany_hqs          Contact[]                 @relation("contacts_crmIdTocompany_hqs")
-  ownedWorkPackages                             work_packages[]           @relation("WorkPackageOwner")
+  contacts_contacts_crmIdTocompany_hqs          Contact[]                       @relation("contacts_crmIdTocompany_hqs")
+  ownedWorkPackages                             work_packages[]                 @relation("WorkPackageOwner")
   deliverable_templates                         deliverable_templates[]
   domain_registry                               domain_registry?
   landing_pages                                 landing_pages[]
@@ -222,10 +220,10 @@ model company_hqs {
   products                                      products[]
   proposals                                     proposals[]
   templates                                     templates[]
-  template_bases                                template_bases[]
+  template_relationship_helpers                 template_relationship_helpers[]
   campaigns                                     campaigns[]
   email_sequences                               email_sequences[]
-  platform                                      platform?                 @relation(fields: [platformId], references: [id])
+  platform                                      platform?                       @relation(fields: [platformId], references: [id])
 
   @@index([platformId])
 }
@@ -482,7 +480,7 @@ model campaigns {
   contact_lists    contact_lists?     @relation(fields: [contact_list_id], references: [id], onDelete: SetNull)
   // WHAT - Email template (optional - can be manual or from template)
   template_id      String?
-  outreach_template outreach_templates? @relation(fields: [template_id], references: [id], onDelete: SetNull)
+  template         templates?         @relation(fields: [template_id], references: [id], onDelete: SetNull)
   // Email content (optional - can be in sequences or from template)
   subject          String?
   preview_text     String?
@@ -1159,22 +1157,16 @@ model super_admins {
 }
 
 model templates {
-  id          String      @id
-  companyHQId String
-  name        String
-  subject     String?
-  body        String?
-  type        String?
-  published   Boolean     @default(false)
-  publishedAt DateTime?
+  id          String      @id @default(uuid())
+  ownerId     String
+  title       String
+  subject     String
+  body        String
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime
-  description String?
-  presenter   String?
-  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  company_hqs company_hqs @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  campaigns   campaigns[]
 
-  @@index([companyHQId])
-  @@index([published])
+  @@index([ownerId])
 }
 
 model work_collateral {
@@ -1392,65 +1384,18 @@ enum TypeOfPersonEnum {
   FRIEND_OF_FRIEND
 }
 
-model template_bases {
-  id                    String               @id @default(uuid())
-  companyHQId           String
-  title                 String
-  relationship          RelationshipEnum
-  typeOfPerson          TypeOfPersonEnum
-  whyReachingOut        String
-  whatWantFromThem      String?
-  // Template-specific context fields (user inputs during template creation)
-  timeSinceConnected    String? // e.g., "a long time", "2 years", "a while"
-  timeHorizon           String? // e.g., "2026", "Q1 2025", "soon"
-  knowledgeOfBusiness   Boolean?             @default(false) // Do they know about your business?
-  myBusinessDescription String? // How you describe your business in this context
-  desiredOutcome        String? // What you want from them
-  contextNotes          String? // Any additional context for this template
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  company_hqs           company_hqs          @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  outreach_templates    outreach_templates[]
+model template_relationship_helpers {
+  id               String      @id @default(uuid())
+  ownerId          String
+  relationshipType String // e.g. "FORMER_COWORKER", "FRIEND", "PROSPECT"
+  familiarityLevel String // e.g. "COLD", "WARM", "ESTABLISHED"
+  whyReachingOut   String
+  desiredOutcome   String?
+  timeHorizon      String?
+  contextNotes     String?
+  createdAt        DateTime    @default(now())
+  company_hqs      company_hqs @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  @@index([companyHQId])
+  @@index([ownerId])
   @@index([createdAt])
-}
-
-model outreach_templates {
-  id                 String               @id @default(uuid())
-  templateBaseId     String
-  content            String
-  mode               String // 'MANUAL' | 'AI'
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  template_bases     template_bases       @relation(fields: [templateBaseId], references: [id], onDelete: Cascade)
-  template_variables template_variables[]
-  campaigns          campaigns[]
-
-  @@index([templateBaseId])
-  @@index([createdAt])
-}
-
-model template_variables {
-  id                 String               @id @default(uuid())
-  outreachTemplateId String
-  variableName       String // e.g., 'firstName', 'companyName', 'timeSinceConnected'
-  variableType       TemplateVariableType
-  defaultValue       String? // Optional default if data not available
-  isRequired         Boolean              @default(true)
-  description        String? // Help text for what this variable represents
-  createdAt          DateTime             @default(now())
-  outreach_templates outreach_templates   @relation(fields: [outreachTemplateId], references: [id], onDelete: Cascade)
-
-  @@unique([outreachTemplateId, variableName])
-  @@index([outreachTemplateId])
-}
-
-enum TemplateVariableType {
-  TEXT // firstName, lastName, companyName
-  DATE // lastContactDate, startDate
-  TIME_DURATION // timeSinceConnected (e.g., "2 years")
-  BOOLEAN // knowledgeOfBusiness (yes/no)
-  ENUM // timeHorizon (e.g., "2025", "2026")
-  CUSTOM // Any other custom field
 }

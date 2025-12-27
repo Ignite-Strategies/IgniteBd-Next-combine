@@ -18,11 +18,9 @@ export default function TemplateBuilderPage() {
   const workPackageId = searchParams.get('workPackageId');
   const itemId = searchParams.get('itemId');
 
-  const [name, setName] = useState('');
+  const [title, setTitle] = useState(''); // was name
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [type, setType] = useState('');
-  const [published, setPublished] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
 
@@ -35,14 +33,12 @@ export default function TemplateBuilderPage() {
   const loadTemplate = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/artifacts/templates/${templateId}`);
+      const response = await api.get(`/api/templates/${templateId}`);
       if (response.data?.success) {
         const template = response.data.template;
-        setName(template.name || '');
+        setTitle(template.title || ''); // was name
         setSubject(template.subject || '');
         setBody(template.body || '');
-        setType(template.type || '');
-        setPublished(template.published || false);
       }
     } catch (err) {
       console.error('Error loading template:', err);
@@ -52,43 +48,50 @@ export default function TemplateBuilderPage() {
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      alert('Name is required');
+    if (!title.trim()) {
+      alert('Title is required');
+      return;
+    }
+
+    if (!subject.trim() || !body.trim()) {
+      alert('Subject and body are required');
       return;
     }
 
     try {
       setSaving(true);
-      const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+      const ownerId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || ''; // was companyHQId
 
       const data = {
-        companyHQId,
-        name,
+        ownerId, // was companyHQId
+        title,   // was name
         subject,
         body,
-        type,
-        published,
       };
 
       let template;
       if (isNew) {
-        const response = await api.post('/api/artifacts/templates', data);
+        const response = await api.post('/api/templates', data);
         template = response.data.template;
       } else {
-        const response = await api.patch(`/api/artifacts/templates/${templateId}`, data);
+        const response = await api.patch(`/api/templates/${templateId}`, data);
         template = response.data.template;
       }
 
-      // If created from work package, link it
-      if (isNew && workPackageId && itemId) {
-        await api.patch(`/api/workpackages/items/${itemId}/add-artifact`, {
-          type: 'OUTREACH_TEMPLATE',
-          artifactId: template.id,
-        });
-        router.push(`/workpackages/${workPackageId}/items/${itemId}`);
-      } else {
-        router.push(`/builder/template/${template.id}`);
-      }
+      // TODO: Artifacts system deprecated - templates are now in actual container
+      // Commented out work package linking until we rebuild the stack
+      // if (isNew && workPackageId && itemId) {
+      //   await api.patch(`/api/workpackages/items/${itemId}/add-artifact`, {
+      //     type: 'OUTREACH_TEMPLATE',
+      //     artifactId: template.id,
+      //   });
+      //   router.push(`/workpackages/${workPackageId}/items/${itemId}`);
+      // } else {
+      //   router.push(`/builder/template/${template.id}`);
+      // }
+      
+      // Always redirect to template builder (artifacts system removed)
+      router.push(`/builder/template/${template.id}`);
     } catch (err) {
       console.error('Error saving template:', err);
       alert('Failed to save template');
@@ -129,64 +132,39 @@ export default function TemplateBuilderPage() {
             
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Name *
+                Title *
               </label>
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder=""
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Reaching out to old friend"
                 className="w-full rounded border border-gray-300 px-3 py-2"
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Subject
+                Subject *
               </label>
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder=""
+                placeholder="Email subject line"
                 className="w-full rounded border border-gray-300 px-3 py-2"
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Body
+                Body *
               </label>
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                placeholder=""
-                rows={5}
+                placeholder="Email body with {{variables}}"
+                rows={10}
                 className="w-full rounded border border-gray-300 px-3 py-2"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Type
-              </label>
-              <input
-                type="text"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                placeholder="email, sms, etc."
-                className="w-full rounded border border-gray-300 px-3 py-2"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="published"
-                checked={published}
-                onChange={(e) => setPublished(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor="published" className="text-sm text-gray-700">
-                Published (visible to client)
-              </label>
             </div>
 
             <div className="flex justify-end gap-4">

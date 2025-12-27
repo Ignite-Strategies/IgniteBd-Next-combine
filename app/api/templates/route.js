@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
- * POST /api/artifacts/templates
- * Create a new template
+ * POST /api/templates
+ * Create a new email template
  */
 export async function POST(request) {
   try {
@@ -19,30 +19,32 @@ export async function POST(request) {
   try {
     const requestBody = await request.json();
     const {
-      companyHQId,
-      name,
+      ownerId, // was companyHQId
+      title,   // was name
       subject,
       body,
-      type,
-      published = false,
     } = requestBody ?? {};
 
-    if (!companyHQId || !name) {
+    if (!ownerId || !title) {
       return NextResponse.json(
-        { success: false, error: 'companyHQId and name are required' },
+        { success: false, error: 'ownerId and title are required' },
         { status: 400 },
       );
     }
 
-    const template = await prisma.template.create({
+    if (!subject || !body) {
+      return NextResponse.json(
+        { success: false, error: 'subject and body are required' },
+        { status: 400 },
+      );
+    }
+
+    const template = await prisma.templates.create({
       data: {
-        companyHQId,
-        name: name || null,
-        subject: subject || null,
-        body: body || null,
-        type: type || null,
-        published,
-        publishedAt: published ? new Date() : null,
+        ownerId,
+        title: title.trim(),
+        subject: subject.trim(),
+        body: body.trim(),
       },
     });
 
@@ -66,8 +68,8 @@ export async function POST(request) {
 }
 
 /**
- * GET /api/artifacts/templates
- * List templates
+ * GET /api/templates
+ * List email templates
  */
 export async function GET(request) {
   try {
@@ -81,14 +83,12 @@ export async function GET(request) {
 
   try {
     const { searchParams } = request.nextUrl;
-    const companyHQId = searchParams.get('companyHQId');
-    const published = searchParams.get('published');
+    const ownerId = searchParams.get('ownerId'); // was companyHQId
 
     const where = {};
-    if (companyHQId) where.companyHQId = companyHQId;
-    if (published !== null) where.published = published === 'true';
+    if (ownerId) where.ownerId = ownerId;
 
-    const templates = await prisma.template.findMany({
+    const templates = await prisma.templates.findMany({
       where,
       orderBy: {
         createdAt: 'desc',

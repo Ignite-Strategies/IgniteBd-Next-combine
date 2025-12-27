@@ -5,7 +5,8 @@ import { hydrateWorkPackage } from '@/lib/services/workpackageHydrationService';
 
 /**
  * GET /api/workpackages/client/:contactId
- * Client portal view - only shows published artifacts
+ * Client portal view
+ * NOTE: Artifacts system removed - commented out until rewire
  */
 export async function GET(request, { params }) {
   try {
@@ -83,7 +84,7 @@ export async function GET(request, { params }) {
       },
     });
 
-    // Hydrate with artifacts (only published ones for client view)
+    // Hydrate work packages (artifacts system removed - commented out until rewire)
     const hydrated = await Promise.all(
       workPackages.map((wp) => hydrateWorkPackage(wp, { clientView: true })),
     );

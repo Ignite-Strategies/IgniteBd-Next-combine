@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { OpenAI } from 'openai';
-import { extractVariables } from '@/lib/templateVariables';
+import { extractVariableNames } from '@/lib/templateVariables';
 
 // Initialize OpenAI client
 let openaiClient = null;
@@ -158,12 +158,12 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
     }
 
     // Extract variables from the generated content
-    const extractedVariables = extractVariables(parsed.content);
+    const extractedVariables = extractVariableNames(parsed.content);
     
     // Merge with AI's suggested variables
     const allVariables = Array.from(
       new Set([
-        ...extractedVariables.map(v => v.name),
+        ...extractedVariables,
         ...(parsed.suggestedVariables || [])
       ])
     );
@@ -172,8 +172,7 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
       success: true,
       template: parsed.content,
       inferred: parsed.inferred || {},
-      variables: extractedVariables,
-      suggestedVariables: allVariables,
+      variables: allVariables, // Simple string array
     });
   } catch (error) {
     console.error('❌ Template generate quick error:', error);

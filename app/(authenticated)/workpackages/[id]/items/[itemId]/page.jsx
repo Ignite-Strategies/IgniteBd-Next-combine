@@ -8,7 +8,8 @@ import Link from 'next/link';
 
 /**
  * WorkPackageItem Detail Page
- * Shows all artifacts for an item + "Add Artifact" button
+ * Shows all collateral for an item + "Add" button
+ * NOTE: Artifacts system removed - commented out until rewire
  */
 export default function WorkPackageItemPage() {
   const params = useParams();
@@ -48,8 +49,9 @@ export default function WorkPackageItemPage() {
     }
   };
 
+  // NOTE: Artifacts system removed - commented out until rewire
   const handleAddArtifact = async (type) => {
-    // Navigate to artifact builder
+    // Navigate to builder (artifacts system removed)
     const builderPaths = {
       BLOG: `/builder/blog/new?workPackageId=${workPackageId}&itemId=${itemId}`,
       PERSONA: `/builder/persona/new?workPackageId=${workPackageId}&itemId=${itemId}`,
@@ -141,8 +143,8 @@ export default function WorkPackageItemPage() {
           </div>
         </div>
 
-        {/* Add Artifact Button */}
-        <div className="mb-6">
+        {/* Add Button - NOTE: Artifacts system removed - commented out until rewire */}
+        {/* <div className="mb-6">
           <button
             onClick={() => handleAddArtifact(item.type)}
             className="flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
@@ -150,11 +152,11 @@ export default function WorkPackageItemPage() {
             <Plus className="h-4 w-4" />
             Add {item.type.replace('_', ' ')}
           </button>
-        </div>
+        </div> */}
 
-        {/* Artifacts List */}
+        {/* Collateral List - NOTE: Artifacts system removed - commented out until rewire */}
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-bold text-gray-900">Artifacts</h2>
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Collateral</h2>
           {item.workCollateral && item.workCollateral.length > 0 ? (
             <div className="space-y-3">
               {item.workCollateral.map((collateral) => {
@@ -183,13 +185,14 @@ export default function WorkPackageItemPage() {
           ) : (
             <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
               <Package className="mx-auto h-12 w-12 text-gray-400" />
-              <p className="mt-4 text-gray-500">No artifacts added yet</p>
-              <button
+              <p className="mt-4 text-gray-500">No collateral added yet</p>
+              {/* NOTE: Artifacts system removed - commented out until rewire */}
+              {/* <button
                 onClick={() => handleAddArtifact(item.type)}
                 className="mt-4 text-red-600 hover:text-red-700"
               >
                 + Add Your First Artifact
-              </button>
+              </button> */}
             </div>
           )}
         </div>

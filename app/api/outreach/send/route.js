@@ -1,194 +1,221 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { sendOutreachEmail } from '@/lib/services/outreachSendService';
+import { readPayload, deletePayload } from '@/lib/redis';
+import sgMail from '@sendgrid/mail';
 import { handleServerError, getErrorStatusCode } from '@/lib/serverError';
+
+// Initialize SendGrid (lazy)
+let sendGridInitialized = false;
+function initializeSendGrid() {
+  if (sendGridInitialized) {
+    return;
+  }
+  const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+  
+  if (!SENDGRID_API_KEY) {
+    console.error('❌ SENDGRID_API_KEY environment variable is not set');
+    throw new Error('SENDGRID_API_KEY not configured');
+  }
+  
+  // Check for common issues
+  const trimmedKey = SENDGRID_API_KEY.trim();
+  if (trimmedKey !== SENDGRID_API_KEY) {
+    console.warn('⚠️ SENDGRID_API_KEY has leading/trailing whitespace - trimming it');
+  }
+  
+  if (trimmedKey.length === 0) {
+    console.error('❌ SENDGRID_API_KEY is empty after trimming');
+    throw new Error('SENDGRID_API_KEY is empty');
+  }
+  
+  // Validate key format (SendGrid API keys start with "SG.")
+  if (!trimmedKey.startsWith('SG.')) {
+    console.warn('⚠️ SENDGRID_API_KEY does not start with "SG." - may be invalid format');
+  }
+  
+  console.log('🔑 Initializing SendGrid API key:', {
+    keyLength: trimmedKey.length,
+    keyPrefix: trimmedKey.substring(0, 5) + '...',
+    hasWhitespace: trimmedKey !== SENDGRID_API_KEY,
+  });
+  
+  sgMail.setApiKey(trimmedKey);
+  sendGridInitialized = true;
+  console.log('✅ SendGrid API key set successfully');
+}
 
 /**
  * POST /api/outreach/send
  * 
- * SendGrid Email Send Route
+ * Step 3: Send
  * 
  * Flow:
- * 1. Authenticates user via Firebase
- * 2. Gets owner record from database
- * 3. Grabs verified sender email (owner.sendgridVerifiedEmail)
- * 4. Grabs verified sender name (owner.sendgridVerifiedName)
- * 5. Takes subject line from request body
- * 6. Calls SendGrid email generator service (sendOutreachEmail)
- * 7. Service pushes email via SendGrid API
- * 8. Logs email activity in database
+ * 1. Auth → verify Firebase token
+ * 2. Fetch owner → get owner record
+ * 3. Read payload from Redis → get EXACT payload (no rebuilding)
+ * 4. Send to SendGrid → pass msg directly to sgMail.send(msg)
+ * 5. Log activity → create email_activity record
+ * 6. Delete payload from Redis → cleanup
+ * 7. Return response
  * 
- * Requires Firebase authentication
- * Requires verified sender (owner.sendgridVerifiedEmail must be set)
+ * Invariant: Payload NEVER changes between preview and send
  * 
  * Request body:
  * {
- *   "to": "prospect@example.com",
- *   "toName": "John Doe", (optional)
- *   "subject": "Quick intro",
- *   "body": "Hey, saw your work on...",
- *   "contactId": "c_123", (optional)
- *   "tenantId": "t_001" (optional)
+ *   "requestId": "uuid-from-build-payload"
  * }
  */
 export async function POST(request) {
   console.log('📧 POST /api/outreach/send - Request received');
   
   try {
-    // Verify Firebase authentication
-    console.log('🔐 Verifying Firebase token...');
+    // Step 1: Auth
     const firebaseUser = await verifyFirebaseToken(request);
-    console.log('✅ Firebase token verified:', firebaseUser.uid);
 
-    // Get or find Owner record
-    console.log('👤 Fetching owner record...');
-    let owner = await prisma.owners.findUnique({
+    // Step 2: Fetch owner
+    const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
       select: {
         id: true,
-        sendgridVerifiedEmail: true,
-        sendgridVerifiedName: true,
-        email: true,
-        firstName: true,
-        lastName: true,
       },
     });
-    console.log('👤 Owner found:', owner ? { id: owner.id, hasVerifiedEmail: !!owner.sendgridVerifiedEmail } : 'NOT FOUND');
 
     if (!owner) {
-      // Create owner if it doesn't exist
-      owner = await prisma.owners.create({
-        data: {
-          firebaseId: firebaseUser.uid,
-          email: firebaseUser.email || null,
-          name: firebaseUser.name || null,
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get requestId from body
+    const body = await request.json();
+    const { requestId } = body;
+
+    if (!requestId) {
+      return NextResponse.json(
+        { success: false, error: 'requestId is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Step 3: Retrieve payload blob from Redis
+    // This is the EXACT same payload blob that was saved in build-payload
+    // No rebuilding, no mutation, no transformation
+    const msg = await readPayload(owner.id, requestId);
+
+    if (!msg) {
+      return NextResponse.json(
+        { success: false, error: 'Payload not found or expired' },
+        { status: 404 }
+      );
+    }
+
+    console.log('📤 Retrieved payload blob from Redis:', {
+      requestId,
+      from: msg.from?.email,
+      to: msg.personalizations[0]?.to[0]?.email,
+      subject: msg.personalizations[0]?.subject,
+    });
+
+    // Step 4: Send payload blob directly to SendGrid API
+    // SendGrid receives: exact payload blob with our verified sender email
+    initializeSendGrid();
+
+    let sendGridResponse;
+    let messageId = null;
+    let statusCode = null;
+
+    try {
+      sendGridResponse = await sgMail.send(msg);
+      statusCode = sendGridResponse[0]?.statusCode;
+      messageId = sendGridResponse[0]?.headers?.['x-message-id'] || 
+                  sendGridResponse[0]?.headers?.['X-Message-Id'] || 
+                  null;
+    
+      console.log('✅ SendGrid Response:', {
+        statusCode,
+        messageId,
+      });
+    } catch (sendGridError) {
+      // Log raw SendGrid error (DO NOT normalize)
+      console.error('❌ SendGrid error details:', {
+        status: sendGridError?.response?.status,
+        statusCode: sendGridError?.response?.statusCode,
+        statusText: sendGridError?.response?.statusText,
+        message: sendGridError?.message,
+        code: sendGridError?.code,
+      });
+      console.error('❌ SendGrid response body:', sendGridError?.response?.body);
+      console.error('❌ SendGrid errors array:', sendGridError?.response?.body?.errors);
+      
+      // Check if this is an auth error
+      const errorStatusCode = sendGridError?.response?.statusCode || sendGridError?.response?.status;
+      if (errorStatusCode === 401 || errorStatusCode === 403) {
+        console.error('🔐 SendGrid Authentication Error Detected');
+        console.error('   This usually means:');
+        console.error('   1. API key is invalid, expired, or revoked');
+        console.error('   2. API key does not have required permissions');
+        console.error('   3. API key belongs to a different SendGrid account');
+        console.error('   Check: SENDGRID_API_KEY environment variable');
+      }
+      
+      // Return SendGrid's exact error (DO NOT convert to generic 500)
+      const sendGridErrorBody = sendGridError.response?.body;
+      const sendGridErrors = sendGridErrorBody?.errors || [];
+      const firstError = sendGridErrors[0] || {};
+      
+      return NextResponse.json(
+        {
+          success: false,
+          error: firstError.message || sendGridError.message || 'SendGrid API error',
+          sendGridError: {
+            statusCode: errorStatusCode,
+            status: sendGridError?.response?.status,
+            errors: sendGridErrors,
+            body: sendGridErrorBody,
+          },
         },
-        select: {
-          id: true,
-          sendgridVerifiedEmail: true,
-          sendgridVerifiedName: true,
-          email: true,
-          firstName: true,
-          lastName: true,
+        { status: errorStatusCode || 500 }
+      );
+    }
+
+    // Step 5: Log email activity
+    const toEmail = msg.personalizations[0]?.to[0]?.email || '';
+    const subject = msg.personalizations[0]?.subject || '';
+    const emailBody = msg.content[0]?.value || '';
+    // custom_args is now inside personalizations[0]
+    const customArgs = msg.personalizations[0]?.custom_args || {};
+    
+    try {
+      await prisma.email_activities.create({
+        data: {
+          owner_id: owner.id,
+          contact_id: customArgs.contactId || null,
+          tenant_id: customArgs.tenantId || null,
+          campaign_id: customArgs.campaignId || null,
+          sequence_id: customArgs.sequenceId || null,
+          sequence_step_id: customArgs.sequenceStepId || null,
+          email: toEmail,
+          subject: subject,
+          body: emailBody,
+          messageId: messageId || '',
+          event: 'sent',
         },
       });
+      console.log('✅ Email activity logged');
+    } catch (dbError) {
+      console.warn('⚠️ Could not log email activity:', dbError.message);
     }
 
-    const ownerId = owner.id;
-    
-    // Get verified sender email/name from owner
-    // ENFORCEMENT: Only use verified sender - never fallback to auth email
-    const fromEmail = owner.sendgridVerifiedEmail;
-    const fromName = owner.sendgridVerifiedName;
-    
-    console.log('📋 Verified sender from DB:', {
-      fromEmail,
-      fromName,
-      ownerId: owner.id,
-    });
-    
-    // Strict enforcement: sender must be verified
-    if (!fromEmail) {
-      console.error('❌ No verified sender email found in owner record');
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Sender not verified. Please verify your sender identity before sending emails. Go to compose page and click "Change" next to From field to verify your sender.' 
-        },
-        { status: 400 }
-      );
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(fromEmail)) {
-      console.error('❌ Invalid email format in verified sender:', fromEmail);
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Invalid sender email format: ${fromEmail}. Please verify your sender identity again.` 
-        },
-        { status: 400 }
-      );
-    }
+    // Step 6: Delete payload from Redis (cleanup)
+    await deletePayload(owner.id, requestId);
 
-    // Parse request body
-    console.log('📝 Parsing request body...');
-    const body = await request.json();
-    const { 
-      to, 
-      subject, 
-      body: emailBody, 
-      contactId, 
-      tenantId, 
-      toName,
-      campaignId,
-      sequenceId,
-      sequenceStepId,
-    } = body;
-    
-    console.log('📝 Request body parsed:', {
-      to,
-      subject,
-      bodyLength: emailBody?.length,
-      contactId,
-      tenantId,
-      hasToName: !!toName,
-    });
-
-    // Validation
-    if (!to || !subject || !emailBody) {
-      console.error('❌ Validation failed:', { to: !!to, subject: !!subject, body: !!emailBody });
-      return NextResponse.json(
-        { success: false, error: 'to, subject, and body are required' },
-        { status: 400 }
-      );
-    }
-
-    // Send email via SendGrid
-    console.log('📧 Calling sendOutreachEmail service...');
-    const { statusCode, messageId } = await sendOutreachEmail({
-      to,
-      toName,
-      subject,
-      body: emailBody,
-      ownerId,
-      contactId,
-      tenantId,
-      campaignId: campaignId || null,
-      sequenceId: sequenceId || null,
-      sequenceStepId: sequenceStepId || null,
-      from: fromEmail,
-      fromName: fromName,
-    });
-
-    // Log email activity in database (Apollo-like tracking)
-    console.log('💾 Logging email activity to database...');
-    const emailActivity = await prisma.email_activities.create({
-      data: {
-        owner_id: ownerId,
-        contact_id: contactId || null,
-        tenant_id: tenantId || null,
-        campaign_id: campaignId || null,
-        sequence_id: sequenceId || null,
-        sequence_step_id: sequenceStepId || null,
-        email: to,
-        subject,
-        body: emailBody,
-        messageId,
-        event: 'sent', // Initial state
-      },
-    });
-
-    console.log(`✅ Email activity logged: ${emailActivity.id}`);
-    console.log(`✅ Email sent successfully - MessageId: ${messageId}, StatusCode: ${statusCode}`);
-
+    // Step 7: Return response
     return NextResponse.json({
       success: true,
-      messageId,
-      statusCode,
-      emailActivityId: emailActivity.id,
+      messageId: messageId || 'unknown',
+      statusCode: statusCode || 202,
     });
   } catch (error) {
     // Handle error globally (logs to Vercel + Sentry)

@@ -35,14 +35,19 @@ export default function BlogBuilderPage() {
   const loadBlog = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/artifacts/blogs/${blogId}`);
-      if (response.data?.success) {
+      // NOTE: Artifacts system removed - commented out until rewire
+      // const response = await api.get(`/api/artifacts/blogs/${blogId}`);
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - load functionality needs to be rewired');
+      alert('Load functionality temporarily unavailable - artifacts system removed');
+      return;
+      /* if (response.data?.success) {
         const blog = response.data.blog;
         setTitle(blog.title || '');
         setContent(blog.content || '');
         setAuthor(blog.author || '');
         setPublished(blog.published || false);
-      }
+      } */
     } catch (err) {
       console.error('Error loading blog:', err);
     } finally {
@@ -60,7 +65,13 @@ export default function BlogBuilderPage() {
       setSaving(true);
       const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
 
-      let blog;
+      // NOTE: Artifacts system removed - commented out until rewire
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - save functionality needs to be rewired');
+      alert('Save functionality temporarily unavailable - artifacts system removed');
+      return;
+      
+      /* let blog;
       if (isNew) {
         const response = await api.post('/api/artifacts/blogs', {
           companyHQId,
@@ -78,7 +89,7 @@ export default function BlogBuilderPage() {
           published,
         });
         blog = response.data.blog;
-      }
+      } */
 
       // If created from work package, link it
       if (isNew && workPackageId && itemId) {

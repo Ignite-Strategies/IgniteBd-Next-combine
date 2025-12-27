@@ -16,32 +16,32 @@ export async function GET(request, { params }) {
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'LandingPage ID is required' },
+        { success: false, error: 'Template ID is required' },
         { status: 400 },
       );
     }
 
-    const landingpage = await prisma.landingpage.findUnique({
+    const template = await prisma.templates.findUnique({
       where: { id },
     });
 
-    if (!landingpage) {
+    if (!template) {
       return NextResponse.json(
-        { success: false, error: 'LandingPage not found' },
+        { success: false, error: 'Template not found' },
         { status: 404 },
       );
     }
 
     return NextResponse.json({
       success: true,
-      landingpage,
+      template,
     });
   } catch (error) {
-    console.error('❌ GetLandingPage error:', error);
+    console.error('❌ GetTemplate error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to get landingpage',
+        error: 'Failed to get template',
         details: error.message,
       },
       { status: 500 },
@@ -63,47 +63,40 @@ export async function PATCH(request, { params }) {
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'LandingPage ID is required' },
+        { success: false, error: 'Template ID is required' },
         { status: 400 },
       );
     }
 
-    const body = await request.json();
+    const requestBody = await request.json();
     const {
-      title,
-      url,
-      content,
-      description,
-      published,
-    } = body ?? {};
+      title,   // was name
+      subject,
+      body,
+    } = requestBody ?? {};
 
     const updateData = {};
-    if (title !== undefined) updateData.title = title;
-    if (url !== undefined) updateData.url = url;
-    if (content !== undefined) updateData.content = content;
-    if (description !== undefined) updateData.description = description;
-    if (published !== undefined) {
-      updateData.published = published;
-      updateData.publishedAt = published ? new Date() : null;
-    }
+    if (title !== undefined) updateData.title = title.trim();
+    if (subject !== undefined) updateData.subject = subject.trim();
+    if (body !== undefined) updateData.body = body.trim();
 
-    const landingpage = await prisma.landingpage.update({
+    const template = await prisma.templates.update({
       where: { id },
       data: updateData,
     });
 
-    console.log('✅ LandingPage updated:', landingpage.id);
+    console.log('✅ Template updated:', template.id);
 
     return NextResponse.json({
       success: true,
-      landingpage,
+      template,
     });
   } catch (error) {
-    console.error('❌ UpdateLandingPage error:', error);
+    console.error('❌ UpdateTemplate error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to update landingpage',
+        error: 'Failed to update template',
         details: error.message,
       },
       { status: 500 },
@@ -125,27 +118,27 @@ export async function DELETE(request, { params }) {
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'LandingPage ID is required' },
+        { success: false, error: 'Template ID is required' },
         { status: 400 },
       );
     }
 
-    await prisma.landingpage.delete({
+    await prisma.templates.delete({
       where: { id },
     });
 
-    console.log('✅ LandingPage deleted:', id);
+    console.log('✅ Template deleted:', id);
 
     return NextResponse.json({
       success: true,
-      message: 'LandingPage deleted successfully',
+      message: 'Template deleted successfully',
     });
   } catch (error) {
-    console.error('❌ DeleteLandingPage error:', error);
+    console.error('❌ DeleteTemplate error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to delete landingpage',
+        error: 'Failed to delete template',
         details: error.message,
       },
       { status: 500 },

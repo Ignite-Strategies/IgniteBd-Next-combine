@@ -106,8 +106,14 @@ function PersonasPageContent() {
 
     setDeletingId(personaId);
     try {
+      // NOTE: Artifacts system removed - commented out until rewire
       // Try the artifacts route first (has DELETE endpoint)
-      await api.delete(`/api/artifacts/personas/${personaId}`);
+      // await api.delete(`/api/artifacts/personas/${personaId}`);
+      
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - delete functionality needs to be rewired');
+      alert('Delete functionality temporarily unavailable - artifacts system removed');
+      return;
       
       // Remove from local state
       const updatedPersonas = personas.filter(p => p.id !== personaId);

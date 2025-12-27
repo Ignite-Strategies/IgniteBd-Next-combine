@@ -35,15 +35,20 @@ export default function LandingpageBuilderPage() {
   const loadLandingpage = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/artifacts/landingpages/${landingpageId}`);
-      if (response.data?.success) {
+      // NOTE: Artifacts system removed - commented out until rewire
+      // const response = await api.get(`/api/artifacts/landingpages/${landingpageId}`);
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - load functionality needs to be rewired');
+      alert('Load functionality temporarily unavailable - artifacts system removed');
+      return;
+      /* if (response.data?.success) {
         const landingpage = response.data.landingPage;
         setTitle(landingpage.title || '');
         setUrl(landingpage.url || '');
         setDescription(landingpage.description || '');
         setContent(landingpage.content || '');
         setPublished(landingpage.published || false);
-      }
+      } */
     } catch (err) {
       console.error('Error loading landingpage:', err);
     } finally {
@@ -70,7 +75,13 @@ export default function LandingpageBuilderPage() {
         published,
       };
 
-      let landingpage;
+      // NOTE: Artifacts system removed - commented out until rewire
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - save functionality needs to be rewired');
+      alert('Save functionality temporarily unavailable - artifacts system removed');
+      return;
+      
+      /* let landingpage;
       if (isNew) {
         const response = await api.post('/api/artifacts/landingpages', data);
         landingpage = response.data.landingPage;
@@ -88,7 +99,7 @@ export default function LandingpageBuilderPage() {
         router.push(`/workpackages/${workPackageId}/items/${itemId}`);
       } else {
         router.push(`/builder/landingpage/${landingpage.id}`);
-      }
+      } */
     } catch (err) {
       console.error('Error saving landingpage:', err);
       alert('Failed to save landingpage');

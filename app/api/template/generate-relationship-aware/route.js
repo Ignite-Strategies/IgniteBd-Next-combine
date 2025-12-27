@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { OpenAI } from 'openai';
-import { extractVariables } from '@/lib/templateVariables';
+import { extractVariableNames } from '@/lib/templateVariables';
 
 // Initialize OpenAI client
 let openaiClient = null;
@@ -227,12 +227,12 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
     }
 
     // Extract variables from the generated content
-    const extractedVariables = extractVariables(parsed.content);
+    const extractedVariables = extractVariableNames(parsed.content);
     
     // Merge with AI's suggested variables
     const allVariables = Array.from(
       new Set([
-        ...extractedVariables.map(v => v.name),
+        ...extractedVariables,
         ...(parsed.suggestedVariables || [])
       ])
     );
@@ -240,8 +240,7 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
     return NextResponse.json({
       success: true,
       template: parsed.content,
-      variables: extractedVariables,
-      suggestedVariables: allVariables,
+      variables: allVariables, // Simple string array
     });
   } catch (error) {
     console.error('❌ Template generate relationship-aware error:', error);

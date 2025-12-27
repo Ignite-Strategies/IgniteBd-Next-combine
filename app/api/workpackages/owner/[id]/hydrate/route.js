@@ -6,7 +6,8 @@ import { hydrateWorkPackage } from '@/lib/services/workpackageHydrationService';
 /**
  * GET /api/workpackages/owner/:id/hydrate
  * Owner App WorkPackage hydration - same data as Client Portal but with timeline calculations
- * Returns WorkPackage with phases (aggregated hours), items (status + estimatedHours + label), and artifacts
+ * Returns WorkPackage with phases (aggregated hours), items (status + estimatedHours + label)
+ * NOTE: Artifacts system removed - commented out until rewire
  */
 export async function GET(request, { params }) {
   try {
@@ -83,7 +84,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Hydrate with artifacts, phases, and timeline calculations (owner view)
+    // Hydrate with phases, and timeline calculations (owner view) (artifacts system removed - commented out until rewire)
     const hydrated = await hydrateWorkPackage(workPackage, {
       clientView: false,
       includeTimeline: true,

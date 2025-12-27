@@ -5,7 +5,8 @@ import { hydrateWorkPackage } from '@/lib/services/workpackageHydrationService';
 
 /**
  * GET /api/workpackages/:id/hydrate
- * Hydrate WorkPackage with full data including phases, items, artifacts, and contactCompany
+ * Hydrate WorkPackage with full data including phases, items, and contactCompany
+ * NOTE: Artifacts system removed - commented out until rewire
  * Returns the same structure as owner hydrate but accessible via simpler route
  */
 export async function GET(request, { params }) {
@@ -84,7 +85,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Hydrate with artifacts, phases, and timeline calculations
+    // Hydrate with phases, and timeline calculations (artifacts system removed - commented out until rewire)
     const hydrated = await hydrateWorkPackage(workPackage, {
       clientView: false,
       includeTimeline: true,

@@ -461,3 +461,81 @@ export async function deleteBlogDraft(redisKey: string): Promise<boolean> {
   }
 }
 
+/**
+ * Outreach Payload Storage Functions
+ * Store email payloads for preview/send flow
+ */
+
+/**
+ * Generate Redis key for payload storage
+ */
+function getPayloadKey(ownerId: string, requestId: string): string {
+  return `outreach:payload:${ownerId}:${requestId}`;
+}
+
+/**
+ * Write payload to Redis
+ * @param ownerId - Owner ID
+ * @param requestId - Request ID (UUID)
+ * @param payload - SendGrid message payload
+ * @param ttl - Time to live in seconds (default: 1 hour)
+ */
+export async function writePayload(
+  ownerId: string,
+  requestId: string,
+  payload: any,
+  ttl: number = 3600 // 1 hour
+): Promise<void> {
+  try {
+    const redisClient = getRedis();
+    const key = getPayloadKey(ownerId, requestId);
+    await redisClient.setex(key, ttl, JSON.stringify(payload));
+    console.log('💾 Payload written to Redis:', key);
+  } catch (error: any) {
+    console.error('❌ Redis write payload error:', error);
+    throw new Error(`Failed to save payload to Redis: ${error.message}`);
+  }
+}
+
+/**
+ * Read payload from Redis
+ * @param ownerId - Owner ID
+ * @param requestId - Request ID (UUID)
+ * @returns Payload object or null if not found
+ */
+export async function readPayload(ownerId: string, requestId: string): Promise<any | null> {
+  try {
+    const redisClient = getRedis();
+    const key = getPayloadKey(ownerId, requestId);
+    const data = await redisClient.get(key);
+    
+    if (!data) {
+      console.log('❌ Payload not found in Redis:', key);
+      return null;
+    }
+    
+    console.log('📖 Payload read from Redis:', key);
+    return typeof data === 'string' ? JSON.parse(data) : data;
+  } catch (error: any) {
+    console.error('❌ Redis read payload error:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete payload from Redis (after send)
+ * @param ownerId - Owner ID
+ * @param requestId - Request ID (UUID)
+ */
+export async function deletePayload(ownerId: string, requestId: string): Promise<void> {
+  try {
+    const redisClient = getRedis();
+    const key = getPayloadKey(ownerId, requestId);
+    await redisClient.del(key);
+    console.log('🗑️  Payload deleted from Redis:', key);
+  } catch (error: any) {
+    console.error('❌ Redis delete payload error:', error);
+    // Don't throw - cleanup failure shouldn't break the flow
+  }
+}
+

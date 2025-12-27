@@ -36,8 +36,13 @@ export default function EventBuilderPage() {
   const loadEvent = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/artifacts/eventplans/${eventId}`);
-      if (response.data?.success) {
+      // NOTE: Artifacts system removed - commented out until rewire
+      // const response = await api.get(`/api/artifacts/eventplans/${eventId}`);
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - load functionality needs to be rewired');
+      alert('Load functionality temporarily unavailable - artifacts system removed');
+      return;
+      /* if (response.data?.success) {
         const event = response.data.eventPlan;
         setEventName(event.eventName || '');
         setDate(event.date || '');
@@ -45,7 +50,7 @@ export default function EventBuilderPage() {
         setAgenda(event.agenda || '');
         setDescription(event.description || '');
         setPublished(event.published || false);
-      }
+      } */
     } catch (err) {
       console.error('Error loading event:', err);
     } finally {
@@ -73,14 +78,20 @@ export default function EventBuilderPage() {
         published,
       };
 
-      let event;
+      // NOTE: Artifacts system removed - commented out until rewire
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - save functionality needs to be rewired');
+      alert('Save functionality temporarily unavailable - artifacts system removed');
+      return;
+      
+      /* let event;
       if (isNew) {
         const response = await api.post('/api/artifacts/eventplans', data);
         event = response.data.eventPlan;
       } else {
         const response = await api.patch(`/api/artifacts/eventplans/${eventId}`, data);
         event = response.data.eventPlan;
-      }
+      } */
 
       // If created from work package, link it
       if (isNew && workPackageId && itemId) {

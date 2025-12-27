@@ -6,7 +6,8 @@ import { upsertWorkPackageEffectiveDate } from '@/lib/services/PhaseDueDateServi
 
 /**
  * GET /api/workpackages/:id
- * Load WorkPackage with items + artifacts (hydrated)
+ * Load WorkPackage with items (hydrated)
+ * NOTE: Artifacts system removed - commented out until rewire
  */
 export async function GET(request, { params }) {
   try {
@@ -96,7 +97,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Hydrate with artifacts and progress
+    // Hydrate with progress (artifacts system removed - commented out until rewire)
     const hydrated = await hydrateWorkPackage(workPackage);
 
     return NextResponse.json({
@@ -263,7 +264,7 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // Hydrate with artifacts and progress
+    // Hydrate with progress (artifacts system removed - commented out until rewire)
     const hydrated = await hydrateWorkPackage(workPackage);
 
     console.log('✅ WorkPackage updated:', workPackage.id);

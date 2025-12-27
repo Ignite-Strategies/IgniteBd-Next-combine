@@ -4,7 +4,8 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
  * POST /api/workpackages/items/:itemId/collateral
- * Add collateral (artifact) to a work package item
+ * Add collateral to a work package item
+ * NOTE: Artifact references removed - commented out until rewire
  */
 export async function POST(request, { params }) {
   try {

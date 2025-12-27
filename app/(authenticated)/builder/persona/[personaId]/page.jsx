@@ -38,8 +38,13 @@ export default function PersonaBuilderPage() {
   const loadPersona = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/artifacts/personas/${personaId}`);
-      if (response.data?.success) {
+      // NOTE: Artifacts system removed - commented out until rewire
+      // const response = await api.get(`/api/artifacts/personas/${personaId}`);
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - load functionality needs to be rewired');
+      alert('Load functionality temporarily unavailable - artifacts system removed');
+      return;
+      /* if (response.data?.success) {
         const persona = response.data.persona;
         setName(persona.name || '');
         setRole(persona.role || '');
@@ -49,7 +54,7 @@ export default function PersonaBuilderPage() {
         setPainPoints(persona.painPoints || '');
         setDesiredOutcome(persona.desiredOutcome || '');
         setPublished(persona.published || false);
-      }
+      } */
     } catch (err) {
       console.error('Error loading persona:', err);
     } finally {
@@ -79,7 +84,13 @@ export default function PersonaBuilderPage() {
         published,
       };
 
-      let persona;
+      // NOTE: Artifacts system removed - commented out until rewire
+      // TODO: Replace with new route once artifacts system is rewired
+      console.warn('Artifacts system removed - save functionality needs to be rewired');
+      alert('Save functionality temporarily unavailable - artifacts system removed');
+      return;
+      
+      /* let persona;
       if (isNew) {
         const response = await api.post('/api/artifacts/personas', data);
         persona = response.data.persona;
@@ -97,7 +108,7 @@ export default function PersonaBuilderPage() {
         router.push(`/workpackages/${workPackageId}/items/${itemId}`);
       } else {
         router.push(`/builder/persona/${persona.id}`);
-      }
+      } */
     } catch (err) {
       console.error('Error saving persona:', err);
       alert('Failed to save persona');
