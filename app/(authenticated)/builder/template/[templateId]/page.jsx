@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Save, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
@@ -13,8 +13,10 @@ import { useOwner } from '@/hooks/useOwner';
 export default function TemplateBuilderPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const templateId = params.templateId;
   const isNew = templateId === 'new';
+  const cloneFrom = searchParams?.get('cloneFrom');
   
   const { ownerId } = useOwner();
 
@@ -22,14 +24,16 @@ export default function TemplateBuilderPage() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(!isNew && !cloneFrom);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isNew && templateId) {
       loadTemplate();
+    } else if (cloneFrom) {
+      loadTemplateToClone(cloneFrom);
     }
-  }, [templateId, isNew]);
+  }, [templateId, isNew, cloneFrom]);
 
   const loadTemplate = async () => {
     try {
@@ -44,6 +48,24 @@ export default function TemplateBuilderPage() {
     } catch (err) {
       console.error('Error loading template:', err);
       setError('Failed to load template');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTemplateToClone = async (sourceTemplateId) => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/api/templates/${sourceTemplateId}`);
+      if (response.data?.success) {
+        const template = response.data.template;
+        setTitle(`${template.title || ''} (Copy)`);
+        setSubject(template.subject || '');
+        setBody(template.body || '');
+      }
+    } catch (err) {
+      console.error('Error loading template to clone:', err);
+      setError('Failed to load template to clone');
     } finally {
       setLoading(false);
     }
