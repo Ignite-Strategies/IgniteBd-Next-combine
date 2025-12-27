@@ -3,8 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 export async function GET(request, { params }) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -50,8 +51,9 @@ export async function GET(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -68,24 +70,18 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const requestBody = await request.json();
-    const {
-      title,   // was name
-      subject,
-      body,
-    } = requestBody ?? {};
+    const body = await request.json();
+    const { title, subject, body: bodyText } = body;
 
     const updateData = {};
     if (title !== undefined) updateData.title = title.trim();
     if (subject !== undefined) updateData.subject = subject.trim();
-    if (body !== undefined) updateData.body = body.trim();
+    if (bodyText !== undefined) updateData.body = bodyText.trim();
 
     const template = await prisma.template.update({
       where: { id },
       data: updateData,
     });
-
-    console.log('✅ Template updated:', template.id);
 
     return NextResponse.json({
       success: true,
@@ -105,8 +101,9 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -126,8 +123,6 @@ export async function DELETE(request, { params }) {
     await prisma.template.delete({
       where: { id },
     });
-
-    console.log('✅ Template deleted:', id);
 
     return NextResponse.json({
       success: true,

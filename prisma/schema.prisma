@@ -1159,19 +1159,19 @@ model super_admins {
 
 model Template {
   id          String      @id @default(uuid())
-  companyHQId String      // company_hqs.id (which company owns this template)
-  createdBy   String?     // owners.id (who created it - for auth tracking)
+  companyHQId String?     // company_hqs.id (optional - can be added later as follow-on feature)
+  ownerId     String      // owners.id (required - who owns this template)
   title       String
   subject     String
   body        String
   createdAt   DateTime    @default(now())
-  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  owners      owners?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  company_hqs company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  owners      owners       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   campaigns   campaigns[]
 
   @@map("templates")
   @@index([companyHQId])
-  @@index([createdBy])
+  @@index([ownerId])
 }
 
 model work_collateral {

@@ -1,28 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Save, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
+import { useOwner } from '@/hooks/useOwner';
 
 /**
  * Template Builder Page
+ * Simple straight save - no Redis, no preview complexity
  */
 export default function TemplateBuilderPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const templateId = params.templateId;
   const isNew = templateId === 'new';
   
-  const workPackageId = searchParams.get('workPackageId');
-  const itemId = searchParams.get('itemId');
+  const { ownerId } = useOwner();
 
-  const [title, setTitle] = useState(''); // was name
+  const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isNew && templateId) {
@@ -36,65 +37,65 @@ export default function TemplateBuilderPage() {
       const response = await api.get(`/api/templates/${templateId}`);
       if (response.data?.success) {
         const template = response.data.template;
-        setTitle(template.title || ''); // was name
+        setTitle(template.title || '');
         setSubject(template.subject || '');
         setBody(template.body || '');
       }
     } catch (err) {
       console.error('Error loading template:', err);
+      setError('Failed to load template');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
+    if (!ownerId) {
+      setError('Owner not found. Please refresh the page.');
+      return;
+    }
+
     if (!title.trim()) {
-      alert('Title is required');
+      setError('Title is required');
       return;
     }
 
     if (!subject.trim() || !body.trim()) {
-      alert('Subject and body are required');
+      setError('Subject and body are required');
       return;
     }
 
     try {
       setSaving(true);
-      const ownerId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || ''; // was companyHQId
+      setError('');
 
       const data = {
-        ownerId, // was companyHQId
-        title,   // was name
-        subject,
-        body,
+        ownerId,
+        title: title.trim(),
+        subject: subject.trim(),
+        body: body.trim(),
       };
 
       let template;
       if (isNew) {
         const response = await api.post('/api/templates', data);
+        if (!response.data?.success) {
+          throw new Error(response.data?.error || 'Failed to create template');
+        }
         template = response.data.template;
       } else {
         const response = await api.patch(`/api/templates/${templateId}`, data);
+        if (!response.data?.success) {
+          throw new Error(response.data?.error || 'Failed to update template');
+        }
         template = response.data.template;
       }
 
-      // TODO: Artifacts system deprecated - templates are now in actual container
-      // Commented out work package linking until we rebuild the stack
-      // if (isNew && workPackageId && itemId) {
-      //   await api.patch(`/api/workpackages/items/${itemId}/add-artifact`, {
-      //     type: 'OUTREACH_TEMPLATE',
-      //     artifactId: template.id,
-      //   });
-      //   router.push(`/workpackages/${workPackageId}/items/${itemId}`);
-      // } else {
-      //   router.push(`/builder/template/${template.id}`);
-      // }
-      
-      // Always redirect to template builder (artifacts system removed)
+      // Redirect to template builder
       router.push(`/builder/template/${template.id}`);
     } catch (err) {
       console.error('Error saving template:', err);
-      alert('Failed to save template');
+      setError(err.response?.data?.error || err.message || 'Failed to save template');
     } finally {
       setSaving(false);
     }
@@ -128,8 +129,12 @@ export default function TemplateBuilderPage() {
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow">
+          {error && (
+            <div className="mb-4 rounded bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+              {error}
+            </div>
+          )}
           <div className="space-y-4">
-            
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Title *
