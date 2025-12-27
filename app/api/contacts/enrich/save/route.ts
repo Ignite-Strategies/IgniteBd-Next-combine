@@ -140,23 +140,20 @@ export async function POST(request: Request) {
     // Compute intelligence scores (skip if skipIntelligence is true)
     const apolloPayload = rawApolloResponse as ApolloEnrichmentPayload;
     
-    let intelligenceScores = {};
-    let companyIntelligence = {};
-    
-    if (!skipIntelligence) {
-      intelligenceScores = {
-        seniorityScore: extractSeniorityScore(apolloPayload),
-        buyingPowerScore: extractBuyingPowerScore(apolloPayload),
-        urgencyScore: extractUrgencyScore(apolloPayload),
-        rolePowerScore: extractRolePowerScore(apolloPayload),
-        buyerLikelihoodScore: extractBuyerLikelihoodScore(apolloPayload),
-        readinessToBuyScore: extractReadinessToBuyScore(apolloPayload),
-        careerMomentumScore: extractCareerMomentumScore(apolloPayload),
-        careerStabilityScore: extractCareerStabilityScore(apolloPayload),
-      };
+    const intelligenceScores = skipIntelligence ? {} : {
+      seniorityScore: extractSeniorityScore(apolloPayload),
+      buyingPowerScore: extractBuyingPowerScore(apolloPayload),
+      urgencyScore: extractUrgencyScore(apolloPayload),
+      rolePowerScore: extractRolePowerScore(apolloPayload),
+      buyerLikelihoodScore: extractBuyerLikelihoodScore(apolloPayload),
+      readinessToBuyScore: extractReadinessToBuyScore(apolloPayload),
+      careerMomentumScore: extractCareerMomentumScore(apolloPayload),
+      careerStabilityScore: extractCareerStabilityScore(apolloPayload),
+    };
 
-      companyIntelligence = extractCompanyIntelligenceScores(apolloPayload);
-    }
+    const companyIntelligence = skipIntelligence 
+      ? null 
+      : extractCompanyIntelligenceScores(apolloPayload);
 
     // ============================================
     // STEP 1: Update Contact with all enrichment data
@@ -289,13 +286,13 @@ export async function POST(request: Request) {
             numberOfFundingRounds: normalizedCompany.numberOfFundingRounds ?? existingCompany.numberOfFundingRounds,
             
             // Company Intelligence Scores (from enrichment, only if not skipping)
-            ...(skipIntelligence ? {} : {
+            ...(companyIntelligence ? {
               companyHealthScore: companyIntelligence.companyHealthScore ?? existingCompany.companyHealthScore,
               growthScore: companyIntelligence.growthScore ?? existingCompany.growthScore,
               stabilityScore: companyIntelligence.stabilityScore ?? existingCompany.stabilityScore,
               marketPositionScore: companyIntelligence.marketPositionScore ?? existingCompany.marketPositionScore,
               readinessScore: companyIntelligence.readinessScore ?? existingCompany.readinessScore,
-            }),
+            } : {}),
             
             // Inference layer fields (enrichment data takes precedence, only if not skipping)
             ...(skipIntelligence ? {} : {
@@ -347,7 +344,7 @@ export async function POST(request: Request) {
             lastFundingDate: normalizedCompany.lastFundingDate || companyByDomain.lastFundingDate,
             lastFundingAmount: normalizedCompany.lastFundingAmount ?? companyByDomain.lastFundingAmount,
             numberOfFundingRounds: normalizedCompany.numberOfFundingRounds ?? companyByDomain.numberOfFundingRounds,
-            ...(skipIntelligence ? {} : {
+            ...(companyIntelligence ? {
               companyHealthScore: companyIntelligence.companyHealthScore,
               growthScore: companyIntelligence.growthScore,
               stabilityScore: companyIntelligence.stabilityScore,
@@ -359,7 +356,7 @@ export async function POST(request: Request) {
               headcountTier: companyPositioning.headcountTier || companyByDomain.headcountTier,
               normalizedIndustry: companyPositioning.normalizedIndustry || companyByDomain.normalizedIndustry,
               competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : companyByDomain.competitors,
-            }),
+            } : {}),
             updatedAt: new Date(),
           },
         });
@@ -385,7 +382,7 @@ export async function POST(request: Request) {
             lastFundingDate: normalizedCompany.lastFundingDate,
             lastFundingAmount: normalizedCompany.lastFundingAmount,
             numberOfFundingRounds: normalizedCompany.numberOfFundingRounds,
-            ...(skipIntelligence ? {} : {
+            ...(companyIntelligence ? {
               companyHealthScore: companyIntelligence.companyHealthScore,
               growthScore: companyIntelligence.growthScore,
               stabilityScore: companyIntelligence.stabilityScore,
@@ -397,7 +394,7 @@ export async function POST(request: Request) {
               headcountTier: companyPositioning.headcountTier,
               normalizedIndustry: companyPositioning.normalizedIndustry,
               competitors: companyPositioning.competitors || [],
-            }),
+            } : {}),
             updatedAt: new Date(),
           },
         });
@@ -435,17 +432,19 @@ export async function POST(request: Request) {
           lastFundingDate: normalizedCompany.lastFundingDate,
           lastFundingAmount: normalizedCompany.lastFundingAmount,
           numberOfFundingRounds: normalizedCompany.numberOfFundingRounds,
-          companyHealthScore: companyIntelligence.companyHealthScore,
-          growthScore: companyIntelligence.growthScore,
-          stabilityScore: companyIntelligence.stabilityScore,
-          marketPositionScore: companyIntelligence.marketPositionScore,
-          readinessScore: companyIntelligence.readinessScore,
-          positioningLabel: companyPositioning.positioningLabel,
-          category: companyPositioning.category,
-          revenueTier: companyPositioning.revenueTier,
-          headcountTier: companyPositioning.headcountTier,
-          normalizedIndustry: companyPositioning.normalizedIndustry,
-          competitors: companyPositioning.competitors || [],
+          ...(companyIntelligence ? {
+            companyHealthScore: companyIntelligence.companyHealthScore,
+            growthScore: companyIntelligence.growthScore,
+            stabilityScore: companyIntelligence.stabilityScore,
+            marketPositionScore: companyIntelligence.marketPositionScore,
+            readinessScore: companyIntelligence.readinessScore,
+            positioningLabel: companyPositioning.positioningLabel,
+            category: companyPositioning.category,
+            revenueTier: companyPositioning.revenueTier,
+            headcountTier: companyPositioning.headcountTier,
+            normalizedIndustry: companyPositioning.normalizedIndustry,
+            competitors: companyPositioning.competitors || [],
+          } : {}),
           updatedAt: new Date(),
         },
       });
@@ -482,17 +481,19 @@ export async function POST(request: Request) {
           lastFundingDate: normalizedCompany.lastFundingDate,
           lastFundingAmount: normalizedCompany.lastFundingAmount,
           numberOfFundingRounds: normalizedCompany.numberOfFundingRounds,
-          companyHealthScore: companyIntelligence.companyHealthScore,
-          growthScore: companyIntelligence.growthScore,
-          stabilityScore: companyIntelligence.stabilityScore,
-          marketPositionScore: companyIntelligence.marketPositionScore,
-          readinessScore: companyIntelligence.readinessScore,
-          positioningLabel: companyPositioning.positioningLabel,
-          category: companyPositioning.category,
-          revenueTier: companyPositioning.revenueTier,
-          headcountTier: companyPositioning.headcountTier,
-          normalizedIndustry: companyPositioning.normalizedIndustry,
-          competitors: companyPositioning.competitors || [],
+          ...(companyIntelligence ? {
+            companyHealthScore: companyIntelligence.companyHealthScore,
+            growthScore: companyIntelligence.growthScore,
+            stabilityScore: companyIntelligence.stabilityScore,
+            marketPositionScore: companyIntelligence.marketPositionScore,
+            readinessScore: companyIntelligence.readinessScore,
+            positioningLabel: companyPositioning.positioningLabel,
+            category: companyPositioning.category,
+            revenueTier: companyPositioning.revenueTier,
+            headcountTier: companyPositioning.headcountTier,
+            normalizedIndustry: companyPositioning.normalizedIndustry,
+            competitors: companyPositioning.competitors || [],
+          } : {}),
           updatedAt: new Date(),
         },
       });
