@@ -21,7 +21,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const template = await prisma.templates.findUnique({
+    const template = await prisma.template.findUnique({
       where: { id },
     });
 
@@ -80,7 +80,7 @@ export async function PATCH(request, { params }) {
     if (subject !== undefined) updateData.subject = subject.trim();
     if (body !== undefined) updateData.body = body.trim();
 
-    const template = await prisma.templates.update({
+    const template = await prisma.template.update({
       where: { id },
       data: updateData,
     });
@@ -123,7 +123,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    await prisma.templates.delete({
+    await prisma.template.delete({
       where: { id },
     });
 

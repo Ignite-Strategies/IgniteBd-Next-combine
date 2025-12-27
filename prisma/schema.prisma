@@ -219,7 +219,7 @@ model company_hqs {
   presentations                                 Presentation[]
   products                                      products[]
   proposals                                     proposals[]
-  templates                                     templates[]
+  templates                                     Template[]
   template_relationship_helpers                 template_relationship_helpers[]
   campaigns                                     campaigns[]
   email_sequences                               email_sequences[]
@@ -480,7 +480,7 @@ model campaigns {
   contact_lists    contact_lists?     @relation(fields: [contact_list_id], references: [id], onDelete: SetNull)
   // WHAT - Email template (optional - can be manual or from template)
   template_id      String?
-  template         templates?         @relation(fields: [template_id], references: [id], onDelete: SetNull)
+  template         Template?         @relation(fields: [template_id], references: [id], onDelete: SetNull)
   // Email content (optional - can be in sequences or from template)
   subject          String?
   preview_text     String?
@@ -1156,7 +1156,7 @@ model super_admins {
   @@index([platformId])
 }
 
-model templates {
+model Template {
   id          String      @id @default(uuid())
   ownerId     String
   title       String
@@ -1166,6 +1166,7 @@ model templates {
   company_hqs company_hqs @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   campaigns   campaigns[]
 
+  @@map("templates")
   @@index([ownerId])
 }
 

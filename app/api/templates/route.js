@@ -39,7 +39,7 @@ export async function POST(request) {
       );
     }
 
-    const template = await prisma.templates.create({
+    const template = await prisma.template.create({
       data: {
         ownerId,
         title: title.trim(),
@@ -88,7 +88,7 @@ export async function GET(request) {
     const where = {};
     if (ownerId) where.ownerId = ownerId;
 
-    const templates = await prisma.templates.findMany({
+    const templates = await prisma.template.findMany({
       where,
       orderBy: {
         createdAt: 'desc',

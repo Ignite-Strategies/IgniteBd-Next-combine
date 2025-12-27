@@ -57,7 +57,7 @@ async function migrateTemplateData() {
         const body = outreach.content || '';
 
         // Create new template
-        await prisma.templates.create({
+        await prisma.template.create({
           data: {
             id: outreach.id, // Use same ID
             ownerId: base.companyHQId,
@@ -77,7 +77,7 @@ async function migrateTemplateData() {
     // Step 2: Migrate standalone templates (if any exist with old structure)
     console.log('Step 2: Migrating standalone templates...');
     
-    const oldTemplates = await prisma.templates.findMany({
+    const oldTemplates = await prisma.template.findMany({
       where: {
         // Find templates that still have old structure (have name but no title)
         name: { not: null },
@@ -87,7 +87,7 @@ async function migrateTemplateData() {
 
     let standaloneMigrated = 0;
     for (const oldTemplate of oldTemplates) {
-      await prisma.templates.update({
+      await prisma.template.update({
         where: { id: oldTemplate.id },
         data: {
           title: oldTemplate.name || 'Untitled Template',

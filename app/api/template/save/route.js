@@ -59,7 +59,7 @@ export async function POST(request) {
     }
 
     // Save to templates model with: title (name), subjectline (subject), templatecontent (body), datecreated (createdAt)
-    const template = await prisma.templates.create({
+    const template = await prisma.template.create({
       data: {
         companyHQId: tenantId,
         name: templateBase.title, // title -> name
