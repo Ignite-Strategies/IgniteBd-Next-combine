@@ -3,82 +3,49 @@
 import { Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Sparkles, FileEdit, Copy, ArrowLeft } from 'lucide-react';
+import { FileCode, Plus } from 'lucide-react';
 
 /**
- * Template Creation Fork Page
- * 3-fork approach: Manual, With AI, or From Previous
+ * Templates Main Forker Page
+ * 2-option approach: View/Edit Templates or Create New
  */
-function TemplateChooserContent() {
+function TemplatesContent() {
   const router = useRouter();
-
-  const handleOptionSelect = (option) => {
-    switch (option) {
-      case 'manual': {
-        // Route to manual template builder
-        router.push('/builder/template/new');
-        break;
-      }
-      case 'ai': {
-        // Route to AI fork page (Quick Idea or Relationship Helper)
-        router.push('/templates/create/ai');
-        break;
-      }
-      case 'previous': {
-        // Route to clone from previous template
-        router.push('/templates/create/clone');
-        break;
-      }
-    }
-  };
 
   const OPTIONS = [
     {
-      id: 'manual',
-      title: 'Manual',
-      description: 'Create a template quickly with a form. You\'ll need to figure out the variables.',
-      icon: FileEdit,
-      buttonText: 'Create Manually',
+      id: 'library',
+      title: 'View/Edit Templates',
+      description: 'Browse and edit your existing email templates',
+      icon: FileCode,
+      buttonText: 'View Templates',
+      route: '/templates/library-email',
     },
     {
-      id: 'ai',
-      title: 'With AI',
-      description: 'Use AI to generate your template. Choose between Quick Idea or Relationship-aware generation.',
-      icon: Sparkles,
-      buttonText: 'Use AI',
-    },
-    {
-      id: 'previous',
-      title: 'From Previous Template',
-      description: 'Clone an existing template as your starting point.',
-      icon: Copy,
-      buttonText: 'Use Previous',
+      id: 'create',
+      title: 'Create New',
+      description: 'Create a new email template using Manual, AI, or Clone',
+      icon: Plus,
+      buttonText: 'Create New',
+      route: '/templates/create',
     },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <PageHeader
-            title="Email Templates"
-            subtitle="Create email templates for your outreach campaigns"
-          />
-        </div>
+        <PageHeader
+          title="Email Templates"
+          subtitle="Manage your email templates for outreach campaigns"
+        />
 
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           {OPTIONS.map((option) => {
             const Icon = option.icon;
             return (
               <div
                 key={option.id}
-                onClick={() => handleOptionSelect(option.id)}
+                onClick={() => router.push(option.route)}
                 className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
               >
                 <div className="flex flex-col items-center text-center mb-4">
@@ -104,7 +71,7 @@ function TemplateChooserContent() {
   );
 }
 
-export default function TemplateChooserPage() {
+export default function TemplatesPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 py-8">
@@ -113,7 +80,7 @@ export default function TemplateChooserPage() {
         </div>
       </div>
     }>
-      <TemplateChooserContent />
+      <TemplatesContent />
     </Suspense>
   );
 }

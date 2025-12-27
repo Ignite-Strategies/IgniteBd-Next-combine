@@ -26,7 +26,7 @@ const ROUTES_WITH_SIDEBAR = [
   '/workpackages',
   '/client-operations/execution',
   '/billing',
-  '/template',
+  '/templates',
   '/people',
   '/companies',
 ];
