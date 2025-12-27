@@ -902,6 +902,7 @@ model owners {
   email_sequences                           email_sequences[]
   super_admins                              super_admins?
   google_oauth_tokens                       GoogleOAuthToken[]
+  templates                                 Template[]            // Templates created by this owner
 }
 
 model payments {
@@ -1158,16 +1159,19 @@ model super_admins {
 
 model Template {
   id          String      @id @default(uuid())
-  ownerId     String
+  companyHQId String      // company_hqs.id (which company owns this template)
+  createdBy   String?     // owners.id (who created it - for auth tracking)
   title       String
   subject     String
   body        String
   createdAt   DateTime    @default(now())
-  company_hqs company_hqs @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  owners      owners?     @relation(fields: [createdBy], references: [id], onDelete: SetNull)
   campaigns   campaigns[]
 
   @@map("templates")
-  @@index([ownerId])
+  @@index([companyHQId])
+  @@index([createdBy])
 }
 
 model work_collateral {
