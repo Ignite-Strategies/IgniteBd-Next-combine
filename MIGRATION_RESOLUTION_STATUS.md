@@ -22,7 +22,7 @@
 ### Option 1: Retry Migration (Recommended)
 Wait a few minutes and retry:
 ```bash
-export DIRECT_DATABASE_URL="postgresql://neondb_owner:npg_EG2wV8XQWmek@ep-summer-firefly-ad0yaaju.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
+export DIRECT_DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
 npx prisma migrate deploy
 ```
 
