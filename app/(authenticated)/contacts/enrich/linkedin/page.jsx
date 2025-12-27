@@ -258,50 +258,51 @@ function LinkedInEnrichContent() {
               </a>
             </div>
 
-            {/* Action Buttons */}
-            <div className="mt-6 space-y-3">
-              {/* Save Without Intelligence Button */}
-              <button
-                onClick={() => handleSave(true)}
-                disabled={saving}
-                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-green-700 transition"
-              >
-                {saving ? (
-                  <>
-                    <RefreshCw className="animate-spin h-5 w-5" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-5 w-5" />
-                    Save Without Intelligence
-                  </>
-                )}
-              </button>
+            {/* Action Buttons - Fork */}
+            <div className="mt-6 border-t pt-6">
+              <p className="text-sm text-gray-600 mb-4 text-center">Choose an option:</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Save Contact as Is - Primary Option */}
+                <button
+                  onClick={() => handleSave(true)}
+                  disabled={saving || generatingIntel}
+                  className="bg-green-600 text-white px-6 py-4 rounded-lg flex flex-col items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-green-700 transition shadow-md"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="animate-spin h-5 w-5" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5" />
+                      <span className="text-base">Save Contact as Is</span>
+                      <span className="text-xs font-normal opacity-90">Name, email, title</span>
+                    </>
+                  )}
+                </button>
 
-              {/* Generate Intelligence Button */}
-              <button
-                onClick={handleGenerateIntelligence}
-                disabled={generatingIntel || saving}
-                className="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-indigo-700 transition"
-              >
-                {generatingIntel ? (
-                  <>
-                    <RefreshCw className="animate-spin h-5 w-5" />
-                    Generating Intelligence...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-5 w-5" />
-                    Generate Intelligence
-                  </>
-                )}
-              </button>
+                {/* Generate Intelligence - Secondary Option */}
+                <button
+                  onClick={handleGenerateIntelligence}
+                  disabled={generatingIntel || saving}
+                  className="bg-indigo-600 text-white px-6 py-4 rounded-lg flex flex-col items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-indigo-700 transition shadow-md"
+                >
+                  {generatingIntel ? (
+                    <>
+                      <RefreshCw className="animate-spin h-5 w-5" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-5 w-5" />
+                      <span className="text-base">Generate Intelligence</span>
+                      <span className="text-xs font-normal opacity-90">Full profile analysis</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-
-            <p className="mt-2 text-xs text-gray-500 text-center">
-              Save now to store basic contact info, or generate intelligence for full profile analysis
-            </p>
           </div>
         )}
 
