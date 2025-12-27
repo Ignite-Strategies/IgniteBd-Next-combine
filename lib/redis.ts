@@ -7,17 +7,74 @@ import { Redis } from '@upstash/redis';
 
 let redis: Redis | null = null;
 
+/**
+ * Parse rediss:// URL format to extract hostname and token
+ * Format: rediss://default:token@hostname:port
+ * Returns: { url: 'https://hostname', token: 'token' }
+ */
+function parseRedisUrl(redisUrl: string): { url: string; token: string } {
+  try {
+    const urlObj = new URL(redisUrl);
+    
+    // Extract token from password field
+    const token = urlObj.password || '';
+    
+    // Extract hostname and convert to HTTPS REST API URL
+    const hostname = urlObj.hostname;
+    const url = `https://${hostname}`;
+    
+    return { url, token };
+  } catch (error: any) {
+    throw new Error(`Invalid REDIS_URL format: ${redisUrl}. Expected rediss://default:token@hostname:port`);
+  }
+}
+
 export function getRedis(): Redis {
   if (redis) {
     return redis;
   }
 
-  // Use Upstash Redis REST API
-  // Automatically reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from env
+  // Priority 1: Try REDIS_URL and REDIS_TOKEN (Vercel format: rediss://default:token@hostname:port)
+  if (process.env.REDIS_URL && process.env.REDIS_TOKEN) {
+    try {
+      let url = process.env.REDIS_URL.trim();
+      let token = process.env.REDIS_TOKEN.trim();
+      
+      // Strip quotes if present
+      url = url.replace(/^["']+|["']+$/g, '');
+      token = token.replace(/^["']+|["']+$/g, '');
+      
+      // If it's a rediss:// URL, parse it to extract hostname and token
+      if (url.startsWith('rediss://') || url.startsWith('redis://')) {
+        const parsed = parseRedisUrl(url);
+        url = parsed.url;
+        // Use token from REDIS_TOKEN env var if provided, otherwise use parsed token
+        if (!token && parsed.token) {
+          token = parsed.token;
+        }
+      }
+      
+      // Validate URL format (should be https:// for REST API)
+      if (!url.startsWith('https://')) {
+        throw new Error(`Invalid REDIS_URL format. Expected https:// URL or rediss:// URL, got: ${url}`);
+      }
+      
+      redis = new Redis({
+        url,
+        token,
+      });
+      console.log('✅ Upstash Redis client initialized from REDIS_URL/REDIS_TOKEN');
+      return redis;
+    } catch (error: any) {
+      console.warn('⚠️ Failed to initialize Redis from REDIS_URL/REDIS_TOKEN:', error.message);
+    }
+  }
+
+  // Priority 2: Try UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (legacy)
   try {
     // Try fromEnv first - it handles quote stripping internally
     redis = Redis.fromEnv();
-    console.log('✅ Upstash Redis client initialized');
+    console.log('✅ Upstash Redis client initialized from UPSTASH env vars');
     return redis;
   } catch (error: any) {
     // Fallback to manual initialization if fromEnv() fails
@@ -26,8 +83,10 @@ export function getRedis(): Redis {
 
     if (!url || !token) {
       throw new Error(
-        'Upstash Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.\n\n' +
-        'Note: These should be REST API credentials, not Redis CLI connection strings.\n' +
+        'Upstash Redis configuration is missing. Please set either:\n' +
+        '  - REDIS_URL and REDIS_TOKEN (Vercel format: rediss://default:token@hostname:port)\n' +
+        '  - UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (REST API format)\n\n' +
+        'Note: REDIS_URL should be in rediss:// format from Vercel, or UPSTASH_REDIS_REST_URL should be the REST API URL (https://...).\n' +
         'Get them from: https://console.upstash.com/redis -> Your Database -> REST API'
       );
     }

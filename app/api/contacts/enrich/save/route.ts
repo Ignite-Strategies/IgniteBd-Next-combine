@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { contactId, redisKey, companyId, previewId } = body;
+    const { contactId, redisKey, companyId, previewId, skipIntelligence } = body;
 
     // Validate inputs
     if (!contactId) {
@@ -76,16 +76,29 @@ export async function POST(request: Request) {
 
     // Get raw enrichment data from Redis
     const redisData = await getEnrichedContactByKey(redisKey);
-    if (!redisData || !redisData.rawEnrichmentPayload) {
+    if (!redisData) {
       return NextResponse.json(
         { success: false, error: 'Enrichment data not found in Redis' },
         { status: 404 },
       );
     }
 
-    const rawApolloResponse = redisData.rawEnrichmentPayload;
+    // Handle different Redis data formats
+    // Format 1: { rawEnrichmentPayload: ... } (from generate-intel route)
+    // Format 2: { enrichedData: { rawApolloResponse: ... } } (from enrich route)
+    let rawApolloResponse: any;
+    if (redisData.rawEnrichmentPayload) {
+      rawApolloResponse = redisData.rawEnrichmentPayload;
+    } else if (redisData.enrichedData?.rawApolloResponse) {
+      rawApolloResponse = redisData.enrichedData.rawApolloResponse;
+    } else {
+      return NextResponse.json(
+        { success: false, error: 'Invalid enrichment data format in Redis' },
+        { status: 400 },
+      );
+    }
 
-    // Get inference fields from preview data (if previewId provided)
+    // Get inference fields from preview data (if previewId provided and not skipping intelligence)
     let profileSummary: string | null = null;
     let tenureYears: number | null = null;
     let currentTenureYears: number | null = null;
@@ -101,7 +114,7 @@ export async function POST(request: Request) {
       competitors?: string[];
     } = {};
 
-    if (previewId) {
+    if (previewId && !skipIntelligence) {
       try {
         const previewData = await getPreviewIntelligence(previewId);
         if (previewData) {
@@ -124,21 +137,26 @@ export async function POST(request: Request) {
     // Normalize company fields
     const normalizedCompany = normalizeCompanyApollo(rawApolloResponse);
 
-    // Compute all intelligence scores
+    // Compute intelligence scores (skip if skipIntelligence is true)
     const apolloPayload = rawApolloResponse as ApolloEnrichmentPayload;
     
-    const intelligenceScores = {
-      seniorityScore: extractSeniorityScore(apolloPayload),
-      buyingPowerScore: extractBuyingPowerScore(apolloPayload),
-      urgencyScore: extractUrgencyScore(apolloPayload),
-      rolePowerScore: extractRolePowerScore(apolloPayload),
-      buyerLikelihoodScore: extractBuyerLikelihoodScore(apolloPayload),
-      readinessToBuyScore: extractReadinessToBuyScore(apolloPayload),
-      careerMomentumScore: extractCareerMomentumScore(apolloPayload),
-      careerStabilityScore: extractCareerStabilityScore(apolloPayload),
-    };
+    let intelligenceScores = {};
+    let companyIntelligence = {};
+    
+    if (!skipIntelligence) {
+      intelligenceScores = {
+        seniorityScore: extractSeniorityScore(apolloPayload),
+        buyingPowerScore: extractBuyingPowerScore(apolloPayload),
+        urgencyScore: extractUrgencyScore(apolloPayload),
+        rolePowerScore: extractRolePowerScore(apolloPayload),
+        buyerLikelihoodScore: extractBuyerLikelihoodScore(apolloPayload),
+        readinessToBuyScore: extractReadinessToBuyScore(apolloPayload),
+        careerMomentumScore: extractCareerMomentumScore(apolloPayload),
+        careerStabilityScore: extractCareerStabilityScore(apolloPayload),
+      };
 
-    const companyIntelligence = extractCompanyIntelligenceScores(apolloPayload);
+      companyIntelligence = extractCompanyIntelligenceScores(apolloPayload);
+    }
 
     // ============================================
     // STEP 1: Update Contact with all enrichment data
@@ -149,16 +167,18 @@ export async function POST(request: Request) {
       enrichmentFetchedAt: new Date(),
       enrichmentRedisKey: redisKey,
       
-      // Intelligence scores
-      ...intelligenceScores,
+      // Intelligence scores (only if not skipping)
+      ...(skipIntelligence ? {} : intelligenceScores),
       
-      // Inference layer fields
-      profileSummary: profileSummary || undefined,
-      tenureYears: tenureYears || undefined, // Keep for backward compatibility
-      currentTenureYears: currentTenureYears || undefined,
-      totalExperienceYears: totalExperienceYears || undefined,
-      avgTenureYears: avgTenureYears || undefined,
-      careerTimeline: careerTimeline || undefined,
+      // Inference layer fields (only if not skipping)
+      ...(skipIntelligence ? {} : {
+        profileSummary: profileSummary || undefined,
+        tenureYears: tenureYears || undefined, // Keep for backward compatibility
+        currentTenureYears: currentTenureYears || undefined,
+        totalExperienceYears: totalExperienceYears || undefined,
+        avgTenureYears: avgTenureYears || undefined,
+        careerTimeline: careerTimeline || undefined,
+      }),
       
       // Normalized contact fields
       title: normalizedContact.title,
@@ -268,20 +288,24 @@ export async function POST(request: Request) {
             lastFundingAmount: normalizedCompany.lastFundingAmount ?? existingCompany.lastFundingAmount,
             numberOfFundingRounds: normalizedCompany.numberOfFundingRounds ?? existingCompany.numberOfFundingRounds,
             
-            // Company Intelligence Scores (from enrichment)
-            companyHealthScore: companyIntelligence.companyHealthScore ?? existingCompany.companyHealthScore,
-            growthScore: companyIntelligence.growthScore ?? existingCompany.growthScore,
-            stabilityScore: companyIntelligence.stabilityScore ?? existingCompany.stabilityScore,
-            marketPositionScore: companyIntelligence.marketPositionScore ?? existingCompany.marketPositionScore,
-            readinessScore: companyIntelligence.readinessScore ?? existingCompany.readinessScore,
+            // Company Intelligence Scores (from enrichment, only if not skipping)
+            ...(skipIntelligence ? {} : {
+              companyHealthScore: companyIntelligence.companyHealthScore ?? existingCompany.companyHealthScore,
+              growthScore: companyIntelligence.growthScore ?? existingCompany.growthScore,
+              stabilityScore: companyIntelligence.stabilityScore ?? existingCompany.stabilityScore,
+              marketPositionScore: companyIntelligence.marketPositionScore ?? existingCompany.marketPositionScore,
+              readinessScore: companyIntelligence.readinessScore ?? existingCompany.readinessScore,
+            }),
             
-            // Inference layer fields (enrichment data takes precedence)
-            positioningLabel: companyPositioning.positioningLabel || existingCompany.positioningLabel,
-            category: companyPositioning.category || existingCompany.category,
-            revenueTier: companyPositioning.revenueTier || existingCompany.revenueTier,
-            headcountTier: companyPositioning.headcountTier || existingCompany.headcountTier,
-            normalizedIndustry: companyPositioning.normalizedIndustry || existingCompany.normalizedIndustry,
-            competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : existingCompany.competitors,
+            // Inference layer fields (enrichment data takes precedence, only if not skipping)
+            ...(skipIntelligence ? {} : {
+              positioningLabel: companyPositioning.positioningLabel || existingCompany.positioningLabel,
+              category: companyPositioning.category || existingCompany.category,
+              revenueTier: companyPositioning.revenueTier || existingCompany.revenueTier,
+              headcountTier: companyPositioning.headcountTier || existingCompany.headcountTier,
+              normalizedIndustry: companyPositioning.normalizedIndustry || existingCompany.normalizedIndustry,
+              competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : existingCompany.competitors,
+            }),
             
             updatedAt: new Date(),
           },
@@ -323,17 +347,19 @@ export async function POST(request: Request) {
             lastFundingDate: normalizedCompany.lastFundingDate || companyByDomain.lastFundingDate,
             lastFundingAmount: normalizedCompany.lastFundingAmount ?? companyByDomain.lastFundingAmount,
             numberOfFundingRounds: normalizedCompany.numberOfFundingRounds ?? companyByDomain.numberOfFundingRounds,
-            companyHealthScore: companyIntelligence.companyHealthScore,
-            growthScore: companyIntelligence.growthScore,
-            stabilityScore: companyIntelligence.stabilityScore,
-            marketPositionScore: companyIntelligence.marketPositionScore,
-            readinessScore: companyIntelligence.readinessScore,
-            positioningLabel: companyPositioning.positioningLabel || companyByDomain.positioningLabel,
-            category: companyPositioning.category || companyByDomain.category,
-            revenueTier: companyPositioning.revenueTier || companyByDomain.revenueTier,
-            headcountTier: companyPositioning.headcountTier || companyByDomain.headcountTier,
-            normalizedIndustry: companyPositioning.normalizedIndustry || companyByDomain.normalizedIndustry,
-            competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : companyByDomain.competitors,
+            ...(skipIntelligence ? {} : {
+              companyHealthScore: companyIntelligence.companyHealthScore,
+              growthScore: companyIntelligence.growthScore,
+              stabilityScore: companyIntelligence.stabilityScore,
+              marketPositionScore: companyIntelligence.marketPositionScore,
+              readinessScore: companyIntelligence.readinessScore,
+              positioningLabel: companyPositioning.positioningLabel || companyByDomain.positioningLabel,
+              category: companyPositioning.category || companyByDomain.category,
+              revenueTier: companyPositioning.revenueTier || companyByDomain.revenueTier,
+              headcountTier: companyPositioning.headcountTier || companyByDomain.headcountTier,
+              normalizedIndustry: companyPositioning.normalizedIndustry || companyByDomain.normalizedIndustry,
+              competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : companyByDomain.competitors,
+            }),
             updatedAt: new Date(),
           },
         });
@@ -359,17 +385,19 @@ export async function POST(request: Request) {
             lastFundingDate: normalizedCompany.lastFundingDate,
             lastFundingAmount: normalizedCompany.lastFundingAmount,
             numberOfFundingRounds: normalizedCompany.numberOfFundingRounds,
-            companyHealthScore: companyIntelligence.companyHealthScore,
-            growthScore: companyIntelligence.growthScore,
-            stabilityScore: companyIntelligence.stabilityScore,
-            marketPositionScore: companyIntelligence.marketPositionScore,
-            readinessScore: companyIntelligence.readinessScore,
-            positioningLabel: companyPositioning.positioningLabel,
-            category: companyPositioning.category,
-            revenueTier: companyPositioning.revenueTier,
-            headcountTier: companyPositioning.headcountTier,
-            normalizedIndustry: companyPositioning.normalizedIndustry,
-            competitors: companyPositioning.competitors || [],
+            ...(skipIntelligence ? {} : {
+              companyHealthScore: companyIntelligence.companyHealthScore,
+              growthScore: companyIntelligence.growthScore,
+              stabilityScore: companyIntelligence.stabilityScore,
+              marketPositionScore: companyIntelligence.marketPositionScore,
+              readinessScore: companyIntelligence.readinessScore,
+              positioningLabel: companyPositioning.positioningLabel,
+              category: companyPositioning.category,
+              revenueTier: companyPositioning.revenueTier,
+              headcountTier: companyPositioning.headcountTier,
+              normalizedIndustry: companyPositioning.normalizedIndustry,
+              competitors: companyPositioning.competitors || [],
+            }),
             updatedAt: new Date(),
           },
         });

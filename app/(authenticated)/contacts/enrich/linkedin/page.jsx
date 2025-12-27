@@ -79,9 +79,15 @@ function LinkedInEnrichContent() {
     }
   }
 
-  async function handleSave() {
-    if (!intelligenceData) {
+  async function handleSave(skipIntelligence = false) {
+    // If skipping intelligence, we need at least preview data
+    if (!skipIntelligence && !intelligenceData) {
       alert('No intelligence data available');
+      return;
+    }
+
+    if (skipIntelligence && !preview) {
+      alert('Please preview the contact first');
       return;
     }
 
@@ -98,13 +104,23 @@ function LinkedInEnrichContent() {
       }
 
       // Step 1: Create contact in CRM
-      const contactResponse = await api.post('/api/contacts', {
-        crmId: companyHQId,
+      const contactData = skipIntelligence ? {
+        firstName: preview.firstName,
+        lastName: preview.lastName,
+        email: preview.email,
+        phone: preview.phone,
+        title: preview.title,
+      } : {
         firstName: intelligenceData.normalizedContact.firstName,
         lastName: intelligenceData.normalizedContact.lastName,
         email: intelligenceData.normalizedContact.email,
         phone: intelligenceData.normalizedContact.phone,
         title: intelligenceData.normalizedContact.title,
+      };
+
+      const contactResponse = await api.post('/api/contacts', {
+        crmId: companyHQId,
+        ...contactData,
       });
 
       if (!contactResponse.data?.contact) {
@@ -113,11 +129,27 @@ function LinkedInEnrichContent() {
 
       const contactId = contactResponse.data.contact.id;
 
-      // Step 2: Save enrichment data with intelligence scores + inferences
+      // Step 2: Save enrichment data
+      // If skipping intelligence, we need to enrich first to get redisKey
+      let redisKey = skipIntelligence ? null : intelligenceData.redisKey;
+      
+      if (skipIntelligence) {
+        // Enrich to get redisKey (but don't generate intelligence)
+        const enrichResponse = await api.post('/api/enrich/enrich', {
+          linkedinUrl: url,
+        });
+        redisKey = enrichResponse.data?.redisKey;
+      }
+
+      if (!redisKey) {
+        throw new Error('Failed to get enrichment data');
+      }
+
       await api.post('/api/contacts/enrich/save', {
         contactId,
-        redisKey: intelligenceData.redisKey,
-        previewId: intelligenceData.previewId, // Pass previewId to get inference fields
+        redisKey,
+        previewId: skipIntelligence ? null : intelligenceData.previewId, // Pass previewId only if not skipping
+        skipIntelligence, // Pass flag to skip intelligence
       });
 
       // Step 3: Show success modal with next steps
@@ -226,27 +258,49 @@ function LinkedInEnrichContent() {
               </a>
             </div>
 
-            {/* Generate Intelligence Button */}
-            <button
-              onClick={handleGenerateIntelligence}
-              disabled={generatingIntel}
-              className="mt-6 w-full bg-indigo-600 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-indigo-700 transition"
-            >
-              {generatingIntel ? (
-                <>
-                  <RefreshCw className="animate-spin h-5 w-5" />
-                  Generating Intelligence...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-5 w-5" />
-                  Generate Intelligence
-                </>
-              )}
-            </button>
+            {/* Action Buttons */}
+            <div className="mt-6 space-y-3">
+              {/* Save Without Intelligence Button */}
+              <button
+                onClick={() => handleSave(true)}
+                disabled={saving}
+                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-green-700 transition"
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw className="animate-spin h-5 w-5" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-5 w-5" />
+                    Save Without Intelligence
+                  </>
+                )}
+              </button>
+
+              {/* Generate Intelligence Button */}
+              <button
+                onClick={handleGenerateIntelligence}
+                disabled={generatingIntel || saving}
+                className="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-indigo-700 transition"
+              >
+                {generatingIntel ? (
+                  <>
+                    <RefreshCw className="animate-spin h-5 w-5" />
+                    Generating Intelligence...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-5 w-5" />
+                    Generate Intelligence
+                  </>
+                )}
+              </button>
+            </div>
 
             <p className="mt-2 text-xs text-gray-500 text-center">
-              This will compute all intelligence scores and show you the full profile
+              Save now to store basic contact info, or generate intelligence for full profile analysis
             </p>
           </div>
         )}
