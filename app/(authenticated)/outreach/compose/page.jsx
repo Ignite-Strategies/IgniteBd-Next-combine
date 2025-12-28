@@ -91,21 +91,21 @@ function ComposeContent() {
       }
     };
 
-    // Load signature from owner
-    if (owner?.emailSignature) {
-      setEmailSignature(owner.emailSignature);
-      setIncludeSignature(true);
-    } else {
-      // Try fetching from API as fallback
-      api.get(`/api/owner/${ownerId}`).then((response) => {
-        if (response.data?.success && response.data.owner?.emailSignature) {
-          setEmailSignature(response.data.owner.emailSignature);
-          setIncludeSignature(true);
-        }
-      }).catch(() => {
-        // Ignore errors - signature is optional
-      });
-    }
+    // Load signature from owner - TODO: Re-enable after relational model is implemented
+    // if (owner?.emailSignature) {
+    //   setEmailSignature(owner.emailSignature);
+    //   setIncludeSignature(true);
+    // } else {
+    //   // Try fetching from API as fallback
+    //   api.get(`/api/owner/${ownerId}`).then((response) => {
+    //     if (response.data?.success && response.data.owner?.emailSignature) {
+    //       setEmailSignature(response.data.owner.emailSignature);
+    //       setIncludeSignature(true);
+    //     }
+    //   }).catch(() => {
+    //     // Ignore errors - signature is optional
+    //   });
+    // }
 
     loadTemplates();
   }, [ownerId, owner]);
@@ -526,7 +526,7 @@ function ComposeContent() {
                 />
               </div>
 
-              {/* Signature Option */}
+              {/* Signature Option - TODO: Re-enable after relational model is implemented
               {emailSignature && (
                 <div className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <input
@@ -559,6 +559,7 @@ function ComposeContent() {
                   </button>
                 </div>
               )}
+              */}
 
               {/* Body */}
               <div>

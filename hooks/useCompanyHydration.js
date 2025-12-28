@@ -169,7 +169,7 @@ export function useCompanyHydration(companyHQId) {
       // Store blogs in both the hook key and the blogs-specific key
       localStorage.setItem('blogs', JSON.stringify(hydratedData.blogs));
       localStorage.setItem(`blogs_${companyHQId}`, JSON.stringify(hydratedData.blogs));
-      localStorage.setItem('templates', JSON.stringify(hydratedData.templates));
+      // templates: REMOVED - Templates are owner-scoped, not company-scoped
       localStorage.setItem('landingPages', JSON.stringify(hydratedData.landingPages));
 
       setLoading(false);

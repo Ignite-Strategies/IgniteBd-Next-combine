@@ -18,10 +18,32 @@ function EmailTemplateLibraryContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // 🎯 LOCAL-FIRST: Load from localStorage on mount - NO API CALLS unless cache miss
   useEffect(() => {
-    if (ownerId) {
-      loadTemplates();
+    if (typeof window === 'undefined') return;
+    if (!ownerId) {
+      setLoading(false);
+      return;
     }
+
+    // Try to load from localStorage first
+    try {
+      const cached = localStorage.getItem(`templates_${ownerId}`);
+      if (cached) {
+        const templates = JSON.parse(cached);
+        if (Array.isArray(templates)) {
+          setTemplates(templates);
+          setLoading(false);
+          console.log(`✅ [LOCAL-FIRST] Loaded ${templates.length} templates from localStorage`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[LOCAL-FIRST] Failed to parse cached templates:', e);
+    }
+
+    // Fallback: Load from API if not cached
+    loadTemplates();
   }, [ownerId]);
 
   const loadTemplates = async () => {
@@ -32,7 +54,11 @@ function EmailTemplateLibraryContent() {
       setError('');
       const response = await api.get(`/api/templates?ownerId=${ownerId}`);
       if (response.data?.success) {
-        setTemplates(response.data.templates || []);
+        const templates = response.data.templates || [];
+        setTemplates(templates);
+        // Cache in localStorage
+        localStorage.setItem(`templates_${ownerId}`, JSON.stringify(templates));
+        console.log(`✅ Loaded ${templates.length} templates from API and cached`);
       } else {
         setError('Failed to load templates');
       }

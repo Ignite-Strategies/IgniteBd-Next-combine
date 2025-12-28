@@ -210,11 +210,10 @@ export async function GET(request) {
         orderBy: { createdAt: 'desc' },
       }).catch(() => []), // Return empty array on error
 
-      // Templates (content)
-      prisma.template.findMany({
-        where: { companyHQId },
-        orderBy: { createdAt: 'desc' },
-      }).catch(() => []), // Return empty array on error
+      // Templates (content) - REMOVED: Templates are owner-scoped, not company-scoped
+      // Templates should be fetched by ownerId, not companyHQId
+      // Use /api/templates?ownerId=${ownerId} instead
+      Promise.resolve([]),
 
       // Landing Pages (content)
       prisma.landingPage.findMany({
@@ -258,7 +257,7 @@ export async function GET(request) {
       workPackages: workPackages || [],
       presentations: presentations || [],
       blogs: blogs || [],
-      templates: templates || [],
+      // templates: REMOVED - Templates are owner-scoped, not company-scoped
       landingPages: landingPages || [],
       stats,
       timestamp: new Date().toISOString(),
