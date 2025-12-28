@@ -29,6 +29,7 @@ function ContactListPreviewContent() {
   const [listDescription, setListDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   
   // Filter-specific state
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
@@ -175,13 +176,20 @@ function ContactListPreviewContent() {
       });
 
       if (response.data?.success && response.data.list) {
-        addList(response.data.list);
-        // If returnTo is provided, redirect there; otherwise go to list manager
-        if (returnTo) {
-          router.push(returnTo);
-        } else {
-          router.push('/contacts/list-manager');
-        }
+        const createdList = response.data.list;
+        addList(createdList);
+        setIsCreating(false);
+        setError(null);
+        setSuccessMessage(`Contact list "${createdList.title || createdList.name}" created successfully with ${createdList.totalContacts || selectedContacts.size} contact${(createdList.totalContacts || selectedContacts.size) !== 1 ? 's' : ''}!`);
+        
+        // Redirect after showing success message
+        setTimeout(() => {
+          if (returnTo) {
+            router.push(returnTo);
+          } else {
+            router.push('/contacts/list-manager');
+          }
+        }, 2000);
       } else {
         setError(response.data?.error || 'Failed to create list');
         setIsCreating(false);
@@ -468,6 +476,16 @@ function ContactListPreviewContent() {
         {error && (
           <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-4">
             <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4">
+            <div className="flex items-center gap-2">
+              <Check className="h-5 w-5 text-green-600" />
+              <p className="text-sm text-green-800 font-medium">{successMessage}</p>
+            </div>
+            <p className="text-xs text-green-700 mt-1">Redirecting...</p>
           </div>
         )}
       </div>
