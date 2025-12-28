@@ -149,6 +149,7 @@ function LinkedInEnrichContent() {
       await api.post('/api/contacts/enrich/save', {
         contactId,
         redisKey,
+        companyHQId, // Pass companyHQId to validate contact belongs to this company
         previewId: skipIntelligence ? null : intelligenceData.previewId, // Pass previewId only if not skipping
         skipIntelligence, // Pass flag to skip intelligence
       });

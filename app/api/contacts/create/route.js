@@ -80,6 +80,28 @@ export async function POST(request) {
     // Normalize email
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Check if contact already exists
+    const existingContact = await prisma.contact.findUnique({
+      where: {
+        email: normalizedEmail,
+      },
+    });
+
+    // If contact exists but belongs to different companyHQ, return error
+    if (existingContact && existingContact.crmId !== crmId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Contact already exists in a different company. Cannot update across company boundaries.',
+          details: {
+            existingCrmId: existingContact.crmId,
+            requestedCrmId: crmId,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
     // Upsert by email
     const now = new Date();
     const contact = await prisma.contact.upsert({
@@ -90,6 +112,7 @@ export async function POST(request) {
         firstName,
         lastName,
         updatedAt: now,
+        // Don't update crmId - it's a tenant identifier and shouldn't change
       },
       create: {
         crmId,

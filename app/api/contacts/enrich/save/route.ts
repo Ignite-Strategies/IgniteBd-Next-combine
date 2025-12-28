@@ -74,6 +74,25 @@ export async function POST(request: Request) {
       );
     }
 
+    // Get companyHQId from request body (should match contact's crmId)
+    const { companyHQId } = body;
+    
+    // Validate that contact belongs to the companyHQ being used (if provided)
+    if (companyHQId && existingContact.crmId !== companyHQId) {
+      console.warn(`⚠️ Contact ${contactId} has crmId ${existingContact.crmId} but enrich request has companyHQId ${companyHQId}`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Contact belongs to a different companyHQ and cannot be enriched in this context.',
+          details: {
+            contactCrmId: existingContact.crmId,
+            requestedCompanyHQId: companyHQId,
+          },
+        },
+        { status: 403 },
+      );
+    }
+
     // Get raw enrichment data from Redis
     const redisData = await getEnrichedContactByKey(redisKey);
     if (!redisData) {

@@ -208,16 +208,59 @@ export async function POST(request) {
     // Associate contacts with the list if contactIds provided
     let contactCount = 0;
     if (contactIds && Array.isArray(contactIds) && contactIds.length > 0) {
+      // First, verify all contacts belong to the same companyHQ (for security/tenant isolation)
+      const contactsToCheck = await prisma.contact.findMany({
+        where: {
+          id: { in: contactIds },
+        },
+        select: {
+          id: true,
+          crmId: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      });
+
+      // Check if any contacts have different crmId (belong to different companyHQ)
+      const mismatchedContacts = contactsToCheck.filter(
+        (contact) => contact.crmId !== resolvedCompanyHQId
+      );
+
+      if (mismatchedContacts.length > 0) {
+        console.warn(`⚠️ Some contacts belong to different companyHQ:`, mismatchedContacts.map(c => ({
+          id: c.id,
+          name: `${c.firstName} ${c.lastName}`,
+          email: c.email,
+          crmId: c.crmId,
+          expectedCrmId: resolvedCompanyHQId
+        })));
+        
+        // Return error with details about which contacts couldn't be added
+        return NextResponse.json(
+          {
+            success: false,
+            error: `${mismatchedContacts.length} contact(s) belong to a different company and cannot be added to this list.`,
+            details: {
+              mismatchedContacts: mismatchedContacts.map(c => ({
+                name: `${c.firstName} ${c.lastName}`,
+                email: c.email,
+                crmId: c.crmId,
+              })),
+              expectedCrmId: resolvedCompanyHQId,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
       // Update contacts to set their contactListId
       // Note: This is a one-to-many relationship, so each contact can only be in one list
       // If a contact is already in another list, we'll move them to this new list
-      // IMPORTANT: We don't filter by crmId here - allow contacts from any company to be in the list
-      // The list owner is determined by companyId, but contacts can span multiple companies
       const updateResult = await prisma.contact.updateMany({
         where: {
           id: { in: contactIds },
-          // Removed crmId filter - allow contacts from any company to be added
-          // Frontend should handle filtering visible contacts by companyHQId if needed
+          crmId: resolvedCompanyHQId, // Ensure contacts belong to this companyHQ
         },
         data: {
           contactListId: listId,
@@ -227,7 +270,7 @@ export async function POST(request) {
       
       // Log if not all contacts were updated (for debugging)
       if (contactCount < contactIds.length) {
-        console.warn(`⚠️ Only ${contactCount} of ${contactIds.length} contacts were updated. Some contact IDs may not exist.`);
+        console.warn(`⚠️ Only ${contactCount} of ${contactIds.length} contacts were updated. Expected all contacts to match crmId.`);
       }
 
       // Update the list's totalContacts count
