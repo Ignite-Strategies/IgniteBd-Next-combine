@@ -254,39 +254,47 @@ function ComposeContent() {
       //   finalBody = finalBody + '\n\n' + emailSignature;
       // }
       
-      // Build payload and save to Redis (same as Build & Preview, but show modal instead of navigating)
-      const response = await api.post('/api/outreach/build-payload', {
-        to,
-        subject: subject || '',
-        body: body || '', // finalBody removed - signature disabled
-        senderEmail,
-        senderName: senderName || undefined,
-        contactId: contactId || undefined,
-        tenantId: tenantId || undefined,
-        templateId: selectedTemplateId || undefined,
-      });
-
-      if (response.data?.success) {
-        // Load preview from Redis to show hydration
-        const previewResponse = await api.get(`/api/outreach/preview?requestId=${response.data.requestId}`);
+      // Hydrate template directly (like sandbox) - NO requestId
+      let hydratedSubject = subject || '';
+      let hydratedBody = body || '';
+      
+      // If template is selected, hydrate it with contact data
+      if (selectedTemplateId && contactId) {
+        const hydrateResponse = await api.post('/api/template/hydrate-with-contact', {
+          templateId: selectedTemplateId,
+          contactId: contactId,
+          metadata: {},
+        });
         
-        if (previewResponse.data?.success) {
-          setPreviewData({
-            requestId: response.data.requestId,
-            preview: previewResponse.data.preview || previewResponse.data.payload,
-            original: {
-              subject: subject || '',
-              body: body || '',
-              templateId: selectedTemplateId,
-            },
-          });
-          setShowPreviewModal(true);
-        } else {
-          setPreviewError(previewResponse.data?.error || 'Failed to load preview');
+        if (hydrateResponse.data?.success) {
+          hydratedSubject = hydrateResponse.data.hydratedSubject || subject;
+          hydratedBody = hydrateResponse.data.hydratedBody || body;
         }
-      } else {
-        setPreviewError(response.data?.error || 'Failed to build payload');
       }
+      
+      // Build preview data (no requestId - just hydrated content)
+      setPreviewData({
+        preview: {
+          from: {
+            email: senderEmail || '',
+            name: senderName || undefined,
+          },
+          to: to,
+          subject: hydratedSubject,
+          body: hydratedBody,
+          content: [{
+            type: 'text/html',
+            value: hydratedBody,
+          }],
+        },
+        original: {
+          subject: subject || '',
+          body: body || '',
+          templateId: selectedTemplateId,
+        },
+        hydrated: selectedTemplateId && contactId,
+      });
+      setShowPreviewModal(true);
     } catch (err) {
       console.error('Preview error:', err);
       setPreviewError(err.response?.data?.error || err.message || 'Failed to preview');
@@ -378,7 +386,7 @@ function ComposeContent() {
         return;
       }
       
-      setError(errorMessage);
+        setError(errorMessage);
       setSending(false);
     }
   };
@@ -396,21 +404,21 @@ function ComposeContent() {
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Compose Form - Left Column (2/3 width) */}
           <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Compose Email</h2>
-              
-              {success && (
-                <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-                  <p className="text-sm font-medium text-green-900">✅ Email sent successfully!</p>
-                </div>
-              )}
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Compose Email</h2>
+            
+            {success && (
+              <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                <p className="text-sm font-medium text-green-900">✅ Email sent successfully!</p>
+              </div>
+            )}
 
-              {error && (
-                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
-                  <p className="text-sm font-medium text-red-900">{error}</p>
-                </div>
-              )}
+            {error && (
+              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                <p className="text-sm font-medium text-red-900">{error}</p>
+              </div>
+            )}
 
               <form onSubmit={handleBuildAndPreview} className="space-y-4">
               {/* Sender Identity - SenderIdentityPanel handles all sender logic */}
@@ -1011,47 +1019,58 @@ function ComposeContent() {
                 Close
               </button>
               <div className="flex gap-3">
-                {previewData?.requestId && (
-                  <button
-                    onClick={() => {
-                      setShowPreviewModal(false);
-                      window.location.href = `/outreach/compose/preview?requestId=${previewData.requestId}`;
-                    }}
-                    className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                  >
-                    Go to Full Preview Page
-                  </button>
-                )}
-                {previewData?.requestId && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const response = await api.post('/api/outreach/send', {
-                          requestId: previewData.requestId,
+                <button
+                  onClick={async () => {
+                    // Build payload and send
+                    try {
+                      setPreviewLoading(true);
+                      const buildResponse = await api.post('/api/outreach/build-payload', {
+                        to,
+                        subject: subject || '',
+                        body: body || '',
+                        senderEmail,
+                        senderName: senderName || undefined,
+                        contactId: contactId || undefined,
+                        tenantId: tenantId || undefined,
+                        templateId: selectedTemplateId || undefined,
+                      });
+
+                      if (buildResponse.data?.success) {
+                        const sendResponse = await api.post('/api/outreach/send', {
+                          requestId: buildResponse.data.requestId,
                         });
-                        if (response.data?.success) {
+                        
+                        if (sendResponse.data?.success) {
                           setShowPreviewModal(false);
-                          setSuccess(true);
-                          setTimeout(() => setSuccess(false), 3000);
-                          // Clear form
-                          setTo('');
-                          setToName('');
-                          setSubject('');
-                          setBody('');
-                          setContactId('');
-                          setSelectedContact(null);
-                          setSelectedTemplateId('');
+                          setSendSuccess(true);
+                          setSentMessageId(sendResponse.data.messageId || null);
+                        } else {
+                          setPreviewError(sendResponse.data?.error || 'Failed to send email');
                         }
-                      } catch (err) {
-                        setPreviewError(err.response?.data?.error || 'Failed to send email');
+                      } else {
+                        setPreviewError(buildResponse.data?.error || 'Failed to build payload');
                       }
-                    }}
-                    className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                  >
-                    <Send className="h-4 w-4" />
-                    Send Now
-                  </button>
-                )}
+                    } catch (err) {
+                      setPreviewError(err.response?.data?.error || 'Failed to send email');
+                    } finally {
+                      setPreviewLoading(false);
+                    }
+                  }}
+                  disabled={previewLoading || !hasVerifiedSender || !senderEmail}
+                  className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {previewLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Send Now
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
