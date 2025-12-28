@@ -70,24 +70,50 @@ async function seedJoelCompanyHQ() {
     // =====================================================
     console.log('\n2️⃣ Creating/finding BusinessPoint Law CompanyHQ...');
     
-    const now = new Date();
-    const company = await prisma.company_hqs.upsert({
-      where: { 
-        id: 'businesspoint-law-hq' // Use a stable ID for idempotency
-      },
-      update: {
-        companyName: 'BusinessPoint Law',
-        updatedAt: now,
-      },
-      create: {
-        id: 'businesspoint-law-hq',
-        companyName: 'BusinessPoint Law',
-        companyIndustry: 'Legal Services',
-        ownerId: joel.id, // Legacy field for compatibility
-        createdAt: now,
-        updatedAt: now,
+    // First, check if old readable ID exists (need to migrate)
+    const oldHQ = await prisma.company_hqs.findUnique({
+      where: { id: 'businesspoint-law-hq' }
+    });
+
+    if (oldHQ) {
+      console.log('  ⚠️  Found CompanyHQ with old readable ID "businesspoint-law-hq"');
+      console.log('  ⚠️  Run fix-businesspoint-law-hq-id.js first to migrate to UUID!');
+      console.log(`  ℹ️  Current ID: ${oldHQ.id}`);
+      process.exit(1);
+    }
+
+    // Try to find by company name instead
+    let company = await prisma.company_hqs.findFirst({
+      where: {
+        companyName: 'BusinessPoint Law'
       }
     });
+
+    const now = new Date();
+    
+    if (!company) {
+      // Create new with proper UUID
+      const newId = randomUUID();
+      console.log(`  📝 Creating new CompanyHQ with UUID: ${newId}`);
+      company = await prisma.company_hqs.create({
+        data: {
+          id: newId, // Use UUID, not readable string!
+          companyName: 'BusinessPoint Law',
+          companyIndustry: 'Legal Services',
+          ownerId: joel.id, // Legacy field for compatibility
+          createdAt: now,
+          updatedAt: now,
+        }
+      });
+      console.log(`  ✅ Created: ${company.companyName} (${company.id})`);
+    } else {
+      console.log(`  ✅ Found existing: ${company.companyName} (${company.id})`);
+      // Verify it's a UUID, not readable string
+      if (company.id === 'businesspoint-law-hq' || !company.id.match(/^[a-f0-9-]{36}$/i)) {
+        console.log('  ⚠️  CompanyHQ has invalid ID format! Run fix-businesspoint-law-hq-id.js');
+        process.exit(1);
+      }
+    }
 
     console.log(`  ✅ CompanyHQ ready: ${company.companyName} (${company.id})`);
 
