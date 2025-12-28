@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send, Mail, Loader2, CheckCircle2, Plus, X, Info, ChevronDown, ChevronUp, Eye, Code } from 'lucide-react';
+import { Send, Mail, Loader2, CheckCircle2, Plus, X, Info, ChevronDown, ChevronUp, Eye, Code, Users, TrendingUp } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
@@ -36,6 +36,8 @@ function ComposeContent() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
   const [previewError, setPreviewError] = useState(null);
+  const [sendSuccess, setSendSuccess] = useState(false);
+  const [sentMessageId, setSentMessageId] = useState(null);
   
   // Signature state - TODO: Re-enable after relational model is implemented
   // const [emailSignature, setEmailSignature] = useState('');
@@ -346,22 +348,19 @@ function ComposeContent() {
       });
 
       if (response.data?.success) {
-        // Step 2: Load preview from Redis and show in modal
-        const previewResponse = await api.get(`/api/outreach/preview?requestId=${response.data.requestId}`);
-        
-        if (previewResponse.data?.success) {
-          setPreviewData({
-            requestId: response.data.requestId,
-            preview: previewResponse.data.preview || previewResponse.data.payload,
-            original: {
-              subject: subject || '',
-              body: body || '',
-              templateId: selectedTemplateId,
-            },
-          });
-          setShowPreviewModal(true);
+        // Build payload successful, now send it
+        const sendResponse = await api.post('/api/outreach/send', {
+          requestId: response.data.requestId,
+        });
+
+        if (sendResponse.data?.success) {
+          // Success! Show success page
+          setSendSuccess(true);
+          setSentMessageId(sendResponse.data.messageId || null);
+          setSuccess(false); // Clear old success state
+          setError(null);
         } else {
-          setError(previewResponse.data?.error || 'Failed to load preview');
+          setError(sendResponse.data?.error || 'Failed to send email');
         }
       } else {
         setError(response.data?.error || 'Failed to build payload');
