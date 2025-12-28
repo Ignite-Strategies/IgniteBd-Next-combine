@@ -37,12 +37,13 @@ export async function POST(request) {
       typeOfPerson, 
       whyReachingOut, 
       whatWantFromThem,
-      // Template context fields
+      // Template context fields (from template_relationship_helpers model + form extras)
       timeSinceConnected,
       timeHorizon,
       knowledgeOfBusiness,
       myBusinessDescription,
       desiredOutcome,
+      contextNotes, // From template_relationship_helpers model
     } = body ?? {};
 
     if (!relationship || !typeOfPerson || !whyReachingOut) {
@@ -100,19 +101,25 @@ export async function POST(request) {
       relationshipLogic += `- Time horizon: "${timeHorizon}" - Use this when mentioning when you want to connect.\n`;
     }
 
+    // Logic for context notes (from template_relationship_helpers model)
+    if (contextNotes) {
+      relationshipLogic += `- Additional context: "${contextNotes}" - Use this context to inform the tone and content of the message.\n`;
+    }
+
     const prompt = `You are a Business Development Relationship Manager. Your task is to create a human, low-pressure outreach EMAIL TEMPLATE with DYNAMIC VARIABLES using relationship-aware logic.
 
-=== RELATIONSHIP CONTEXT ===
-Relationship: ${relationship}
-Type of Person: ${typeOfPerson}
+=== RELATIONSHIP CONTEXT (from template_relationship_helpers model) ===
+Familiarity Level (relationship): ${relationship}
+Relationship Type (typeOfPerson): ${typeOfPerson}
 Why Reaching Out: ${whyReachingOut}
 ${whatWantFromThem ? `What Want From Them: ${whatWantFromThem}` : 'What Want From Them: Not specified'}
 
-=== TEMPLATE CONTEXT ===
+=== TEMPLATE CONTEXT (from template_relationship_helpers model) ===
 ${timeSinceConnected ? `Time Since Connected: ${timeSinceConnected}` : 'Time Since Connected: Not specified'}
 ${timeHorizon ? `Time Horizon: ${timeHorizon}` : 'Time Horizon: Not specified'}
 ${myBusinessDescription ? `My Business: ${myBusinessDescription}` : 'My Business: Not specified'}
 ${desiredOutcome ? `Desired Outcome: ${desiredOutcome}` : 'Desired Outcome: Not specified'}
+${contextNotes ? `Additional Context Notes: ${contextNotes}` : 'Additional Context Notes: Not specified'}
 Knowledge of Business: ${knowledgeOfBusiness ? 'Yes, they know' : 'No, they don\'t know'}
 
 === RELATIONSHIP-AWARE LOGIC RULES ===
@@ -146,11 +153,15 @@ Use {{variableName}} ONLY for contact-specific data that will be filled in later
 - {{phone}} - Their phone number (rarely needed in body, but available)
 - {{linkedinUrl}} - Their LinkedIn profile URL (use when offering to connect on LinkedIn)
 
-**TEMPLATE CONTEXT** (use provided values DIRECTLY as text, NOT as {{variables}}):
-- Time Since Connected: "${timeSinceConnected || 'not specified'}" - BAKE THIS INTO THE CONTENT
-- Time Horizon: "${timeHorizon || 'soon'}" - BAKE THIS INTO THE CONTENT
-- My Business: "${myBusinessDescription || 'not specified'}" - BAKE THIS INTO THE CONTENT
+**TEMPLATE CONTEXT** (from template_relationship_helpers model - use provided values DIRECTLY as text, NOT as {{variables}}):
+- Relationship Type: "${typeOfPerson}" - Use this to inform tone and approach
+- Familiarity Level: "${relationship}" - Use this to determine formality
+- Why Reaching Out: "${whyReachingOut}" - BAKE THIS INTO THE CONTENT
+- Time Since Connected: "${timeSinceConnected || 'not specified'}" - BAKE THIS INTO THE CONTENT if provided
+- Time Horizon: "${timeHorizon || 'soon'}" - BAKE THIS INTO THE CONTENT if provided
+- My Business: "${myBusinessDescription || 'not specified'}" - BAKE THIS INTO THE CONTENT if provided
 - Desired Outcome: "${desiredOutcome || whatWantFromThem || 'catch up'}" - BAKE THIS INTO THE CONTENT
+- Context Notes: "${contextNotes || 'none'}" - Use any additional context notes to inform the message tone and content
 
 === REQUIREMENTS ===
 1. **Contact Variables Only**: Use {{variableName}} for contact-specific data from the list above (firstName, goesBy, lastName, fullName, companyName, title, seniority, department, city, state, country, email, phone, linkedinUrl). Choose variables that make sense for the context.

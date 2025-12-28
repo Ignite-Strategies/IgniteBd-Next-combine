@@ -43,7 +43,7 @@ export async function GET(request) {
     console.log(`🚀 COMPANY HYDRATE: Fetching all data for companyHQId: ${companyHQId}`);
 
     // Fetch all data in parallel
-    const [companyHQ, personas, contacts, products, pipelines, proposals, phaseTemplates, deliverableTemplates, workPackages, presentations, blogs, templates, landingPages] = await Promise.all([
+    const [companyHQ, personas, contacts, products, pipelines, proposals, phaseTemplates, deliverableTemplates, workPackages, presentations, blogs, landingPages] = await Promise.all([
       // CompanyHQ (no longer using owner FK - use memberships instead)
       prisma.companyHQ.findUnique({
         where: { id: companyHQId },

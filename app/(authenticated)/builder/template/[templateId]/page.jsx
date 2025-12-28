@@ -144,6 +144,31 @@ export default function TemplateBuilderPage() {
         setCurrentTemplateId(template.id);
         window.history.replaceState({}, '', `/builder/template/${template.id}`);
       }
+
+      // Update localStorage cache
+      if (ownerId && typeof window !== 'undefined') {
+        try {
+          const cached = localStorage.getItem(`templates_${ownerId}`);
+          const templates = cached ? JSON.parse(cached) : [];
+          if (isNew) {
+            // Add new template to cache
+            templates.unshift(template);
+          } else {
+            // Update existing template in cache
+            const index = templates.findIndex(t => t.id === template.id);
+            if (index >= 0) {
+              templates[index] = template;
+            } else {
+              templates.unshift(template);
+            }
+          }
+          localStorage.setItem(`templates_${ownerId}`, JSON.stringify(templates));
+          console.log('✅ Updated templates cache in localStorage');
+        } catch (e) {
+          console.warn('Failed to update templates cache:', e);
+        }
+      }
+
       // Clear success message after 5 seconds
       setTimeout(() => setSaveSuccess(false), 5000);
     } catch (err) {

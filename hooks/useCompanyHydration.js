@@ -62,7 +62,7 @@ export function useCompanyHydration(companyHQId) {
             ...parsed.data,
             presentations: parsed.data.presentations || [],
             blogs: parsed.data.blogs || [],
-            templates: parsed.data.templates || [],
+            // templates: REMOVED - Templates are owner-scoped, not company-scoped
             landingPages: parsed.data.landingPages || [],
           };
           setData(hydratedData);
@@ -122,7 +122,7 @@ export function useCompanyHydration(companyHQId) {
         workPackages: response.data.workPackages || [],
         presentations: response.data.presentations || [],
         blogs: response.data.blogs || [],
-        templates: response.data.templates || [],
+        // templates: REMOVED - Templates are owner-scoped, not company-scoped
         landingPages: response.data.landingPages || [],
         stats: response.data.stats || {
           personaCount: 0,
@@ -198,7 +198,7 @@ export function useCompanyHydration(companyHQId) {
     workPackages: data.workPackages,
     presentations: data.presentations,
     blogs: data.blogs,
-    templates: data.templates,
+    // templates: REMOVED - Templates are owner-scoped, not company-scoped
     landingPages: data.landingPages,
     stats: data.stats,
   };

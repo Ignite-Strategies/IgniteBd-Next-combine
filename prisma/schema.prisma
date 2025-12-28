@@ -487,9 +487,9 @@ model campaigns {
   body             String? // Email body content
   from_email       String?
   from_name        String?
-  // Signature (optional - reusable signature)
-  signature_id     String?
-  email_signatures email_signatures?  @relation("campaign_signatures", fields: [signature_id], references: [id], onDelete: SetNull)
+  // Signature (optional - reusable signature) - TODO: Re-enable after email_signatures model is added
+  // signature_id     String?
+  // email_signatures email_signatures?  @relation("campaign_signatures", fields: [signature_id], references: [id], onDelete: SetNull)
   scheduled_for    DateTime?
   started_at       DateTime?
   completed_at     DateTime?
@@ -517,7 +517,7 @@ model campaigns {
   @@index([created_at])
   @@index([contact_list_id])
   @@index([template_id])
-  @@index([signature_id])
+  // @@index([signature_id]) // TODO: Re-enable after email_signatures model is added
 }
 
 enum CampaignStatus {
@@ -586,8 +586,9 @@ model sequence_steps {
   conditions       Json? // Conditional logic: { if_opened: true, if_clicked: false, if_replied: false }
   from_email       String?
   from_name        String?
-  signature_id     String? // Optional signature for this step
-  email_signatures email_signatures?  @relation("sequence_step_signatures", fields: [signature_id], references: [id], onDelete: SetNull)
+  // Signature (optional - reusable signature) - TODO: Re-enable after email_signatures model is added
+  // signature_id     String? // Optional signature for this step
+  // email_signatures email_signatures?  @relation("sequence_step_signatures", fields: [signature_id], references: [id], onDelete: SetNull)
   total_sent       Int                @default(0)
   total_opened     Int                @default(0)
   total_clicked    Int                @default(0)
@@ -603,7 +604,7 @@ model sequence_steps {
   @@unique([sequence_id, step_number])
   @@index([sequence_id])
   @@index([sequence_id, step_number])
-  @@index([signature_id])
+  // @@index([signature_id]) // TODO: Re-enable after email_signatures model is added
 }
 
 // Email Events - REMOVED for MVP1 (deprecated - using email_activities.event instead)
@@ -910,7 +911,7 @@ model owners {
   super_admins                              super_admins?
   google_oauth_tokens                       GoogleOAuthToken[]
   templates                                 Template[]            // Templates created by this owner
-  email_signatures                          email_signatures[]    // Email signatures created by this owner
+  // email_signatures email_signatures[]    // Email signatures created by this owner - TODO: Re-enable after model is added
 }
 
 model payments {
