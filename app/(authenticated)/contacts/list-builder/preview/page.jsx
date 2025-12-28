@@ -146,7 +146,10 @@ function ContactListPreviewContent() {
     setError(null);
 
     try {
-      const contactIds = Array.from(selectedContacts);
+      // If selectAll was used, use all qualifying contacts; otherwise use selected contacts
+      const contactIds = selectAllParam && selectedContacts.size === qualifyingContacts.length
+        ? Array.from(qualifyingContacts.map(c => c.id))
+        : Array.from(selectedContacts);
       
       if (!ownerId) {
         setError('Owner ID not found. Please refresh the page.');
@@ -343,10 +346,12 @@ function ContactListPreviewContent() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">
-                Select Contacts ({selectedContacts.size} selected)
+                Select Contacts ({selectedContacts.size} selected{selectAllParam && selectedContacts.size > 0 ? ` of ${qualifyingContacts.length}` : ''})
               </h3>
               <p className="text-sm text-gray-600">
-                {filteredContacts.length} contact{filteredContacts.length !== 1 ? 's' : ''} available
+                {searchTerm.trim() 
+                  ? `${filteredContacts.length} contact${filteredContacts.length !== 1 ? 's' : ''} match your search`
+                  : `${qualifyingContacts.length} contact${qualifyingContacts.length !== 1 ? 's' : ''} available`}
               </p>
             </div>
             <button

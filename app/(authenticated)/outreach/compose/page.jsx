@@ -1032,9 +1032,8 @@ function ComposeContent() {
       )}
       
       {/* Old preview modal code removed - replaced with split screen above */}
-      {false && previewData && (
-        <div className="hidden">
-              {previewError && (
+      
+      {/* Quick Contact Modal */}
                 <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
                   <p className="text-sm font-medium text-red-900">{previewError}</p>
                 </div>

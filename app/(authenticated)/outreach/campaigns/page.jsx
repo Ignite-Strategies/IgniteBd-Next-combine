@@ -2,40 +2,65 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Mail, History, RefreshCw, ArrowRight } from 'lucide-react';
+import { Plus, Mail, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOutreachContext } from '@/hooks/useOutreach';
+import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 export default function CampaignsPage() {
   const router = useRouter();
-  const { campaigns, hydrating, refreshCampaigns } = useOutreachContext();
-  const { companyHQId } = useCompanyHQ();
-  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
-  const [campaignsList, setCampaignsList] = useState([]);
+  const { ownerId, hydrated: ownerHydrated } = useOwner();
+  const [campaigns, setCampaigns] = useState([]);
+  const [hydrating, setHydrating] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  // Load campaigns from API
+  // Load from localStorage immediately (no blocking)
   useEffect(() => {
-    if (companyHQId) {
-      loadCampaigns();
+    if (typeof window === 'undefined') return;
+    
+    const cached = window.localStorage.getItem('campaigns');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setCampaigns(parsed);
+          setHydrated(true);
+        }
+      } catch (error) {
+        console.warn('Unable to parse cached campaigns', error);
+      }
     }
-  }, [companyHQId]);
+  }, []);
 
-  const loadCampaigns = async () => {
-    if (!companyHQId) return;
-    setLoadingCampaigns(true);
+  // Sync from API if owner is hydrated and we haven't synced yet
+  const syncCampaigns = async () => {
+    if (!ownerId || hydrating) return;
+    
+    setHydrating(true);
     try {
-      const response = await api.get(`/api/campaigns?companyHQId=${companyHQId}`);
+      // Load campaigns by owner_id (companyHQId is optional filter)
+      const response = await api.get('/api/campaigns');
       if (response.data?.success) {
-        setCampaignsList(response.data.campaigns || []);
+        const data = response.data.campaigns || [];
+        setCampaigns(data);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('campaigns', JSON.stringify(data));
+        }
+        setHydrated(true);
       }
     } catch (error) {
-      console.error('Error loading campaigns:', error);
+      console.error('Error syncing campaigns:', error);
     } finally {
-      setLoadingCampaigns(false);
+      setHydrating(false);
     }
   };
+
+  // Auto-sync when owner is hydrated (only once)
+  useEffect(() => {
+    if (ownerHydrated && ownerId && !hydrated && !hydrating) {
+      syncCampaigns();
+    }
+  }, [ownerHydrated, ownerId, hydrated, hydrating]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
