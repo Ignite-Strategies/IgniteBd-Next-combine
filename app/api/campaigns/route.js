@@ -6,11 +6,16 @@ import { inferCampaignState, getEffectiveEmailContent } from '@/lib/services/cam
 /**
  * GET /api/campaigns
  * Get all campaigns for the authenticated owner with inferred state
+ * 
+ * Query params:
+ * - status (optional) - filter by status
+ * - companyHQId (optional) - filter by companyHQ (can use query param like contact-lists)
  */
 export async function GET(request) {
   try {
     const firebaseUser = await verifyFirebaseToken(request);
     
+    // Get owner from auth (required)
     const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
@@ -19,14 +24,15 @@ export async function GET(request) {
       return NextResponse.json({ success: true, campaigns: [] });
     }
 
+    // Get optional filters from query params (following contact-lists pattern)
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
-    const companyHQId = searchParams.get('companyHQId');
+    const companyHQId = searchParams.get('companyHQId'); // Optional query param
 
     const where = {
-      owner_id: owner.id,
+      owner_id: owner.id, // Required - filter by owner
       ...(status && { status }),
-      ...(companyHQId && { company_hq_id: companyHQId }),
+      ...(companyHQId && { company_hq_id: companyHQId }), // Optional filter
     };
 
     const campaigns = await prisma.campaigns.findMany({
@@ -91,11 +97,20 @@ export async function GET(request) {
 /**
  * POST /api/campaigns
  * Create a new campaign
+ * 
+ * Follows template pattern: owner_id required (from auth), company_hq_id optional (from body)
+ * 
+ * Body:
+ * - name (required)
+ * - description (optional)
+ * - company_hq_id (optional) - can be added later as bolt-on
+ * - status, type, subject, body, etc. (optional)
  */
 export async function POST(request) {
   try {
     const firebaseUser = await verifyFirebaseToken(request);
     
+    // Get owner from Firebase auth (required)
     const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
     });
@@ -118,7 +133,7 @@ export async function POST(request) {
       from_email,
       from_name,
       scheduled_for,
-      company_hq_id,
+      company_hq_id, // Optional - can be null, follows template pattern
     } = body;
 
     if (!name) {
@@ -128,10 +143,11 @@ export async function POST(request) {
       );
     }
 
+    // Create campaign with owner_id from auth, company_hq_id optional (null is fine)
     const campaign = await prisma.campaigns.create({
       data: {
-        owner_id: owner.id,
-        company_hq_id: company_hq_id || null,
+        owner_id: owner.id, // Required - from auth
+        company_hq_id: company_hq_id || null, // Optional - can be added later as bolt-on
         name,
         description: description || null,
         status,

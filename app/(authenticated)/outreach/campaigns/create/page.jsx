@@ -14,12 +14,8 @@ export default function CampaignCreatePage() {
 
   useEffect(() => {
     // Immediately create a draft campaign and redirect to edit page
+    // companyHQId is optional (can be added later as bolt-on), following template pattern
     const createCampaign = async () => {
-      if (!companyHQId) {
-        // Wait for companyHQId to be available
-        return;
-      }
-
       if (creating) return; // Prevent double creation
 
       setCreating(true);
@@ -29,7 +25,9 @@ export default function CampaignCreatePage() {
         const response = await api.post('/api/campaigns', {
           name: 'Untitled Campaign',
           description: null,
-          company_hq_id: companyHQId,
+          // company_hq_id is optional - can be null (matches template pattern)
+          // Send it if available, but don't require it
+          ...(companyHQId && { company_hq_id: companyHQId }),
           status: 'DRAFT',
         });
 
@@ -46,8 +44,9 @@ export default function CampaignCreatePage() {
       }
     };
 
+    // Create campaign immediately - don't wait for companyHQId (it's optional)
     createCampaign();
-  }, [companyHQId, router, creating]);
+  }, [router, creating]); // Removed companyHQId dependency - it's optional
 
   if (error) {
     return (
