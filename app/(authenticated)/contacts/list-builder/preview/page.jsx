@@ -43,16 +43,16 @@ function ContactListPreviewContent() {
     }
   }, [hydrated, companyHQId, refreshContacts]);
 
-  // Filter contacts based on selected filter type and search
-  const filteredContacts = useMemo(() => {
+  // Filter contacts based on selected filter type (without search - for selectAll)
+  const qualifyingContacts = useMemo(() => {
     let filtered = [...contacts];
 
-    // Apply filter type
+    // Apply filter type only (no search filtering for selectAll)
     if (filterType === 'all') {
       // Show all contacts - no filtering by type
-      filtered = allContacts;
+      filtered = contacts;
     } else if (filterType === 'company' && selectedCompanyId) {
-      filtered = allContacts.filter((contact) => {
+      filtered = contacts.filter((contact) => {
         return contact.contactCompanyId === selectedCompanyId || 
                contact.contactCompany?.id === selectedCompanyId ||
                contact.companies?.id === selectedCompanyId;
@@ -72,6 +72,13 @@ function ContactListPreviewContent() {
       }
     }
 
+    return filtered;
+  }, [contacts, filterType, selectedCompanyId, selectedPipeline, selectedStage]);
+
+  // Filter contacts with search applied (for display)
+  const filteredContacts = useMemo(() => {
+    let filtered = [...qualifyingContacts];
+
     // Apply search query (works for all filter types)
     if (searchTerm && searchTerm.trim()) {
       const query = searchTerm.toLowerCase();
@@ -88,14 +95,15 @@ function ContactListPreviewContent() {
     }
 
     return filtered;
-  }, [contacts, filterType, selectedCompanyId, selectedPipeline, selectedStage, searchTerm]);
+  }, [qualifyingContacts, searchTerm]);
 
-  // Auto-select all if selectAll param is true
+  // Auto-select all qualifying contacts if selectAll param is true (ignore search term)
   useEffect(() => {
-    if (selectAllParam && filteredContacts.length > 0 && selectedContacts.size === 0) {
-      setSelectedContacts(new Set(filteredContacts.map((c) => c.id)));
+    if (selectAllParam && hydrated && qualifyingContacts.length > 0 && selectedContacts.size === 0) {
+      // Select all contacts that qualify for the filter (not just what's visible in search)
+      setSelectedContacts(new Set(qualifyingContacts.map((c) => c.id)));
     }
-  }, [selectAllParam, filteredContacts, selectedContacts.size]);
+  }, [selectAllParam, hydrated, qualifyingContacts, selectedContacts.size]);
 
   const handleToggleContact = (contactId) => {
     setSelectedContacts((prev) => {

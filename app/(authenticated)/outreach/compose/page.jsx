@@ -801,11 +801,12 @@ function ComposeContent() {
         </div>
       </div>
 
-      {/* Preview Modal - Shows hydrated email (reference: sandbox email-sandbox-preview) */}
+      {/* Preview Modal - Split Screen, Inline Editable (like sandbox) */}
       {showPreviewModal && previewData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <div className="fixed inset-0 z-50 bg-gray-50">
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Email Preview</h2>
                 <p className="text-sm text-gray-600 mt-1">
@@ -828,7 +829,211 @@ function ComposeContent() {
               </button>
             </div>
             
-            <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-6">
+            {/* Split Screen Content */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left: Editable Fields */}
+              <div className="w-1/2 border-r border-gray-200 bg-white overflow-y-auto p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit Email</h3>
+                
+                {previewError && (
+                  <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                    <p className="text-sm font-medium text-red-900">{previewError}</p>
+                  </div>
+                )}
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+                    <div className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+                      {previewData.preview.from?.name 
+                        ? `${previewData.preview.from.name} <${previewData.preview.from.email}>`
+                        : previewData.preview.from?.email}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+                    <input
+                      type="text"
+                      value={formatEmailWithName(previewData.preview.to, previewData.preview.toName)}
+                      onChange={(e) => {
+                        const parsed = parseEmailString(e.target.value);
+                        // Update preview data
+                        setPreviewData({
+                          ...previewData,
+                          preview: {
+                            ...previewData.preview,
+                            to: parsed.email,
+                            toName: parsed.name || undefined,
+                          },
+                        });
+                        // Update form state
+                        setTo(e.target.value);
+                        setToName(parsed.name || '');
+                      }}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <input
+                      type="text"
+                      value={previewData.preview.subject}
+                      onChange={(e) => {
+                        setPreviewData({
+                          ...previewData,
+                          preview: {
+                            ...previewData.preview,
+                            subject: e.target.value,
+                          },
+                          original: {
+                            ...previewData.original,
+                            subject: e.target.value,
+                          },
+                        });
+                        setSubject(e.target.value);
+                      }}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+                    <textarea
+                      value={previewData.preview.body}
+                      onChange={(e) => {
+                        setPreviewData({
+                          ...previewData,
+                          preview: {
+                            ...previewData.preview,
+                            body: e.target.value,
+                            content: [{
+                              type: 'text/html',
+                              value: e.target.value,
+                            }],
+                          },
+                          original: {
+                            ...previewData.original,
+                            body: e.target.value,
+                          },
+                        });
+                        setBody(e.target.value);
+                      }}
+                      rows={15}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Right: Preview Display */}
+              <div className="w-1/2 bg-gray-50 overflow-y-auto p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview</h3>
+                
+                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+                      <p className="text-sm text-gray-900">
+                        {previewData.preview.from?.name 
+                          ? `${previewData.preview.from.name} <${previewData.preview.from.email}>`
+                          : previewData.preview.from?.email}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+                      <p className="text-sm text-gray-900">
+                        {formatEmailWithName(previewData.preview.to, previewData.preview.toName)}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                      <p className="text-sm text-gray-900 font-medium">{previewData.preview.subject}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Body</label>
+                      <div 
+                        className="text-sm text-gray-900 border border-gray-200 rounded p-4 bg-gray-50 whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{ __html: previewData.preview.body || previewData.preview.content?.[0]?.value || '' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer with Send Button */}
+            <div className="flex items-center justify-end border-t border-gray-200 px-6 py-4 bg-white">
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    // Build payload and send (use current preview data)
+                    try {
+                      setPreviewLoading(true);
+                      const parsedTo = parseEmailString(previewData.preview.to || to);
+                      const toEmail = parsedTo.email || previewData.preview.to || to;
+                      
+                      const buildResponse = await api.post('/api/outreach/build-payload', {
+                        to: toEmail,
+                        toName: parsedTo.name || previewData.preview.toName || toName || undefined,
+                        subject: previewData.preview.subject || subject || '',
+                        body: previewData.preview.body || body || '',
+                        senderEmail,
+                        senderName: senderName || undefined,
+                        contactId: contactId || undefined,
+                        tenantId: tenantId || undefined,
+                        templateId: selectedTemplateId || undefined,
+                      });
+
+                      if (buildResponse.data?.success) {
+                        const sendResponse = await api.post('/api/outreach/send', {
+                          requestId: buildResponse.data.requestId,
+                        });
+                        
+                        if (sendResponse.data?.success) {
+                          setShowPreviewModal(false);
+                          setSendSuccess(true);
+                          setSentMessageId(sendResponse.data.messageId || null);
+                        } else {
+                          setPreviewError(sendResponse.data?.error || 'Failed to send email');
+                        }
+                      } else {
+                        setPreviewError(buildResponse.data?.error || 'Failed to build payload');
+                      }
+                    } catch (err) {
+                      setPreviewError(err.response?.data?.error || 'Failed to send email');
+                    } finally {
+                      setPreviewLoading(false);
+                    }
+                  }}
+                  disabled={previewLoading || !hasVerifiedSender || !senderEmail}
+                  className="inline-flex items-center gap-2 rounded-md bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {previewLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Send Email
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Old preview modal code removed - replaced with split screen above */}
+      {false && previewData && (
+        <div className="hidden">
               {previewError && (
                 <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
                   <p className="text-sm font-medium text-red-900">{previewError}</p>
