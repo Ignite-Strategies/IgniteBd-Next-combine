@@ -10,6 +10,7 @@ import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
+import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
 function ComposeContent() {
   const router = useRouter();
@@ -182,7 +183,9 @@ function ComposeContent() {
   const handleContactSelect = (contact, company) => {
     setSelectedContact(contact);
     setContactId(contact.id);
-    setTo(contact.email || '');
+    // Format as "Name <email>" for display
+    const formattedEmail = formatContactEmail(contact);
+    setTo(formattedEmail);
     setToName(contact.goesBy || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '');
     
     if (contact.crmId) {

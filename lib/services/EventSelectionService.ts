@@ -129,6 +129,12 @@ export async function generateSelectableEvents(
 /**
  * Create bd_event_ops from selectable events
  * User selects events to add to their program
+ * 
+ * Flow:
+ * 1. Regenerate selectable events to get prioritySource and BD intelligence info
+ * 2. Filter to only the selected event IDs
+ * 3. Create bd_event_ops with prioritySource preserved
+ * 4. eventPlanId is NOT set here - it gets hydrated later
  */
 export async function createEventOpsFromSelection(
   eventTunerId: string,
@@ -144,32 +150,45 @@ export async function createEventOpsFromSelection(
     throw new Error('EventTuner not found');
   }
 
-  // Get selected events from EventMeta
-  const selectedEvents = await prisma.event_metas.findMany({
-    where: {
-      id: { in: selectedEventIds },
-    },
-  });
+  // Regenerate selectable events to get prioritySource and BD intelligence info
+  const allSelectableEvents = await generateSelectableEvents(eventTunerId);
+  
+  // Filter to only selected events
+  const selectedSelectableEvents = allSelectableEvents.filter(
+    event => selectedEventIds.includes(event.id)
+  );
 
   // Create bd_event_ops for each selected event
-  for (const event of selectedEvents) {
+  for (const selectableEvent of selectedSelectableEvents) {
+    // Get EventMeta for additional details
+    const eventMeta = await prisma.event_metas.findUnique({
+      where: { id: selectableEvent.id },
+    });
+
+    if (!eventMeta) {
+      console.warn(`EventMeta not found for id: ${selectableEvent.id}`);
+      continue;
+    }
+
     await prisma.bdEventOps.create({
       data: {
         companyHQId,
         ownerId,
         eventTunerId,
-        title: event.name,
-        eventType: event.eventType,
-        startDate: event.startDate,
-        endDate: event.endDate,
-        city: event.city,
-        state: event.state,
-        country: event.country,
-        costBand: event.costMin && event.costMax
-          ? determineCostBand(event.costMin, event.costMax)
+        title: selectableEvent.title,
+        eventType: selectableEvent.eventType,
+        startDate: selectableEvent.startDate,
+        endDate: selectableEvent.endDate,
+        city: selectableEvent.city,
+        state: selectableEvent.state,
+        country: selectableEvent.country,
+        costBand: selectableEvent.costMin && selectableEvent.costMax
+          ? determineCostBand(selectableEvent.costMin, selectableEvent.costMax)
           : null,
-        source: 'USER_PREF',
+        source: selectableEvent.prioritySource === 'BD_INTEL' ? 'BD_INTEL' : 'USER_PREF',
+        prioritySource: selectableEvent.prioritySource || null,
         status: 'CONSIDERING',
+        // eventPlanId is NOT set here - it gets hydrated later
       },
     });
   }

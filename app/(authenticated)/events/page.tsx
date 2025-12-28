@@ -19,7 +19,7 @@ export default function EventsPage() {
 
         <div className="space-y-6">
           <div
-            onClick={() => router.push('/events/build-from-persona')}
+            onClick={() => router.push('/events/build')}
             className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-md transition-all cursor-pointer hover:border-gray-300"
           >
             <div className="flex items-start gap-4">
@@ -27,9 +27,9 @@ export default function EventsPage() {
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Build from Persona</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Build Events</h3>
                 <p className="text-gray-600 mb-4">
-                  Generate personalized event recommendations based on your target persona and business development priorities.
+                  Create your event program by building from persona, event tuner, or preferences.
                 </p>
                 <div className="flex items-center gap-2 text-red-600 font-medium">
                   <span>Get Started</span>

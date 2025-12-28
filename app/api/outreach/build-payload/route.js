@@ -134,7 +134,9 @@ export async function POST(request) {
     const msg = {
       personalizations: [
         {
-          to: [{ email: to }],
+          to: [{ 
+            email: to,
+            ...(toName && { name: toName }),
           subject: finalSubject,
           // custom_args goes INSIDE personalizations (SendGrid requirement)
           ...(contactId || tenantId || campaignId || sequenceId || sequenceStepId ? {
