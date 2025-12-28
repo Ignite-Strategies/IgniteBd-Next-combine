@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Users, Building2, Filter, Check, X, ArrowLeft, Save } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -8,6 +8,7 @@ import api from '@/lib/api';
 import { useContactLists } from '../../ContactListsContext';
 import { useContacts } from '../../ContactsContext';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { useOwner } from '@/hooks/useOwner';
 import CompanySelector from '@/components/CompanySelector';
 import { OFFICIAL_PIPELINES, PIPELINE_STAGES } from '@/lib/config/pipelineConfig';
 
@@ -18,9 +19,10 @@ function ContactListPreviewContent() {
   const selectAllParam = searchParams.get('selectAll') === 'true';
   const returnTo = searchParams.get('returnTo');
   
-  const { contacts } = useContacts();
+  const { contacts, hydrated, refreshContacts } = useContacts(); // Use existing ContactsContext
   const { addList } = useContactLists();
   const { companyHQId } = useCompanyHQ();
+  const { ownerId } = useOwner(); // Get ownerId like templates do
   
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [listName, setListName] = useState('');
@@ -32,17 +34,25 @@ function ContactListPreviewContent() {
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedPipeline, setSelectedPipeline] = useState('');
   const [selectedStage, setSelectedStage] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter contacts based on selected filter type
+  // Refresh contacts if not hydrated
+  useEffect(() => {
+    if (!hydrated && companyHQId) {
+      refreshContacts();
+    }
+  }, [hydrated, companyHQId, refreshContacts]);
+
+  // Filter contacts based on selected filter type and search
   const filteredContacts = useMemo(() => {
     let filtered = [...contacts];
 
     // Apply filter type
     if (filterType === 'all') {
       // Show all contacts - no filtering by type
+      filtered = allContacts;
     } else if (filterType === 'company' && selectedCompanyId) {
-      filtered = filtered.filter((contact) => {
+      filtered = allContacts.filter((contact) => {
         return contact.contactCompanyId === selectedCompanyId || 
                contact.contactCompany?.id === selectedCompanyId ||
                contact.companies?.id === selectedCompanyId;
@@ -63,8 +73,8 @@ function ContactListPreviewContent() {
     }
 
     // Apply search query (works for all filter types)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (searchTerm && searchTerm.trim()) {
+      const query = searchTerm.toLowerCase();
       filtered = filtered.filter((contact) => {
         const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
         const email = (contact.email || '').toLowerCase();
@@ -78,7 +88,7 @@ function ContactListPreviewContent() {
     }
 
     return filtered;
-  }, [contacts, filterType, selectedCompanyId, selectedPipeline, selectedStage, searchQuery]);
+  }, [contacts, filterType, selectedCompanyId, selectedPipeline, selectedStage, searchTerm]);
 
   // Auto-select all if selectAll param is true
   useEffect(() => {
@@ -130,19 +140,27 @@ function ContactListPreviewContent() {
     try {
       const contactIds = Array.from(selectedContacts);
       
+      if (!ownerId) {
+        setError('Owner ID not found. Please refresh the page.');
+        setIsCreating(false);
+        return;
+      }
+
       const response = await api.post('/api/contact-lists', {
-        companyHQId,
-        name: listName.trim(),
+        ownerId, // Use ownerId like templates (from useOwner hook)
+        companyHQId: companyHQId || undefined, // Optional, will be resolved from owner if not provided
+        title: listName.trim(), // Use 'title' like templates (maps to 'name' in schema)
         description: listDescription.trim() || undefined,
-        type: 'static',
-        filters: {
-          filterType,
-          ...(filterType === 'all' && { allContacts: true }),
-          ...(filterType === 'company' && selectedCompanyId && { companyId: selectedCompanyId }),
-          ...(filterType === 'stage' && selectedPipeline && selectedPipeline !== 'all' && { pipeline: selectedPipeline }),
-          ...(filterType === 'stage' && selectedStage && selectedStage !== 'all' && { stage: selectedStage }),
-        },
         contactIds,
+        // Store filter info in filters if needed (or we can add campaignId later)
+        ...(filterType !== 'all' && {
+          filters: {
+            filterType,
+            ...(filterType === 'company' && selectedCompanyId && { companyId: selectedCompanyId }),
+            ...(filterType === 'stage' && selectedPipeline && selectedPipeline !== 'all' && { pipeline: selectedPipeline }),
+            ...(filterType === 'stage' && selectedStage && selectedStage !== 'all' && { stage: selectedStage }),
+          },
+        }),
       });
 
       if (response.data?.success && response.data.list) {
@@ -225,14 +243,14 @@ function ContactListPreviewContent() {
         {/* Filter Controls */}
         <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search - always available */}
+            {/* Search - always available - inline typing filter */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search contacts..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={filterType === 'all' ? 'Type to search all contacts...' : 'Type to search filtered contacts...'}
                 className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -332,9 +350,27 @@ function ContactListPreviewContent() {
             </button>
           </div>
 
-          {filteredContacts.length === 0 ? (
+          {!hydrated ? (
             <div className="py-12 text-center">
-              <p className="text-gray-600">No contacts match your filters.</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-indigo-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading contacts...</p>
+            </div>
+          ) : filteredContacts.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-gray-600">
+                {searchTerm.trim() 
+                  ? 'No contacts match your search. Try a different query.' 
+                  : 'No contacts match your filters.'}
+              </p>
+              {searchTerm.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="mt-2 text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  Clear search
+                </button>
+              )}
             </div>
           ) : (
             <div className="max-h-96 space-y-2 overflow-y-auto">

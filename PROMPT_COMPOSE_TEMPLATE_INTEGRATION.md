@@ -1,139 +1,73 @@
-# Prompt: Add Template Selection & Hydration to Compose Page
+# Template Integration in Outreach Compose - Implementation Summary
 
-## Context
+## ✅ Implementation Complete
 
-The `/outreach/compose` page currently sends emails directly without template variable hydration. We need to add template selection and variable hydration so users can:
-1. Select an email template
-2. See variables automatically filled with contact data
-3. Send personalized emails
+Template selection and hydration have been integrated into the outreach compose flow using a **server-side payload pattern** that matches the sandbox architecture.
 
-## Current State
+## Implementation Approach
 
-### ✅ What Works:
-- Contact selection (sets `contactId`)
-- Manual email composition
-- Email sending via `/api/outreach/send`
+We implemented template support using the **build-payload → preview → send** flow:
 
-### ❌ What's Missing:
-- Template selection UI
-- Template hydration before sending
-- Preview of hydrated content
+1. **Template selection** happens in the compose page UI
+2. **Template hydration** happens server-side in `/api/outreach/build-payload`
+3. **Hydrated content** becomes part of the JSON payload stored in Redis
+4. **Preview** shows the exact payload before sending
+5. **Send** uses the same payload (invariant: payload never changes)
 
-## Task: Add Template Selection & Hydration
+This approach ensures:
+- Templates become part of the JSON payload (not assigned separately)
+- Preview matches exactly what will be sent
+- No client-side hydration needed
 
-### Step 1: Update `/api/template/hydrate-with-contact` Route
+## Current Implementation
 
-**File:** `app/api/template/hydrate-with-contact/route.js`
+### ✅ What's Implemented:
 
-**Current Issue:** Uses old `outreach_templates` model (line 32)
+1. **Template Selection in Compose Page**
+   - Template dropdown selector
+   - Auto-fills subject/body when template is selected
+   - Templates loaded from `/api/templates?ownerId=${ownerId}`
 
-**Fix Required:**
-- Change from `prisma.outreach_templates` to `prisma.template` (new model)
-- Use `template.body` and `template.subject` instead of `template.content`
-- Remove references to `template_bases` and `template_variables` (old schema)
+2. **Server-Side Template Hydration in Build-Payload**
+   - `/api/outreach/build-payload` accepts optional `templateId`
+   - When `templateId` is provided:
+     - Fetches template from `prisma.template` (new model)
+     - Fetches contact data if `contactId` is provided
+     - Hydrates template subject and body with contact variables
+     - Includes hydrated content in the payload JSON
+   - Template hydration happens ONCE when building payload
 
-**Expected Input:**
-```json
-{
-  "templateId": "uuid",
-  "contactId": "uuid",
-  "metadata": {} // optional
-}
-```
+3. **Preview Page**
+   - Shows exact payload from Redis
+   - User can review before sending
+   - Send button triggers `/api/outreach/send` with `requestId`
 
-**Expected Output:**
-```json
-{
-  "success": true,
-  "hydratedSubject": "Hi Sarah, ...",
-  "hydratedBody": "Hey Sarah,\n\nYour email...",
-  "originalTemplate": { "subject": "...", "body": "..." },
-  "validation": { "valid": true, "missingVariables": [] },
-  "contactData": { ... }
-}
-```
-
-### Step 2: Add Template Selection UI to Compose Page
-
-**File:** `app/(authenticated)/outreach/compose/page.jsx`
-
-**Reference Pattern:** See `app/(authenticated)/outreach/campaigns/[campaignId]/edit/page.jsx` lines 332-411 for template selection UI pattern.
-
-**Required Changes:**
-
-1. **Add State:**
-   ```javascript
-   const [emailMode, setEmailMode] = useState('manual'); // 'manual' | 'template'
-   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
-   const [templates, setTemplates] = useState([]);
-   const [loadingTemplates, setLoadingTemplates] = useState(false);
-   const [hydratedSubject, setHydratedSubject] = useState('');
-   const [hydratedBody, setHydratedBody] = useState('');
+4. **Payload Pattern Flow**
+   ```
+   Compose → Build Payload (hydrates template) → Redis (stores JSON)
+   ↓
+   Preview Page → Reads from Redis → Shows exact payload
+   ↓
+   Send → Reads same payload from Redis → Sends to SendGrid
    ```
 
-2. **Load Templates:**
-   - Fetch templates by `ownerId` from `/api/templates?ownerId=${ownerId}`
-   - Load on mount when `ownerId` is available
+### 📋 Code Location:
 
-3. **Add Mode Toggle:**
-   - Toggle between "Manual" and "Use Template" modes
-   - Similar to campaigns page (lines 333-359)
+- **Compose Page:** `app/(authenticated)/outreach/compose/page.jsx`
+  - Template selector (lines ~240-260)
+  - Build-payload call with templateId (line ~180)
+  
+- **Build-Payload Route:** `app/api/outreach/build-payload/route.js`
+  - Template hydration logic (lines ~71-130)
+  - Uses `prisma.template` model
+  - Uses `hydrateTemplate()` from `lib/templateVariables.js`
 
-4. **Template Selector:**
-   - Dropdown/list to select template
-   - Show template title, subject preview
-   - When selected, load template subject/body
+- **Preview Page:** `app/(authenticated)/outreach/compose/preview/page.jsx`
+  - Displays payload from Redis
+  - Send functionality
 
-5. **Hydration Logic:**
-   - When template is selected AND contact is selected:
-     - Call `/api/template/hydrate-with-contact` with `templateId` and `contactId`
-     - Update `hydratedSubject` and `hydratedBody`
-     - Show hydrated content in subject/body fields
-   - Re-hydrate when contact changes (if template is selected)
-   - Re-hydrate when template changes (if contact is selected)
+## Template Model Schema
 
-### Step 3: Update Send Flow
-
-**In `handleSend` function:**
-
-1. **If using template mode:**
-   - Ensure template is hydrated before sending
-   - Use `hydratedSubject` and `hydratedBody` instead of manual input
-   - Validate that both template and contact are selected
-
-2. **Send hydrated content:**
-   ```javascript
-   const response = await api.post('/api/outreach/send', {
-     to,
-     toName,
-     subject: emailMode === 'template' ? hydratedSubject : subject,
-     body: emailMode === 'template' ? hydratedBody : body,
-     contactId,
-     tenantId,
-   });
-   ```
-
-## Technical Details
-
-### Variable Mapping (Already Works)
-
-The `hydrateTemplate()` function in `lib/templateVariables.js` already handles:
-- `{{firstName}}` → `contact.firstName || contact.goesBy || 'there'`
-- `{{lastName}}` → `contact.lastName`
-- `{{fullName}}` → `contact.fullName || firstName + lastName`
-- `{{companyName}}` → `contact.companyName || 'your company'`
-- `{{title}}` → `contact.title || 'your role'`
-
-### Contact Data Fields Available:
-```javascript
-{
-  firstName, lastName, fullName, goesBy,
-  email, title, companyName, companyDomain,
-  updatedAt, createdAt
-}
-```
-
-### Template Model Schema:
 ```prisma
 model Template {
   id          String
@@ -145,44 +79,66 @@ model Template {
 }
 ```
 
-## Files to Modify
+## Variable Hydration
 
-1. **`app/api/template/hydrate-with-contact/route.js`**
-   - Update to use `Template` model
-   - Return `hydratedSubject` and `hydratedBody` separately
+The `hydrateTemplate()` function in `lib/templateVariables.js` handles:
+- `{{firstName}}` → `contact.firstName || contact.goesBy || 'there'`
+- `{{lastName}}` → `contact.lastName`
+- `{{fullName}}` → `contact.fullName || firstName + lastName`
+- `{{companyName}}` → `contact.companyName || 'your company'`
+- `{{title}}` → `contact.title || 'your role'`
+- `{{timeSinceConnected}}` → calculated from `contact.updatedAt`
 
-2. **`app/(authenticated)/outreach/compose/page.jsx`**
-   - Add template selection UI
-   - Add hydration logic
-   - Update send flow
+## Usage Flow
 
-## Testing Checklist
+1. User selects contact (optional but recommended for variable hydration)
+2. User optionally selects template
+   - If template selected: subject/body auto-filled with template content
+   - Variables like `{{firstName}}` show as-is in the form
+3. User clicks "Build & Preview"
+4. Server builds payload:
+   - If `templateId` provided: hydrates template with contact data
+   - If no `templateId`: uses manual subject/body
+   - Saves complete SendGrid payload to Redis
+   - Returns `requestId`
+5. Preview page shows exact payload (variables already replaced)
+6. User clicks "Send Email"
+7. Server reads same payload from Redis and sends to SendGrid
 
-- [ ] Can select template from dropdown
-- [ ] Template subject/body loads when selected
-- [ ] Variables are replaced with contact data
-- [ ] Hydrated content shows in preview
-- [ ] Email sends with hydrated content
-- [ ] Manual mode still works (no regression)
-- [ ] Switching between modes works smoothly
-- [ ] Re-hydration happens when contact changes
-- [ ] Validation works (requires both template and contact in template mode)
+## Differences from Original Plan
 
-## Reference Code
+The original plan suggested:
+- Client-side hydration via `/api/template/hydrate-with-contact`
+- Mode toggle (Manual vs Template)
+- Hydrated content shown in form fields before sending
+- Direct send (not using build-payload)
 
-**Template Selection Pattern:**
-See `app/(authenticated)/outreach/campaigns/[campaignId]/edit/page.jsx:332-411`
-
-**Hydrate Function:**
-See `lib/templateVariables.js:139-170`
-
-**Current Compose Send:**
-See `app/(authenticated)/outreach/compose/page.jsx:107-181`
+**Actual implementation:**
+- Server-side hydration in build-payload route
+- Simple template selector (no mode toggle needed)
+- Template content shown in form, but hydration happens server-side
+- Uses build-payload → preview → send flow (matches sandbox pattern)
 
 ## Notes
 
-- The variable mapper service already exists and works correctly
-- Just need to integrate it into the compose flow
-- Make sure to handle loading states and errors gracefully
-- Consider showing a "preview" mode to see hydrated content before sending
+- Templates are **part of the JSON payload**, not assigned as a separate request ID (deprecated pattern)
+- The `/api/template/hydrate-with-contact` route still exists but is not used by the compose flow
+- That route still uses old `outreach_templates` model and may need updating for other use cases
+- The compose flow uses the new `Template` model via build-payload route
 
+## Testing Checklist
+
+- [x] Can select template from dropdown
+- [x] Template subject/body loads when selected
+- [x] Variables are replaced with contact data (server-side)
+- [x] Hydrated content shows in preview
+- [x] Email sends with hydrated content
+- [x] Manual mode still works (no template selected)
+- [x] Preview shows exactly what will be sent
+
+## Future Enhancements (Optional)
+
+- Add client-side preview of hydrated template before building payload (nice-to-have)
+- Show template variables in form with placeholders (e.g., "Hi {{firstName}},")
+- Add "Use Template" vs "Write Manually" mode toggle for clearer UX
+- Update `/api/template/hydrate-with-contact` route to use new Template model for other use cases

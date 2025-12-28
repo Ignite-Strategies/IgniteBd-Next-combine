@@ -17,12 +17,12 @@ function PreviewContent() {
   const searchParams = useSearchParams();
   const requestId = searchParams.get('requestId');
 
-  const [previewPayload, setPreviewPayload] = useState<any | null>(null);
+  const [previewPayload, setPreviewPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const [messageId, setMessageId] = useState<string | null>(null);
+  const [messageId, setMessageId] = useState(null);
 
   // Auto-load preview when page loads
   useEffect(() => {
@@ -58,7 +58,7 @@ function PreviewContent() {
     }
   };
 
-  const handleSend = async (e?: React.FormEvent) => {
+  const handleSend = async (e) => {
     if (e) {
       e.preventDefault();
     }
@@ -89,7 +89,7 @@ function PreviewContent() {
       } else {
         setError(response.data?.error || 'Failed to send email');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('[preview] Send error:', err);
       const errorMessage = err.response?.data?.error || err.message || 'Failed to send email';
       setError(errorMessage);

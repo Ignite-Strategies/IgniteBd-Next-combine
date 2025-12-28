@@ -131,10 +131,20 @@ Return ONLY valid JSON in this exact format:
 Use {{variableName}} ONLY for contact-specific data that will be filled in later from the database.
 
 **CONTACT VARIABLES** (use {{tags}} - these will be filled later):
-- {{firstName}} - Contact's first name (ALWAYS use this in greeting)
-- {{lastName}} - Contact's last name  
-- {{companyName}} - Their current company (use if relevant)
-- {{title}} - Their job title (use if relevant)
+- {{firstName}} - Contact's first name (ALWAYS use this in greeting, preferred over goesBy for formal contexts)
+- {{goesBy}} - Contact's preferred/nickname (use for casual, friendly contexts)
+- {{lastName}} - Contact's last name
+- {{fullName}} - Contact's full name (computed from firstName + lastName)
+- {{companyName}} - Their current company name (use when relevant to context)
+- {{title}} - Their job title/role (use when relevant to context)
+- {{seniority}} - Their seniority level (e.g., "C-Suite", "VP+", "Director+")
+- {{department}} - Their department (use when relevant)
+- {{city}} - Their city (use for local events or regional context)
+- {{state}} - Their state/region (use for regional context)
+- {{country}} - Their country (use for international context)
+- {{email}} - Their email address (rarely needed in body, but available)
+- {{phone}} - Their phone number (rarely needed in body, but available)
+- {{linkedinUrl}} - Their LinkedIn profile URL (use when offering to connect on LinkedIn)
 
 **TEMPLATE CONTEXT** (use provided values DIRECTLY as text, NOT as {{variables}}):
 - Time Since Connected: "${timeSinceConnected || 'not specified'}" - BAKE THIS INTO THE CONTENT
@@ -143,15 +153,17 @@ Use {{variableName}} ONLY for contact-specific data that will be filled in later
 - Desired Outcome: "${desiredOutcome || whatWantFromThem || 'catch up'}" - BAKE THIS INTO THE CONTENT
 
 === REQUIREMENTS ===
-1. **Contact Variables Only**: ONLY use {{variableName}} for firstName, lastName, companyName, title
+1. **Contact Variables Only**: Use {{variableName}} for contact-specific data from the list above (firstName, goesBy, lastName, fullName, companyName, title, seniority, department, city, state, country, email, phone, linkedinUrl). Choose variables that make sense for the context.
 2. **Bake in Context**: Time, business description, desired outcome should be PLAIN TEXT (not {{variables}})
 3. **Follow Logic Rules**: Apply the relationship-aware logic rules above
 4. **Human & Natural**: Write like a real person, not a sales bot
 5. **Low Pressure**: Always include a release valve that removes pressure
 6. **No Sales Language**: No CTAs, no calendar links, no "let's hop on a call"
-7. **Greeting**: Always start with "Hi {{firstName}}," or similar
-8. **Company Context**: Use {{companyName}} when relevant
-9. **Signature**: End with a plain name like "Joel" or "Cheers, Joel"
+7. **Greeting**: Always start with "Hi {{firstName}}," or "Hi {{goesBy}}," (use goesBy for very casual/friendly relationships, firstName for more formal)
+8. **Company Context**: Use {{companyName}} when relevant to the conversation
+9. **Location Context**: Use {{city}} or {{state}} when mentioning local events or regional topics
+10. **Professional Context**: Use {{title}} or {{seniority}} when relevant to the ask or context
+11. **Signature**: End with a plain name like "Joel" or "Cheers, Joel"
 
 === TEMPLATE STRUCTURE ===
 1. **Warm Greeting**: "Hi {{firstName}}," or similar

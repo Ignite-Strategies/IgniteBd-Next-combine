@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { resolveMembership } from '@/lib/membership';
+import { resolveMembership, resolveAllMemberships } from '@/lib/membership';
 
 /**
  * Helper: Get owner and verify membership for companyHQId
@@ -110,12 +110,15 @@ export async function GET(request) {
 /**
  * POST /api/contact-lists
  * Create a new contact list
+ * Simple route similar to templates - accepts ownerId from useOwner hook
  * 
  * Body:
- * - name (required)
+ * - ownerId (required) - from useOwner hook
+ * - title (required) - list name
  * - description (optional)
- * - type (optional, defaults to "static")
- * - filters (optional, JSON for smart lists)
+ * - companyHQId (optional) - if not provided, uses owner's primary companyHQ
+ * - contactIds (optional) - array of contact IDs to add to the list
+ * - campaignId (optional) - link to campaign if this list is for a specific campaign
  * 
  * Returns:
  * - success: boolean
@@ -134,32 +137,48 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const companyHQId = body.companyHQId;
-    
-    if (!companyHQId) {
-      return NextResponse.json(
-        { success: false, error: 'companyHQId is required in request body' },
-        { status: 400 },
-      );
-    }
-
-    await getOwnerAndVerifyMembership(firebaseUser, companyHQId);
-    const { name, description, type, filters, contactIds } = body;
+    const { ownerId, title, description, companyHQId, contactIds, campaignId } = body;
 
     // Validate required fields
-    if (!name || !name.trim()) {
+    if (!ownerId) {
       return NextResponse.json(
-        { success: false, error: 'List name is required' },
+        { success: false, error: 'ownerId is required' },
         { status: 400 },
       );
     }
+
+    if (!title || !title.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'title is required' },
+        { status: 400 },
+      );
+    }
+
+    // Resolve companyHQId from owner if not provided
+    let resolvedCompanyHQId = companyHQId;
+    if (!resolvedCompanyHQId) {
+      // Get owner's primary companyHQ from memberships (first one, typically the primary)
+      const memberships = await resolveAllMemberships(ownerId);
+      if (!memberships || memberships.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'companyHQId is required. Provide it in the request body or ensure owner has a companyHQ membership.' },
+          { status: 400 },
+        );
+      }
+      // Use the first membership (typically the primary/oldest)
+      // Membership uses companyHqId (camelCase) field name
+      resolvedCompanyHQId = memberships[0].companyHqId;
+    }
+
+    // Verify membership for the companyHQ
+    await getOwnerAndVerifyMembership(firebaseUser, resolvedCompanyHQId);
 
     // Check if list with same name already exists for this company
     const existingList = await prisma.contact_lists.findUnique({
       where: {
         companyId_name: {
-          companyId: companyHQId,
-          name: name.trim(),
+          companyId: resolvedCompanyHQId,
+          name: title.trim(),
         },
       },
     });
@@ -176,11 +195,11 @@ export async function POST(request) {
     const newList = await prisma.contact_lists.create({
       data: {
         id: listId,
-        companyId: companyHQId,
-        name: name.trim(),
+        companyId: resolvedCompanyHQId,
+        name: title.trim(), // title -> name in schema
         description: description?.trim() || null,
-        type: type || 'static',
-        filters: filters || null,
+        type: 'static', // Default to static for simple lists
+        filters: campaignId ? { campaignId } : null, // Store campaignId in filters if provided
         totalContacts: 0,
         isActive: true,
       },
@@ -195,7 +214,7 @@ export async function POST(request) {
       const updateResult = await prisma.contact.updateMany({
         where: {
           id: { in: contactIds },
-          crmId: companyHQId, // Ensure contacts belong to this company
+          crmId: resolvedCompanyHQId, // Ensure contacts belong to this company
         },
         data: {
           contactListId: listId,
@@ -222,13 +241,17 @@ export async function POST(request) {
       },
     });
 
-    // Format the response
+    // Format the response (similar to template response)
     const formattedList = {
       id: updatedList.id,
-      name: updatedList.name,
+      ownerId, // Include ownerId in response
+      title: updatedList.name, // Map name -> title for consistency
+      name: updatedList.name, // Also include name for backward compatibility
       description: updatedList.description,
       type: updatedList.type,
       totalContacts: updatedList._count.contacts,
+      companyHQId: resolvedCompanyHQId,
+      campaignId: campaignId || null, // Include campaignId if provided
       createdAt: updatedList.createdAt.toISOString(),
       updatedAt: updatedList.updatedAt.toISOString(),
     };

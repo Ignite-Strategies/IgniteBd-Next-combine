@@ -3,7 +3,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { writePayload } from '@/lib/redis';
 import { randomUUID } from 'crypto';
-import { hydrateTemplate } from '@/lib/templateVariables';
+import { hydrateTemplateFromDatabase } from '@/lib/services/variableMapperService';
 
 /**
  * POST /api/outreach/build-payload
@@ -69,12 +69,12 @@ export async function POST(request) {
     });
     
     // Step 3.5: Handle template hydration if templateId is provided
+    // Uses variable mapper service to resolve variables from database
     let finalSubject = subject;
     let finalBody = emailBody;
-    let contactData = {};
     
     if (templateId) {
-      console.log('📧 Template ID provided, hydrating template...');
+      console.log('📧 Template ID provided, hydrating template with variable mapper service...');
       
       // Fetch template
       const template = await prisma.template.findUnique({
@@ -89,38 +89,25 @@ export async function POST(request) {
         );
       }
       
-      // Fetch contact data if contactId is provided (for variable hydration)
-      if (contactId) {
-        const contact = await prisma.contact.findUnique({
-          where: { id: contactId },
-          select: {
-            firstName: true,
-            lastName: true,
-            fullName: true,
-            goesBy: true,
-            email: true,
-            title: true,
-            companyName: true,
-            companyDomain: true,
-            updatedAt: true,
-          },
-        });
-        
-        if (contact) {
-          contactData = contact;
-        }
-      }
+      // Build context for variable resolution
+      // Variable mapper service will query database based on contactId
+      const context = {
+        contactId: contactId || undefined,
+        ownerId: owner.id,
+      };
       
-      // Hydrate template subject and body with contact data
+      // Hydrate template using variable mapper service
+      // This automatically queries database and maps contact fields to variables
       // Template becomes part of the payload JSON (not assigned separately)
-      finalSubject = hydrateTemplate(template.subject, contactData, {});
-      finalBody = hydrateTemplate(template.body, contactData, {});
+      finalSubject = await hydrateTemplateFromDatabase(template.subject, context, {});
+      finalBody = await hydrateTemplateFromDatabase(template.body, context, {});
       
-      console.log('✅ Template hydrated:', {
+      console.log('✅ Template hydrated via variable mapper:', {
         originalSubjectLength: template.subject.length,
         originalBodyLength: template.body.length,
         hydratedSubjectLength: finalSubject.length,
         hydratedBodyLength: finalBody.length,
+        contactId: contactId || 'none',
       });
     }
     

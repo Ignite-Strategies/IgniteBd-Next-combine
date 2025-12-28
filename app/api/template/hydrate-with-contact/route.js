@@ -1,8 +1,40 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { hydrateTemplate, validateHydration } from '@/lib/templateVariables';
+import { validateHydration } from '@/lib/templateVariables';
+import { 
+  hydrateTemplateFromDatabase,
+  extractVariableNames,
+} from '@/lib/services/variableMapperService';
 
+/**
+ * POST /api/template/hydrate-with-contact
+ * 
+ * Hydrates a template with contact data by resolving variables from the database.
+ * 
+ * Uses variable mapper service to:
+ * 1. Extract variables from template (e.g., {{firstName}})
+ * 2. Query database based on contactId
+ * 3. Map contact fields to variables
+ * 4. Replace variables in template
+ * 
+ * Request body:
+ * {
+ *   "templateId": "uuid",
+ *   "contactId": "uuid", // Optional but recommended for variable resolution
+ *   "metadata": {} // Optional metadata for computed variables (timeHorizon, etc.)
+ * }
+ * 
+ * Returns:
+ * {
+ *   "success": true,
+ *   "hydratedSubject": "Hi John, ...",
+ *   "hydratedBody": "Hey John,\n\n...",
+ *   "originalTemplate": { "subject": "...", "body": "..." },
+ *   "validation": { "valid": true, "missingVariables": [] },
+ *   "variables": ["firstName", "companyName"], // Variables found in template
+ * }
+ */
 export async function POST(request) {
   try {
     await verifyFirebaseToken(request);
@@ -28,12 +60,14 @@ export async function POST(request) {
       );
     }
 
-    // Fetch the template
-    const template = await prisma.outreach_templates.findUnique({
+    // Fetch the template (using new Template model)
+    const template = await prisma.template.findUnique({
       where: { id: templateId },
-      include: {
-        template_bases: true,
-        template_variables: true,
+      select: {
+        id: true,
+        title: true,
+        subject: true,
+        body: true,
       },
     });
 
@@ -44,54 +78,65 @@ export async function POST(request) {
       );
     }
 
-    let contactData = {};
-    
-    // If contactId provided, fetch contact data
-    if (contactId) {
-      const contact = await prisma.contact.findUnique({
-        where: { id: contactId },
-        select: {
-          firstName: true,
-          lastName: true,
-          fullName: true,
-          goesBy: true,
-          email: true,
-          title: true,
-          companyName: true,
-          companyDomain: true,
-          updatedAt: true,
-          createdAt: true,
-        },
-      });
+    // Build context for variable resolution
+    const context = {
+      contactId,
+      metadata,
+    };
 
-      if (!contact) {
-        return NextResponse.json(
-          { error: 'Contact not found' },
-          { status: 404 },
-        );
-      }
+    // Extract variables from both subject and body
+    const subjectVariables = extractVariableNames(template.subject);
+    const bodyVariables = extractVariableNames(template.body);
+    const allVariables = Array.from(new Set([...subjectVariables, ...bodyVariables]));
 
-      contactData = contact;
-    }
+    // Hydrate subject and body using variable mapper service
+    // This queries the database based on contactId and maps to variables
+    const hydratedSubject = await hydrateTemplateFromDatabase(
+      template.subject,
+      context,
+      metadata
+    );
 
-    // Hydrate the template with contact data + metadata
-    const hydratedContent = hydrateTemplate(template.content, contactData, metadata);
+    const hydratedBody = await hydrateTemplateFromDatabase(
+      template.body,
+      context,
+      metadata
+    );
 
-    // Validate hydration
-    const validation = validateHydration(hydratedContent);
+    // Validate hydration (check for any unresolved variables)
+    const subjectValidation = validateHydration(hydratedSubject);
+    const bodyValidation = validateHydration(hydratedBody);
+    const allValid = subjectValidation.valid && bodyValidation.valid;
+    const missingVariables = [
+      ...subjectValidation.missingVariables,
+      ...bodyValidation.missingVariables,
+    ];
 
     return NextResponse.json({
       success: true,
-      hydratedContent,
-      originalTemplate: template.content,
-      validation,
-      contactData: contactId ? contactData : null,
+      hydratedSubject,
+      hydratedBody,
+      originalTemplate: {
+        subject: template.subject,
+        body: template.body,
+        title: template.title,
+      },
+      validation: {
+        valid: allValid,
+        missingVariables: Array.from(new Set(missingVariables)),
+      },
+      variables: allVariables, // List of variables found in template
+      contactId: contactId || null,
       metadata,
     });
   } catch (error) {
     console.error('❌ Template hydrate with contact error:', error);
+    console.error('❌ Error stack:', error.stack);
     return NextResponse.json(
-      { error: 'Failed to hydrate template with contact data' },
+      { 
+        error: 'Failed to hydrate template with contact data',
+        details: error.message,
+      },
       { status: 500 },
     );
   }

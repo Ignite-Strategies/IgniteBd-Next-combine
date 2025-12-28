@@ -2,13 +2,14 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send, Mail, Loader2, CheckCircle2, Plus, X } from 'lucide-react';
+import { Send, Mail, Loader2, CheckCircle2, Plus, X, Info, ChevronDown, ChevronUp, Eye, Code } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
 
 function ComposeContent() {
   const router = useRouter();
@@ -27,6 +28,13 @@ function ComposeContent() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templateVariables, setTemplateVariables] = useState([]);
+  const [showVariablesHelp, setShowVariablesHelp] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [previewError, setPreviewError] = useState(null);
   
   // UI state
   const [sending, setSending] = useState(false);
@@ -177,10 +185,22 @@ function ComposeContent() {
 
   // Handle template selection - populate subject and body if template selected
   useEffect(() => {
-    if (!selectedTemplateId || !templates.length) return;
+    if (!selectedTemplateId || !templates.length) {
+      setSelectedTemplate(null);
+      setTemplateVariables([]);
+      return;
+    }
 
     const template = templates.find(t => t.id === selectedTemplateId);
     if (template) {
+      setSelectedTemplate(template);
+      
+      // Extract variables from template
+      const subjectVars = extractVariableNames(template.subject || '');
+      const bodyVars = extractVariableNames(template.body || '');
+      const allVars = Array.from(new Set([...subjectVars, ...bodyVars]));
+      setTemplateVariables(allVars);
+      
       // Only populate if fields are empty (don't overwrite user edits)
       if (!subject) {
         setSubject(template.subject || '');
@@ -190,6 +210,75 @@ function ComposeContent() {
       }
     }
   }, [selectedTemplateId, templates]);
+
+  // Handle preview - builds payload, saves to Redis, shows hydration (reference: sandbox email-sandbox-preview)
+  const handlePreview = async () => {
+    // Validate required fields
+    if (!selectedTemplateId && (!to || !subject || !body)) {
+      setPreviewError('Please fill in all required fields or select a template');
+      return;
+    }
+
+    if (!to) {
+      setPreviewError('Please specify a recipient (To field or select a contact)');
+      return;
+    }
+
+    if (!ownerId) {
+      setPreviewError('Authentication required. Please sign in and try again.');
+      return;
+    }
+
+    if (!hasVerifiedSender || !senderEmail) {
+      setPreviewError('Please verify your sender email before previewing.');
+      return;
+    }
+
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewData(null);
+
+    try {
+      // Build payload and save to Redis (same as Build & Preview, but show modal instead of navigating)
+      const response = await api.post('/api/outreach/build-payload', {
+        to,
+        subject: subject || '',
+        body: body || '',
+        senderEmail,
+        senderName: senderName || undefined,
+        contactId: contactId || undefined,
+        tenantId: tenantId || undefined,
+        templateId: selectedTemplateId || undefined,
+      });
+
+      if (response.data?.success) {
+        // Load preview from Redis to show hydration
+        const previewResponse = await api.get(`/api/outreach/preview?requestId=${response.data.requestId}`);
+        
+        if (previewResponse.data?.success) {
+          setPreviewData({
+            requestId: response.data.requestId,
+            preview: previewResponse.data.preview || previewResponse.data.payload,
+            original: {
+              subject: subject || '',
+              body: body || '',
+              templateId: selectedTemplateId,
+            },
+          });
+          setShowPreviewModal(true);
+        } else {
+          setPreviewError(previewResponse.data?.error || 'Failed to load preview');
+        }
+      } else {
+        setPreviewError(response.data?.error || 'Failed to build payload');
+      }
+    } catch (err) {
+      console.error('Preview error:', err);
+      setPreviewError(err.response?.data?.error || err.message || 'Failed to preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const handleBuildAndPreview = async (e) => {
     e.preventDefault();
@@ -271,24 +360,26 @@ function ComposeContent() {
           backLabel="Back to Outreach"
         />
 
-        <div className="mt-8 rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Compose Email</h2>
-            
-            {success && (
-              <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-                <p className="text-sm font-medium text-green-900">✅ Email sent successfully!</p>
-              </div>
-            )}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Compose Form - Left Column (2/3 width) */}
+          <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Compose Email</h2>
+              
+              {success && (
+                <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                  <p className="text-sm font-medium text-green-900">✅ Email sent successfully!</p>
+                </div>
+              )}
 
-            {error && (
-              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
-                <p className="text-sm font-medium text-red-900">{error}</p>
-              </div>
-            )}
+              {error && (
+                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                  <p className="text-sm font-medium text-red-900">{error}</p>
+                </div>
+              )}
 
-            <form onSubmit={handleBuildAndPreview} className="space-y-4">
+              <form onSubmit={handleBuildAndPreview} className="space-y-4">
               {/* Sender Identity - SenderIdentityPanel handles all sender logic */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -363,34 +454,30 @@ function ComposeContent() {
                 />
               </div>
 
-              {/* Template Selector (Optional) */}
-              <div>
-                <label htmlFor="template" className="block text-sm font-medium text-gray-700 mb-1">
-                  Template (Optional)
-                </label>
-                <select
-                  id="template"
-                  value={selectedTemplateId}
-                  onChange={(e) => setSelectedTemplateId(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                >
-                  <option value="">None - Write manually</option>
-                  {loadingTemplates ? (
-                    <option disabled>Loading templates...</option>
-                  ) : templates.length === 0 ? (
-                    <option disabled>No templates available</option>
-                  ) : (
-                    templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.title}
-                      </option>
-                    ))
-                  )}
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Select a template to auto-fill subject and body. Template variables will be hydrated with contact data.
-                </p>
-              </div>
+              {/* Template indicator if selected */}
+              {selectedTemplateId && selectedTemplate && (
+                <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900">
+                        Using template: {selectedTemplate.title}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplateId('');
+                        setSelectedTemplate(null);
+                        setTemplateVariables([]);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Subject */}
               <div>
@@ -423,13 +510,112 @@ function ComposeContent() {
                 />
                 {selectedTemplateId && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Template selected. Variables like {`{{firstName}}`}, {`{{companyName}}`} will be replaced with contact data.
+                    Template selected. Variables will be replaced with contact data when you build the payload.
                   </p>
                 )}
               </div>
 
-              {/* Send Button */}
-              <div className="flex justify-end pt-4">
+              {/* Variables Helper Section */}
+              <div className="border border-gray-200 rounded-lg bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setShowVariablesHelp(!showVariablesHelp)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-100 transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      {selectedTemplateId && templateVariables.length > 0
+                        ? `Template Variables (${templateVariables.length} found)`
+                        : 'Available Variables'}
+                    </span>
+                  </div>
+                  {showVariablesHelp ? (
+                    <ChevronUp className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                  )}
+                </button>
+                
+                {showVariablesHelp && (
+                  <div className="px-4 pb-4 border-t border-gray-200 pt-4">
+                    {selectedTemplateId && templateVariables.length > 0 ? (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700 mb-2">
+                          Variables found in selected template:
+                        </p>
+                        <div className="space-y-2">
+                          {templateVariables.map((varName) => {
+                            const varDef = VariableCatalogue[varName];
+                            return (
+                              <div key={varName} className="flex items-start gap-2 text-xs">
+                                <code className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-mono">
+                                  {`{{${varName}}}`}
+                                </code>
+                                <span className="text-gray-600 flex-1">
+                                  {varDef?.description || `Variable: ${varName}`}
+                                  {contactId && varDef && (
+                                    <span className="text-gray-400 ml-1">
+                                      • Maps to: {varDef.dbField || varDef.source}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {!contactId && (
+                          <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                            💡 Select a contact to see how variables will be resolved from the database.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700 mb-2">
+                          Available variables you can use:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {Object.entries(VariableCatalogue).map(([key, def]) => (
+                            <div key={key} className="flex items-start gap-2 text-xs">
+                              <code className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-mono whitespace-nowrap">
+                                {`{{${key}}}`}
+                              </code>
+                              <span className="text-gray-600">
+                                {def.description}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-xs text-gray-600">
+                          💡 Variables are automatically resolved from the database when you select a contact and template.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handlePreview}
+                  disabled={previewLoading || !ownerId || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
+                  className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {previewLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4" />
+                      Preview
+                    </>
+                  )}
+                </button>
                 <button
                   type="submit"
                   disabled={sending || !ownerId}
@@ -448,10 +634,345 @@ function ComposeContent() {
                   )}
                 </button>
               </div>
-            </form>
+              </form>
+            </div>
+          </div>
+
+          {/* Template Selector Sidebar - Right Column (1/3 width) */}
+          <div className="lg:col-span-1 rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900">Choose from Template</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Select a template to fill subject and body
+              </p>
+            </div>
+            <div className="p-4">
+              {loadingTemplates ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-600">Loading templates...</span>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-8">
+                  <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No templates available</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Create templates in the Templates section
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+                  {templates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplateId(template.id);
+                        // Fill subject and body with template content (variables shown as-is)
+                        setSubject(template.subject || '');
+                        setBody(template.body || '');
+                      }}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                        selectedTemplateId === template.id
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-medium text-sm text-gray-900 mb-1">
+                        {template.title}
+                      </div>
+                      {template.subject && (
+                        <div className="text-xs text-gray-600 truncate mb-1" title={template.subject}>
+                          {template.subject}
+                        </div>
+                      )}
+                      {template.body && (
+                        <div className="text-xs text-gray-500 line-clamp-2">
+                          {template.body.replace(/\{\{(\w+)\}\}/g, '[var]').substring(0, 60)}...
+                        </div>
+                      )}
+                      {selectedTemplateId === template.id && (
+                        <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>Selected</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Preview Modal - Shows hydrated email (reference: sandbox email-sandbox-preview) */}
+      {showPreviewModal && previewData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Email Preview</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedTemplateId && contactId 
+                    ? 'Template hydrated with contact data from database'
+                    : selectedTemplateId
+                    ? 'Template preview (select a contact to see hydration)'
+                    : 'Manual email preview'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPreviewModal(false);
+                  setPreviewData(null);
+                  setPreviewError(null);
+                }}
+                className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-6">
+              {previewError && (
+                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                  <p className="text-sm font-medium text-red-900">{previewError}</p>
+                </div>
+              )}
+
+              {previewData?.preview && (
+                <div className="space-y-6">
+                  {/* Hydration Comparison - Show original vs hydrated if template is used */}
+                  {selectedTemplateId && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      {/* Original Template with Variables */}
+                      <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                        <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                          <Code className="h-4 w-4" />
+                          Original Template (with variables)
+                        </h3>
+                        <div className="space-y-3 text-xs">
+                          <div>
+                            <label className="block font-medium text-blue-800 mb-1">Subject:</label>
+                            <div className="bg-white rounded p-2 border border-blue-200 font-mono text-xs whitespace-pre-wrap break-words">
+                              {previewData.original.subject}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block font-medium text-blue-800 mb-1">Body:</label>
+                            <div className="bg-white rounded p-2 border border-blue-200 font-mono text-xs whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
+                              {previewData.original.body}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Hydrated Version */}
+                      <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                        <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Hydrated Version {contactId ? '(from database)' : '(no contact selected)'}
+                        </h3>
+                        <div className="space-y-3 text-xs">
+                          <div>
+                            <label className="block font-medium text-green-800 mb-1">Subject:</label>
+                            <div className="bg-white rounded p-2 border border-green-200">
+                              {previewData.preview.subject || previewData.preview.personalizations?.[0]?.subject}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block font-medium text-green-800 mb-1">Body:</label>
+                            <div 
+                              className="bg-white rounded p-2 border border-green-200 max-h-64 overflow-y-auto prose prose-xs max-w-none"
+                              dangerouslySetInnerHTML={{ 
+                                __html: previewData.preview.body || previewData.preview.content?.[0]?.value || '' 
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Final Email Preview */}
+                  <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Mail className="h-5 w-5" />
+                      Final Email Preview
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                          From
+                        </label>
+                        <div className="text-sm text-gray-900">
+                          {previewData.preview.from?.name && (
+                            <span className="font-medium">{previewData.preview.from.name} </span>
+                          )}
+                          <span className="text-gray-600">&lt;{previewData.preview.from?.email || 'N/A'}&gt;</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                          To
+                        </label>
+                        <p className="text-sm text-gray-900">
+                          {previewData.preview.to || previewData.preview.personalizations?.[0]?.to?.[0]?.email || 'N/A'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                          Subject
+                        </label>
+                        <p className="text-sm font-medium text-gray-900">
+                          {previewData.preview.subject || previewData.preview.personalizations?.[0]?.subject || 'N/A'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                          Message
+                        </label>
+                        <div 
+                          className="text-sm text-gray-900 prose prose-sm max-w-none border border-gray-200 rounded-md p-4 bg-white"
+                          dangerouslySetInnerHTML={{ 
+                            __html: previewData.preview.body || previewData.preview.content?.[0]?.value || 'N/A' 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Variables Info - Shows how variables map */}
+                  {selectedTemplateId && templateVariables.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Variable Hydration</h3>
+                      <div className="space-y-2">
+                        {templateVariables.map((varName) => {
+                          const varDef = VariableCatalogue[varName];
+                          // Check if variable was resolved (no {{}} in hydrated version)
+                          const hydratedSubject = previewData.preview.subject || previewData.preview.personalizations?.[0]?.subject || '';
+                          const hydratedBody = previewData.preview.body || previewData.preview.content?.[0]?.value || '';
+                          const isResolved = !hydratedSubject.includes(`{{${varName}}}`) && !hydratedBody.includes(`{{${varName}}}`);
+                          
+                          return (
+                            <div key={varName} className="flex items-start gap-3 p-2 bg-white rounded border border-gray-200">
+                              <code className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-mono text-xs whitespace-nowrap">
+                                {`{{${varName}}}`}
+                              </code>
+                              <div className="flex-1 text-xs">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-gray-600">→</span>
+                                  {contactId ? (
+                                    <span className={isResolved ? 'text-green-600 font-medium' : 'text-amber-600'}>
+                                      {isResolved ? '✓ Resolved from database' : '⚠ Not found in database'}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">Select contact to resolve</span>
+                                  )}
+                                </div>
+                                {varDef && (
+                                  <div className="text-gray-500 text-xs">
+                                    Maps to: <code className="bg-gray-100 px-1 rounded">{varDef.dbField || varDef.source}</code>
+                                    {varDef.description && ` • ${varDef.description}`}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {!contactId && (
+                        <p className="text-xs text-amber-700 mt-3 bg-amber-50 border border-amber-200 rounded p-2">
+                          💡 Select a contact to see how variables are resolved from the database. Variables will be replaced with actual contact data when you send.
+                        </p>
+                      )}
+                      {contactId && selectedContact && (
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+                          <p className="text-xs font-medium text-green-900 mb-2">Contact Data (from database):</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs text-green-800">
+                            {selectedContact.firstName && (
+                              <div><strong>firstName:</strong> {selectedContact.firstName}</div>
+                            )}
+                            {selectedContact.lastName && (
+                              <div><strong>lastName:</strong> {selectedContact.lastName}</div>
+                            )}
+                            {selectedContact.companyName && (
+                              <div><strong>companyName:</strong> {selectedContact.companyName}</div>
+                            )}
+                            {selectedContact.title && (
+                              <div><strong>title:</strong> {selectedContact.title}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4 bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowPreviewModal(false);
+                  setPreviewData(null);
+                  setPreviewError(null);
+                }}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <div className="flex gap-3">
+                {previewData?.requestId && (
+                  <button
+                    onClick={() => {
+                      setShowPreviewModal(false);
+                      window.location.href = `/outreach/compose/preview?requestId=${previewData.requestId}`;
+                    }}
+                    className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Go to Full Preview Page
+                  </button>
+                )}
+                {previewData?.requestId && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await api.post('/api/outreach/send', {
+                          requestId: previewData.requestId,
+                        });
+                        if (response.data?.success) {
+                          setShowPreviewModal(false);
+                          setSuccess(true);
+                          setTimeout(() => setSuccess(false), 3000);
+                          // Clear form
+                          setTo('');
+                          setToName('');
+                          setSubject('');
+                          setBody('');
+                          setContactId('');
+                          setSelectedContact(null);
+                          setSelectedTemplateId('');
+                        }
+                      } catch (err) {
+                        setPreviewError(err.response?.data?.error || 'Failed to send email');
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  >
+                    <Send className="h-4 w-4" />
+                    Send Now
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Contact Modal */}
       {showQuickContactModal && (
