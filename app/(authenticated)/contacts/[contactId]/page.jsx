@@ -222,22 +222,22 @@ export default function ContactDetailPage({ params }) {
           {!editingStage ? (
             <>
               <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600">
-                {contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'Prospect'}
+                {contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'Unassigned'}
               </span>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-600">
-                  {contact.pipelines?.stage || contact.pipeline?.stage || 'Unassigned Stage'}
+                  {contact.pipelines?.stage || contact.pipeline?.stage || 'No Stage'}
                 </span>
                 <button
                   onClick={() => {
-                    const currentPipeline = contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'prospect';
-                    const currentStage = contact.pipelines?.stage || contact.pipeline?.stage || 'interest';
+                    const currentPipeline = contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'unassigned';
+                    const currentStage = contact.pipelines?.stage || contact.pipeline?.stage || null;
                     setEditingStage(true);
                     setSelectedPipeline(currentPipeline);
-                    setSelectedStage(currentStage);
+                    setSelectedStage(currentStage || '');
                   }}
                   className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                  title="Change stage"
+                  title="Change pipeline and stage"
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
@@ -249,68 +249,91 @@ export default function ContactDetailPage({ params }) {
                 value={selectedPipeline}
                 onChange={(e) => {
                   setSelectedPipeline(e.target.value);
-                  // Reset stage when pipeline changes
-                  setSelectedStage('interest');
+                  // Reset stage when pipeline changes (unless it's unassigned)
+                  if (e.target.value === 'unassigned') {
+                    setSelectedStage('');
+                  } else {
+                    setSelectedStage('interest');
+                  }
                 }}
                 className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-600 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
+                <option value="unassigned">Unassigned</option>
                 <option value="prospect">Prospect</option>
                 <option value="client">Client</option>
                 <option value="collaborator">Collaborator</option>
                 <option value="institution">Institution</option>
               </select>
-              <select
-                value={selectedStage}
-                onChange={(e) => setSelectedStage(e.target.value)}
-                className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                {selectedPipeline === 'prospect' && (
-                  <>
-                    <option value="interest">Interest</option>
-                    <option value="meeting">Meeting</option>
-                    <option value="proposal">Proposal</option>
-                    <option value="contract">Contract</option>
-                    <option value="contract-signed">Contract Signed</option>
-                  </>
-                )}
-                {selectedPipeline === 'client' && (
-                  <>
-                    <option value="kickoff">Kickoff</option>
-                    <option value="work-started">Work Started</option>
-                    <option value="work-delivered">Work Delivered</option>
-                    <option value="sustainment">Sustainment</option>
-                    <option value="renewal">Renewal</option>
-                    <option value="terminated-contract">Terminated</option>
-                  </>
-                )}
-                {selectedPipeline === 'collaborator' && (
-                  <>
-                    <option value="interest">Interest</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </>
-                )}
-                {selectedPipeline === 'institution' && (
-                  <>
-                    <option value="interest">Interest</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </>
-                )}
-              </select>
+              {selectedPipeline !== 'unassigned' && (
+                <select
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value)}
+                  className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  {selectedPipeline === 'prospect' && (
+                    <>
+                      <option value="interest">Interest</option>
+                      <option value="meeting">Meeting</option>
+                      <option value="proposal">Proposal</option>
+                      <option value="contract">Contract</option>
+                      <option value="contract-signed">Contract Signed</option>
+                    </>
+                  )}
+                  {selectedPipeline === 'client' && (
+                    <>
+                      <option value="kickoff">Kickoff</option>
+                      <option value="work-started">Work Started</option>
+                      <option value="work-delivered">Work Delivered</option>
+                      <option value="sustainment">Sustainment</option>
+                      <option value="renewal">Renewal</option>
+                      <option value="terminated-contract">Terminated</option>
+                    </>
+                  )}
+                  {selectedPipeline === 'collaborator' && (
+                    <>
+                      <option value="interest">Interest</option>
+                      <option value="meeting">Meeting</option>
+                      <option value="moa">MOA</option>
+                      <option value="agreement">Agreement</option>
+                    </>
+                  )}
+                  {selectedPipeline === 'institution' && (
+                    <>
+                      <option value="interest">Interest</option>
+                      <option value="meeting">Meeting</option>
+                      <option value="moa">MOA</option>
+                      <option value="agreement">Agreement</option>
+                    </>
+                  )}
+                </select>
+              )}
+              {selectedPipeline === 'unassigned' && (
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600">
+                  No Stage
+                </span>
+              )}
               <button
                 onClick={async () => {
-                  if (!selectedPipeline || !selectedStage) {
+                  if (!selectedPipeline) {
+                    alert('Please select a pipeline');
+                    return;
+                  }
+                  // Stage is required for all pipelines except unassigned
+                  if (selectedPipeline !== 'unassigned' && !selectedStage) {
                     alert('Please select both pipeline and stage');
                     return;
                   }
                   setSavingStage(true);
                   try {
                     // Use dedicated pipeline route
-                    const response = await api.put(`/api/contacts/${contactId}/pipeline`, {
+                    // For unassigned, don't send stage (or send null)
+                    const payload = {
                       pipeline: selectedPipeline,
-                      stage: selectedStage,
-                    });
+                    };
+                    if (selectedPipeline !== 'unassigned' && selectedStage) {
+                      payload.stage = selectedStage;
+                    }
+                    const response = await api.put(`/api/contacts/${contactId}/pipeline`, payload);
                     if (response.data?.success) {
                       setContact(response.data.contact);
                       setEditingStage(false);

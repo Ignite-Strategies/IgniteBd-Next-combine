@@ -57,20 +57,24 @@ export async function ensureContactPipeline(
 
       // Validate pipeline
       if (!isValidPipeline(finalPipeline)) {
-        throw new Error(`Invalid pipeline: ${finalPipeline}. Must be one of: prospect, client, collaborator, institution`);
+        throw new Error(`Invalid pipeline: ${finalPipeline}. Must be one of: unassigned, prospect, client, collaborator, institution`);
       }
 
       // Validate stage (if provided)
-      if (finalStage && !isValidStageForPipeline(finalStage, finalPipeline)) {
+      // Unassigned pipeline doesn't require a stage
+      if (finalPipeline !== 'unassigned' && finalStage && !isValidStageForPipeline(finalStage, finalPipeline)) {
         throw new Error(`Invalid stage "${finalStage}" for pipeline "${finalPipeline}"`);
       }
 
       // Update pipeline
+      // For unassigned pipeline, stage should be null
+      const stageValue = finalPipeline === 'unassigned' ? null : (finalStage || null);
+      
       await prisma.pipelines.update({
         where: { contactId },
         data: {
           pipeline: finalPipeline,
-          stage: finalStage || null,
+          stage: stageValue,
         },
       });
 
@@ -85,11 +89,12 @@ export async function ensureContactPipeline(
 
   // Validate pipeline
   if (!isValidPipeline(newPipeline)) {
-    throw new Error(`Invalid pipeline: ${newPipeline}. Must be one of: prospect, client, collaborator, institution`);
+    throw new Error(`Invalid pipeline: ${newPipeline}. Must be one of: unassigned, prospect, client, collaborator, institution`);
   }
 
   // Validate stage (if provided)
-  if (newStage && !isValidStageForPipeline(newStage, newPipeline)) {
+  // Unassigned pipeline doesn't require a stage
+  if (newPipeline !== 'unassigned' && newStage && !isValidStageForPipeline(newStage, newPipeline)) {
     throw new Error(`Invalid stage "${newStage}" for pipeline "${newPipeline}"`);
   }
 
@@ -97,12 +102,15 @@ export async function ensureContactPipeline(
   const { randomUUID } = await import('crypto');
   const pipelineId = randomUUID();
   
+  // For unassigned pipeline, stage should be null
+  const stageValue = newPipeline === 'unassigned' ? null : newStage;
+  
   await prisma.pipelines.create({
     data: {
       id: pipelineId,
       contactId,
       pipeline: newPipeline,
-      stage: newStage,
+      stage: stageValue,
       updatedAt: new Date(),
     },
   });
@@ -128,11 +136,12 @@ export function validatePipeline(
   if (!isValidPipeline(pipeline)) {
     return {
       isValid: false,
-      error: `Invalid pipeline: ${pipeline}. Must be one of: prospect, client, collaborator, institution`,
+      error: `Invalid pipeline: ${pipeline}. Must be one of: unassigned, prospect, client, collaborator, institution`,
     };
   }
 
-  if (stage && !isValidStageForPipeline(stage, pipeline)) {
+  // Unassigned pipeline doesn't require a stage
+  if (pipeline !== 'unassigned' && stage && !isValidStageForPipeline(stage, pipeline)) {
     return {
       isValid: false,
       error: `Invalid stage "${stage}" for pipeline "${pipeline}"`,

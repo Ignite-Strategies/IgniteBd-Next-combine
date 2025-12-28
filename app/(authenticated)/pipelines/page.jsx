@@ -8,6 +8,7 @@ import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 
 const FALLBACK_PIPELINES = {
+  unassigned: [],
   prospect: ['interest', 'meeting', 'proposal', 'contract', 'contract-signed'],
   client: ['kickoff', 'work-started', 'work-delivered', 'sustainment', 'renewal'],
   collaborator: ['interest', 'meeting', 'agreement'],
@@ -15,6 +16,7 @@ const FALLBACK_PIPELINES = {
 };
 
 const PIPELINE_ICONS = {
+  unassigned: '📋',
   prospect: '📈',
   client: '🏁',
   collaborator: '🤝',
@@ -90,8 +92,7 @@ export default function PipelinesPage() {
   const contactsByPipeline = useMemo(() => {
     return contacts.reduce((acc, contact) => {
       const pipeline = contact.pipelines || contact.pipeline;
-      const pipelineId = slugify(pipeline?.pipeline);
-      if (!pipelineId) return acc;
+      const pipelineId = pipeline?.pipeline ? slugify(pipeline.pipeline) : 'unassigned';
       const list = acc.get(pipelineId) ?? [];
       list.push(contact);
       acc.set(pipelineId, list);
@@ -127,7 +128,7 @@ export default function PipelinesPage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Pipeline"
-          subtitle="Track contacts through prospect, client, collaborator, and institution flows."
+          subtitle="Track contacts through unassigned, prospect, client, collaborator, and institution flows."
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
         />
@@ -192,7 +193,7 @@ export default function PipelinesPage() {
               >
                 All Stages
               </button>
-              {activeStages.map((stageId) => {
+              {activeStages.length > 0 && activeStages.map((stageId) => {
                 const isSelected = selectedStage === stageId;
                 const stageCount = allActiveContacts.filter(
                   (contact) => {
@@ -218,7 +219,12 @@ export default function PipelinesPage() {
                   </button>
                 );
               })}
-              {activeStages.length === 0 && (
+              {activeStages.length === 0 && activePipeline === 'unassigned' && (
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                  Unassigned contacts have no stages
+                </span>
+              )}
+              {activeStages.length === 0 && activePipeline !== 'unassigned' && (
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
                   No stages defined yet
                 </span>

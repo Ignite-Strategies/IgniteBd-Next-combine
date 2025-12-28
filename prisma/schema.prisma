@@ -891,6 +891,7 @@ model owners {
   microsoftTenantId                         String?
   sendgridVerifiedEmail                     String? // Verified sender email for SendGrid
   sendgridVerifiedName                      String? // Display name for verified sender
+  emailSignature                            String? // Email signature HTML for outreach emails
   createdAt                                 DateTime              @default(now())
   updatedAt                                 DateTime
   assessments                               assessments[]

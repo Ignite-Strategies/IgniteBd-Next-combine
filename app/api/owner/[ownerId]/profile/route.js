@@ -35,7 +35,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { firstName, lastName, name, email, photoURL, teamSize } = body ?? {};
+    const { firstName, lastName, name, email, photoURL, teamSize, emailSignature } = body ?? {};
 
     // Build update data
     const updateData = {};
@@ -56,6 +56,7 @@ export async function PUT(request, { params }) {
     if (email !== undefined) updateData.email = email || null;
     if (photoURL !== undefined) updateData.photoURL = photoURL || null;
     if (teamSize !== undefined) updateData.teamSize = teamSize || null;
+    if (emailSignature !== undefined) updateData.emailSignature = emailSignature || null;
 
     // Update owner
     const updatedOwner = await prisma.owners.update({

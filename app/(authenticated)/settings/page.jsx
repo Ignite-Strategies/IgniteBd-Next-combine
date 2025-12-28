@@ -28,6 +28,7 @@ export default function SettingsPage() {
     email: '',
     title: '',
     yearsAtCompany: '',
+    emailSignature: '',
   });
   
   // Company form state
@@ -165,6 +166,7 @@ export default function SettingsPage() {
         email: owner.email || '',
         title: '', // TODO: Add title field to Owner model
         yearsAtCompany: '', // TODO: Add yearsAtCompany field to Owner model
+        emailSignature: owner.emailSignature || '',
       });
     }
     
@@ -225,6 +227,7 @@ export default function SettingsPage() {
         firstName: profileData.firstName || null,
         lastName: profileData.lastName || null,
         email: profileData.email,
+        emailSignature: profileData.emailSignature || null,
       });
 
       if (response.data.success) {
@@ -459,6 +462,25 @@ export default function SettingsPage() {
                         placeholder="0"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label htmlFor="emailSignature" className="block text-sm font-medium text-gray-700 mb-1">
+                      Email Signature
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      HTML signature that will be added to your outreach emails (optional). You can include your name, title, company, etc.
+                    </p>
+                    <textarea
+                      id="emailSignature"
+                      rows={6}
+                      value={profileData.emailSignature}
+                      onChange={(e) => setProfileData({ ...profileData, emailSignature: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 font-mono text-sm"
+                      placeholder="<p>Best regards,<br>John Doe<br>CEO, Company Name</p>"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Use HTML tags like &lt;p&gt;, &lt;br&gt; for formatting
+                    </p>
                   </div>
                   <div className="flex justify-end">
                     <button

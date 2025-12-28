@@ -9,8 +9,8 @@ import { applyPipelineTriggers } from '@/lib/services/PipelineTriggerService';
  * Create or update pipeline for a contact
  * 
  * Body:
- * - pipeline (required) - "prospect" | "client" | "collaborator" | "institution"
- * - stage (required) - Stage within the pipeline
+ * - pipeline (required) - "unassigned" | "prospect" | "client" | "collaborator" | "institution"
+ * - stage (optional for "unassigned", required for others) - Stage within the pipeline
  * 
  * Returns:
  * - success: boolean
@@ -61,15 +61,18 @@ export async function PUT(request, { params }) {
       );
     }
 
-    if (!stage) {
+    // Stage is optional for 'unassigned' pipeline, required for others
+    if (pipeline !== 'unassigned' && !stage) {
       return NextResponse.json(
-        { success: false, error: 'stage is required' },
+        { success: false, error: 'stage is required for this pipeline' },
         { status: 400 },
       );
     }
 
     // Validate pipeline and stage values
-    const validation = validatePipeline(pipeline, stage);
+    // For unassigned, stage can be null/empty
+    const stageToValidate = pipeline === 'unassigned' ? null : stage;
+    const validation = validatePipeline(pipeline, stageToValidate);
     if (!validation.isValid) {
       return NextResponse.json(
         { success: false, error: validation.error },
@@ -98,18 +101,21 @@ export async function PUT(request, { params }) {
     const pipelineId = existingPipeline?.id || randomUUID();
 
     // Upsert pipeline
+    // For unassigned pipeline, stage should be null
+    const stageValue = pipeline === 'unassigned' ? null : stage;
+    
     const updatedPipeline = await prisma.pipelines.upsert({
       where: { contactId },
       update: {
         pipeline,
-        stage,
+        stage: stageValue,
         updatedAt: new Date(),
       },
       create: {
         id: pipelineId,
         contactId,
         pipeline,
-        stage,
+        stage: stageValue,
         updatedAt: new Date(),
       },
     });
