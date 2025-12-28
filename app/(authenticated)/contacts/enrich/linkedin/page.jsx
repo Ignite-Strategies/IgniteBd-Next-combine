@@ -95,13 +95,33 @@ function LinkedInEnrichContent() {
     setSaving(true);
 
     try {
+      // CRITICAL: Only use companyHQId, never fallback to companyId (which might be wrong)
       const companyHQId = typeof window !== 'undefined' 
-        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
+        ? localStorage.getItem('companyHQId')
         : null;
+      
       if (!companyHQId) {
-        alert('Company context required. Please set your company first.');
+        alert('Company context required. Please set your company first. You may need to refresh or switch company context.');
         setSaving(false);
         return;
+      }
+
+      // Validate companyHQId is in user's memberships (prevent wrong context)
+      const storedMemberships = typeof window !== 'undefined' 
+        ? localStorage.getItem('memberships') 
+        : null;
+      if (storedMemberships) {
+        try {
+          const memberships = JSON.parse(storedMemberships);
+          const hasAccess = memberships.some(m => m.companyHqId === companyHQId);
+          if (!hasAccess) {
+            alert(`⚠️ You don't have access to CompanyHQ ${companyHQId}. Please switch to a CompanyHQ you have membership in.`);
+            setSaving(false);
+            return;
+          }
+        } catch (error) {
+          console.warn('Failed to validate membership, proceeding anyway:', error);
+        }
       }
 
       // Step 1: Create contact in CRM

@@ -39,6 +39,11 @@ export async function POST(request) {
       );
     }
 
+    // Validate crmId format - should not be a company name
+    if (crmId.includes(' ') || crmId.toLowerCase() === crmId && crmId.includes('-') && !crmId.match(/^[a-f0-9-]{36}$/i) && !crmId.match(/^[a-z0-9-]+$/)) {
+      console.warn(`⚠️ Suspicious crmId format: ${crmId}. This might be a company name instead of an ID.`);
+    }
+
     // Get owner from Firebase user
     const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
@@ -52,14 +57,43 @@ export async function POST(request) {
       );
     }
 
-    // Membership guard - verify owner has access to this CompanyHQ
+    // CRITICAL: Membership guard - verify owner has access to this CompanyHQ
+    // This prevents creating contacts in companyHQs the user doesn't belong to
     const { membership } = await resolveMembership(owner.id, crmId);
     if (!membership) {
+      console.error(`❌ ACCESS DENIED: Owner ${owner.id} attempted to create contact in CompanyHQ ${crmId} without membership`);
       return NextResponse.json(
-        { success: false, error: 'Forbidden: No membership in this CompanyHQ' },
+        { 
+          success: false, 
+          error: 'Forbidden: No membership in this CompanyHQ. Please switch to a CompanyHQ you have access to.',
+          details: {
+            requestedCompanyHQId: crmId,
+            ownerId: owner.id,
+          },
+        },
         { status: 403 },
       );
     }
+
+    // Verify the CompanyHQ actually exists
+    const companyHQ = await prisma.company_hqs.findUnique({
+      where: { id: crmId },
+      select: { id: true, companyName: true },
+    });
+
+    if (!companyHQ) {
+      console.error(`❌ CompanyHQ not found: ${crmId}`);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'CompanyHQ not found. The companyHQId may be incorrect.',
+          details: { requestedCompanyHQId: crmId },
+        },
+        { status: 404 },
+      );
+    }
+
+    console.log(`✅ Membership verified: Owner ${owner.id} has ${membership.role} role in CompanyHQ ${crmId} (${companyHQ.companyName})`);
     const { firstName, lastName, email } = body;
 
     // Validate required fields

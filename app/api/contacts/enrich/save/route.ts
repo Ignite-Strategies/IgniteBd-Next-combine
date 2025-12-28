@@ -31,8 +31,9 @@ import {
  * }
  */
 export async function POST(request: Request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { contactId, redisKey, companyId, previewId, skipIntelligence } = body;
+    const { contactId, redisKey, companyId, previewId, skipIntelligence, companyHQId } = body;
 
     // Validate inputs
     if (!contactId) {
@@ -75,7 +76,38 @@ export async function POST(request: Request) {
     }
 
     // Get companyHQId from request body (should match contact's crmId)
-    const { companyHQId } = body;
+    // If not provided, use contact's crmId
+    const targetCompanyHQId = companyHQId || existingContact.crmId;
+    
+    // CRITICAL: Verify user has membership in this CompanyHQ
+    if (targetCompanyHQId) {
+      const owner = await prisma.owners.findUnique({
+        where: { firebaseId: firebaseUser.uid },
+        select: { id: true },
+      });
+
+      if (owner) {
+        const { resolveMembership } = await import('@/lib/membership');
+        const { membership } = await resolveMembership(owner.id, targetCompanyHQId);
+        
+        if (!membership) {
+          console.error(`❌ ACCESS DENIED: Owner ${owner.id} attempted to enrich contact in CompanyHQ ${targetCompanyHQId} without membership`);
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Forbidden: No membership in this CompanyHQ. Please switch to a CompanyHQ you have access to.',
+              details: {
+                requestedCompanyHQId: targetCompanyHQId,
+                contactCrmId: existingContact.crmId,
+                ownerId: owner.id,
+              },
+            },
+            { status: 403 },
+          );
+        }
+        console.log(`✅ Membership verified: Owner ${owner.id} has ${membership.role} role in CompanyHQ ${targetCompanyHQId}`);
+      }
+    }
     
     // Validate that contact belongs to the companyHQ being used (if provided)
     if (companyHQId && existingContact.crmId !== companyHQId) {
