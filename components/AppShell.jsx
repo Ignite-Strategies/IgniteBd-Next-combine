@@ -66,8 +66,12 @@ export default function AppShell({ children }) {
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  // Show navigation when authenticated
-  if (isAuthenticated) {
+  // Routes that should never show navigation (even when authenticated)
+  const PUBLIC_ROUTES = ['/'];
+  const isPublicRoute = pathname && PUBLIC_ROUTES.includes(pathname);
+
+  // Show navigation when authenticated, but not on public routes like splash
+  if (isAuthenticated && !isPublicRoute) {
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation Bar - Global component */}
@@ -83,6 +87,6 @@ export default function AppShell({ children }) {
     );
   }
 
-  // For unauthenticated routes, render children without navigation
+  // For unauthenticated routes or public routes (like splash), render children without navigation
   return <>{children}</>;
 }
