@@ -130,7 +130,9 @@ Create a warm, human, low-pressure outreach message template using VARIABLE TAGS
 
 Return ONLY valid JSON in this exact format:
 {
-  "content": "The email template with {{variableName}} tags for dynamic content",
+  "title": "Template title/name (e.g., 'Reconnecting with {{typeOfPerson}} - {{relationship}}')",
+  "subject": "Email subject line with {{variables}} if needed (e.g., 'Hi {{firstName}}, long time no see')",
+  "content": "The email body template with {{variableName}} tags for dynamic content",
   "suggestedVariables": ["firstName", "companyName", etc.]
 }
 
@@ -190,6 +192,8 @@ Use {{variableName}} ONLY for contact-specific data that will be filled in later
 If relationship="DORMANT", typeOfPerson="FORMER_COWORKER", timeSinceConnected="a long time", timeHorizon="2026", myBusinessDescription="my own NDA house", desiredOutcome="see if we can collaborate":
 
 {
+  "title": "Reconnecting with Former Co-worker - Dormant Relationship",
+  "subject": "Hi {{firstName}}, long time no see",
   "content": "Hi {{firstName}},\\n\\nI know it's been a long time since we connected. I saw you recently started working at {{companyName}}.\\n\\nNot sure if you knew, but I run my own NDA house.\\n\\nLet's get together in 2026 — see if we can collaborate and get some NDA work from you.\\n\\nNo pressure at all — just wanted to reach out.\\n\\nCheers to what's ahead!\\n\\nJoel",
   "suggestedVariables": ["firstName", "companyName"]
 }
@@ -197,6 +201,8 @@ If relationship="DORMANT", typeOfPerson="FORMER_COWORKER", timeSinceConnected="a
 If relationship="ESTABLISHED", typeOfPerson="FRIEND_OF_FRIEND", whatWantFromThem="catch up":
 
 {
+  "title": "Catching up with Friend - Established Relationship",
+  "subject": "Hi {{firstName}}, would love to catch up",
   "content": "Hi {{firstName}},\\n\\nHope you're doing well! Been thinking about you and wanted to reach out.\\n\\nWould love to catch up if you're open to it — maybe grab coffee or lunch?\\n\\nNo pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nCheers,\\nJoel",
   "suggestedVariables": ["firstName"]
 }
