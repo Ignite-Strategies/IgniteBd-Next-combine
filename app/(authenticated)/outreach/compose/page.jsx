@@ -30,7 +30,8 @@ function ComposeContent() {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateVariables, setTemplateVariables] = useState([]);
-  const [showVariablesHelp, setShowVariablesHelp] = useState(false);
+  // Always show variables - no need for state since it's always visible
+  // const [showVariablesHelp, setShowVariablesHelp] = useState(true); // Always show - removed state
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
@@ -73,13 +74,13 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates when ownerId is available
+  // Load templates when ownerId is available - NON-BLOCKING (load in background)
   useEffect(() => {
     if (!ownerId) return;
 
+    // Load templates asynchronously without blocking render
     const loadTemplates = async () => {
       try {
-        setLoadingTemplates(true);
         const response = await api.get(`/api/templates?ownerId=${ownerId}`);
         if (response.data?.success) {
           setTemplates(response.data.templates || []);
@@ -91,6 +92,8 @@ function ComposeContent() {
       }
     };
 
+    // Start loading (but don't wait for it)
+    setLoadingTemplates(true);
     loadTemplates();
   }, [ownerId]); // Removed 'owner' from dependencies to avoid unnecessary re-renders
 
@@ -291,7 +294,7 @@ function ComposeContent() {
   };
 
   const handleBuildAndPreview = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     
     // If template is selected, validate that we have required fields
     // Otherwise, validate manual input
@@ -343,8 +346,23 @@ function ComposeContent() {
       });
 
       if (response.data?.success) {
-        // Step 2: Navigate to preview page
-        window.location.href = `/outreach/compose/preview?requestId=${response.data.requestId}`;
+        // Step 2: Load preview from Redis and show in modal
+        const previewResponse = await api.get(`/api/outreach/preview?requestId=${response.data.requestId}`);
+        
+        if (previewResponse.data?.success) {
+          setPreviewData({
+            requestId: response.data.requestId,
+            preview: previewResponse.data.preview || previewResponse.data.payload,
+            original: {
+              subject: subject || '',
+              body: body || '',
+              templateId: selectedTemplateId,
+            },
+          });
+          setShowPreviewModal(true);
+        } else {
+          setError(previewResponse.data?.error || 'Failed to load preview');
+        }
       } else {
         setError(response.data?.error || 'Failed to build payload');
         setSending(false);
@@ -566,121 +584,137 @@ function ComposeContent() {
                 )}
               </div>
 
-              {/* Variables Helper Section */}
+              {/* Variables Helper Section - Always Visible, Clickable */}
               <div className="border border-gray-200 rounded-lg bg-gray-50">
-                <button
-                  type="button"
-                  onClick={() => setShowVariablesHelp(!showVariablesHelp)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-100 transition"
-                >
+                <div className="px-4 py-3 border-b border-gray-200">
                   <div className="flex items-center gap-2">
                     <Info className="h-4 w-4 text-gray-600" />
                     <span className="text-sm font-medium text-gray-700">
                       {selectedTemplateId && templateVariables.length > 0
-                        ? `Template Variables (${templateVariables.length} found)`
-                        : 'Available Variables'}
+                        ? `Template Variables (${templateVariables.length} found) - Click to insert`
+                        : 'Available Variables - Click to insert'}
                     </span>
                   </div>
-                  {showVariablesHelp ? (
-                    <ChevronUp className="h-4 w-4 text-gray-600" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-gray-600" />
-                  )}
-                </button>
+                </div>
                 
-                {showVariablesHelp && (
-                  <div className="px-4 pb-4 border-t border-gray-200 pt-4">
-                    {selectedTemplateId && templateVariables.length > 0 ? (
-                      <div>
-                        <p className="text-xs font-medium text-gray-700 mb-2">
-                          Variables found in selected template:
-                        </p>
-                        <div className="space-y-2">
-                          {templateVariables.map((varName) => {
-                            const varDef = VariableCatalogue[varName];
-                            return (
-                              <div key={varName} className="flex items-start gap-2 text-xs">
-                                <code className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-mono">
-                                  {`{{${varName}}}`}
-                                </code>
-                                <span className="text-gray-600 flex-1">
-                                  {varDef?.description || `Variable: ${varName}`}
-                                  {contactId && varDef && (
-                                    <span className="text-gray-400 ml-1">
-                                      • Maps to: {varDef.dbField || varDef.source}
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {!contactId && (
-                          <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                            💡 Select a contact to see how variables will be resolved from the database.
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-xs font-medium text-gray-700 mb-2">
-                          Available variables you can use:
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {Object.entries(VariableCatalogue).map(([key, def]) => (
-                            <div key={key} className="flex items-start gap-2 text-xs">
+                <div className="px-4 pb-4 pt-4">
+                  {selectedTemplateId && templateVariables.length > 0 ? (
+                    <div>
+                      <p className="text-xs font-medium text-gray-700 mb-2">
+                        Variables found in selected template (click to insert):
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {templateVariables.map((varName) => {
+                          const varDef = VariableCatalogue[varName];
+                          return (
+                            <button
+                              key={varName}
+                              type="button"
+                              onClick={() => {
+                                // Insert variable at cursor position in body textarea
+                                const textarea = document.getElementById('body');
+                                if (textarea) {
+                                  const start = textarea.selectionStart || 0;
+                                  const end = textarea.selectionEnd || 0;
+                                  const variableText = `{{${varName}}}`;
+                                  const newBody = body.substring(0, start) + variableText + body.substring(end);
+                                  setBody(newBody);
+                                  // Set cursor position after inserted variable
+                                  setTimeout(() => {
+                                    textarea.focus();
+                                    textarea.setSelectionRange(start + variableText.length, start + variableText.length);
+                                  }, 0);
+                                }
+                              }}
+                              className="text-left flex items-start gap-2 text-xs p-2 rounded hover:bg-blue-50 transition cursor-pointer border border-transparent hover:border-blue-200"
+                            >
                               <code className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-mono whitespace-nowrap">
-                                {`{{${key}}}`}
+                                {`{{${varName}}}`}
                               </code>
-                              <span className="text-gray-600">
-                                {def.description}
+                              <span className="text-gray-600 flex-1">
+                                {varDef?.description || `Variable: ${varName}`}
+                                {contactId && varDef && (
+                                  <span className="text-gray-400 ml-1">
+                                    • Maps to: {varDef.dbField || varDef.source}
+                                  </span>
+                                )}
                               </span>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="mt-3 text-xs text-gray-600">
-                          💡 Variables are automatically resolved from the database when you select a contact and template.
-                        </p>
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
-                )}
+                      {!contactId && (
+                        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                          💡 Select a contact to see how variables will be resolved from the database.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs font-medium text-gray-700 mb-2">
+                        Available variables you can use (click to insert):
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {Object.entries(VariableCatalogue).map(([key, def]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              // Insert variable at cursor position in body textarea
+                              const textarea = document.getElementById('body');
+                              if (textarea) {
+                                const start = textarea.selectionStart || 0;
+                                const end = textarea.selectionEnd || 0;
+                                const variableText = `{{${key}}}`;
+                                const newBody = body.substring(0, start) + variableText + body.substring(end);
+                                setBody(newBody);
+                                // Set cursor position after inserted variable
+                                setTimeout(() => {
+                                  textarea.focus();
+                                  textarea.setSelectionRange(start + variableText.length, start + variableText.length);
+                                }, 0);
+                              }
+                            }}
+                            className="text-left flex items-start gap-2 text-xs p-2 rounded hover:bg-blue-50 transition cursor-pointer border border-transparent hover:border-blue-200"
+                          >
+                            <code className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-mono whitespace-nowrap">
+                              {`{{${key}}}`}
+                            </code>
+                            <span className="text-gray-600">
+                              {def.description}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-xs text-gray-600">
+                        💡 Variables are automatically resolved from the database when you select a contact and template.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={handlePreview}
-                  disabled={previewLoading || !ownerId || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
-                  className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {previewLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-4 w-4" />
-                      Preview
-                    </>
-                  )}
-                </button>
-                <button
-                  type="submit"
-                  disabled={sending || !ownerId}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    // First build payload, then show preview
+                    await handleBuildAndPreview(e);
+                  }}
+                  disabled={previewLoading || sending || !ownerId || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
                   className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {sending ? (
+                  {previewLoading || sending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Building...
                     </>
                   ) : (
                     <>
-                      <Send className="h-4 w-4" />
-                      Build & Preview
+                      <Eye className="h-4 w-4" />
+                      Preview
                     </>
                   )}
                 </button>
