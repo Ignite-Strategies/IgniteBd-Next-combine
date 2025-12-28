@@ -118,7 +118,7 @@ export async function GET(request) {
  * - description (optional)
  * - companyHQId (optional) - if not provided, uses owner's primary companyHQ
  * - contactIds (optional) - array of contact IDs to add to the list
- * - campaignId (optional) - link to campaign if this list is for a specific campaign
+ * - filters (optional) - filter criteria for smart lists (e.g., { filterType: "stage", pipeline: "prospect" })
  * 
  * Returns:
  * - success: boolean
@@ -137,7 +137,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { ownerId, title, description, companyHQId, contactIds, campaignId } = body;
+    const { ownerId, title, description, companyHQId, contactIds, filters } = body;
 
     // Validate required fields
     if (!ownerId) {
@@ -199,7 +199,7 @@ export async function POST(request) {
         name: title.trim(), // title -> name in schema
         description: description?.trim() || null,
         type: 'static', // Default to static for simple lists
-        filters: campaignId ? { campaignId } : null, // Store campaignId in filters if provided
+        filters: filters || null, // Store filter criteria (no campaign logic here)
         totalContacts: 0,
         isActive: true,
       },
@@ -251,7 +251,6 @@ export async function POST(request) {
       type: updatedList.type,
       totalContacts: updatedList._count.contacts,
       companyHQId: resolvedCompanyHQId,
-      campaignId: campaignId || null, // Include campaignId if provided
       createdAt: updatedList.createdAt.toISOString(),
       updatedAt: updatedList.updatedAt.toISOString(),
     };
