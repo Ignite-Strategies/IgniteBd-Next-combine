@@ -14,7 +14,7 @@ import { VariableCatalogue, extractVariableNames } from '@/lib/services/variable
 function ComposeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { ownerId } = useOwner();
+  const { ownerId, owner } = useOwner();
   const { companyHQId } = useCompanyHQ();
   
   // Form state
@@ -73,7 +73,7 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates when ownerId is available
+  // Load templates and signature when ownerId is available
   useEffect(() => {
     if (!ownerId) return;
 
@@ -91,8 +91,24 @@ function ComposeContent() {
       }
     };
 
+    // Load signature from owner
+    if (owner?.emailSignature) {
+      setEmailSignature(owner.emailSignature);
+      setIncludeSignature(true);
+    } else {
+      // Try fetching from API as fallback
+      api.get(`/api/owner/${ownerId}`).then((response) => {
+        if (response.data?.success && response.data.owner?.emailSignature) {
+          setEmailSignature(response.data.owner.emailSignature);
+          setIncludeSignature(true);
+        }
+      }).catch(() => {
+        // Ignore errors - signature is optional
+      });
+    }
+
     loadTemplates();
-  }, [ownerId]);
+  }, [ownerId, owner]);
 
   // Load sender email (needed for build-payload)
   useEffect(() => {
@@ -243,11 +259,17 @@ function ComposeContent() {
     setPreviewData(null);
 
     try {
+      // Append signature to body if enabled and signature exists
+      let finalBody = body || '';
+      if (includeSignature && emailSignature) {
+        finalBody = finalBody + '\n\n' + emailSignature;
+      }
+      
       // Build payload and save to Redis (same as Build & Preview, but show modal instead of navigating)
       const response = await api.post('/api/outreach/build-payload', {
         to,
         subject: subject || '',
-        body: body || '',
+        body: finalBody,
         senderEmail,
         senderName: senderName || undefined,
         contactId: contactId || undefined,
@@ -317,12 +339,18 @@ function ComposeContent() {
     setSuccess(false);
 
     try {
+      // Append signature to body if enabled and signature exists
+      let finalBody = body || '';
+      if (includeSignature && emailSignature) {
+        finalBody = finalBody + '\n\n' + emailSignature;
+      }
+      
       // Step 1: Build payload and save to Redis
       // Template (if selected) will be hydrated in build-payload route
       const response = await api.post('/api/outreach/build-payload', {
         to,
         subject: subject || '', // May be empty if using template
-        body: body || '', // May be empty if using template
+        body: finalBody, // May be empty if using template, includes signature if enabled
         senderEmail,
         senderName: senderName || undefined,
         contactId: contactId || undefined,
@@ -497,6 +525,40 @@ function ComposeContent() {
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
               </div>
+
+              {/* Signature Option */}
+              {emailSignature && (
+                <div className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="includeSignature"
+                    checked={includeSignature}
+                    onChange={(e) => setIncludeSignature(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="includeSignature" className="block text-sm font-medium text-gray-700 cursor-pointer">
+                      Include email signature
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Your signature will be added at the end of the email
+                    </p>
+                    {includeSignature && (
+                      <div 
+                        className="mt-2 text-xs text-gray-600 border border-gray-200 rounded p-2 bg-white"
+                        dangerouslySetInnerHTML={{ __html: emailSignature }}
+                      />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open('/settings?section=profile', '_blank')}
+                    className="text-xs text-blue-600 hover:text-blue-700 whitespace-nowrap"
+                  >
+                    Edit signature
+                  </button>
+                </div>
+              )}
 
               {/* Body */}
               <div>
