@@ -28,7 +28,7 @@ export default function SettingsPage() {
     email: '',
     title: '',
     yearsAtCompany: '',
-    emailSignature: '',
+    // emailSignature: '', // TODO: Re-enable after relational model is implemented
   });
   
   // Company form state
@@ -166,7 +166,7 @@ export default function SettingsPage() {
         email: owner.email || '',
         title: '', // TODO: Add title field to Owner model
         yearsAtCompany: '', // TODO: Add yearsAtCompany field to Owner model
-        emailSignature: owner.emailSignature || '',
+        // emailSignature: owner.emailSignature || '', // TODO: Re-enable after relational model
       });
     }
     
@@ -227,7 +227,7 @@ export default function SettingsPage() {
         firstName: profileData.firstName || null,
         lastName: profileData.lastName || null,
         email: profileData.email,
-        emailSignature: profileData.emailSignature || null,
+        // emailSignature: profileData.emailSignature || null, // TODO: Re-enable after relational model
       });
 
       if (response.data.success) {
@@ -463,6 +463,7 @@ export default function SettingsPage() {
                       />
                     </div>
                   </div>
+                  {/* Email Signature - TODO: Re-enable after relational model is implemented
                   <div>
                     <label htmlFor="emailSignature" className="block text-sm font-medium text-gray-700 mb-1">
                       Email Signature
@@ -482,6 +483,7 @@ export default function SettingsPage() {
                       Use HTML tags like &lt;p&gt;, &lt;br&gt; for formatting
                     </p>
                   </div>
+                  */}
                   <div className="flex justify-end">
                     <button
                       type="submit"

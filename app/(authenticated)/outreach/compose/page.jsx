@@ -36,9 +36,9 @@ function ComposeContent() {
   const [previewData, setPreviewData] = useState(null);
   const [previewError, setPreviewError] = useState(null);
   
-  // Signature state
-  const [emailSignature, setEmailSignature] = useState('');
-  const [includeSignature, setIncludeSignature] = useState(true); // Default to true if signature exists
+  // Signature state - TODO: Re-enable after relational model is implemented
+  // const [emailSignature, setEmailSignature] = useState('');
+  // const [includeSignature, setIncludeSignature] = useState(true); // Default to true if signature exists
   
   // UI state
   const [sending, setSending] = useState(false);
