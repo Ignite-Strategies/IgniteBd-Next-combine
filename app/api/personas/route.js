@@ -74,7 +74,7 @@ export async function GET(request) {
             },
           },
         },
-        bdIntel: true,
+        bd_intels: true,
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -233,7 +233,7 @@ export async function POST(request) {
               },
             },
           },
-          bdIntel: true,
+          bd_intels: true,
         },
       });
     } else {
@@ -251,7 +251,7 @@ export async function POST(request) {
               },
             },
           },
-          bdIntel: true,
+          bd_intels: true,
         },
       });
     }

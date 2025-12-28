@@ -175,7 +175,7 @@ Generate BD intelligence.`;
     }
 
     // Create or update BdIntel
-    const bdIntel = await prisma.bdIntel.upsert({
+    const bdIntel = await prisma.bd_intels.upsert({
       where: { personaId },
       create: {
         personaId,

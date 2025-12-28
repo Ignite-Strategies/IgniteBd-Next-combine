@@ -43,7 +43,7 @@ export async function GET(request, { params }) {
             },
           },
         },
-        bdIntel: true,
+        bd_intels: true,
         companyHQ: {
           select: {
             id: true,
