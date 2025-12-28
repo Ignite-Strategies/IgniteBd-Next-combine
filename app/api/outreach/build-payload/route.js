@@ -46,6 +46,7 @@ export async function POST(request) {
     const body = await request.json();
     const { 
       to, 
+      toName, // Optional: recipient display name
       subject, 
       body: emailBody, 
       senderEmail,
@@ -137,6 +138,7 @@ export async function POST(request) {
           to: [{ 
             email: to,
             ...(toName && { name: toName }),
+          }],
           subject: finalSubject,
           // custom_args goes INSIDE personalizations (SendGrid requirement)
           ...(contactId || tenantId || campaignId || sequenceId || sequenceStepId ? {
