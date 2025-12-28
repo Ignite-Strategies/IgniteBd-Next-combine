@@ -482,7 +482,7 @@ function ContactListPreviewContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <button
                 type="button"
-                onClick={() => router.push(`/outreach/campaigns/new?contactListId=${createdListId}`)}
+                onClick={() => router.push(`/outreach/campaigns/create?contactListId=${createdListId}`)}
                 className="flex flex-col items-center gap-2 rounded-lg bg-white border-2 border-indigo-200 p-4 hover:border-indigo-400 hover:bg-indigo-50 transition"
               >
                 <Send className="h-6 w-6 text-indigo-600" />
@@ -500,7 +500,7 @@ function ContactListPreviewContent() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push(`/contacts/enrich?contactListId=${createdListId}`)}
+                onClick={() => router.push(`/contacts/enrich/csv?contactListId=${createdListId}`)}
                 className="flex flex-col items-center gap-2 rounded-lg bg-white border-2 border-purple-200 p-4 hover:border-purple-400 hover:bg-purple-50 transition"
               >
                 <Sparkles className="h-6 w-6 text-purple-600" />
