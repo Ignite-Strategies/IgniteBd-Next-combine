@@ -166,17 +166,19 @@ Use {{variableName}} ONLY for contact-specific data that will be filled in later
 - Context Notes: "${contextNotes || 'none'}" - Use any additional context notes to inform the message tone and content
 
 === REQUIREMENTS ===
-1. **Contact Variables Only**: Use {{variableName}} for contact-specific data from the list above (firstName, goesBy, lastName, fullName, companyName, title, seniority, department, city, state, country, email, phone, linkedinUrl). Choose variables that make sense for the context.
-2. **Bake in Context**: Time, business description, desired outcome should be PLAIN TEXT (not {{variables}})
-3. **Follow Logic Rules**: Apply the relationship-aware logic rules above
-4. **Human & Natural**: Write like a real person, not a sales bot
-5. **Low Pressure**: Always include a release valve that removes pressure
-6. **No Sales Language**: No CTAs, no calendar links, no "let's hop on a call"
-7. **Greeting**: Always start with "Hi {{firstName}}," or "Hi {{goesBy}}," (use goesBy for very casual/friendly relationships, firstName for more formal)
-8. **Company Context**: Use {{companyName}} when relevant to the conversation
-9. **Location Context**: Use {{city}} or {{state}} when mentioning local events or regional topics
-10. **Professional Context**: Use {{title}} or {{seniority}} when relevant to the ask or context
-11. **Signature**: End with a plain name like "Joel" or "Cheers, Joel"
+1. **Title**: Create a concise, descriptive title (e.g., "Reconnecting with Former Co-worker", "Catching up with Friend", "Outreach to Prospect"). Keep it under 60 characters. This is for template organization, not the email subject.
+2. **Subject**: Create a warm, personal email subject line. Should feel human and natural. Can use {{variables}} like {{firstName}}. Keep it under 80 characters. Examples: "Hi {{firstName}}, long time no see" or "Quick check-in, {{firstName}}".
+3. **Contact Variables Only**: Use {{variableName}} for contact-specific data from the list above (firstName, goesBy, lastName, fullName, companyName, title, seniority, department, city, state, country, email, phone, linkedinUrl). Choose variables that make sense for the context.
+4. **Bake in Context**: Time, business description, desired outcome should be PLAIN TEXT (not {{variables}})
+5. **Follow Logic Rules**: Apply the relationship-aware logic rules above
+6. **Human & Natural**: Write like a real person, not a sales bot
+7. **Low Pressure**: Always include a release valve that removes pressure
+8. **No Sales Language**: No CTAs, no calendar links, no "let's hop on a call"
+9. **Greeting**: Always start with "Hi {{firstName}}," or "Hi {{goesBy}}," (use goesBy for very casual/friendly relationships, firstName for more formal)
+10. **Company Context**: Use {{companyName}} when relevant to the conversation
+11. **Location Context**: Use {{city}} or {{state}} when mentioning local events or regional topics
+12. **Professional Context**: Use {{title}} or {{seniority}} when relevant to the ask or context
+13. **Signature**: End with a plain name like "Joel" or "Cheers, Joel"
 
 === TEMPLATE STRUCTURE ===
 1. **Warm Greeting**: "Hi {{firstName}}," or similar
@@ -255,20 +257,36 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
       throw new Error('AI response missing content field');
     }
 
-    // Extract variables from the generated content
-    const extractedVariables = extractVariableNames(parsed.content);
+    // Generate title if not provided (fallback)
+    const title = parsed.title || `Relationship: ${typeOfPerson} - ${relationship}`;
+    
+    // Generate subject if not provided (extract from first line of content or use default)
+    let subject = parsed.subject;
+    if (!subject || typeof subject !== 'string') {
+      // Fallback: extract first meaningful line from content or use a default
+      const firstLine = parsed.content.split('\\n')[0].replace(/{{.*?}}/g, '').trim();
+      subject = firstLine || `Hi {{firstName}}, ${whyReachingOut.substring(0, 50)}...`;
+    }
+
+    // Extract variables from both subject and content
+    const extractedVariablesFromContent = extractVariableNames(parsed.content);
+    const extractedVariablesFromSubject = extractVariableNames(subject);
     
     // Merge with AI's suggested variables
     const allVariables = Array.from(
       new Set([
-        ...extractedVariables,
+        ...extractedVariablesFromContent,
+        ...extractedVariablesFromSubject,
         ...(parsed.suggestedVariables || [])
       ])
     );
 
     return NextResponse.json({
       success: true,
-      template: parsed.content,
+      title: title.trim(),
+      subject: subject.trim(),
+      body: parsed.content.trim(), // Map content to body for Template model
+      template: parsed.content.trim(), // Keep for backward compatibility
       variables: allVariables, // Simple string array
     });
   } catch (error) {

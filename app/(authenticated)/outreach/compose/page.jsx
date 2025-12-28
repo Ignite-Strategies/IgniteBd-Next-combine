@@ -73,7 +73,7 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates and signature when ownerId is available
+  // Load templates when ownerId is available
   useEffect(() => {
     if (!ownerId) return;
 
@@ -91,24 +91,8 @@ function ComposeContent() {
       }
     };
 
-    // Load signature from owner - TODO: Re-enable after relational model is implemented
-    // if (owner?.emailSignature) {
-    //   setEmailSignature(owner.emailSignature);
-    //   setIncludeSignature(true);
-    // } else {
-    //   // Try fetching from API as fallback
-    //   api.get(`/api/owner/${ownerId}`).then((response) => {
-    //     if (response.data?.success && response.data.owner?.emailSignature) {
-    //       setEmailSignature(response.data.owner.emailSignature);
-    //       setIncludeSignature(true);
-    //     }
-    //   }).catch(() => {
-    //     // Ignore errors - signature is optional
-    //   });
-    // }
-
     loadTemplates();
-  }, [ownerId, owner]);
+  }, [ownerId]); // Removed 'owner' from dependencies to avoid unnecessary re-renders
 
   // Load sender email (needed for build-payload)
   useEffect(() => {
