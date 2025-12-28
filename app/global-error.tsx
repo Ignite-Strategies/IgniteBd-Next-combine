@@ -71,10 +71,10 @@ export default function GlobalError({
                 Try again
               </button>
               <button
-                onClick={() => (window.location.href = '/')}
+                onClick={() => (window.location.href = '/growth-dashboard')}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
               >
-                Go home
+                Go to Dashboard
               </button>
             </div>
           </div>

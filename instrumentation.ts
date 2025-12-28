@@ -18,13 +18,17 @@
 export async function register() {
   // Skip Sentry initialization during build to speed up builds (saves 2-4 minutes)
   // Sentry will still work at runtime, just not during the build process
+  // Also skip if explicitly disabled or in test environment
   if (
     process.env.NEXT_PHASE === 'phase-production-build' ||
-    process.env.SKIP_SENTRY_BUILD === 'true'
+    process.env.SKIP_SENTRY_BUILD === 'true' ||
+    process.env.NODE_ENV === 'test' ||
+    !process.env.SENTRY_DSN // Skip if no DSN configured
   ) {
     return;
   }
 
+  // Only initialize Sentry at runtime, not during build
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./sentry.server.config');
   }

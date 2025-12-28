@@ -1127,7 +1127,16 @@ function ComposeContent() {
 
 export default function ComposePage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-red-600" />
+            <p className="text-sm text-gray-600">Loading compose page...</p>
+          </div>
+        </div>
+      </div>
+    }>
       <ComposeContent />
     </Suspense>
   );
