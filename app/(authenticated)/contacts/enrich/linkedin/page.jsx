@@ -495,7 +495,7 @@ function LinkedInEnrichContent() {
                       <button
                         onClick={() => {
                           setShowSuccessModal(false);
-                          router.push(`/personas/builder?contactId=${savedContactId}`);
+                          router.push(`/personas/from-contact?contactId=${savedContactId}`);
                         }}
                         className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
                       >

@@ -96,7 +96,7 @@ export default function BuildFromContactsPage() {
   }, [contacts, selectedPipeline, selectedStage, searchQuery]);
 
   const handleContactSelect = (contactId) => {
-    router.push(`/personas/builder?contactId=${contactId}`);
+    router.push(`/personas/from-contact?contactId=${contactId}`);
   };
 
   const getPipelineBadgeColor = (pipeline) => {
