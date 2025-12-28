@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Navigation from './Navigation';
+import { CompanyHQContextHeader } from './CompanyHQContextHeader';
 
 const ROUTES_WITH_SIDEBAR = [
   '/growth-dashboard',
@@ -76,6 +77,9 @@ export default function AppShell({ children }) {
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation Bar - Global component */}
         <Navigation />
+        
+        {/* CompanyHQ Context Header - Shows current company and role */}
+        <CompanyHQContextHeader />
         
         {/* Sidebar - Only render when showSidebar is true */}
         {showSidebar && <Sidebar />}
