@@ -55,13 +55,14 @@ function CampaignEditContent({ params }) {
     }
   }, [campaignId, companyHQId]);
 
-  // Load template content when template is selected
+  // Load template content when template is selected (template is source of truth)
   useEffect(() => {
     if (selectedTemplateId && templates.length > 0 && emailMode === 'template') {
       const template = templates.find(t => t.id === selectedTemplateId);
       if (template) {
-        setSubject(template.template_bases?.title || '');
-        setBody(template.content || '');
+        // Template is the source of truth - populate for preview but don't allow editing
+        setSubject(template.subject || template.template_bases?.title || '');
+        setBody(template.body || template.content || '');
       }
     }
   }, [selectedTemplateId, templates, emailMode]);
@@ -77,12 +78,26 @@ function CampaignEditContent({ params }) {
         setDescription(campaign.description || '');
         setSelectedListId(campaign.contact_list_id || null);
         setSelectedTemplateId(campaign.template_id || null);
+        
+        // Smart routing: If template_id exists, use template mode (template is source of truth)
         if (campaign.template_id) {
           setEmailMode('template');
+          // Use effective content (template takes precedence)
+          const effectiveContent = campaign.effectiveContent || {
+            subject: campaign.subject || '',
+            body: campaign.body || '',
+            preview_text: campaign.preview_text || '',
+          };
+          setSubject(effectiveContent.subject || '');
+          setBody(effectiveContent.body || '');
+          setPreviewText(effectiveContent.preview_text || '');
+        } else {
+          // Manual mode - use direct fields
+          setEmailMode('manual');
+          setSubject(campaign.subject || '');
+          setPreviewText(campaign.preview_text || '');
+          setBody(campaign.body || '');
         }
-        setSubject(campaign.subject || '');
-        setPreviewText(campaign.preview_text || '');
-        setBody(campaign.body || '');
       } else {
         setError('Campaign not found');
       }
@@ -138,15 +153,20 @@ function CampaignEditContent({ params }) {
         name: name.trim(),
         description: description.trim() || null,
         contact_list_id: selectedListId || null,
-        subject: subject.trim() || null,
-        preview_text: previewText.trim() || null,
-        body: body.trim() || null,
+        preview_text: previewText.trim() || null, // Always allow preview text
       };
 
+      // Smart routing: template_id is the bolt-on that does the work
       if (emailMode === 'template' && selectedTemplateId) {
+        // Template mode: template_id is source of truth, clear manual content
         updateData.template_id = selectedTemplateId;
+        // Don't send subject/body - template provides them
+        // But keep preview_text (not in template)
       } else {
+        // Manual mode: clear template_id, use manual content
         updateData.template_id = null;
+        updateData.subject = subject.trim() || null;
+        updateData.body = body.trim() || null;
       }
 
       const response = await api.patch(`/api/campaigns/${campaignId}`, updateData);
@@ -410,22 +430,65 @@ function CampaignEditContent({ params }) {
               </div>
             )}
 
-            {/* Email Fields */}
+            {/* Email Fields - Smart routing based on template_id */}
             <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Email Subject {emailMode === 'manual' && '*'}
-                </label>
-                <input
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Ready to accelerate your 2025 pipeline?"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={emailMode === 'template' && selectedTemplateId}
-                  required={emailMode === 'manual'}
-                />
-              </div>
+              {emailMode === 'template' && selectedTemplateId ? (
+                // Template mode: Show template content (read-only, template is source of truth)
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <p className="mb-2 text-xs font-semibold text-blue-800">
+                    Using Template Content (Template is source of truth)
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-gray-700">
+                        Subject (from template)
+                      </label>
+                      <div className="rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        {subject || 'No subject in template'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-gray-700">
+                        Body (from template)
+                      </label>
+                      <div className="max-h-40 overflow-y-auto rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 whitespace-pre-wrap">
+                        {body || 'No body in template'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Manual mode: Allow editing
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Email Subject *
+                    </label>
+                    <input
+                      type="text"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="Ready to accelerate your 2025 pipeline?"
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Email Body *
+                    </label>
+                    <textarea
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      rows={10}
+                      placeholder="Write your email content here..."
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+              {/* Preview text is always editable (not in template) */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Preview Text
@@ -436,20 +499,6 @@ function CampaignEditContent({ params }) {
                   rows={2}
                   placeholder="Short snippet that shows in inbox previews."
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Email Body {emailMode === 'manual' && '*'}
-                </label>
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  rows={10}
-                  placeholder="Write your email content here..."
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={emailMode === 'template' && selectedTemplateId}
-                  required={emailMode === 'manual'}
                 />
               </div>
             </div>

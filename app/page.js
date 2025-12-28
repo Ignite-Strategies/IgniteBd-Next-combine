@@ -9,15 +9,19 @@ export default function RootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace('/welcome');
-      } else {
-        router.replace('/signup');
-      }
-    });
+    let unsubscribe;
+    const timer = setTimeout(() => {
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          router.replace('/welcome');
+        } else {
+          router.replace('/signup');
+        }
+      });
+    }, 1500);
 
     return () => {
+      clearTimeout(timer);
       if (unsubscribe) {
         unsubscribe();
       }

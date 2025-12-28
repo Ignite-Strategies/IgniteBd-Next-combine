@@ -174,8 +174,28 @@ export default function CampaignsPage() {
                       <p className="mt-1 text-sm text-gray-600">{campaign.description}</p>
                     )}
                     <p className="mt-2 text-sm text-gray-600">
-                      {campaign.subject || 'No email subject assigned yet.'}
+                      {campaign.effectiveContent?.subject || campaign.subject || 'No email subject assigned yet.'}
                     </p>
+                    {/* Show inferred state badges */}
+                    {campaign.state && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {campaign.state.isSaved && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                            Saved
+                          </span>
+                        )}
+                        {campaign.state.isReadyToSend && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                            Ready to Send
+                          </span>
+                        )}
+                        {campaign.state.hasTemplate && (
+                          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">
+                            Template
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2 text-right text-sm text-gray-500 md:ml-4">
                     {campaign.contact_lists && (

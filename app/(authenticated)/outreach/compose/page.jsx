@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, Mail, Loader2, CheckCircle2, Plus, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
@@ -10,6 +11,8 @@ import { useOwner } from '@/hooks/useOwner';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 function ComposeContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { ownerId } = useOwner();
   const { companyHQId } = useCompanyHQ();
   
@@ -21,6 +24,9 @@ function ComposeContent() {
   const [body, setBody] = useState('');
   const [contactId, setContactId] = useState('');
   const [tenantId, setTenantId] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   
   // UI state
   const [sending, setSending] = useState(false);
@@ -29,6 +35,8 @@ function ComposeContent() {
   
   // Verified sender state - managed by SenderIdentityPanel, we just track it for validation
   const [hasVerifiedSender, setHasVerifiedSender] = useState(false);
+  const [senderEmail, setSenderEmail] = useState(null);
+  const [senderName, setSenderName] = useState(null);
   
   // Quick contact creation modal
   const [showQuickContactModal, setShowQuickContactModal] = useState(false);
@@ -45,11 +53,74 @@ function ComposeContent() {
     if (!ownerId) {
       // Auth state changed - user logged out or not authenticated
       setHasVerifiedSender(false);
+      setSenderEmail(null);
+      setSenderName(null);
       setError(null);
       setSuccess(false);
       // Don't clear form fields - let user keep their work
     }
   }, [ownerId]);
+
+  // Load templates when ownerId is available
+  useEffect(() => {
+    if (!ownerId) return;
+
+    const loadTemplates = async () => {
+      try {
+        setLoadingTemplates(true);
+        const response = await api.get(`/api/templates?ownerId=${ownerId}`);
+        if (response.data?.success) {
+          setTemplates(response.data.templates || []);
+        }
+      } catch (err) {
+        console.error('Failed to load templates:', err);
+      } finally {
+        setLoadingTemplates(false);
+      }
+    };
+
+    loadTemplates();
+  }, [ownerId]);
+
+  // Load sender email (needed for build-payload)
+  useEffect(() => {
+    if (!ownerId) return;
+
+    const loadSender = async () => {
+      try {
+        const response = await api.get('/api/outreach/verified-senders');
+        if (response.data?.success) {
+          setSenderEmail(response.data.verifiedEmail);
+          setSenderName(response.data.verifiedName);
+        }
+      } catch (err) {
+        console.error('Failed to load sender:', err);
+      }
+    };
+
+    loadSender();
+  }, [ownerId]);
+
+  // Handle contactId from URL params (when navigating from success modal)
+  useEffect(() => {
+    const urlContactId = searchParams?.get('contactId');
+    if (urlContactId && urlContactId !== contactId && ownerId) {
+      // Fetch contact and select it
+      const fetchAndSelectContact = async () => {
+        try {
+          const response = await api.get(`/api/contacts/${urlContactId}`);
+          if (response.data?.success && response.data?.contact) {
+            const contact = response.data.contact;
+            handleContactSelect(contact, null);
+          }
+        } catch (err) {
+          console.error('Failed to load contact from URL:', err);
+        }
+      };
+      fetchAndSelectContact();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, ownerId]);
   
   // Quick contact creation
   const handleQuickSaveContact = async () => {
@@ -104,11 +175,35 @@ function ComposeContent() {
     }
   };
 
-  const handleSend = async (e) => {
+  // Handle template selection - populate subject and body if template selected
+  useEffect(() => {
+    if (!selectedTemplateId || !templates.length) return;
+
+    const template = templates.find(t => t.id === selectedTemplateId);
+    if (template) {
+      // Only populate if fields are empty (don't overwrite user edits)
+      if (!subject) {
+        setSubject(template.subject || '');
+      }
+      if (!body) {
+        setBody(template.body || '');
+      }
+    }
+  }, [selectedTemplateId, templates]);
+
+  const handleBuildAndPreview = async (e) => {
     e.preventDefault();
     
-    if (!to || !subject || !body) {
-      setError('Please fill in all required fields');
+    // If template is selected, validate that we have required fields
+    // Otherwise, validate manual input
+    if (!selectedTemplateId && (!to || !subject || !body)) {
+      setError('Please fill in all required fields or select a template');
+      return;
+    }
+
+    // If template is selected but no to/contact, still need recipient
+    if (!to) {
+      setError('Please specify a recipient (To field or select a contact)');
       return;
     }
 
@@ -118,8 +213,8 @@ function ComposeContent() {
       return;
     }
 
-    // Check for verified sender - SenderIdentityPanel manages this, we just validate
-    if (!hasVerifiedSender) {
+    // Check for verified sender
+    if (!hasVerifiedSender || !senderEmail) {
       setError('Please verify your sender email before sending. Click "Add" next to From field.');
       return;
     }
@@ -129,53 +224,39 @@ function ComposeContent() {
     setSuccess(false);
 
     try {
-      // Send email directly - no template variable replacement
-      const response = await api.post('/api/outreach/send', {
+      // Step 1: Build payload and save to Redis
+      // Template (if selected) will be hydrated in build-payload route
+      const response = await api.post('/api/outreach/build-payload', {
         to,
-        toName: toName || undefined,
-        subject,
-        body,
+        subject: subject || '', // May be empty if using template
+        body: body || '', // May be empty if using template
+        senderEmail,
+        senderName: senderName || undefined,
         contactId: contactId || undefined,
         tenantId: tenantId || undefined,
+        templateId: selectedTemplateId || undefined, // Optional: template becomes part of JSON payload
       });
 
-      if (response.data.success) {
-        setSuccess(true);
-        // Clear form
-        setTo('');
-        setToName('');
-        setSubject('');
-        setBody('');
-        setContactId('');
-        setTenantId('');
-        setSelectedContact(null);
-        
-        setTimeout(() => setSuccess(false), 3000);
+      if (response.data?.success) {
+        // Step 2: Navigate to preview page
+        window.location.href = `/outreach/compose/preview?requestId=${response.data.requestId}`;
       } else {
-        setError(response.data.error || 'Failed to send email');
+        setError(response.data?.error || 'Failed to build payload');
+        setSending(false);
       }
     } catch (err) {
-      console.error('Send error:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to send email';
+      console.error('Build payload error:', err);
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to build payload';
       const statusCode = err.response?.status;
       
       // Handle auth errors separately
       if (statusCode === 401 || errorMessage.includes('Authentication failed') || errorMessage.includes('Unauthorized')) {
         setError('Your session has expired. Please sign in again and try sending.');
-        setHasVerifiedSender(false); // Reset sender state on auth failure
+        setHasVerifiedSender(false);
         return;
       }
       
-      // Handle SendGrid-specific errors
-      if (errorMessage.includes('credits') || errorMessage.includes('exceeded')) {
-        setError('SendGrid account has exceeded email credits. Please upgrade your plan or wait for credits to reset. Contact your administrator for help.');
-      } else if (errorMessage.includes('not verified') || errorMessage.includes('sender')) {
-        setError(errorMessage);
-        setHasVerifiedSender(false); // Reset sender state if verification issue
-      } else {
-        setError(errorMessage);
-      }
-    } finally {
+      setError(errorMessage);
       setSending(false);
     }
   };
@@ -207,7 +288,7 @@ function ComposeContent() {
               </div>
             )}
 
-            <form onSubmit={handleSend} className="space-y-4">
+            <form onSubmit={handleBuildAndPreview} className="space-y-4">
               {/* Sender Identity - SenderIdentityPanel handles all sender logic */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -217,6 +298,15 @@ function ComposeContent() {
                   onSenderChange={(hasSender) => {
                     // Callback to track if sender is verified
                     setHasVerifiedSender(hasSender);
+                    // Reload sender email when sender changes
+                    if (hasSender && ownerId) {
+                      api.get('/api/outreach/verified-senders').then((response) => {
+                        if (response.data?.success) {
+                          setSenderEmail(response.data.verifiedEmail);
+                          setSenderName(response.data.verifiedName);
+                        }
+                      }).catch(console.error);
+                    }
                   }}
                 />
               </div>
@@ -273,6 +363,35 @@ function ComposeContent() {
                 />
               </div>
 
+              {/* Template Selector (Optional) */}
+              <div>
+                <label htmlFor="template" className="block text-sm font-medium text-gray-700 mb-1">
+                  Template (Optional)
+                </label>
+                <select
+                  id="template"
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="">None - Write manually</option>
+                  {loadingTemplates ? (
+                    <option disabled>Loading templates...</option>
+                  ) : templates.length === 0 ? (
+                    <option disabled>No templates available</option>
+                  ) : (
+                    templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.title}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select a template to auto-fill subject and body. Template variables will be hydrated with contact data.
+                </p>
+              </div>
+
               {/* Subject */}
               <div>
                 <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">
@@ -283,7 +402,7 @@ function ComposeContent() {
                   id="subject"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  required
+                  required={!selectedTemplateId}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
               </div>
@@ -298,10 +417,15 @@ function ComposeContent() {
                   id="body"
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  required
+                  required={!selectedTemplateId}
                   rows={10}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
+                {selectedTemplateId && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Template selected. Variables like {`{{firstName}}`}, {`{{companyName}}`} will be replaced with contact data.
+                  </p>
+                )}
               </div>
 
               {/* Send Button */}
@@ -314,12 +438,12 @@ function ComposeContent() {
                   {sending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Sending...
+                      Building...
                     </>
                   ) : (
                     <>
                       <Send className="h-4 w-4" />
-                      Send Email
+                      Build & Preview
                     </>
                   )}
                 </button>

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
+import { inferCampaignState, getEffectiveEmailContent } from '@/lib/services/campaignInference';
 
 /**
  * GET /api/campaigns
- * Get all campaigns for the authenticated owner
+ * Get all campaigns for the authenticated owner with inferred state
  */
 export async function GET(request) {
   try {
@@ -39,15 +40,12 @@ export async function GET(request) {
             totalContacts: true,
           },
         },
-        outreach_template: {
+        template: {
           select: {
             id: true,
-            content: true,
-            template_bases: {
-              select: {
-                title: true,
-              },
-            },
+            title: true,
+            subject: true,
+            body: true,
           },
         },
         email_activities: {
@@ -62,9 +60,21 @@ export async function GET(request) {
       },
     });
 
+    // Add inferred state to each campaign
+    const campaignsWithState = campaigns.map(campaign => {
+      const state = inferCampaignState(campaign);
+      const effectiveContent = getEffectiveEmailContent(campaign);
+      
+      return {
+        ...campaign,
+        state,
+        effectiveContent,
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      campaigns,
+      campaigns: campaignsWithState,
     });
   } catch (error) {
     console.error('Get campaigns error:', error);

@@ -3,6 +3,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { writePayload } from '@/lib/redis';
 import { randomUUID } from 'crypto';
+import { hydrateTemplate } from '@/lib/templateVariables';
 
 /**
  * POST /api/outreach/build-payload
@@ -54,6 +55,7 @@ export async function POST(request) {
       campaignId,
       sequenceId,
       sequenceStepId,
+      templateId, // Optional: if provided, hydrate template into body
     } = body;
     
     console.log('📦 Request body parsed:', {
@@ -63,11 +65,74 @@ export async function POST(request) {
       senderEmail,
       hasContactId: !!contactId,
       hasTenantId: !!tenantId,
+      hasTemplateId: !!templateId,
     });
     
+    // Step 3.5: Handle template hydration if templateId is provided
+    let finalSubject = subject;
+    let finalBody = emailBody;
+    let contactData = {};
+    
+    if (templateId) {
+      console.log('📧 Template ID provided, hydrating template...');
+      
+      // Fetch template
+      const template = await prisma.template.findUnique({
+        where: { id: templateId },
+        select: { subject: true, body: true },
+      });
+      
+      if (!template) {
+        return NextResponse.json(
+          { success: false, error: 'Template not found' },
+          { status: 404 }
+        );
+      }
+      
+      // Fetch contact data if contactId is provided (for variable hydration)
+      if (contactId) {
+        const contact = await prisma.contact.findUnique({
+          where: { id: contactId },
+          select: {
+            firstName: true,
+            lastName: true,
+            fullName: true,
+            goesBy: true,
+            email: true,
+            title: true,
+            companyName: true,
+            companyDomain: true,
+            updatedAt: true,
+          },
+        });
+        
+        if (contact) {
+          contactData = contact;
+        }
+      }
+      
+      // Hydrate template subject and body with contact data
+      // Template becomes part of the payload JSON (not assigned separately)
+      finalSubject = hydrateTemplate(template.subject, contactData, {});
+      finalBody = hydrateTemplate(template.body, contactData, {});
+      
+      console.log('✅ Template hydrated:', {
+        originalSubjectLength: template.subject.length,
+        originalBodyLength: template.body.length,
+        hydratedSubjectLength: finalSubject.length,
+        hydratedBodyLength: finalBody.length,
+      });
+    }
+    
     // Validation (minimal - just required fields)
-    if (!to || !subject || !emailBody || !senderEmail) {
-      console.error('❌ Missing required fields:', { to: !!to, subject: !!subject, body: !!emailBody, senderEmail: !!senderEmail });
+    // Note: If templateId is provided, finalBody will be from template
+    if (!to || !finalSubject || !finalBody || !senderEmail) {
+      console.error('❌ Missing required fields:', { 
+        to: !!to, 
+        subject: !!finalSubject, 
+        body: !!finalBody, 
+        senderEmail: !!senderEmail 
+      });
       return NextResponse.json(
         { success: false, error: 'to, subject, body, and senderEmail are required' },
         { status: 400 }
@@ -78,11 +143,12 @@ export async function POST(request) {
     console.log('🔨 Step 4: Building SendGrid payload...');
     // Build canonical SendGrid payload (EXACT format)
     // custom_args must be INSIDE personalizations[0], not at top level
+    // Template (if used) is already hydrated into finalSubject/finalBody - it's part of the JSON payload
     const msg = {
       personalizations: [
         {
           to: [{ email: to }],
-          subject: subject,
+          subject: finalSubject,
           // custom_args goes INSIDE personalizations (SendGrid requirement)
           ...(contactId || tenantId || campaignId || sequenceId || sequenceStepId ? {
             custom_args: {
@@ -103,7 +169,7 @@ export async function POST(request) {
       content: [
         {
           type: 'text/html',
-          value: emailBody,
+          value: finalBody,
         },
       ],
     };

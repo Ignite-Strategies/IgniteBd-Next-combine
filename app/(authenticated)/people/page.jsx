@@ -7,6 +7,7 @@ import {
   List,
   ArrowRight,
   RefreshCw,
+  Users,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -20,6 +21,16 @@ const ACTION_CARDS = [
     containerClasses:
       'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
     iconClasses: 'bg-blue-500 text-white',
+  },
+  {
+    id: 'manage',
+    title: 'Manage',
+    description: 'View all contacts and filter by deal stage.',
+    route: '/contacts/view',
+    icon: Users,
+    containerClasses:
+      'from-green-50 to-green-100 border-green-200 hover:border-green-400',
+    iconClasses: 'bg-green-500 text-white',
   },
   {
     id: 'outreach-prep',
