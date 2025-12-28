@@ -23,7 +23,8 @@ export default function CampaignCreatePage() {
 
       try {
         const response = await api.post('/api/campaigns', {
-          name: 'Untitled Campaign',
+          // Don't prefill name - let user set it in the builder
+          name: '',
           description: null,
           // company_hq_id is optional - can be null (matches template pattern)
           // Send it if available, but don't require it

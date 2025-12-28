@@ -1031,15 +1031,8 @@ function ComposeContent() {
         </div>
       )}
       
-      {/* Old preview modal code removed - replaced with split screen above */}
-      
       {/* Quick Contact Modal */}
-                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
-                  <p className="text-sm font-medium text-red-900">{previewError}</p>
-                </div>
-              )}
-
-              {previewData?.preview && (
+      {showQuickContactModal && (
                 <div className="space-y-6">
                   {/* Hydration Comparison - Show original vs hydrated if template is used */}
                   {selectedTemplateId && (
