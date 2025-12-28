@@ -259,17 +259,17 @@ function ComposeContent() {
     setPreviewData(null);
 
     try {
-      // Append signature to body if enabled and signature exists
-      let finalBody = body || '';
-      if (includeSignature && emailSignature) {
-        finalBody = finalBody + '\n\n' + emailSignature;
-      }
+      // Append signature to body if enabled and signature exists - TODO: Re-enable after relational model
+      // let finalBody = body || '';
+      // if (includeSignature && emailSignature) {
+      //   finalBody = finalBody + '\n\n' + emailSignature;
+      // }
       
       // Build payload and save to Redis (same as Build & Preview, but show modal instead of navigating)
       const response = await api.post('/api/outreach/build-payload', {
         to,
         subject: subject || '',
-        body: finalBody,
+        body: body || '', // finalBody removed - signature disabled
         senderEmail,
         senderName: senderName || undefined,
         contactId: contactId || undefined,
@@ -339,18 +339,18 @@ function ComposeContent() {
     setSuccess(false);
 
     try {
-      // Append signature to body if enabled and signature exists
-      let finalBody = body || '';
-      if (includeSignature && emailSignature) {
-        finalBody = finalBody + '\n\n' + emailSignature;
-      }
+      // Append signature to body if enabled and signature exists - TODO: Re-enable after relational model
+      // let finalBody = body || '';
+      // if (includeSignature && emailSignature) {
+      //   finalBody = finalBody + '\n\n' + emailSignature;
+      // }
       
       // Step 1: Build payload and save to Redis
       // Template (if selected) will be hydrated in build-payload route
       const response = await api.post('/api/outreach/build-payload', {
         to,
         subject: subject || '', // May be empty if using template
-        body: finalBody, // May be empty if using template, includes signature if enabled
+        body: body || '', // May be empty if using template
         senderEmail,
         senderName: senderName || undefined,
         contactId: contactId || undefined,

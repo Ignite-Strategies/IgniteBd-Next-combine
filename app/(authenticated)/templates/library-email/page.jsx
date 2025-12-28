@@ -80,7 +80,12 @@ function EmailTemplateLibraryContent() {
       const response = await api.delete(`/api/templates/${templateId}`);
       if (response.data?.success) {
         // Remove from list
-        setTemplates(templates.filter(t => t.id !== templateId));
+        const updatedTemplates = templates.filter(t => t.id !== templateId);
+        setTemplates(updatedTemplates);
+        // Update localStorage cache
+        if (ownerId) {
+          localStorage.setItem(`templates_${ownerId}`, JSON.stringify(updatedTemplates));
+        }
       } else {
         alert('Failed to delete template');
       }

@@ -21,7 +21,7 @@ import { verifyFirebaseToken, optionallyVerifyFirebaseToken } from '@/lib/fireba
  * - deliverableTemplates: Array of deliverable templates (or empty array)
  * - presentations: Array of presentations (or empty array)
  * - blogs: Array of blogs (or empty array)
- * - templates: Array of content templates (or empty array)
+ * - templates: REMOVED - Templates are owner-scoped, use /api/templates?ownerId=${ownerId} instead
  * - landingPages: Array of landing pages (or empty array)
  * - stats: Counts and metrics
  */
