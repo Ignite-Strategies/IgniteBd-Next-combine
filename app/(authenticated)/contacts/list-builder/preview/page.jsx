@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Users, Building2, Filter, Check, X, ArrowLeft, Save } from 'lucide-react';
+import { Search, Users, Building2, Filter, Check, X, ArrowLeft, Save, Mail, Sparkles, Send } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useContactLists } from '../../ContactListsContext';
@@ -30,6 +30,7 @@ function ContactListPreviewContent() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [createdListId, setCreatedListId] = useState(null);
   
   // Filter-specific state
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
@@ -180,16 +181,8 @@ function ContactListPreviewContent() {
         addList(createdList);
         setIsCreating(false);
         setError(null);
+        setCreatedListId(createdList.id);
         setSuccessMessage(`Contact list "${createdList.title || createdList.name}" created successfully with ${createdList.totalContacts || selectedContacts.size} contact${(createdList.totalContacts || selectedContacts.size) !== 1 ? 's' : ''}!`);
-        
-        // Redirect after showing success message
-        setTimeout(() => {
-          if (returnTo) {
-            router.push(returnTo);
-          } else {
-            router.push('/contacts/list-manager');
-          }
-        }, 2000);
       } else {
         setError(response.data?.error || 'Failed to create list');
         setIsCreating(false);
@@ -480,12 +473,56 @@ function ContactListPreviewContent() {
         )}
 
         {successMessage && (
-          <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4">
-            <div className="flex items-center gap-2">
-              <Check className="h-5 w-5 text-green-600" />
-              <p className="text-sm text-green-800 font-medium">{successMessage}</p>
+          <div className="mt-6 rounded-2xl bg-green-50 border-2 border-green-200 p-6 shadow-lg">
+            <div className="flex items-center gap-2 mb-4">
+              <Check className="h-6 w-6 text-green-600" />
+              <p className="text-base text-green-900 font-semibold">{successMessage}</p>
             </div>
-            <p className="text-xs text-green-700 mt-1">Redirecting...</p>
+            <p className="text-sm text-green-700 mb-4">What would you like to do next?</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/outreach/campaigns/new?contactListId=${createdListId}`)}
+                className="flex flex-col items-center gap-2 rounded-lg bg-white border-2 border-indigo-200 p-4 hover:border-indigo-400 hover:bg-indigo-50 transition"
+              >
+                <Send className="h-6 w-6 text-indigo-600" />
+                <span className="font-semibold text-gray-900">Start Campaign</span>
+                <span className="text-xs text-gray-600 text-center">Create an outreach campaign with this list</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/outreach/compose?contactListId=${createdListId}`)}
+                className="flex flex-col items-center gap-2 rounded-lg bg-white border-2 border-blue-200 p-4 hover:border-blue-400 hover:bg-blue-50 transition"
+              >
+                <Mail className="h-6 w-6 text-blue-600" />
+                <span className="font-semibold text-gray-900">1:1 Email</span>
+                <span className="text-xs text-gray-600 text-center">Send personalized emails to contacts</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/contacts/enrich?contactListId=${createdListId}`)}
+                className="flex flex-col items-center gap-2 rounded-lg bg-white border-2 border-purple-200 p-4 hover:border-purple-400 hover:bg-purple-50 transition"
+              >
+                <Sparkles className="h-6 w-6 text-purple-600" />
+                <span className="font-semibold text-gray-900">Enrich Contacts</span>
+                <span className="text-xs text-gray-600 text-center">Add more data to your contacts</span>
+              </button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-green-200">
+              <button
+                type="button"
+                onClick={() => {
+                  if (returnTo) {
+                    router.push(returnTo);
+                  } else {
+                    router.push('/contacts/list-manager');
+                  }
+                }}
+                className="text-sm text-green-700 hover:text-green-900 font-medium"
+              >
+                Or go back to {returnTo ? 'campaign' : 'list manager'} →
+              </button>
+            </div>
           </div>
         )}
       </div>
