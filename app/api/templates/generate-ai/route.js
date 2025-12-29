@@ -170,8 +170,8 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         normalized.body = normalized.body.replace(/\[Your name\]/g, ownerName);
       }
 
-      // Ensure subject is simple (no variables) - if it has variables, generate simple fallback
-      if (normalized.subject && normalized.subject.includes('{{')) {
+      // Ensure subject is simple (no variables) - if it has variables or looks like a greeting, generate simple fallback
+      if (normalized.subject && (normalized.subject.includes('{{') || normalized.subject.match(/^(Hi|Hey|Hello)[,\s]/i))) {
         // Extract simple subject from body context or use defaults
         if (normalized.body.toLowerCase().includes('collaboration')) {
           normalized.subject = 'Collaboration in 2026';
