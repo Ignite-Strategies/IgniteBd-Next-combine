@@ -204,7 +204,7 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
 
     // Generate subject if not provided (use simple default, NO variables)
     let subject = parsed.subject;
-    if (!subject || typeof subject !== 'string') {
+    if (!subject || typeof subject !== 'string' || subject.trim() === '') {
       // Default to simple subject based on inferred ask
       const inferred = parsed.inferred || {};
       if (inferred.ask) {
@@ -212,6 +212,20 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
                   inferred.relationship === 'DORMANT' ? 'Reconnecting' : 'Reaching Out';
       } else {
         subject = 'Reaching Out';
+      }
+    } else {
+      // Clean up subject - remove variables, trim, ensure it's simple
+      subject = subject.trim();
+      // If subject contains variables or looks like a greeting, replace with simple subject
+      if (subject.includes('{{') || subject.match(/^(Hi|Hey|Hello)[,\s]/i)) {
+        const inferred = parsed.inferred || {};
+        if (inferred.ask && inferred.ask.includes('collaboration')) {
+          subject = 'Collaboration in 2026';
+        } else if (inferred.relationship === 'DORMANT') {
+          subject = 'Reconnecting';
+        } else {
+          subject = 'Reaching Out';
+        }
       }
     }
 
