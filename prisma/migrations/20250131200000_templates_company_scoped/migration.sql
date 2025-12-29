@@ -24,35 +24,26 @@ WHERE t."companyHQId" IS NULL
     WHERE cm."userId" = t."ownerId"
   );
 
--- Step 2: For templates still without companyHQId, try owner's companyHQId directly
-UPDATE "templates" t
-SET "companyHQId" = o."companyHQId"
-FROM "owners" o
-WHERE t."companyHQId" IS NULL
-  AND t."ownerId" = o."id"
-  AND o."companyHQId" IS NOT NULL;
-
--- Step 3: Make companyHQId required (drop NOT NULL constraint first if needed, then add it)
+-- Step 2: Make companyHQId required
 -- First ensure all templates have companyHQId (delete any that don't - they're orphaned)
 DELETE FROM "templates" WHERE "companyHQId" IS NULL;
 
--- Step 4: Add NOT NULL constraint to companyHQId
+-- Step 3: Add NOT NULL constraint to companyHQId
 ALTER TABLE "templates" ALTER COLUMN "companyHQId" SET NOT NULL;
 
--- Step 5: Update foreign key constraint for company_hqs (ensure it's not nullable)
+-- Step 4: Update foreign key constraint for company_hqs (ensure it's not nullable)
 ALTER TABLE "templates" DROP CONSTRAINT IF EXISTS "templates_companyHQId_fkey";
 ALTER TABLE "templates" ADD CONSTRAINT "templates_companyHQId_fkey" 
   FOREIGN KEY ("companyHQId") REFERENCES "company_hqs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- Step 6: Make ownerId optional (drop NOT NULL constraint)
+-- Step 5: Make ownerId optional (drop NOT NULL constraint)
 ALTER TABLE "templates" ALTER COLUMN "ownerId" DROP NOT NULL;
 
--- Step 7: Update foreign key constraint for owners (change onDelete to SetNull since it's optional)
+-- Step 6: Update foreign key constraint for owners (change onDelete to SetNull since it's optional)
 ALTER TABLE "templates" DROP CONSTRAINT IF EXISTS "templates_ownerId_fkey";
 ALTER TABLE "templates" ADD CONSTRAINT "templates_ownerId_fkey" 
   FOREIGN KEY ("ownerId") REFERENCES "owners"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- Step 8: Ensure indexes exist
+-- Step 7: Ensure indexes exist
 CREATE INDEX IF NOT EXISTS "templates_companyHQId_idx" ON "templates"("companyHQId");
 CREATE INDEX IF NOT EXISTS "templates_ownerId_idx" ON "templates"("ownerId");
-
