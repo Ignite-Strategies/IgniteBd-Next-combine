@@ -114,45 +114,48 @@ export async function POST(request) {
     // Normalize email
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check if contact already exists
+    // CANON: Contacts are CompanyHQ-scoped
+    // Query by email + crmId only (not globally)
     const existingContact = await prisma.contact.findUnique({
       where: {
-        email: normalizedEmail,
+        email_crmId: {
+          email: normalizedEmail,
+          crmId: crmId,
+        },
       },
     });
 
-    // Contacts are global - if exists, just update name fields
-    // Don't block cross-CompanyHQ - multiple people can know the same contact
     const now = new Date();
     let contact;
     
     if (existingContact) {
-      // Contact exists globally - update name fields (but keep original crmId)
-      // This allows multiple CompanyHQs to work with the same contact
+      // Contact already exists in this CompanyHQ - update name fields
       contact = await prisma.contact.update({
         where: {
-          email: normalizedEmail,
+          id: existingContact.id,
         },
         data: {
           firstName,
           lastName,
           updatedAt: now,
-          // Note: We keep the original crmId - the contact "belongs" to the first CompanyHQ that created it
-          // But this doesn't prevent other CompanyHQs from enriching/working with them
         },
       });
-      console.log(`ℹ️ Contact ${normalizedEmail} already exists in CompanyHQ ${existingContact.crmId}, updating name fields for CompanyHQ ${crmId} context`);
+      console.log(`✅ Updated existing contact ${normalizedEmail} in CompanyHQ ${crmId}`);
     } else {
-      // Create new contact
+      // Create new contact in this CompanyHQ
+      // CANON: Same email can exist in different CompanyHQs - each CompanyHQ has its own record
       contact = await prisma.contact.create({
         data: {
           crmId,
           firstName,
           lastName,
           email: normalizedEmail,
+          ownerId: owner.id,
+          createdAt: now,
           updatedAt: now,
         },
       });
+      console.log(`✅ Created new contact ${normalizedEmail} in CompanyHQ ${crmId}`);
     }
 
     return NextResponse.json({

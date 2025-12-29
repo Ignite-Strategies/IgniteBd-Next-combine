@@ -53,11 +53,13 @@ function LinkedInEnrichContent() {
 
       if (response.data?.success) {
         // Store intelligence data in component state (not Redis previewId)
+        // Store EVERYTHING including rawEnrichmentPayload so we can send it directly to save route
         setIntelligenceData({
           normalizedContact: response.data.normalizedContact,
           normalizedCompany: response.data.normalizedCompany,
           intelligenceScores: response.data.intelligenceScores,
           companyIntelligence: response.data.companyIntelligence,
+          rawEnrichmentPayload: response.data.rawEnrichmentPayload, // Store raw payload!
           redisKey: response.data.redisKey,
           previewId: response.data.previewId,
           profileSummary: response.data.profileSummary,
@@ -151,37 +153,52 @@ function LinkedInEnrichContent() {
       const contactId = contactResponse.data.contact.id;
 
       // Step 2: Save enrichment data
-      // If skipping intelligence, we need to enrich first to get redisKey
-      let redisKey = skipIntelligence ? null : intelligenceData.redisKey;
-      
+      // Send ALL the data we already have in state - no Redis needed!
       if (skipIntelligence) {
-        // Enrich to get redisKey (but don't generate intelligence)
+        // If skipping intelligence, we still need to enrich to get raw payload
         const enrichResponse = await api.post('/api/enrich/enrich', {
           linkedinUrl: url,
         });
-        redisKey = enrichResponse.data?.redisKey;
+        
+        await api.post('/api/contacts/enrich/save', {
+          contactId,
+          rawEnrichmentPayload: enrichResponse.data?.rawApolloResponse || enrichResponse.data?.rawEnrichmentPayload, // Send raw payload directly
+          companyHQId,
+          skipIntelligence: true,
+        });
+      } else {
+        // We have everything in intelligenceData - send it all directly!
+        await api.post('/api/contacts/enrich/save', {
+          contactId,
+          rawEnrichmentPayload: intelligenceData.rawEnrichmentPayload, // Send raw payload directly (no Redis!)
+          companyHQId,
+          skipIntelligence: false,
+          // Send all inference fields directly too
+          profileSummary: intelligenceData.profileSummary,
+          tenureYears: intelligenceData.tenureYears,
+          currentTenureYears: intelligenceData.currentTenureYears,
+          totalExperienceYears: intelligenceData.totalExperienceYears,
+          avgTenureYears: intelligenceData.avgTenureYears,
+          careerTimeline: intelligenceData.careerTimeline,
+          companyPositioning: intelligenceData.companyPositioning,
+        });
       }
-
-      if (!redisKey) {
-        throw new Error('Failed to get enrichment data');
-      }
-
-      await api.post('/api/contacts/enrich/save', {
-        contactId,
-        redisKey,
-        companyHQId, // Pass companyHQId to validate contact belongs to this company
-        previewId: skipIntelligence ? null : intelligenceData.previewId, // Pass previewId only if not skipping
-        skipIntelligence, // Pass flag to skip intelligence
-      });
 
       // Step 3: Show success modal with next steps
       setSaving(false);
       setShowSuccessModal(true);
       setSavedContactId(contactId);
       setSavedWithoutIntelligence(skipIntelligence);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving contact:', err);
-      alert(err.response?.data?.error || err.message || 'Failed to save contact');
+      // Handle network errors (Redis connection failures, etc.)
+      const errorMessage = err.message || err.response?.data?.error || 'Failed to save contact';
+      // If it's a network error (status 0) or Redis connection error, show a more helpful message
+      if (err.status === 0 || err.type === 'NETWORK_ERROR' || errorMessage.includes('Redis') || errorMessage.includes('connection')) {
+        alert(`Connection error: ${errorMessage}\n\nThis might be a Redis configuration issue. Please check your Redis settings or try again in a moment.`);
+      } else {
+        alert(errorMessage);
+      }
       setSaving(false);
     }
   }

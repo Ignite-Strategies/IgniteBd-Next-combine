@@ -204,7 +204,14 @@ export default function EnrichmentModal({
       }
     } catch (err: any) {
       console.error('Save error:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to save enrichment');
+      // Handle network errors (Redis connection failures, etc.)
+      const errorMessage = err.message || err.response?.data?.error || 'Failed to save enrichment';
+      // If it's a network error (status 0) or Redis connection error, show a more helpful message
+      if (err.status === 0 || err.type === 'NETWORK_ERROR' || errorMessage.includes('Redis') || errorMessage.includes('connection')) {
+        setError(`Connection error: ${errorMessage}. This might be a Redis configuration issue. Please check your Redis settings or try again in a moment.`);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setSaving(false);
     }

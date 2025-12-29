@@ -208,7 +208,17 @@ export async function getEnrichedContactByKey(redisKey: string): Promise<any | n
     return typeof data === 'string' ? JSON.parse(data) : data;
   } catch (error: any) {
     console.error('❌ Redis get error:', error);
-    return null;
+    // Re-throw connection/configuration errors so they can be handled upstream
+    // Only return null for "not found" cases
+    if (error.message?.includes('configuration') || 
+        error.message?.includes('REDIS') || 
+        error.message?.includes('Upstash') ||
+        error.message?.includes('connection') ||
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('timeout')) {
+      throw error; // Re-throw connection errors
+    }
+    return null; // Return null for other errors (e.g., parse errors)
   }
 }
 

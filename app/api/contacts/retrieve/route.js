@@ -50,10 +50,9 @@ export async function GET(request) {
       );
     }
 
-    // 3. Get ALL CompanyHQs the user has access to (for cross-CompanyHQ contact access)
-    let accessibleCompanyHQIds = [];
+    // 3. Membership guard - require membership for companyHQ access
+    // CANON: Contacts are CompanyHQ-scoped, no cross-CompanyHQ queries
     if (companyHQId) {
-      // Verify membership in requested CompanyHQ
       const { membership } = await resolveMembership(owner.id, companyHQId);
       if (!membership) {
         return NextResponse.json(
@@ -61,15 +60,6 @@ export async function GET(request) {
           { status: 403 },
         );
       }
-      
-      // Get all CompanyHQs user has access to
-      const allMemberships = await prisma.company_memberships.findMany({
-        where: { userId: owner.id },
-        select: { companyHqId: true }
-      });
-      accessibleCompanyHQIds = allMemberships.map(m => m.companyHqId);
-      
-      console.log(`🔍 User has access to ${accessibleCompanyHQIds.length} CompanyHQs:`, accessibleCompanyHQIds);
     }
 
     // Single contact retrieval by ID
@@ -168,11 +158,10 @@ export async function GET(request) {
     }
 
     console.log('🔍 Fetching contacts for companyHQId:', companyHQId);
-    console.log(`🔍 Including contacts from all accessible CompanyHQs:`, accessibleCompanyHQIds);
 
-    // Show contacts from ALL CompanyHQs user has access to (contacts are global, can belong to multiple)
+    // CANON: Contacts are CompanyHQ-scoped - query only by crmId
     const where = {
-      crmId: { in: accessibleCompanyHQIds.length > 0 ? accessibleCompanyHQIds : [companyHQId] },
+      crmId: companyHQId,
     };
 
     // Filter by client company ID if provided

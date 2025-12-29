@@ -43,7 +43,23 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { contactId, redisKey, companyId, previewId, skipIntelligence, companyHQId } = body;
+    const { 
+      contactId, 
+      redisKey, 
+      rawEnrichmentPayload, // Accept payload directly (alternative to redisKey)
+      companyId, 
+      previewId, 
+      skipIntelligence, 
+      companyHQId,
+      // Also accept inference fields directly if available
+      profileSummary,
+      tenureYears,
+      currentTenureYears,
+      totalExperienceYears,
+      avgTenureYears,
+      careerTimeline,
+      companyPositioning,
+    } = body;
 
     // Validate inputs
     if (!contactId) {
@@ -53,9 +69,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!redisKey) {
+    // Either redisKey OR rawEnrichmentPayload must be provided
+    if (!redisKey && !rawEnrichmentPayload) {
       return NextResponse.json(
-        { success: false, error: 'redisKey is required' },
+        { success: false, error: 'Either redisKey or rawEnrichmentPayload is required' },
         { status: 400 },
       );
     }
@@ -109,64 +126,98 @@ export async function POST(request: Request) {
       }
     }
     
-    // Contacts are global - allow enriching even if contact belongs to different CompanyHQ
-    // Multiple CompanyHQs can work with the same contact
-    if (companyHQId && existingContact.crmId !== companyHQId) {
-      console.log(`ℹ️ Contact ${contactId} has crmId ${existingContact.crmId} but enrich request is from CompanyHQ ${companyHQId} - allowing cross-CompanyHQ enrichment`);
-      // Don't block - just log it. The contact can be enriched regardless of which CompanyHQ owns it
-    }
-
-    // Get raw enrichment data from Redis
-    const redisData = await getEnrichedContactByKey(redisKey);
-    if (!redisData) {
+    // CANON: Contacts are CompanyHQ-scoped - enrichment only updates contacts in this CompanyHQ
+    // Verify contact belongs to the CompanyHQ that's enriching it
+    if (targetCompanyHQId && existingContact.crmId !== targetCompanyHQId) {
+      console.error(`❌ CANON VIOLATION: Contact ${contactId} belongs to CompanyHQ ${existingContact.crmId} but enrich request is for CompanyHQ ${targetCompanyHQId}`);
       return NextResponse.json(
-        { success: false, error: 'Enrichment data not found in Redis' },
-        { status: 404 },
+        {
+          success: false,
+          error: 'Contact does not belong to this CompanyHQ. Each CompanyHQ has its own contact records.',
+          details: {
+            contactId,
+            contactCrmId: existingContact.crmId,
+            requestedCompanyHQId: targetCompanyHQId,
+          },
+        },
+        { status: 403 },
       );
     }
 
-    // Handle different Redis data formats
-    // Format 1: { rawEnrichmentPayload: ... } (from generate-intel route)
-    // Format 2: { enrichedData: { rawApolloResponse: ... } } (from enrich route)
+    // Get raw enrichment data - either from request body or Redis
     let rawApolloResponse: any;
-    if (redisData.rawEnrichmentPayload) {
-      rawApolloResponse = redisData.rawEnrichmentPayload;
-    } else if (redisData.enrichedData?.rawApolloResponse) {
-      rawApolloResponse = redisData.enrichedData.rawApolloResponse;
-    } else {
-      return NextResponse.json(
-        { success: false, error: 'Invalid enrichment data format in Redis' },
-        { status: 400 },
-      );
+    
+    if (rawEnrichmentPayload) {
+      // Use payload directly from request body (no Redis needed!)
+      console.log('✅ Using enrichment payload from request body (skipping Redis)');
+      rawApolloResponse = rawEnrichmentPayload;
+    } else if (redisKey) {
+      // Fallback to Redis if no direct payload provided
+      let redisData;
+      try {
+        redisData = await getEnrichedContactByKey(redisKey);
+      } catch (redisError: any) {
+        console.error('❌ Redis connection error:', redisError);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Redis connection failed. Please check Redis configuration or pass rawEnrichmentPayload directly.',
+            details: process.env.NODE_ENV === 'development' ? redisError.message : undefined,
+          },
+          { status: 503 },
+        );
+      }
+      
+      if (!redisData) {
+        return NextResponse.json(
+          { success: false, error: 'Enrichment data not found in Redis. The data may have expired or the Redis key is invalid.' },
+          { status: 404 },
+        );
+      }
+
+      // Handle different Redis data formats
+      // Format 1: { rawEnrichmentPayload: ... } (from generate-intel route)
+      // Format 2: { enrichedData: { rawApolloResponse: ... } } (from enrich route)
+      if (redisData.rawEnrichmentPayload) {
+        rawApolloResponse = redisData.rawEnrichmentPayload;
+      } else if (redisData.enrichedData?.rawApolloResponse) {
+        rawApolloResponse = redisData.enrichedData.rawApolloResponse;
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Invalid enrichment data format in Redis' },
+          { status: 400 },
+        );
+      }
     }
 
-    // Get inference fields from preview data (if previewId provided and not skipping intelligence)
-    let profileSummary: string | null = null;
-    let tenureYears: number | null = null;
-    let currentTenureYears: number | null = null;
-    let totalExperienceYears: number | null = null;
-    let avgTenureYears: number | null = null;
-    let careerTimeline: any = null;
-    let companyPositioning: {
+    // Get inference fields - use from request body if provided, otherwise try Redis previewId
+    let finalProfileSummary: string | null = profileSummary || null;
+    let finalTenureYears: number | null = tenureYears ?? null;
+    let finalCurrentTenureYears: number | null = currentTenureYears ?? null;
+    let finalTotalExperienceYears: number | null = totalExperienceYears ?? null;
+    let finalAvgTenureYears: number | null = avgTenureYears ?? null;
+    let finalCareerTimeline: any = careerTimeline || null;
+    let finalCompanyPositioning: {
       positioningLabel?: string;
       category?: string;
       revenueTier?: string;
       headcountTier?: string;
       normalizedIndustry?: string;
       competitors?: string[];
-    } = {};
+    } = companyPositioning || {};
 
-    if (previewId && !skipIntelligence) {
+    // If inference fields not provided in request body, try to fetch from Redis (if previewId provided)
+    if (previewId && !skipIntelligence && !finalProfileSummary) {
       try {
         const previewData = await getPreviewIntelligence(previewId);
         if (previewData) {
-          profileSummary = previewData.profileSummary || null;
-          tenureYears = previewData.tenureYears || null;
-          currentTenureYears = previewData.currentTenureYears || null;
-          totalExperienceYears = previewData.totalExperienceYears || null;
-          avgTenureYears = previewData.avgTenureYears || null;
-          careerTimeline = previewData.careerTimeline || null;
-          companyPositioning = previewData.companyPositioning || {};
+          finalProfileSummary = previewData.profileSummary || null;
+          finalTenureYears = previewData.tenureYears ?? null;
+          finalCurrentTenureYears = previewData.currentTenureYears ?? null;
+          finalTotalExperienceYears = previewData.totalExperienceYears ?? null;
+          finalAvgTenureYears = previewData.avgTenureYears ?? null;
+          finalCareerTimeline = previewData.careerTimeline || null;
+          finalCompanyPositioning = previewData.companyPositioning || {};
         }
       } catch (error: any) {
         console.warn('⚠️ Could not fetch preview data for inferences (non-critical):', error.message);
@@ -211,12 +262,12 @@ export async function POST(request: Request) {
       
       // Inference layer fields (only if not skipping)
       ...(skipIntelligence ? {} : {
-        profileSummary: profileSummary || undefined,
-        tenureYears: tenureYears || undefined, // Keep for backward compatibility
-        currentTenureYears: currentTenureYears || undefined,
-        totalExperienceYears: totalExperienceYears || undefined,
-        avgTenureYears: avgTenureYears || undefined,
-        careerTimeline: careerTimeline || undefined,
+        profileSummary: finalProfileSummary || undefined,
+        tenureYears: finalTenureYears ?? undefined, // Keep for backward compatibility
+        currentTenureYears: finalCurrentTenureYears ?? undefined,
+        totalExperienceYears: finalTotalExperienceYears ?? undefined,
+        avgTenureYears: finalAvgTenureYears ?? undefined,
+        careerTimeline: finalCareerTimeline || undefined,
       }),
       
       // Normalized contact fields
@@ -338,12 +389,12 @@ export async function POST(request: Request) {
             
             // Inference layer fields (enrichment data takes precedence, only if not skipping)
             ...(skipIntelligence ? {} : {
-              positioningLabel: companyPositioning.positioningLabel || existingCompany.positioningLabel,
-              category: companyPositioning.category || existingCompany.category,
-              revenueTier: companyPositioning.revenueTier || existingCompany.revenueTier,
-              headcountTier: companyPositioning.headcountTier || existingCompany.headcountTier,
-              normalizedIndustry: companyPositioning.normalizedIndustry || existingCompany.normalizedIndustry,
-              competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : existingCompany.competitors,
+              positioningLabel: finalCompanyPositioning.positioningLabel || existingCompany.positioningLabel,
+              category: finalCompanyPositioning.category || existingCompany.category,
+              revenueTier: finalCompanyPositioning.revenueTier || existingCompany.revenueTier,
+              headcountTier: finalCompanyPositioning.headcountTier || existingCompany.headcountTier,
+              normalizedIndustry: finalCompanyPositioning.normalizedIndustry || existingCompany.normalizedIndustry,
+              competitors: finalCompanyPositioning.competitors?.length ? finalCompanyPositioning.competitors : existingCompany.competitors,
             }),
             
             updatedAt: new Date(),
@@ -392,12 +443,12 @@ export async function POST(request: Request) {
               stabilityScore: companyIntelligence.stabilityScore,
               marketPositionScore: companyIntelligence.marketPositionScore,
               readinessScore: companyIntelligence.readinessScore,
-              positioningLabel: companyPositioning.positioningLabel || companyByDomain.positioningLabel,
-              category: companyPositioning.category || companyByDomain.category,
-              revenueTier: companyPositioning.revenueTier || companyByDomain.revenueTier,
-              headcountTier: companyPositioning.headcountTier || companyByDomain.headcountTier,
-              normalizedIndustry: companyPositioning.normalizedIndustry || companyByDomain.normalizedIndustry,
-              competitors: companyPositioning.competitors?.length ? companyPositioning.competitors : companyByDomain.competitors,
+              positioningLabel: finalCompanyPositioning.positioningLabel || companyByDomain.positioningLabel,
+              category: finalCompanyPositioning.category || companyByDomain.category,
+              revenueTier: finalCompanyPositioning.revenueTier || companyByDomain.revenueTier,
+              headcountTier: finalCompanyPositioning.headcountTier || companyByDomain.headcountTier,
+              normalizedIndustry: finalCompanyPositioning.normalizedIndustry || companyByDomain.normalizedIndustry,
+              competitors: finalCompanyPositioning.competitors?.length ? finalCompanyPositioning.competitors : companyByDomain.competitors,
             } : {}),
             updatedAt: new Date(),
           },
@@ -430,12 +481,12 @@ export async function POST(request: Request) {
               stabilityScore: companyIntelligence.stabilityScore,
               marketPositionScore: companyIntelligence.marketPositionScore,
               readinessScore: companyIntelligence.readinessScore,
-              positioningLabel: companyPositioning.positioningLabel,
-              category: companyPositioning.category,
-              revenueTier: companyPositioning.revenueTier,
-              headcountTier: companyPositioning.headcountTier,
-              normalizedIndustry: companyPositioning.normalizedIndustry,
-              competitors: companyPositioning.competitors || [],
+              positioningLabel: finalCompanyPositioning.positioningLabel,
+              category: finalCompanyPositioning.category,
+              revenueTier: finalCompanyPositioning.revenueTier,
+              headcountTier: finalCompanyPositioning.headcountTier,
+              normalizedIndustry: finalCompanyPositioning.normalizedIndustry,
+              competitors: finalCompanyPositioning.competitors || [],
             } : {}),
             updatedAt: new Date(),
           },

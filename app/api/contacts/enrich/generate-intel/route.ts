@@ -237,10 +237,12 @@ export async function POST(request: Request) {
     }
 
     // Return preview data with intelligence scores + inferences
+    // IMPORTANT: Also return rawApolloResponse so frontend can send it directly to save route (no Redis needed!)
     return NextResponse.json({
       success: true,
       previewId,
       redisKey,
+      rawEnrichmentPayload: rawApolloResponse, // Return raw payload so frontend can send it directly
       normalizedContact,
       normalizedCompany,
       intelligenceScores,
