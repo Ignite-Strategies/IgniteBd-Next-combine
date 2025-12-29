@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, AlertCircle, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -16,7 +16,7 @@ import { clearCompanyData } from '@/lib/hydrationService';
  * Only shown to users with multiple memberships
  * Handles validation and error recovery
  */
-export default function ContextSwitchPage() {
+function ContextSwitchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetCompanyHQId = searchParams.get('to');
@@ -244,6 +244,21 @@ export default function ContextSwitchPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ContextSwitchPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ContextSwitchContent />
+    </Suspense>
   );
 }
 
