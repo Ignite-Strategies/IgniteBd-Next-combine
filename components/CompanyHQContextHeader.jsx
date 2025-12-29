@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Building2, AlertCircle, ChevronDown } from 'lucide-react';
+import { Building2, AlertCircle, ChevronDown, Loader2 } from 'lucide-react';
 import { useOwner } from '@/hooks/useOwner';
 import { switchCompanyHQ } from '@/lib/companyhq-switcher';
 import { useRouter } from 'next/navigation';
+import { hydrateCompanyData, clearCompanyData } from '@/lib/hydrationService';
 
 /**
  * CompanyHQ Context Header
@@ -18,6 +19,7 @@ export function CompanyHQContextHeader() {
   const { companyHQ, companyHQId, memberships, owner, refresh } = useOwner();
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [isValid, setIsValid] = useState(true);
+  const [hydrating, setHydrating] = useState(false);
   const router = useRouter();
 
   // Validate context
@@ -42,12 +44,44 @@ export function CompanyHQContextHeader() {
 
   // Handle context switch
   const handleSwitchCompanyHQ = async (newCompanyHQId) => {
-    const result = switchCompanyHQ(newCompanyHQId);
-    if (result) {
-      await refresh();
+    // Don't switch if already on this CompanyHQ
+    if (newCompanyHQId === companyHQId) {
       setShowSwitcher(false);
-      // Reload page to apply new context
+      return;
+    }
+
+    try {
+      setHydrating(true);
+      setShowSwitcher(false);
+
+      console.log(`🔄 Switching from ${companyHQId} to ${newCompanyHQId}`);
+
+      // Step 1: Clear old company data to avoid stale data showing
+      clearCompanyData();
+
+      // Step 2: Switch CompanyHQ context (updates localStorage)
+      const result = switchCompanyHQ(newCompanyHQId);
+      if (!result) {
+        console.error('❌ Failed to switch CompanyHQ');
+        setHydrating(false);
+        return;
+      }
+
+      // Step 3: Refresh owner/membership data
+      await refresh();
+
+      // Step 4: Hydrate new company's data (contacts, lists, etc.)
+      console.log('🔄 Hydrating company data...');
+      await hydrateCompanyData(newCompanyHQId);
+
+      // Step 5: Refresh page to apply new context everywhere
       router.refresh();
+      
+      // Note: setHydrating will be reset on unmount/remount after refresh
+    } catch (error) {
+      console.error('❌ Error switching CompanyHQ:', error);
+      setHydrating(false);
+      alert('Failed to switch company. Please refresh the page.');
     }
   };
 
@@ -60,8 +94,19 @@ export function CompanyHQContextHeader() {
 
   return (
     <div className="w-full border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+      {/* Hydrating Indicator */}
+      {hydrating && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+          <div className="flex items-center gap-2 text-sm text-blue-800">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="font-semibold">Switching CompanyHQ...</span>
+            <span>Loading company data...</span>
+          </div>
+        </div>
+      )}
+
       {/* Invalid Context Warning */}
-      {!isValid && (
+      {!isValid && !hydrating && (
         <div className="bg-red-50 border-b border-red-200 px-4 py-2">
           <div className="flex items-center gap-2 text-sm text-red-800">
             <AlertCircle className="w-4 h-4" />
@@ -103,10 +148,20 @@ export function CompanyHQContextHeader() {
             <div className="relative">
               <button
                 onClick={() => setShowSwitcher(!showSwitcher)}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm rounded-md border border-gray-300 transition"
+                disabled={hydrating}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm rounded-md border border-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>Switch Company</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${showSwitcher ? 'rotate-180' : ''}`} />
+                {hydrating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Switching...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Switch Company</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showSwitcher ? 'rotate-180' : ''}`} />
+                  </>
+                )}
               </button>
 
               {/* Dropdown Menu */}

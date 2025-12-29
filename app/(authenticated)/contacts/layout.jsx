@@ -95,6 +95,63 @@ export default function ContactsLayout({ children }) {
     }
   }, [companyHQId]);
 
+  // Listen for companyHQId changes and auto-refresh contacts
+  useEffect(() => {
+    if (!companyHQId) return;
+    
+    // Check if contacts in localStorage match current companyHQId
+    // If they don't match, clear and refresh
+    const cachedContacts = typeof window !== 'undefined' 
+      ? window.localStorage.getItem('contacts')
+      : null;
+    
+    if (cachedContacts) {
+      try {
+        const parsed = JSON.parse(cachedContacts);
+        // If we have cached contacts, check if they belong to this CompanyHQ
+        // If any contact has different crmId, we need to refresh
+        const hasMismatch = Array.isArray(parsed) && parsed.some(contact => 
+          contact.crmId && contact.crmId !== companyHQId
+        );
+        
+        if (hasMismatch) {
+          console.log('🔄 CompanyHQ changed, clearing stale contacts...');
+          setContacts([]);
+          setHydrated(false);
+          refreshContacts();
+        }
+      } catch (error) {
+        console.warn('Failed to check cached contacts:', error);
+      }
+    }
+  }, [companyHQId, refreshContacts]);
+
+  // Listen for hydration events from CompanyHQ switch
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleHydration = (event) => {
+      const { contacts: hydratedContacts, lists: hydratedLists } = event.detail || {};
+      
+      if (hydratedContacts && Array.isArray(hydratedContacts)) {
+        console.log('🔄 Received hydrated contacts from switch:', hydratedContacts.length);
+        setContacts(hydratedContacts);
+        setHydrated(true);
+      }
+      
+      if (hydratedLists && Array.isArray(hydratedLists)) {
+        console.log('🔄 Received hydrated lists from switch:', hydratedLists.length);
+        setLists(hydratedLists);
+        setListsHydrated(true);
+      }
+    };
+
+    window.addEventListener('companyDataHydrated', handleHydration);
+    return () => {
+      window.removeEventListener('companyDataHydrated', handleHydration);
+    };
+  }, []);
+
   // No auto-fetch - only use localStorage. Use refreshContacts() manually via sync button
 
   // Contact Lists: Refresh from API (manual sync only)
