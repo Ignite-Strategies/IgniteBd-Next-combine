@@ -52,10 +52,12 @@ export default function QuickIdeaTemplatePage() {
           : 'AI Generated Template';
         
         // Generate subject from first line of template or default
+        // Template body uses \n for newlines, so split on that
         let subject = 'Hi {{firstName}}';
         if (templateBody) {
-          const firstLine = templateBody.split('\\n')[0].replace(/{{.*?}}/g, '').trim();
-          if (firstLine && firstLine.length < 80) {
+          // Handle both \n and actual newlines
+          const firstLine = templateBody.split(/\\n|\n/)[0].replace(/{{.*?}}/g, '').trim();
+          if (firstLine && firstLine.length < 80 && firstLine.length > 0) {
             subject = firstLine;
           }
         }
@@ -67,8 +69,10 @@ export default function QuickIdeaTemplatePage() {
           body: templateBody,
         });
         
-        // Navigate to template builder
-        router.push(`/builder/template/new?${params.toString()}`);
+        // Navigate to template builder - use full path
+        const url = `/builder/template/new?${params.toString()}`;
+        console.log('Navigating to:', url);
+        router.push(url);
       } else {
         setError(response.data?.error || 'Failed to generate template');
         setGenerating(false);
