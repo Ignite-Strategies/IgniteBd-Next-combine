@@ -152,6 +152,11 @@ export default function TemplateBuilderPage() {
       return;
     }
 
+    if (!companyHQId) {
+      setError('Company not found. Please refresh the page.');
+      return;
+    }
+
     if (!title.trim()) {
       setError('Title is required');
       return;
@@ -167,7 +172,8 @@ export default function TemplateBuilderPage() {
       setError('');
 
       const data = {
-        ownerId,
+        companyHQId, // Required - company-scoped
+        ownerId, // Optional - creator/audit trail
         title: title.trim(),
         subject: subject.trim(),
         body: body.trim(),

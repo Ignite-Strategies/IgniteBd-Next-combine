@@ -77,14 +77,14 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates when ownerId is available - NON-BLOCKING (load in background)
+  // Load templates when companyHQId is available - NON-BLOCKING (load in background)
   useEffect(() => {
-    if (!ownerId) return;
+    if (!companyHQId) return;
 
     // Load templates asynchronously without blocking render
     const loadTemplates = async () => {
       try {
-        const response = await api.get(`/api/templates?ownerId=${ownerId}`);
+        const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
         if (response.data?.success) {
           setTemplates(response.data.templates || []);
         }

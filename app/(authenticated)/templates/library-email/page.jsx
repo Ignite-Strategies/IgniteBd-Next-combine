@@ -13,7 +13,7 @@ import PageHeader from '@/components/PageHeader.jsx';
  */
 function EmailTemplateLibraryContent() {
   const router = useRouter();
-  const { ownerId } = useOwner();
+  const { companyHQId } = useOwner();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,7 +28,7 @@ function EmailTemplateLibraryContent() {
 
     // Try to load from localStorage first
     try {
-      const cached = localStorage.getItem(`templates_${ownerId}`);
+      const cached = localStorage.getItem(`templates_${companyHQId}`);
       if (cached) {
         const templates = JSON.parse(cached);
         if (Array.isArray(templates)) {
@@ -44,20 +44,20 @@ function EmailTemplateLibraryContent() {
 
     // Fallback: Load from API if not cached
     loadTemplates();
-  }, [ownerId]);
+  }, [companyHQId]);
 
   const loadTemplates = async () => {
-    if (!ownerId) return;
+    if (!companyHQId) return;
 
     try {
       setLoading(true);
       setError('');
-      const response = await api.get(`/api/templates?ownerId=${ownerId}`);
+      const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
       if (response.data?.success) {
         const templates = response.data.templates || [];
         setTemplates(templates);
         // Cache in localStorage
-        localStorage.setItem(`templates_${ownerId}`, JSON.stringify(templates));
+        localStorage.setItem(`templates_${companyHQId}`, JSON.stringify(templates));
         console.log(`✅ Loaded ${templates.length} templates from API and cached`);
       } else {
         setError('Failed to load templates');

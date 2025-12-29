@@ -1,23 +1,26 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { resolveMembership } from '@/lib/membership';
 
 /**
  * POST /api/templates
- * Create a new email template
+ * Create a new email template (company-scoped)
  * 
  * Body:
- * - ownerId (required) - from useOwner hook
+ * - companyHQId (required) - company to create template for
  * - title (required)
  * - subject (required)
  * - body (required)
+ * - ownerId (optional) - creator/audit trail
  * 
  * Returns:
  * - template: Created template
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -26,14 +29,35 @@ export async function POST(request) {
   }
 
   try {
+    // Get owner from Firebase token
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const body = await request.json();
-    const { ownerId, title, subject, body: bodyText } = body;
+    const { companyHQId, ownerId, title, subject, body: bodyText } = body;
 
     // Validate required fields
-    if (!ownerId) {
+    if (!companyHQId) {
       return NextResponse.json(
-        { success: false, error: 'ownerId is required' },
+        { success: false, error: 'companyHQId is required' },
         { status: 400 },
+      );
+    }
+
+    // Validate membership - owner must have access to this companyHQ
+    const { membership } = await resolveMembership(owner.id, companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied to this company' },
+        { status: 403 },
       );
     }
 
@@ -58,10 +82,11 @@ export async function POST(request) {
       );
     }
 
-    // Create template with ownerId from request body (from useOwner hook)
+    // Create template (company-scoped, ownerId optional for audit trail)
     const template = await prisma.template.create({
       data: {
-        ownerId,
+        companyHQId,
+        ownerId: ownerId || owner.id, // Use provided ownerId or current owner as creator
         title: title.trim(),
         subject: subject.trim(),
         body: bodyText.trim(),
@@ -87,18 +112,19 @@ export async function POST(request) {
 
 /**
  * GET /api/templates
- * List email templates for the authenticated owner
+ * List email templates for a company (company-scoped)
  * 
  * Query params:
- * - ownerId (required) - from useOwner hook
+ * - companyHQId (required) - company to list templates for
  * 
  * Returns:
  * - success: boolean
- * - templates: array of templates owned by the owner
+ * - templates: array of templates for the company
  */
 export async function GET(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -107,20 +133,41 @@ export async function GET(request) {
   }
 
   try {
-    const { searchParams } = request.nextUrl;
-    const ownerId = searchParams.get('ownerId');
+    // Get owner from Firebase token
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
 
-    if (!ownerId) {
+    if (!owner) {
       return NextResponse.json(
-        { success: false, error: 'ownerId query parameter is required' },
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
+    const { searchParams } = request.nextUrl;
+    const companyHQId = searchParams.get('companyHQId');
+
+    if (!companyHQId) {
+      return NextResponse.json(
+        { success: false, error: 'companyHQId query parameter is required' },
         { status: 400 },
       );
     }
 
-    // List templates for this owner
+    // Validate membership - owner must have access to this companyHQ
+    const { membership } = await resolveMembership(owner.id, companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied to this company' },
+        { status: 403 },
+      );
+    }
+
+    // List templates for this company (company-scoped)
     const templates = await prisma.template.findMany({
       where: {
-        ownerId,
+        companyHQId,
       },
       orderBy: {
         createdAt: 'desc',

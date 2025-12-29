@@ -12,21 +12,21 @@ import { useOwner } from '@/hooks/useOwner';
  */
 export default function CloneTemplatePage() {
   const router = useRouter();
-  const { ownerId } = useOwner();
+  const { companyHQId } = useOwner();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (ownerId) {
+    if (companyHQId) {
       loadTemplates();
     }
-  }, [ownerId]);
+  }, [companyHQId]);
 
   const loadTemplates = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/templates?ownerId=${ownerId}`);
+      const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
       if (response.data?.success) {
         setTemplates(response.data.templates || []);
       }

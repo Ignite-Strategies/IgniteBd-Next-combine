@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { resolveMembership } from '@/lib/membership';
 
 export async function GET(request, { params }) {
   let firebaseUser;
@@ -14,6 +15,18 @@ export async function GET(request, { params }) {
   }
 
   try {
+    // Get owner from Firebase token
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
@@ -30,6 +43,15 @@ export async function GET(request, { params }) {
       return NextResponse.json(
         { success: false, error: 'Template not found' },
         { status: 404 },
+      );
+    }
+
+    // Validate membership - owner must have access to template's companyHQ
+    const { membership } = await resolveMembership(owner.id, template.companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied to this template' },
+        { status: 403 },
       );
     }
 
@@ -62,11 +84,44 @@ export async function PATCH(request, { params }) {
   }
 
   try {
+    // Get owner from Firebase token
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 },
+      );
+    }
+
+    // Get existing template to validate access
+    const existingTemplate = await prisma.template.findUnique({
+      where: { id },
+    });
+
+    if (!existingTemplate) {
+      return NextResponse.json(
+        { success: false, error: 'Template not found' },
+        { status: 404 },
+      );
+    }
+
+    // Validate membership - owner must have access to template's companyHQ
+    const { membership } = await resolveMembership(owner.id, existingTemplate.companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied to this template' },
+        { status: 403 },
       );
     }
 
@@ -112,11 +167,44 @@ export async function DELETE(request, { params }) {
   }
 
   try {
+    // Get owner from Firebase token
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const { id } = params || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Template ID is required' },
         { status: 400 },
+      );
+    }
+
+    // Get existing template to validate access
+    const existingTemplate = await prisma.template.findUnique({
+      where: { id },
+    });
+
+    if (!existingTemplate) {
+      return NextResponse.json(
+        { success: false, error: 'Template not found' },
+        { status: 404 },
+      );
+    }
+
+    // Validate membership - owner must have access to template's companyHQ
+    const { membership } = await resolveMembership(owner.id, existingTemplate.companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: 'Access denied to this template' },
+        { status: 403 },
       );
     }
 
