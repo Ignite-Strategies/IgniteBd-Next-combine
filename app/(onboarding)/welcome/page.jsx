@@ -144,7 +144,7 @@ export default function WelcomePage() {
 
   const handleContinue = () => {
     // If user has memberships, save selected company and route to dashboard
-    if (membershipData?.hasMemberships && selectedCompanyHqId && membershipData.memberships.length > 0) {
+    if (membershipData?.hasMemberships && selectedCompanyHqId) {
       // Find the selected membership
       const selectedMembership = membershipData.memberships.find(
         m => m.companyHqId === selectedCompanyHqId

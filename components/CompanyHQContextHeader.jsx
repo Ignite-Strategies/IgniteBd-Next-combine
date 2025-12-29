@@ -3,9 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Building2, AlertCircle, ChevronDown } from 'lucide-react';
 import { useOwner } from '@/hooks/useOwner';
-import { switchCompanyHQ } from '@/lib/companyhq-switcher';
 import { useRouter } from 'next/navigation';
-import { clearCompanyData } from '@/lib/hydrationService';
 
 /**
  * CompanyHQ Context Header
@@ -41,7 +39,7 @@ export function CompanyHQContextHeader() {
   const currentMembership = memberships?.find(m => m.companyHqId === companyHQId);
   const currentRole = currentMembership?.role || null;
 
-  // Handle context switch - MVP1: Simple redirect to welcome for full hydration
+  // Handle context switch - Redirect to dedicated context switch page
   const handleSwitchCompanyHQ = (newCompanyHQId) => {
     // Don't switch if already on this CompanyHQ
     if (newCompanyHQId === companyHQId) {
@@ -49,22 +47,10 @@ export function CompanyHQContextHeader() {
       return;
     }
 
-    console.log(`🔄 Switching from ${companyHQId} to ${newCompanyHQId}`);
+    console.log(`🔄 Switching to CompanyHQ: ${newCompanyHQId}`);
 
-    // Step 1: Switch CompanyHQ context (updates localStorage)
-    const result = switchCompanyHQ(newCompanyHQId);
-    if (!result) {
-      console.error('❌ Failed to switch CompanyHQ');
-      alert('Failed to switch company. Please try again.');
-      return;
-    }
-
-    // Step 2: Clear old company data to avoid stale data
-    clearCompanyData();
-
-    // Step 3: Redirect to welcome page for full hydration
-    // This is the simplest, safest approach - let welcome page handle all hydration
-    router.push('/welcome');
+    // Redirect to dedicated context switch page with target CompanyHQ
+    router.push(`/context-switch?to=${newCompanyHQId}`);
   };
 
   // Don't show if no context
