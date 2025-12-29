@@ -59,18 +59,6 @@ export default function WelcomePage() {
             const defaultCompanyHqId = defaultMembership?.companyHqId || memberships[0]?.companyHqId;
             setSelectedCompanyHqId(defaultCompanyHqId);
             
-            // If switching via header AND membership is valid, automatically continue
-            if (hasStoredMembership && storedCompanyHQId && storedCompanyHQId !== owner.companyHQId) {
-              console.log(`🔄 Welcome: Detected valid CompanyHQ switch to ${storedCompanyHQId}, auto-continuing...`);
-              // Small delay to ensure state is set, then auto-continue
-              setTimeout(() => {
-                if (membershipData?.hasMemberships && selectedCompanyHqId) {
-                  handleContinue();
-                }
-              }, 200);
-              return;
-            }
-            
             // Set membership data for display/routing
             setMembershipData({
               hasMemberships,
