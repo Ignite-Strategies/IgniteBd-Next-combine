@@ -427,48 +427,14 @@ export default function IntelligencePreview({
         </section>
       )}
 
-      {/* Career Snapshot */}
-      {(normalizedContact.numberOfJobChanges !== null || 
-        normalizedContact.totalYearsExperience !== null ||
-        normalizedContact.averageTenureMonths !== null) && (
+      {/* Career Signals - Recent Changes Only */}
+      {(normalizedContact.recentJobChange || normalizedContact.recentPromotion) && (
         <section className="rounded-2xl bg-white p-6 shadow">
           <div className="flex items-center gap-3 mb-4">
             <Briefcase className="h-5 w-5 text-purple-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Career Snapshot</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Career Signals</h3>
           </div>
           <div className="space-y-3">
-            {normalizedContact.totalYearsExperience !== null && normalizedContact.totalYearsExperience !== undefined && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                <span className="text-sm text-gray-600">Total Experience</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {fmt(normalizedContact.totalYearsExperience)} years
-                </span>
-              </div>
-            )}
-            {normalizedContact.numberOfJobChanges !== null && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                <span className="text-sm text-gray-600">Job Changes</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {normalizedContact.numberOfJobChanges}
-                </span>
-              </div>
-            )}
-            {normalizedContact.averageTenureMonths !== null && normalizedContact.averageTenureMonths !== undefined && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                <span className="text-sm text-gray-600">Avg Tenure</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {fmt(normalizedContact.averageTenureMonths / 12)} years
-                </span>
-              </div>
-            )}
-            {normalizedContact.careerProgression && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                <span className="text-sm text-gray-600">Progression</span>
-                <span className="text-sm font-semibold text-gray-900 capitalize">
-                  {normalizedContact.careerProgression}
-                </span>
-              </div>
-            )}
             {normalizedContact.recentJobChange && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
                 <Clock className="h-4 w-4 text-yellow-600" />
