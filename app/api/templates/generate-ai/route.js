@@ -191,17 +191,10 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
       throw new Error(`Failed to normalize AI response: ${error.message}`);
     }
 
-    // Extract variables from both subject and body
+    // Extract variables from body only (subject has no variables)
     const extractedVariablesFromBody = extractVariableNames(normalized.body);
-    const extractedVariablesFromSubject = extractVariableNames(normalized.subject);
     
-    // Merge all variables
-    const allVariables = Array.from(
-      new Set([
-        ...extractedVariablesFromBody,
-        ...extractedVariablesFromSubject,
-      ])
-    );
+    const allVariables = extractedVariablesFromBody;
 
     // Return structure matching the relationship-aware pattern
     return NextResponse.json({
