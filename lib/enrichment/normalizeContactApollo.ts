@@ -8,6 +8,16 @@
 import type { ApolloPersonMatchResponse } from '@/lib/apollo';
 import { inferTimezoneFromLocation, detectRecentPromotion } from './apolloFieldMapper';
 
+/**
+ * Normalize seniority value to uppercase
+ * @param seniority - Raw seniority string from Apollo
+ * @returns Uppercase seniority string or undefined
+ */
+function normalizeSeniority(seniority: string | null | undefined): string | undefined {
+  if (!seniority) return undefined;
+  return seniority.toUpperCase();
+}
+
 export interface NormalizedContactFields {
   // Basic Info
   fullName?: string;
@@ -71,7 +81,7 @@ export function normalizeContactApollo(apolloData: ApolloPersonMatchResponse): N
 
   // Professional
   if (person.title) normalized.title = person.title;
-  if (person.seniority) normalized.seniority = person.seniority;
+  if (person.seniority) normalized.seniority = normalizeSeniority(person.seniority);
   if (person.department) normalized.department = person.department;
   // Job role can be derived from title if needed
   if (person.title) normalized.jobRole = person.title;

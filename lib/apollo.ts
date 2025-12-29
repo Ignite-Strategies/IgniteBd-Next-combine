@@ -56,6 +56,7 @@ export interface ApolloPersonMatchResponse {
     };
     photo_url?: string; // Avatar URL
     // Employment history - Apollo returns this in enrich endpoint
+    // Apollo may use different field names, so we check all variants
     employment_history?: Array<{
       started_at?: string;
       started_on?: string;

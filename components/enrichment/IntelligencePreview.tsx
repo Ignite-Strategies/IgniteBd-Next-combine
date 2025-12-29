@@ -393,34 +393,34 @@ export default function IntelligencePreview({
         </section>
       )}
 
-      {/* Career Timeline */}
+      {/* Career Timeline - LinkedIn Style */}
       {careerTimeline && careerTimeline.length > 0 && (
         <section className="rounded-2xl bg-white p-6 shadow">
           <div className="flex items-center gap-3 mb-4">
             <Briefcase className="h-5 w-5 text-indigo-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Career Timeline</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Career Snapshot</h3>
           </div>
-          <div className="space-y-3">
-            {careerTimeline.map((role, index) => (
-              <div key={index} className="flex items-start gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
-                <div className="flex-shrink-0 w-2 h-2 rounded-full bg-indigo-600 mt-2"></div>
-                <div className="flex-1">
-                  <div className="flex items-start justify-between mb-1">
-                    <div>
-                      <p className="font-semibold text-gray-900">{role.title}</p>
-                      <p className="text-sm text-gray-600">{role.company}</p>
-                    </div>
-                    <div className="text-right text-xs text-gray-500">
-                      <p>{new Date(role.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
-                      <p>{role.endDate ? new Date(role.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present'}</p>
-                    </div>
+          <div className="space-y-4">
+            {careerTimeline.map((role, index) => {
+              // Extract years - use startYear/endYear if available, otherwise parse from dates
+              const startYear = role.startYear || (role.startDate ? new Date(role.startDate).getFullYear() : null);
+              const endYear = role.endYear !== undefined ? role.endYear : (role.endDate ? new Date(role.endDate).getFullYear() : null);
+              const yearRange = endYear ? `${startYear}-${endYear}` : `${startYear}-Present`;
+              
+              return (
+                <div key={index} className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-1 h-full bg-indigo-200 rounded-full mt-1 mb-1"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm leading-tight">
+                      {role.company}
+                    </p>
+                    <p className="text-sm text-gray-700 mt-0.5">
+                      {yearRange} {role.title}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {role.durationYears > 0 ? `${fmt(role.durationYears)} ${role.durationYears === 1 ? 'year' : 'years'}` : `${role.durationMonths} ${role.durationMonths === 1 ? 'month' : 'months'}`}
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

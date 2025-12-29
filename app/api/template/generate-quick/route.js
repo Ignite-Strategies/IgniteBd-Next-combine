@@ -68,15 +68,18 @@ ${idea.trim()}
 2. **Infer the ask** - what they want from the person (meeting, coffee, collaboration, etc.)
 3. **Infer the general intent** - why they're reaching out
 4. **Build a template** with this structure:
-   - Warm welcome/greeting (use {{firstName}} variable)
+   - Title: Simple descriptive title that infers variables (e.g., "Collaboration Outreach to Old Colleague")
+   - Subject: Simple, human subject line WITHOUT variables that relates to the body (e.g., "Reaching Out", "Reconnecting", "Collaboration in 2026")
+   - Body: Warm welcome/greeting (use {{firstName}} variable)
    - Engagement line (reference why reaching out naturally)
    - The ask (what they want, low pressure)
    - Soft close with signature: "${ownerName}"
 
 Return ONLY valid JSON in this exact format:
 {
+  "title": "Simple descriptive title that infers variables (e.g., 'Collaboration Outreach to Old Colleague')",
   "content": "The email template with {{variableName}} tags",
-  "subject": "Email subject line with {{firstName}} variable (e.g., 'Hi {{firstName}},' or 'Quick check-in, {{firstName}}')",
+  "subject": "Simple, human subject line WITHOUT variables (e.g., 'Reaching Out', 'Reconnecting', 'Collaboration in 2026')",
   "inferred": {
     "relationship": "COLD" | "WARM" | "ESTABLISHED" | "DORMANT",
     "ask": "What they want (e.g., 'meet for coffee', 'catch up', 'explore collaboration')",
@@ -86,7 +89,8 @@ Return ONLY valid JSON in this exact format:
 }
 
 IMPORTANT: 
-- The "subject" field MUST include {{firstName}} variable (e.g., "Hi {{firstName}}," or "Quick check-in, {{firstName}}")
+- The "subject" field should be simple and relate to the body content (e.g., "Reaching Out", "Reconnecting", "Collaboration in 2026")
+- Do NOT use variables like {{firstName}} in the subject line - that's spammy
 - Do NOT use "[Your name]" in the content - use the provided signature: "${ownerName}"
 
 === TEMPLATE STRUCTURE ===
@@ -116,7 +120,7 @@ Idea: "build me a quick note to a friend and tell him I want to meet"
 Response:
 {
   "content": "Hi {{firstName}},\\n\\nHope you're doing well! Been thinking about you and wanted to reach out.\\n\\nWould love to catch up in person if you're open to it — maybe grab coffee or lunch?\\n\\nNo pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nCheers,\\n${ownerName}",
-  "subject": "Hi {{firstName}}, would love to catch up",
+  "subject": "Reconnecting",
   "inferred": {
     "relationship": "ESTABLISHED",
     "ask": "meet for coffee or lunch",
@@ -130,7 +134,7 @@ Idea: "I want to reach out to my old coworker Sarah who I haven't talked to in 2
 Response:
 {
   "content": "Hi {{firstName}},\\n\\nI know it's been a while since we connected — saw you moved to {{companyName}} and wanted to reach out!\\n\\nWould love to catch up over coffee if you're open to it. No pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nBest,\\n${ownerName}",
-  "subject": "Hi {{firstName}}, long time no see",
+  "subject": "Reconnecting",
   "inferred": {
     "relationship": "DORMANT",
     "ask": "catch up over coffee",
@@ -181,11 +185,17 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
       throw new Error('AI response missing content field');
     }
 
-    // Generate subject if not provided (extract from first line or use default)
+    // Generate subject if not provided (use simple default)
     let subject = parsed.subject;
     if (!subject || typeof subject !== 'string') {
-      // Default to greeting with firstName
-      subject = 'Hi {{firstName}},';
+      // Default to simple subject based on inferred ask
+      const inferred = parsed.inferred || {};
+      if (inferred.ask) {
+        subject = inferred.ask.includes('collaboration') ? 'Collaboration in 2026' : 
+                  inferred.relationship === 'DORMANT' ? 'Reconnecting' : 'Reaching Out';
+      } else {
+        subject = 'Reaching Out';
+      }
     }
 
     // Replace [Your name] with actual owner name in content if it exists

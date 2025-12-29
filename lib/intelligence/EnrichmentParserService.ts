@@ -911,13 +911,21 @@ export function calculateCareerStats(
 export function generateCareerTimeline(
   employmentHistory?: Array<{
     started_at?: string;
+    started_on?: string;
+    start_date?: string;
     ended_at?: string | null;
+    ended_on?: string | null;
+    end_date?: string | null;
     title?: string;
     organization?: { name?: string };
+    company?: string;
+    company_name?: string;
   }>
 ): Array<{
   startDate: string;
   endDate: string | null;
+  startYear: number;
+  endYear: number | null;
   title: string;
   company: string;
   durationMonths: number;
@@ -930,24 +938,38 @@ export function generateCareerTimeline(
   const now = new Date();
   const timeline = employmentHistory
     .filter(job => {
-      // Only include jobs with valid start dates
-      if (!job.started_at) return false;
-      const startDate = parseDate(job.started_at);
+      // Try multiple date field names
+      const startDateStr = job.started_at || job.started_on || job.start_date;
+      if (!startDateStr) return false;
+      const startDate = parseDate(startDateStr);
       return startDate !== null;
     })
     .map(job => {
-      const startDate = parseDate(job.started_at!)!; // We know it's valid from filter
-      const endDate = job.ended_at ? parseDate(job.ended_at) : now;
+      // Try multiple date field names
+      const startDateStr = job.started_at || job.started_on || job.start_date;
+      const endDateStr = job.ended_at || job.ended_on || job.end_date;
+      
+      const startDate = parseDate(startDateStr!)!; // We know it's valid from filter
+      const endDate = endDateStr ? parseDate(endDateStr) : now;
       const validEndDate = endDate || now; // Fallback to now if invalid
       
       const months = Math.max(0, (validEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
       const years = months / 12;
 
+      // Extract company name from multiple possible fields
+      const companyName = 
+        job.organization?.name || 
+        job.company || 
+        job.company_name || 
+        'Unknown Company';
+
       return {
         startDate: startDate.toISOString().split('T')[0], // YYYY-MM-DD
-        endDate: job.ended_at && endDate ? endDate.toISOString().split('T')[0] : null,
+        endDate: endDateStr && endDate ? endDate.toISOString().split('T')[0] : null,
+        startYear: startDate.getFullYear(),
+        endYear: endDateStr && endDate ? endDate.getFullYear() : null,
         title: job.title || 'Unknown Title',
-        company: job.organization?.name || 'Unknown Company',
+        company: companyName,
         durationMonths: Math.round(months),
         durationYears: Math.round(years * 10) / 10,
       };
