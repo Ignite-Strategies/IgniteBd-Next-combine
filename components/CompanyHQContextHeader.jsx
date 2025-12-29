@@ -73,27 +73,27 @@ export function CompanyHQContextHeader() {
       )}
 
       {/* Main Context Bar */}
-      <div className="container mx-auto px-4 py-2">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-2">
         <div className="flex items-center justify-between">
-          {/* Left: Current Context */}
-          <div className="flex items-center gap-3">
+          {/* Left: Current Context - Add left margin to account for logo */}
+          <div className="flex items-center gap-3 ml-0 sm:ml-0">
             <div className="flex items-center gap-2 text-sm text-gray-700">
-              <Building2 className="w-4 h-4 text-blue-600" />
-              <span className="font-medium">Working in:</span>
-              <span className="font-semibold text-blue-900">{companyHQ.companyName}</span>
+              <Building2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+              <span className="font-medium whitespace-nowrap">Working in:</span>
+              <span className="font-semibold text-blue-900 whitespace-nowrap">{companyHQ.companyName}</span>
               
               {currentRole && (
                 <>
                   <span className="text-gray-400">•</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 whitespace-nowrap">
                     {currentRole}
                   </span>
                 </>
               )}
             </div>
 
-            {/* CompanyHQ ID (truncated, hover to see full) */}
-            <div className="hidden md:block text-xs text-gray-500" title={companyHQId}>
+            {/* CompanyHQ ID (truncated, hover to see full) - hidden on smaller screens */}
+            <div className="hidden lg:block text-xs text-gray-500 whitespace-nowrap" title={companyHQId}>
               ID: {companyHQId.substring(0, 8)}...
             </div>
           </div>
@@ -169,7 +169,7 @@ export function CompanyHQContextHeader() {
 
         {/* Additional Info (if multiple companies) */}
         {hasMultipleCompanies && (
-          <div className="mt-1 text-xs text-gray-500">
+          <div className="mt-1 text-xs text-gray-500 px-4 sm:px-6 lg:px-8">
             You have access to {memberships.length} CompanyHQ{memberships.length !== 1 ? 's' : ''}
           </div>
         )}
