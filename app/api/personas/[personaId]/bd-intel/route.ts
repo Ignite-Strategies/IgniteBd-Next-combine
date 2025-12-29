@@ -51,7 +51,7 @@ export async function POST(
       include: {
         product_fits: {
           include: {
-            product: {
+            products: {
               select: {
                 id: true,
                 name: true,
@@ -124,7 +124,7 @@ ${JSON.stringify({
 
 Product Fit:
 ${JSON.stringify({
-  product: persona.product_fits.product,
+  product: persona.product_fits.products,
   valuePropToThem: persona.product_fits.valuePropToThem,
   alignmentReasoning: persona.product_fits.alignmentReasoning,
 }, null, 2)}

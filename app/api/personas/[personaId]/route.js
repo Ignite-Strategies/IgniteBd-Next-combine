@@ -31,7 +31,7 @@ export async function GET(request, { params }) {
       include: {
         product_fits: {
           include: {
-            product: {
+            products: {
               select: {
                 id: true,
                 name: true,
@@ -43,7 +43,8 @@ export async function GET(request, { params }) {
             },
           },
         },
-        bd_intels: true,
+        // bd_intels removed - migrating to contact_analyses
+        // bd_intels: true,
         companyHQ: {
           select: {
             id: true,

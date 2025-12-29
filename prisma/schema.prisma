@@ -107,6 +107,7 @@ model bd_eventop_intel {
   @@index([status])
 }
 
+// Legacy model - will be removed after migration to contact_analyses
 model bd_intels {
   id                    String   @id
   personaId             String   @unique
@@ -124,6 +125,28 @@ model bd_intels {
   createdAt             DateTime @default(now())
   updatedAt             DateTime
   personas              personas @relation(fields: [personaId], references: [id], onDelete: Cascade)
+}
+
+// Contact Analysis - for REAL contacts (meeting prep), not hypothetical personas
+model contact_analyses {
+  id                    String   @id @default(cuid())
+  contactId             String   @unique
+  fitScore              Int?
+  painAlignmentScore    Int?
+  workflowFitScore      Int?
+  urgencyScore          Int?
+  adoptionBarrierScore  Int?
+  risks                 Json?
+  opportunities         Json?
+  recommendedTalkTrack  String? // How to speak with THIS person
+  recommendedSequence   String? // Outreach sequence for THIS person
+  recommendedLeadSource String?
+  finalSummary          String? // Prep summary for meeting
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime
+  contacts              Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
 }
 
 model bdos_scores {
@@ -288,14 +311,14 @@ model company_hqs {
   blogs                                         blogs[]
   campaigns                                     campaigns[]
   companies                                     companies[]
-  contacts_company_hqs_contactOwnerIdTocontacts Contact?                       @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
+  contacts_company_hqs_contactOwnerIdTocontacts Contact?                        @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
   owners_company_hqs_ownerIdToowners            owners?                         @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
   platform                                      platform?                       @relation(fields: [platformId], references: [id])
   company_memberships                           company_memberships[]
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
-  contacts_contacts_crmIdTocompany_hqs          Contact[]                      @relation("contacts_crmIdTocompany_hqs")
+  contacts_contacts_crmIdTocompany_hqs          Contact[]                       @relation("contacts_crmIdTocompany_hqs")
   deliverable_templates                         deliverable_templates[]
   domain_registry                               domain_registry?
   email_sequences                               email_sequences[]
@@ -346,7 +369,7 @@ model consultant_deliverables {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime
   company_hqs      company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts         Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts         Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   proposals        proposals?  @relation(fields: [proposalId], references: [id])
 
   @@index([companyHQId])
@@ -456,8 +479,8 @@ model Contact {
   proposals                                                 proposals[]
   work_packages_work_packages_workPackageClientIdTocontacts work_packages[]           @relation("work_packages_workPackageClientIdTocontacts")
   work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]           @relation("work_packages_workPackageMemberIdTocontacts")
+  contact_analyses                                          contact_analyses?
 
-  @@map("contacts")
   @@unique([email, crmId])
   @@index([companyDomain])
   @@index([companyId])
@@ -466,6 +489,7 @@ model Contact {
   @@index([firebaseUid])
   @@index([ownerId])
   @@index([role])
+  @@map("contacts")
 }
 
 model deliverable_templates {
@@ -705,7 +729,7 @@ model invite_tokens {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
-  contacts  Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([email])
@@ -857,6 +881,7 @@ model personas {
   title                String
   headline             String?
   seniority            String?
+  role                 String? // Additional role context (more than just title)
   industry             String?
   subIndustries        String[]
   company              String?
@@ -864,7 +889,10 @@ model personas {
   annualRevenue        String?
   location             String?
   description          String?
-  whatTheyWant         String?
+  whatTheyWant         String? // Legacy field - use needForOurProduct
+  coreGoal             String? // Their north star (regardless of our product)
+  needForOurProduct    String? // Need for OUR PRODUCT assessment (key field!)
+  potentialPitch       String? // How we would pitch (inferred)
   painPoints           String[]
   risks                String[]
   decisionDrivers      String[]
@@ -872,7 +900,7 @@ model personas {
   createdAt            DateTime               @default(now())
   updatedAt            DateTime
   productId            String?
-  bd_intels            bd_intels?
+  bd_intels            bd_intels? // Legacy - will be removed after migration
   event_tuner_personas event_tuner_personas[]
   company_hqs          company_hqs            @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   products             products?              @relation(fields: [productId], references: [id])
@@ -913,7 +941,7 @@ model pipelines {
   stage     String
   createdAt DateTime @default(now())
   updatedAt DateTime
-  contacts  Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
 model platform {
@@ -1038,7 +1066,7 @@ model proposals {
   proposal_phases         proposal_phases[]
   company_hqs             company_hqs               @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   companies               companies                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts                Contact                  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts                Contact                   @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
 model prospect_candidates {
@@ -1136,16 +1164,16 @@ model template_relationship_helpers {
 }
 
 model templates {
-  id          String       @id
+  id          String      @id
   subject     String
   body        String
-  createdAt   DateTime     @default(now())
-  companyHQId String       // Required - company-scoped (matches phase_templates pattern)
+  createdAt   DateTime    @default(now())
+  companyHQId String // Required - company-scoped (matches phase_templates pattern)
   title       String
-  ownerId     String?      // Optional - creator/audit trail
+  ownerId     String? // Optional - creator/audit trail
   campaigns   campaigns[]
-  company_hqs company_hqs  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  owners      owners?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  owners      owners?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   @@index([companyHQId])
   @@index([ownerId])
@@ -1241,8 +1269,8 @@ model work_packages {
   work_package_items                                   work_package_items[]
   work_package_phases                                  work_package_phases[]
   companies                                            companies             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts_work_packages_workPackageClientIdTocontacts Contact              @relation("work_packages_workPackageClientIdTocontacts", fields: [workPackageClientId], references: [id])
-  contacts_work_packages_workPackageMemberIdTocontacts Contact?             @relation("work_packages_workPackageMemberIdTocontacts", fields: [workPackageMemberId], references: [id])
+  contacts_work_packages_workPackageClientIdTocontacts Contact               @relation("work_packages_workPackageClientIdTocontacts", fields: [workPackageClientId], references: [id])
+  contacts_work_packages_workPackageMemberIdTocontacts Contact?              @relation("work_packages_workPackageMemberIdTocontacts", fields: [workPackageMemberId], references: [id])
   company_hqs                                          company_hqs           @relation(fields: [workPackageOwnerId], references: [id])
 
   @@index([companyId])

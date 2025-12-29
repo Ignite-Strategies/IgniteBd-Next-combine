@@ -66,7 +66,7 @@ export async function POST(
     }
 
     // Fetch all products for this tenant
-    const products = await prisma.product.findMany({
+    const products = await prisma.products.findMany({
       where: { companyHQId: persona.companyHQId },
       select: {
         id: true,

@@ -57,7 +57,7 @@ export async function GET(request) {
       where: {
         companyHQId,
         ...(productId ? { 
-          productFit: {
+          product_fits: {
             productId: productId
           }
         } : {}),
@@ -65,7 +65,7 @@ export async function GET(request) {
       include: {
         product_fits: {
           include: {
-            product: {
+            products: {
               select: {
                 id: true,
                 name: true,
@@ -74,7 +74,8 @@ export async function GET(request) {
             },
           },
         },
-        bd_intels: true,
+        // bd_intels removed - migrating to contact_analyses
+        // bd_intels: true,
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -222,9 +223,9 @@ export async function POST(request) {
         where: { id },
         data: personaData,
         include: {
-          productFit: {
+          product_fits: {
             include: {
-              product: {
+              products: {
                 select: {
                   id: true,
                   name: true,
@@ -233,16 +234,17 @@ export async function POST(request) {
               },
             },
           },
-          bd_intels: true,
+          // bd_intels removed - migrating to contact_analyses
+          // bd_intels: true,
         },
       });
     } else {
       persona = await prisma.personas.create({
         data: personaData,
         include: {
-          productFit: {
+          product_fits: {
             include: {
-              product: {
+              products: {
                 select: {
                   id: true,
                   name: true,
@@ -251,7 +253,8 @@ export async function POST(request) {
               },
             },
           },
-          bd_intels: true,
+          // bd_intels removed - migrating to contact_analyses
+          // bd_intels: true,
         },
       });
     }

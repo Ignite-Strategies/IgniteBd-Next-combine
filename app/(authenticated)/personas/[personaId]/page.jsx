@@ -144,10 +144,12 @@ export default function PersonaDetailPage({ params }) {
                   <dd>{persona.location}</dd>
                 </div>
               )}
-              <div>
-                <dt className="font-semibold text-gray-700">Company Context</dt>
-                <dd>{persona.companyHQ?.companyName || 'Linked to company HQ'}</dd>
-              </div>
+              {persona.companyHQ && (
+                <div>
+                  <dt className="font-semibold text-gray-700">Company Context</dt>
+                  <dd>{persona.companyHQ.companyName || 'Linked to company HQ'}</dd>
+                </div>
+              )}
             </dl>
           </section>
 
@@ -161,19 +163,15 @@ export default function PersonaDetailPage({ params }) {
                 <FieldBlock label="Description" value={persona.description} />
               )}
               <FieldBlock label="What They Want" value={persona.whatTheyWant} />
-              {persona.painPoints && (
+              {persona.painPoints && Array.isArray(persona.painPoints) && persona.painPoints.length > 0 && (
                 <div>
                   <p className="font-semibold text-gray-800">Pain Points</p>
                   <div className="mt-1 text-sm text-gray-600">
-                    {Array.isArray(persona.painPoints) ? (
-                      <ul className="list-disc list-inside space-y-1">
-                        {persona.painPoints.map((point, idx) => (
-                          <li key={idx}>{point}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p>{persona.painPoints || 'Fill this in to strengthen targeting.'}</p>
-                    )}
+                    <ul className="list-disc list-inside space-y-1">
+                      {persona.painPoints.map((point, idx) => (
+                        <li key={idx}>{point}</li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               )}
@@ -181,10 +179,10 @@ export default function PersonaDetailPage({ params }) {
                 <div>
                   <p className="font-semibold text-gray-800">Product Fit</p>
                   <div className="mt-1 text-sm text-gray-600">
-                    <p><strong>Product:</strong> {persona.product_fits.product?.name || 'N/A'}</p>
+                    <p><strong>Product:</strong> {persona.product_fits?.products?.name || 'N/A'}</p>
                     <p className="mt-2"><strong>Value Prop to Them:</strong></p>
-                    <p className="mt-1">{persona.product_fits.valuePropToThem || 'N/A'}</p>
-                    {persona.product_fits.alignmentReasoning && (
+                    <p className="mt-1">{persona.product_fits?.valuePropToThem || 'N/A'}</p>
+                    {persona.product_fits?.alignmentReasoning && (
                       <>
                         <p className="mt-2"><strong>Alignment Reasoning:</strong></p>
                         <p className="mt-1">{persona.product_fits.alignmentReasoning}</p>
@@ -193,7 +191,7 @@ export default function PersonaDetailPage({ params }) {
                   </div>
                 </div>
               )}
-              {persona.buyerTriggers && persona.buyerTriggers.length > 0 && (
+              {persona.buyerTriggers && Array.isArray(persona.buyerTriggers) && persona.buyerTriggers.length > 0 && (
                 <div>
                   <p className="font-semibold text-gray-800">Buyer Triggers</p>
                   <div className="mt-1 text-sm text-gray-600">
@@ -205,28 +203,7 @@ export default function PersonaDetailPage({ params }) {
                   </div>
                 </div>
               )}
-              {persona.bd_intels && (
-                <div>
-                  <p className="font-semibold text-gray-800">BD Intelligence</p>
-                  <div className="mt-1 text-sm text-gray-600 space-y-2">
-                    <p><strong>Fit Score:</strong> {persona.bd_intels.fitScore}/100</p>
-                    <p><strong>Pain Alignment:</strong> {persona.bd_intels.painAlignmentScore}/100</p>
-                    <p><strong>Workflow Fit:</strong> {persona.bd_intels.workflowFitScore}/100</p>
-                    {persona.bd_intels.recommendedTalkTrack && (
-                      <>
-                        <p className="mt-2"><strong>Recommended Talk Track:</strong></p>
-                        <p className="mt-1">{persona.bd_intels.recommendedTalkTrack}</p>
-                      </>
-                    )}
-                    {persona.bd_intels.finalSummary && (
-                      <>
-                        <p className="mt-2"><strong>Summary:</strong></p>
-                        <p className="mt-1">{persona.bd_intels.finalSummary}</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* bd_intels removed - migrating to contact_analyses */}
             </div>
           </section>
         </div>

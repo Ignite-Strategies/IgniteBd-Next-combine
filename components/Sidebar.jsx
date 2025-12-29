@@ -52,6 +52,7 @@ function Sidebar() {
         { key: 'templates', label: 'Templates', href: '/templates', icon: FileCode },
         { key: 'pipelines', label: 'Pipeline', href: '/pipelines', icon: GitBranch },
         { key: 'companies', label: 'Company Hub', href: '/companies', icon: Building2 },
+        { key: 'meetings', label: 'Meetings', href: '/meetings', icon: Calendar },
       ],
     },
     {
