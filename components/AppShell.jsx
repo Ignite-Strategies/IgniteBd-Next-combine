@@ -67,9 +67,12 @@ export default function AppShell({ children }) {
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  // Routes that should never show navigation (even when authenticated)
+  // Routes that should never show navigation or context header (even when authenticated)
   const PUBLIC_ROUTES = ['/'];
+  // Auth/onboarding routes that shouldn't show context header
+  const HIDE_CONTEXT_ROUTES = ['/welcome', '/signup', '/signin', '/sign-in', '/sign-up'];
   const isPublicRoute = pathname && PUBLIC_ROUTES.includes(pathname);
+  const shouldHideContext = pathname && HIDE_CONTEXT_ROUTES.some(route => pathname.startsWith(route));
 
   // Show navigation when authenticated, but not on public routes like splash
   if (isAuthenticated && !isPublicRoute) {
@@ -78,8 +81,8 @@ export default function AppShell({ children }) {
         {/* Top Navigation Bar - Global component */}
         <Navigation />
         
-        {/* CompanyHQ Context Header - Shows current company and role */}
-        <CompanyHQContextHeader />
+        {/* CompanyHQ Context Header - Shows current company and role (hidden on auth/onboarding pages) */}
+        {!shouldHideContext && <CompanyHQContextHeader />}
         
         {/* Sidebar - Only render when showSidebar is true */}
         {showSidebar && <Sidebar />}
