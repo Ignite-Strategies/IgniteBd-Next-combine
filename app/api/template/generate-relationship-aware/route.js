@@ -44,7 +44,25 @@ export async function POST(request) {
       myBusinessDescription,
       desiredOutcome,
       contextNotes, // From template_relationship_helpers model
+      ownerId, // For getting owner name for signature
     } = body ?? {};
+
+    // Get owner name for signature (if ownerId provided)
+    let ownerName = '[Your name]';
+    if (ownerId) {
+      try {
+        const { prisma } = await import('@/lib/prisma');
+        const owner = await prisma.owners.findUnique({
+          where: { id: ownerId },
+          select: { firstName: true, lastName: true, name: true },
+        });
+        if (owner) {
+          ownerName = owner.firstName || owner.name?.split(' ')[0] || '[Your name]';
+        }
+      } catch (err) {
+        console.warn('Could not fetch owner name:', err);
+      }
+    }
 
     if (!relationship || !typeOfPerson || !whyReachingOut) {
       return NextResponse.json(
@@ -178,7 +196,7 @@ Use {{variableName}} ONLY for contact-specific data that will be filled in later
 10. **Company Context**: Use {{companyName}} when relevant to the conversation
 11. **Location Context**: Use {{city}} or {{state}} when mentioning local events or regional topics
 12. **Professional Context**: Use {{title}} or {{seniority}} when relevant to the ask or context
-13. **Signature**: End with a plain name like "Joel" or "Cheers, Joel"
+13. **Signature**: End with the provided signature: "${ownerName}" (NOT "[Your name]")
 
 === TEMPLATE STRUCTURE ===
 1. **Warm Greeting**: "Hi {{firstName}}," or similar
@@ -196,7 +214,7 @@ If relationship="DORMANT", typeOfPerson="FORMER_COWORKER", timeSinceConnected="a
 {
   "title": "Reconnecting with Former Co-worker - Dormant Relationship",
   "subject": "Hi {{firstName}}, long time no see",
-  "content": "Hi {{firstName}},\\n\\nI know it's been a long time since we connected. I saw you recently started working at {{companyName}}.\\n\\nNot sure if you knew, but I run my own NDA house.\\n\\nLet's get together in 2026 — see if we can collaborate and get some NDA work from you.\\n\\nNo pressure at all — just wanted to reach out.\\n\\nCheers to what's ahead!\\n\\nJoel",
+  "content": "Hi {{firstName}},\\n\\nI know it's been a long time since we connected. I saw you recently started working at {{companyName}}.\\n\\nNot sure if you knew, but I run my own NDA house.\\n\\nLet's get together in 2026 — see if we can collaborate and get some NDA work from you.\\n\\nNo pressure at all — just wanted to reach out.\\n\\nCheers to what's ahead!\\n\\n${ownerName}",
   "suggestedVariables": ["firstName", "companyName"]
 }
 
@@ -205,7 +223,7 @@ If relationship="ESTABLISHED", typeOfPerson="FRIEND_OF_FRIEND", whatWantFromThem
 {
   "title": "Catching up with Friend - Established Relationship",
   "subject": "Hi {{firstName}}, would love to catch up",
-  "content": "Hi {{firstName}},\\n\\nHope you're doing well! Been thinking about you and wanted to reach out.\\n\\nWould love to catch up if you're open to it — maybe grab coffee or lunch?\\n\\nNo pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nCheers,\\nJoel",
+  "content": "Hi {{firstName}},\\n\\nHope you're doing well! Been thinking about you and wanted to reach out.\\n\\nWould love to catch up if you're open to it — maybe grab coffee or lunch?\\n\\nNo pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nCheers,\\n${ownerName}",
   "suggestedVariables": ["firstName"]
 }
 
@@ -257,19 +275,29 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
       throw new Error('AI response missing content field');
     }
 
+    // Replace [Your name] with actual owner name in content if it exists
+    let templateContent = parsed.content;
+    if (ownerName && ownerName !== '[Your name]') {
+      templateContent = templateContent.replace(/\[Your name\]/g, ownerName);
+    }
+
     // Generate title if not provided (fallback)
     const title = parsed.title || `Relationship: ${typeOfPerson} - ${relationship}`;
     
-    // Generate subject if not provided (extract from first line of content or use default)
+    // Generate subject if not provided (must include {{firstName}})
     let subject = parsed.subject;
     if (!subject || typeof subject !== 'string') {
-      // Fallback: extract first meaningful line from content or use a default
-      const firstLine = parsed.content.split('\\n')[0].replace(/{{.*?}}/g, '').trim();
-      subject = firstLine || `Hi {{firstName}}, ${whyReachingOut.substring(0, 50)}...`;
+      // Default to greeting with firstName
+      subject = 'Hi {{firstName}},';
+    }
+    
+    // Ensure subject includes {{firstName}} if it doesn't already
+    if (!subject.includes('{{firstName}}')) {
+      subject = `Hi {{firstName}}, ${subject}`;
     }
 
     // Extract variables from both subject and content
-    const extractedVariablesFromContent = extractVariableNames(parsed.content);
+    const extractedVariablesFromContent = extractVariableNames(templateContent);
     const extractedVariablesFromSubject = extractVariableNames(subject);
     
     // Merge with AI's suggested variables
@@ -285,8 +313,8 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
       success: true,
       title: title.trim(),
       subject: subject.trim(),
-      body: parsed.content.trim(), // Map content to body for Template model
-      template: parsed.content.trim(), // Keep for backward compatibility
+      body: templateContent.trim(), // Map content to body for Template model (with owner name replaced)
+      template: templateContent.trim(), // Keep for backward compatibility
       variables: allVariables, // Simple string array
     });
   } catch (error) {

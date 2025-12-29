@@ -34,33 +34,23 @@ export default function QuickIdeaTemplatePage() {
       setGenerating(true);
       setError('');
 
-      // Call the generate-quick endpoint
+      // Call the generate-quick endpoint with ownerId for signature
       const response = await api.post('/api/template/generate-quick', {
         idea: idea.trim(),
+        ownerId: ownerId,
       });
 
       if (response.data?.success && response.data?.template) {
         // Navigate to template builder with generated data
-        // The generate-quick endpoint returns: { success: true, template, inferred, variables }
-        // template = body content, inferred = { relationship, ask, intent }
+        // The generate-quick endpoint returns: { success: true, template, subject, inferred, variables }
         const templateBody = response.data.template || '';
+        const subject = response.data.subject || 'Hi {{firstName}},';
         const inferred = response.data.inferred || {};
         
         // Generate title from inferred data
         const title = inferred.ask 
           ? `Quick Note: ${inferred.ask}`
           : 'AI Generated Template';
-        
-        // Generate subject from first line of template or default
-        // Template body uses \n for newlines, so split on that
-        let subject = 'Hi {{firstName}}';
-        if (templateBody) {
-          // Handle both \n and actual newlines
-          const firstLine = templateBody.split(/\\n|\n/)[0].replace(/{{.*?}}/g, '').trim();
-          if (firstLine && firstLine.length < 80 && firstLine.length > 0) {
-            subject = firstLine;
-          }
-        }
         
         // Create params for template builder - URL encode properly
         const params = new URLSearchParams({

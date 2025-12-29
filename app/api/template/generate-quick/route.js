@@ -41,6 +41,44 @@ export async function POST(request) {
       );
     }
 
+export async function POST(request) {
+  try {
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 },
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const { idea, ownerId } = body ?? {};
+
+    if (!idea || idea.trim() === '') {
+      return NextResponse.json(
+        { error: 'idea is required' },
+        { status: 400 },
+      );
+    }
+
+    // Get owner name for signature (if ownerId provided)
+    let ownerName = '[Your name]';
+    if (ownerId) {
+      try {
+        const { prisma } = await import('@/lib/prisma');
+        const owner = await prisma.owners.findUnique({
+          where: { id: ownerId },
+          select: { firstName: true, lastName: true, name: true },
+        });
+        if (owner) {
+          ownerName = owner.firstName || owner.name?.split(' ')[0] || '[Your name]';
+        }
+      } catch (err) {
+        console.warn('Could not fetch owner name:', err);
+      }
+    }
+
     const prompt = `You are a Business Development Relationship Manager. Your task is to create a quick, warm, human outreach note from a simple idea.
 
 === USER'S IDEA ===
@@ -54,11 +92,12 @@ ${idea.trim()}
    - Warm welcome/greeting (use {{firstName}} variable)
    - Engagement line (reference why reaching out naturally)
    - The ask (what they want, low pressure)
-   - Soft close
+   - Soft close with signature: "${ownerName}"
 
 Return ONLY valid JSON in this exact format:
 {
   "content": "The email template with {{variableName}} tags",
+  "subject": "Email subject line with {{firstName}} variable (e.g., 'Hi {{firstName}},' or 'Quick check-in, {{firstName}}')",
   "inferred": {
     "relationship": "COLD" | "WARM" | "ESTABLISHED" | "DORMANT",
     "ask": "What they want (e.g., 'meet for coffee', 'catch up', 'explore collaboration')",
@@ -66,6 +105,10 @@ Return ONLY valid JSON in this exact format:
   },
   "suggestedVariables": ["firstName", "companyName", etc.]
 }
+
+IMPORTANT: 
+- The "subject" field MUST include {{firstName}} variable (e.g., "Hi {{firstName}}," or "Quick check-in, {{firstName}}")
+- Do NOT use "[Your name]" in the content - use the provided signature: "${ownerName}"
 
 === TEMPLATE STRUCTURE ===
 1. **Warm Welcome**: Start with "Hi {{firstName}}," or similar friendly greeting
@@ -93,7 +136,8 @@ Idea: "build me a quick note to a friend and tell him I want to meet"
 
 Response:
 {
-  "content": "Hi {{firstName}},\\n\\nHope you're doing well! Been thinking about you and wanted to reach out.\\n\\nWould love to catch up in person if you're open to it — maybe grab coffee or lunch?\\n\\nNo pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nCheers,\\n[Your name]",
+  "content": "Hi {{firstName}},\\n\\nHope you're doing well! Been thinking about you and wanted to reach out.\\n\\nWould love to catch up in person if you're open to it — maybe grab coffee or lunch?\\n\\nNo pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nCheers,\\n${ownerName}",
+  "subject": "Hi {{firstName}}, would love to catch up",
   "inferred": {
     "relationship": "ESTABLISHED",
     "ask": "meet for coffee or lunch",
@@ -106,7 +150,8 @@ Idea: "I want to reach out to my old coworker Sarah who I haven't talked to in 2
 
 Response:
 {
-  "content": "Hi {{firstName}},\\n\\nI know it's been a while since we connected — saw you moved to {{companyName}} and wanted to reach out!\\n\\nWould love to catch up over coffee if you're open to it. No pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nBest,\\n[Your name]",
+  "content": "Hi {{firstName}},\\n\\nI know it's been a while since we connected — saw you moved to {{companyName}} and wanted to reach out!\\n\\nWould love to catch up over coffee if you're open to it. No pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nBest,\\n${ownerName}",
+  "subject": "Hi {{firstName}}, long time no see",
   "inferred": {
     "relationship": "DORMANT",
     "ask": "catch up over coffee",
@@ -157,20 +202,36 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
       throw new Error('AI response missing content field');
     }
 
-    // Extract variables from the generated content
-    const extractedVariables = extractVariableNames(parsed.content);
+    // Generate subject if not provided (extract from first line or use default)
+    let subject = parsed.subject;
+    if (!subject || typeof subject !== 'string') {
+      // Default to greeting with firstName
+      subject = 'Hi {{firstName}},';
+    }
+
+    // Replace [Your name] with actual owner name in content if it exists
+    let templateContent = parsed.content;
+    if (ownerName && ownerName !== '[Your name]') {
+      templateContent = templateContent.replace(/\[Your name\]/g, ownerName);
+    }
+
+    // Extract variables from both subject and content
+    const extractedVariablesFromContent = extractVariableNames(templateContent);
+    const extractedVariablesFromSubject = extractVariableNames(subject);
     
     // Merge with AI's suggested variables
     const allVariables = Array.from(
       new Set([
-        ...extractedVariables,
+        ...extractedVariablesFromContent,
+        ...extractedVariablesFromSubject,
         ...(parsed.suggestedVariables || [])
       ])
     );
 
     return NextResponse.json({
       success: true,
-      template: parsed.content,
+      template: templateContent,
+      subject: subject,
       inferred: parsed.inferred || {},
       variables: allVariables, // Simple string array
     });

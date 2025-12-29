@@ -52,7 +52,24 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { title, subject, body: bodyText, templateId } = body ?? {};
+    const { title, subject, body: bodyText, templateId, ownerId } = body ?? {};
+
+    // Get owner name for signature (if ownerId provided)
+    let ownerName = '[Your name]';
+    if (ownerId) {
+      try {
+        const { prisma } = await import('@/lib/prisma');
+        const owner = await prisma.owners.findUnique({
+          where: { id: ownerId },
+          select: { firstName: true, lastName: true, name: true },
+        });
+        if (owner) {
+          ownerName = owner.firstName || owner.name?.split(' ')[0] || '[Your name]';
+        }
+      } catch (err) {
+        console.warn('Could not fetch owner name:', err);
+      }
+    }
 
     // Build context from provided content
     const hasContent = (title && title.trim()) || (subject && subject.trim()) || (bodyText && bodyText.trim());
@@ -87,7 +104,7 @@ Generate a complete email template with:
 4. **No Sales Language**: No CTAs, no calendar links, no "let's hop on a call"
 5. **Greeting**: Always start with "Hi {{firstName}}," or similar
 6. **Company Context**: Use {{companyName}} when relevant
-7. **Signature**: End with a plain name like "Best," or "Cheers,"
+7. **Signature**: End with the provided signature: "${ownerName}" (NOT "[Your name]")
 
 === OUTPUT FORMAT ===
 Return ONLY valid JSON in this exact format:
@@ -101,7 +118,7 @@ Return ONLY valid JSON in this exact format:
 {
   "title": "Reconnecting with Former Colleague",
   "subject": "Hi {{firstName}}, long time no see",
-  "body": "Hi {{firstName}},\\n\\nI hope this email finds you well. It's been a while since we connected, and I wanted to reach out.\\n\\nI saw you're now at {{companyName}} - congratulations on the new role!\\n\\nI'd love to catch up and see how things are going. No pressure at all, just thought it'd be nice to reconnect.\\n\\nBest,\\n[Your Name]"
+  "body": "Hi {{firstName}},\\n\\nI hope this email finds you well. It's been a while since we connected, and I wanted to reach out.\\n\\nI saw you're now at {{companyName}} - congratulations on the new role!\\n\\nI'd love to catch up and see how things are going. No pressure at all, just thought it'd be nice to reconnect.\\n\\nBest,\\n${ownerName}"
 }
 
 Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
@@ -147,6 +164,16 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
 
       // Normalize the response to ensure consistent structure
       normalized = normalizeTemplateResponse(parsed);
+
+      // Replace [Your name] with actual owner name if it exists
+      if (ownerName && ownerName !== '[Your name]') {
+        normalized.body = normalized.body.replace(/\[Your name\]/g, ownerName);
+      }
+
+      // Ensure subject includes {{firstName}} if it doesn't already
+      if (!normalized.subject.includes('{{firstName}}')) {
+        normalized.subject = `Hi {{firstName}}, ${normalized.subject}`;
+      }
 
       // Validate the normalized structure
       if (!validateTemplateStructure(normalized)) {

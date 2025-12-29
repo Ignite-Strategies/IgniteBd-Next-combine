@@ -42,7 +42,7 @@ export default function RelationshipAwareTemplatePage() {
       setGenerating(true);
       setError('');
 
-      // Call the generate-relationship-aware endpoint
+      // Call the generate-relationship-aware endpoint with ownerId for signature
       const response = await api.post('/api/template/generate-relationship-aware', {
         relationship: relationship,
         typeOfPerson: typeOfPerson,
@@ -53,6 +53,7 @@ export default function RelationshipAwareTemplatePage() {
         knowledgeOfBusiness: knowledgeOfBusiness,
         myBusinessDescription: myBusinessDescription.trim() || undefined,
         desiredOutcome: desiredOutcome.trim() || undefined,
+        ownerId: ownerId,
       });
 
       if (response.data?.success && response.data?.body) {

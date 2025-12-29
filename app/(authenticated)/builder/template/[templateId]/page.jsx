@@ -19,7 +19,7 @@ export default function TemplateBuilderPage() {
   const isNew = templateId === 'new';
   const cloneFrom = searchParams?.get('cloneFrom');
   
-  const { ownerId } = useOwner();
+  const { ownerId, owner } = useOwner();
 
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
@@ -45,7 +45,17 @@ export default function TemplateBuilderPage() {
       if (titleParam || subjectParam || bodyParam) {
         setTitle(titleParam || '');
         setSubject(subjectParam || '');
-        setBody(bodyParam || '');
+        // Replace [Your name] with actual owner name if present
+        let bodyContent = bodyParam || '';
+        if (owner) {
+          const ownerName = owner.firstName || owner.name?.split(' ')[0] || '';
+          if (ownerName) {
+            bodyContent = bodyContent.replace(/\[Your name\]/g, ownerName);
+          }
+        }
+        setBody(bodyContent);
+        setLoading(false);
+      } else {
         setLoading(false);
       }
     }
@@ -96,6 +106,7 @@ export default function TemplateBuilderPage() {
         title: title || undefined,
         subject: subject || undefined,
         body: body || undefined,
+        ownerId: ownerId,
       });
 
       if (response.data?.subject && response.data?.body) {
@@ -306,7 +317,7 @@ export default function TemplateBuilderPage() {
                 <label className="block text-sm font-semibold text-gray-700">
                   Body *
                 </label>
-                {isNew && (
+                {isNew && !title && !subject && !body && (
                   <button
                     type="button"
                     onClick={handleGenerateWithAI}
