@@ -65,10 +65,19 @@ export async function POST(request) {
       );
     }
 
-    // Fetch all contacts with all relations
+    // Get ALL CompanyHQs user has access to (for cross-CompanyHQ contact access)
+    const allMemberships = await prisma.company_memberships.findMany({
+      where: { userId: owner.id },
+      select: { companyHqId: true }
+    });
+    const accessibleCompanyHQIds = allMemberships.map(m => m.companyHqId);
+    
+    console.log(`🔍 Hydrating contacts from ${accessibleCompanyHQIds.length} accessible CompanyHQs:`, accessibleCompanyHQIds);
+
+    // Fetch all contacts with all relations (from ALL accessible CompanyHQs)
     const contacts = await prisma.contact.findMany({
       where: {
-        crmId: companyHQId,
+        crmId: { in: accessibleCompanyHQIds },
       },
       include: {
         companies: true, // Company relation
