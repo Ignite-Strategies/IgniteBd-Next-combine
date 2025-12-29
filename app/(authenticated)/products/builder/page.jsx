@@ -34,6 +34,13 @@ export default function ProductBuilderPage({ searchParams }) {
   const productId = searchParams?.productId || null;
   const buildWithAI = searchParams?.buildWithAI === 'true';
 
+  // Redirect to fork page if creating new product without going through fork
+  useEffect(() => {
+    if (!productId && !buildWithAI) {
+      router.replace('/products/create');
+    }
+  }, [productId, buildWithAI, router]);
+
   const [isHydrating, setIsHydrating] = useState(Boolean(productId));
   const [fetchError, setFetchError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
