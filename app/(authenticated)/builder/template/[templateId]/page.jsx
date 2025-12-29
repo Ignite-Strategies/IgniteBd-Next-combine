@@ -99,17 +99,21 @@ export default function TemplateBuilderPage() {
       });
 
       if (response.data?.subject && response.data?.body) {
-        // Populate fields with generated content
-        setTitle(response.data.title || '');
-        setSubject(response.data.subject);
-        setBody(response.data.body);
+        // Redirect to template builder with generated data in query params
+        const params = new URLSearchParams({
+          title: response.data.title || '',
+          subject: response.data.subject,
+          body: response.data.body,
+        });
+        
+        router.push(`/builder/template/new?${params.toString()}`);
       } else {
         setError('Failed to generate template - invalid response format');
+        setGeneratingAI(false);
       }
     } catch (err) {
       console.error('Error generating with AI:', err);
       setError(err.response?.data?.error || err.message || 'Failed to generate template with AI');
-    } finally {
       setGeneratingAI(false);
     }
   };
