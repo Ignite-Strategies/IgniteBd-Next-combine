@@ -35,8 +35,20 @@ export default function TemplateBuilderPage() {
       loadTemplate();
     } else if (cloneFrom) {
       loadTemplateToClone(cloneFrom);
+    } else if (isNew) {
+      // Check for pre-filled data from query params (AI generation)
+      const titleParam = searchParams?.get('title');
+      const subjectParam = searchParams?.get('subject');
+      const bodyParam = searchParams?.get('body');
+      
+      if (titleParam || subjectParam || bodyParam) {
+        setTitle(titleParam || '');
+        setSubject(subjectParam || '');
+        setBody(bodyParam || '');
+        setLoading(false);
+      }
     }
-  }, [templateId, isNew, cloneFrom]);
+  }, [templateId, isNew, cloneFrom, searchParams]);
 
   const loadTemplate = async () => {
     try {
