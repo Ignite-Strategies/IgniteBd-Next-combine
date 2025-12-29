@@ -399,7 +399,7 @@ model contact_lists {
 }
 
 model Contact {
-  id                                                        String                    @id
+  id                                                        String                    @id @default(dbgenerated("gen_random_uuid()"))
   crmId                                                     String
   firstName                                                 String?
   lastName                                                  String?
