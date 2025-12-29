@@ -8,13 +8,19 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
-model platform {
-  id           String         @id @default(uuid())
-  name         String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  company_hqs  company_hqs[]
-  super_admins super_admins[]
+model GoogleOAuthToken {
+  id           String   @id
+  ownerId      String
+  provider     String   @default("google")
+  refreshToken String
+  scopes       String?
+  email        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  owners       owners   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, provider])
+  @@index([ownerId])
 }
 
 model assessments {
@@ -44,6 +50,39 @@ model assessments {
   @@index([ownerId])
 }
 
+model bd_event_ops {
+  id              String            @id
+  companyHQId     String
+  ownerId         String
+  eventPlanId     String?
+  title           String
+  description     String?
+  whyGo           String?
+  eventType       EventType
+  startDate       DateTime?
+  endDate         DateTime?
+  city            String?
+  state           String?
+  country         String?
+  costBand        String?
+  source          EventSource       @default(MANUAL)
+  status          EventOppStatus    @default(CONSIDERING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  eventTunerId    String?
+  prioritySource  String?
+  event_tuners    event_tuners?     @relation(fields: [eventTunerId], references: [id])
+  event_plan_opps event_plan_opps[]
+
+  @@index([companyHQId])
+  @@index([eventPlanId])
+  @@index([eventTunerId])
+  @@index([ownerId])
+  @@index([prioritySource])
+  @@index([source])
+  @@index([status])
+}
+
 model bd_eventop_intel {
   id               String         @id
   companyHQId      String
@@ -66,7 +105,6 @@ model bd_eventop_intel {
   @@index([ownerId])
   @@index([personaId])
   @@index([status])
-  @@map("bd_eventop_intel")
 }
 
 model bd_intels {
@@ -127,6 +165,52 @@ model blogs {
   @@index([companyHQId])
 }
 
+model campaigns {
+  id               String             @id
+  owner_id         String
+  company_hq_id    String?
+  name             String
+  description      String?
+  status           CampaignStatus     @default(DRAFT)
+  type             CampaignType       @default(EMAIL)
+  subject          String?
+  preview_text     String?
+  from_email       String?
+  from_name        String?
+  scheduled_for    DateTime?
+  started_at       DateTime?
+  completed_at     DateTime?
+  total_recipients Int                @default(0)
+  emails_sent      Int                @default(0)
+  emails_delivered Int                @default(0)
+  emails_opened    Int                @default(0)
+  emails_clicked   Int                @default(0)
+  emails_replied   Int                @default(0)
+  emails_bounced   Int                @default(0)
+  open_rate        Float?
+  click_rate       Float?
+  reply_rate       Float?
+  bounce_rate      Float?
+  created_at       DateTime           @default(now())
+  updated_at       DateTime
+  contact_list_id  String?
+  body             String?
+  template_id      String?
+  company_hqs      company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
+  contact_lists    contact_lists?     @relation(fields: [contact_list_id], references: [id])
+  owners           owners             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  templates        templates?         @relation(fields: [template_id], references: [id])
+  email_activities email_activities[]
+  email_sequences  email_sequences[]
+
+  @@index([company_hq_id])
+  @@index([contact_list_id])
+  @@index([created_at])
+  @@index([owner_id])
+  @@index([status])
+  @@index([template_id])
+}
+
 model client_uploads {
   id           String   @id
   ownerId      String
@@ -174,7 +258,7 @@ model companies {
   revenueTier           String?
   stabilityScore        Int?
   company_hqs           company_hqs     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts              Contact[]
+  contacts              contacts[]
   proposals             proposals[]
   work_packages         work_packages[]
 
@@ -199,43 +283,43 @@ model company_hqs {
   companyAnnualRev                              String?
   yearsInBusiness                               String?
   platformId                                    String?
-  tier                                          String? // Product tier for future use (not gated)
+  tier                                          String?
   assessments                                   assessments[]
   blogs                                         blogs[]
+  campaigns                                     campaigns[]
   companies                                     companies[]
-  contacts_company_hqs_contactOwnerIdTocontacts Contact?                        @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
+  contacts_company_hqs_contactOwnerIdTocontacts contacts?                       @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
   owners_company_hqs_ownerIdToowners            owners?                         @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
+  platform                                      platform?                       @relation(fields: [platformId], references: [id])
   company_memberships                           company_memberships[]
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
-  contacts_contacts_crmIdTocompany_hqs          Contact[]                       @relation("contacts_crmIdTocompany_hqs")
-  ownedWorkPackages                             work_packages[]                 @relation("WorkPackageOwner")
+  contacts_contacts_crmIdTocompany_hqs          contacts[]                      @relation("contacts_crmIdTocompany_hqs")
   deliverable_templates                         deliverable_templates[]
   domain_registry                               domain_registry?
+  email_sequences                               email_sequences[]
   landing_pages                                 landing_pages[]
   personas                                      personas[]
   phase_templates                               phase_templates[]
-  presentations                                 Presentation[]
+  presentations                                 presentations[]
   products                                      products[]
   proposals                                     proposals[]
-  templates                                     Template[]
   template_relationship_helpers                 template_relationship_helpers[]
-  campaigns                                     campaigns[]
-  email_sequences                               email_sequences[]
-  platform                                      platform?                       @relation(fields: [platformId], references: [id])
+  templates                                     templates[]
+  work_packages                                 work_packages[]
 
   @@index([platformId])
 }
 
 model company_memberships {
   id          String      @id
-  userId      String // owner.id (not firebaseId)
+  userId      String
   companyHqId String
   role        String
   createdAt   DateTime    @default(now())
-  owners      owners      @relation(fields: [userId], references: [id], onDelete: Cascade)
   company_hqs company_hqs @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
+  owners      owners      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyHqId])
   @@index([companyHqId])
@@ -262,7 +346,7 @@ model consultant_deliverables {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime
   company_hqs      company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts         Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts         contacts    @relation(fields: [contactId], references: [id], onDelete: Cascade)
   proposals        proposals?  @relation(fields: [proposalId], references: [id])
 
   @@index([companyHQId])
@@ -275,105 +359,105 @@ model contact_lists {
   companyId     String
   name          String
   description   String?
-  type          String      @default("static") // static, smart, manual
-  filters       Json? // For smart lists: { audienceType: "...", stages: [...], tags: [...] }
+  type          String      @default("static")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime
+  filters       Json?
   totalContacts Int         @default(0)
   lastUpdated   DateTime    @default(now())
   isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  company_hqs   company_hqs @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts      Contact[]
   campaigns     campaigns[]
+  company_hqs   company_hqs @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contacts      contacts[]
 
   @@unique([companyId, name])
   @@index([companyId])
   @@index([isActive])
 }
 
-model Contact {
-  id                                               String                    @id @default(uuid())
-  crmId                                            String
-  firstName                                        String?
-  lastName                                         String?
-  fullName                                         String?
-  goesBy                                           String?
-  email                                            String?
-  phone                                            String?
-  title                                            String?
-  seniority                                        String?
-  department                                       String?
-  linkedinUrl                                      String?
-  city                                             String?
-  state                                            String?
-  country                                          String?
-  companyName                                      String?
-  companyDomain                                    String?
-  contactCompanyId                                 String?
-  buyerPerson                                      BuyerPerson?
-  buyingReadiness                                  BuyingReadiness?
-  howMet                                           String?
-  notes                                            String?
-  contactListId                                    String?
-  domain                                           String?
-  enrichmentSource                                 String?
-  enrichmentFetchedAt                              DateTime?
-  enrichmentPayload                                Json?
-  createdById                                      String?
-  firebaseUid                                      String?                   @unique
-  clientPortalUrl                                  String?                   @default("https://clientportal.ignitegrowth.biz")
-  isActivated                                      Boolean                   @default(false)
-  activatedAt                                      DateTime?
-  ownerId                                          String?
-  role                                             String                    @default("contact")
-  createdAt                                        DateTime                  @default(now())
-  updatedAt                                        DateTime
-  averageTenureMonths                              Float?
-  avgTenureYears                                   Float?
-  budgetAuthority                                  Boolean?
-  buyerLikelihoodScore                             Int?
-  buyingPowerScore                                 Int?
-  buyingTriggers                                   String[]                  @default([])
-  careerMomentumScore                              Int?
-  careerProgression                                String?
-  careerStabilityScore                             Int?
-  careerTimeline                                   Json?
-  companyId                                        String?
-  companyIndustry                                  String?
-  companySize                                      String?
-  currentRoleStartDate                             DateTime?
-  currentTenureYears                               Float?
-  decisionMaker                                    Boolean?
-  enrichmentRedisKey                               String?
-  gatekeeper                                       Boolean?
-  goals                                            String[]                  @default([])
-  influencer                                       Boolean?
-  jobRole                                          String?
-  numberOfJobChanges                               Int?
-  painPoints                                       String[]                  @default([])
-  profileSummary                                   String?
-  readinessToBuyScore                              Int?
-  recentJobChange                                  Boolean?
-  recentPromotion                                  Boolean?
-  rolePowerScore                                   Int?
-  seniorityScore                                   Int?
-  tenureYears                                      Int?
-  timezone                                         String?
-  totalExperienceYears                             Float?
-  totalYearsExperience                             Float?
-  urgencyScore                                     Int?
-  company_hqs_company_hqs_contactOwnerIdTocontacts company_hqs[]             @relation("company_hqs_contactOwnerIdTocontacts")
-  consultant_deliverables                          consultant_deliverables[]
-  companies                                        companies?                @relation(fields: [contactCompanyId], references: [id])
-  contact_lists                                    contact_lists?            @relation(fields: [contactListId], references: [id])
-  company_hqs_contacts_crmIdTocompany_hqs          company_hqs               @relation("contacts_crmIdTocompany_hqs", fields: [crmId], references: [id])
-  invite_tokens                                    invite_tokens[]
-  pipelines                                        pipelines?
-  proposals                                        proposals[]
-  workPackagesAsClient                             work_packages[]           @relation("WorkPackageClient")
-  workPackagesAsMember                             work_packages[]           @relation("WorkPackageMember")
+model contacts {
+  id                                                        String                    @id
+  crmId                                                     String
+  firstName                                                 String?
+  lastName                                                  String?
+  fullName                                                  String?
+  goesBy                                                    String?
+  email                                                     String?
+  phone                                                     String?
+  title                                                     String?
+  seniority                                                 String?
+  department                                                String?
+  linkedinUrl                                               String?
+  city                                                      String?
+  state                                                     String?
+  country                                                   String?
+  companyName                                               String?
+  companyDomain                                             String?
+  contactCompanyId                                          String?
+  howMet                                                    String?
+  notes                                                     String?
+  contactListId                                             String?
+  domain                                                    String?
+  enrichmentSource                                          String?
+  enrichmentFetchedAt                                       DateTime?
+  enrichmentPayload                                         Json?
+  createdById                                               String?
+  firebaseUid                                               String?                   @unique
+  clientPortalUrl                                           String?                   @default("https://clientportal.ignitegrowth.biz")
+  isActivated                                               Boolean                   @default(false)
+  activatedAt                                               DateTime?
+  ownerId                                                   String?
+  role                                                      String                    @default("contact")
+  createdAt                                                 DateTime                  @default(now())
+  updatedAt                                                 DateTime
+  averageTenureMonths                                       Float?
+  avgTenureYears                                            Float?
+  budgetAuthority                                           Boolean?
+  buyerLikelihoodScore                                      Int?
+  buyingPowerScore                                          Int?
+  buyingTriggers                                            String[]                  @default([])
+  careerMomentumScore                                       Int?
+  careerProgression                                         String?
+  careerStabilityScore                                      Int?
+  careerTimeline                                            Json?
+  companyId                                                 String?
+  companyIndustry                                           String?
+  companySize                                               String?
+  currentRoleStartDate                                      DateTime?
+  currentTenureYears                                        Float?
+  decisionMaker                                             Boolean?
+  enrichmentRedisKey                                        String?
+  gatekeeper                                                Boolean?
+  goals                                                     String[]                  @default([])
+  influencer                                                Boolean?
+  jobRole                                                   String?
+  numberOfJobChanges                                        Int?
+  painPoints                                                String[]                  @default([])
+  profileSummary                                            String?
+  readinessToBuyScore                                       Int?
+  recentJobChange                                           Boolean?
+  recentPromotion                                           Boolean?
+  rolePowerScore                                            Int?
+  seniorityScore                                            Int?
+  tenureYears                                               Int?
+  timezone                                                  String?
+  totalExperienceYears                                      Float?
+  totalYearsExperience                                      Float?
+  urgencyScore                                              Int?
+  buyingReadiness                                           BuyingReadiness?
+  buyerPerson                                               BuyerPerson?
+  company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]             @relation("company_hqs_contactOwnerIdTocontacts")
+  consultant_deliverables                                   consultant_deliverables[]
+  companies                                                 companies?                @relation(fields: [contactCompanyId], references: [id])
+  contact_lists                                             contact_lists?            @relation(fields: [contactListId], references: [id])
+  company_hqs_contacts_crmIdTocompany_hqs                   company_hqs               @relation("contacts_crmIdTocompany_hqs", fields: [crmId], references: [id])
+  invite_tokens                                             invite_tokens[]
+  pipelines                                                 pipelines?
+  proposals                                                 proposals[]
+  work_packages_work_packages_workPackageClientIdTocontacts work_packages[]           @relation("work_packages_workPackageClientIdTocontacts")
+  work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]           @relation("work_packages_workPackageMemberIdTocontacts")
 
-  @@unique([email, crmId]) // One contact per email per CompanyHQ - duplicate emails allowed across CompanyHQs
+  @@unique([email, crmId])
   @@index([companyDomain])
   @@index([companyId])
   @@index([domain])
@@ -381,7 +465,6 @@ model Contact {
   @@index([firebaseUid])
   @@index([ownerId])
   @@index([role])
-  @@map("contacts")
 }
 
 model deliverable_templates {
@@ -439,108 +522,42 @@ model ecosystem_orgs {
 }
 
 model email_activities {
-  id                  String           @id @default(uuid())
+  id                  String           @id
   owner_id            String
   contact_id          String?
   tenant_id           String?
-  campaign_id         String?
-  sequence_id         String?
-  sequence_step_id    String?
   email               String
   subject             String
   body                String
-  event               String? // Latest event: sent, delivered, opened, clicked, replied, bounce, etc.
+  event               String?
   messageId           String           @unique
-  reply_to_message_id String? // If this is a reply, link to original email
   createdAt           DateTime         @default(now())
   updatedAt           DateTime
+  campaign_id         String?
+  sequence_id         String?
+  sequence_step_id    String?
+  reply_to_message_id String?
+  campaigns           campaigns?       @relation(fields: [campaign_id], references: [id])
   owners              owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  campaigns           campaigns?       @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
-  email_sequences     email_sequences? @relation(fields: [sequence_id], references: [id], onDelete: SetNull)
-  sequence_steps      sequence_steps?  @relation(fields: [sequence_step_id], references: [id], onDelete: SetNull)
+  email_sequences     email_sequences? @relation(fields: [sequence_id], references: [id])
+  sequence_steps      sequence_steps?  @relation(fields: [sequence_step_id], references: [id])
 
+  @@index([campaign_id])
+  @@index([contact_id, createdAt])
   @@index([contact_id])
   @@index([messageId])
   @@index([owner_id])
-  @@index([campaign_id])
   @@index([sequence_id])
-  @@index([contact_id, createdAt])
 }
 
-// Campaigns - Apollo-like campaign management
-model campaigns {
-  id               String             @id @default(uuid())
-  owner_id         String
-  company_hq_id    String?
-  name             String
-  description      String?
-  status           CampaignStatus     @default(DRAFT) // DRAFT, SCHEDULED, ACTIVE, PAUSED, COMPLETED, CANCELLED
-  type             CampaignType       @default(EMAIL) // EMAIL, SEQUENCE, ONE_OFF
-  // WHO - Contact list (reusable, modular)
-  contact_list_id  String?
-  contact_lists    contact_lists?     @relation(fields: [contact_list_id], references: [id], onDelete: SetNull)
-  // WHAT - Email template (optional - can be manual or from template)
-  template_id      String?
-  template         Template?          @relation(fields: [template_id], references: [id], onDelete: SetNull)
-  // Email content (optional - can be in sequences or from template)
-  subject          String?
-  preview_text     String?
-  body             String? // Email body content
-  from_email       String?
-  from_name        String?
-  scheduled_for    DateTime?
-  started_at       DateTime?
-  completed_at     DateTime?
-  total_recipients Int                @default(0)
-  emails_sent      Int                @default(0)
-  emails_delivered Int                @default(0)
-  emails_opened    Int                @default(0)
-  emails_clicked   Int                @default(0)
-  emails_replied   Int                @default(0)
-  emails_bounced   Int                @default(0)
-  open_rate        Float?
-  click_rate       Float?
-  reply_rate       Float?
-  bounce_rate      Float?
-  created_at       DateTime           @default(now())
-  updated_at       DateTime           @updatedAt
-  owners           owners             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  company_hqs      company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
-  email_activities email_activities[]
-  email_sequences  email_sequences[]
-
-  @@index([owner_id])
-  @@index([company_hq_id])
-  @@index([status])
-  @@index([created_at])
-  @@index([contact_list_id])
-  @@index([template_id])
-}
-
-enum CampaignStatus {
-  DRAFT
-  SCHEDULED
-  ACTIVE
-  PAUSED
-  COMPLETED
-  CANCELLED
-}
-
-enum CampaignType {
-  EMAIL
-  SEQUENCE
-  ONE_OFF
-}
-
-// Email Sequences - Multi-step email flows (Apollo-like)
 model email_sequences {
-  id                  String             @id @default(uuid())
+  id                  String             @id
   campaign_id         String?
   owner_id            String
   company_hq_id       String?
   name                String
   description         String?
-  status              SequenceStatus     @default(DRAFT) // DRAFT, ACTIVE, PAUSED, COMPLETED
+  status              SequenceStatus     @default(DRAFT)
   auto_pause_on_reply Boolean            @default(true)
   total_recipients    Int                @default(0)
   emails_sent         Int                @default(0)
@@ -551,84 +568,31 @@ model email_sequences {
   click_rate          Float?
   reply_rate          Float?
   created_at          DateTime           @default(now())
-  updated_at          DateTime           @updatedAt
-  campaigns           campaigns?         @relation(fields: [campaign_id], references: [id], onDelete: SetNull)
-  owners              owners             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  company_hqs         company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
-  sequence_steps      sequence_steps[]
+  updated_at          DateTime
   email_activities    email_activities[]
+  campaigns           campaigns?         @relation(fields: [campaign_id], references: [id])
+  company_hqs         company_hqs?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
+  owners              owners             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  sequence_steps      sequence_steps[]
 
-  @@index([owner_id])
   @@index([campaign_id])
+  @@index([owner_id])
   @@index([status])
 }
 
-enum SequenceStatus {
-  DRAFT
-  ACTIVE
-  PAUSED
-  COMPLETED
-}
-
-// Sequence Steps - Individual emails in a sequence
-model sequence_steps {
-  id               String             @id @default(uuid())
-  sequence_id      String
-  step_number      Int // Order in sequence (1, 2, 3, ...)
-  name             String?
-  subject          String
-  body             String
-  delay_days       Int                @default(0) // Days to wait before sending this step
-  delay_hours      Int                @default(0) // Additional hours
-  conditions       Json? // Conditional logic: { if_opened: true, if_clicked: false, if_replied: false }
-  from_email       String?
-  from_name        String?
-  total_sent       Int                @default(0)
-  total_opened     Int                @default(0)
-  total_clicked    Int                @default(0)
-  total_replied    Int                @default(0)
-  open_rate        Float?
-  click_rate       Float?
-  reply_rate       Float?
-  created_at       DateTime           @default(now())
-  updated_at       DateTime           @updatedAt
-  email_sequences  email_sequences    @relation(fields: [sequence_id], references: [id], onDelete: Cascade)
-  email_activities email_activities[]
-
-  @@unique([sequence_id, step_number])
-  @@index([sequence_id])
-  @@index([sequence_id, step_number])
-}
-
-// Email Signatures - Reusable HTML signatures for owners
 model email_signatures {
-  id         String   @id @default(uuid())
-  owner_id   String // Owner who created this signature
-  name       String // Display name (e.g., "Default", "Sales Team", "Support")
-  content    String // HTML signature content
-  is_default Boolean  @default(false) // Default signature for this owner
+  id         String   @id
+  owner_id   String
+  name       String
+  content    String
+  is_default Boolean  @default(false)
   created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  updated_at DateTime
   owners     owners   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
 
   @@index([owner_id])
   @@index([owner_id, is_default])
 }
-
-// Email Events - REMOVED for MVP1 (deprecated - using email_activities.event instead)
-// Migration will drop this table - keeping enum commented for reference
-// enum EmailEventType {
-//   SENT
-//   DELIVERED
-//   OPEN
-//   CLICK
-//   REPLY
-//   BOUNCE
-//   DROP
-//   DEFERRED
-//   UNSUBSCRIBE
-//   SPAM_REPORT
-// }
 
 model event_metas {
   id               String             @id
@@ -655,116 +619,13 @@ model event_metas {
   @@index([organizerId])
 }
 
-model bd_event_ops {
-  id              String            @id @default(uuid())
-  companyHQId     String
-  ownerId         String
-  eventPlanId     String?
-  eventTunerId    String?
-  title           String
-  description     String?
-  whyGo           String?
-  eventType       EventType
-  startDate       DateTime?
-  endDate         DateTime?
-  city            String?
-  state           String?
-  country         String?
-  costBand        String?
-  source          EventSource       @default(MANUAL)
-  prioritySource  String? // "BD_INTEL" if from BD intelligence
-  status          EventOppStatus    @default(CONSIDERING)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  event_plan_opps event_plan_opps[]
-  event_tuners    event_tuners?     @relation(fields: [eventTunerId], references: [id], onDelete: SetNull)
-
-  @@index([companyHQId])
-  @@index([ownerId])
-  @@index([eventPlanId])
-  @@index([eventTunerId])
-  @@index([status])
-  @@index([source])
-  @@index([prioritySource])
-}
-
-enum EventSource {
-  PERSONA
-  USER_PREF
-  MANUAL
-  BD_INTEL
-}
-
-enum EventCostRange {
-  FREE
-  LOW_0_500
-  MEDIUM_500_2000
-  HIGH_2000_5000
-  PREMIUM_5000_PLUS
-  NO_LIMIT
-}
-
-enum TravelDistance {
-  LOCAL
-  REGIONAL
-  DOMESTIC
-  INTERNATIONAL
-  NO_LIMIT
-}
-
-model event_tuners {
-  id                    String                 @id @default(uuid())
-  companyHQId           String
-  ownerId               String
-  name                  String
-  conferencesPerQuarter Int?
-  costRange             EventCostRange?
-  eventSearchRawText    String?
-  travelDistance        TravelDistance?
-  isActive              Boolean                @default(true)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  preferredStates       event_tuner_states[]
-  event_tuner_personas  event_tuner_personas[]
-  bd_event_ops          bd_event_ops[]
-
-  @@index([companyHQId])
-  @@index([ownerId])
-  @@index([isActive])
-}
-
-model event_tuner_states {
-  id           String       @id @default(uuid())
-  eventTunerId String
-  state        String
-  createdAt    DateTime     @default(now())
-  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
-
-  @@unique([eventTunerId, state])
-  @@index([eventTunerId])
-  @@index([state])
-}
-
-model event_tuner_personas {
-  id           String       @id @default(uuid())
-  eventTunerId String
-  personaId    String
-  createdAt    DateTime     @default(now())
-  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
-  personas     personas     @relation(fields: [personaId], references: [id], onDelete: Cascade)
-
-  @@unique([eventTunerId, personaId])
-  @@index([eventTunerId])
-  @@index([personaId])
-}
-
 model event_plan_opps {
-  id           String        @id
+  id           String       @id
   eventPlanId  String
   bdEventOppId String
   order        Int?
-  createdAt    DateTime      @default(now())
-  bd_event_ops bd_event_ops? @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  bd_event_ops bd_event_ops @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
 
   @@unique([eventPlanId, bdEventOppId])
   @@index([bdEventOppId])
@@ -789,6 +650,52 @@ model event_plans {
   @@index([ownerId])
 }
 
+model event_tuner_personas {
+  id           String       @id
+  eventTunerId String
+  personaId    String
+  createdAt    DateTime     @default(now())
+  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
+  personas     personas     @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@unique([eventTunerId, personaId])
+  @@index([eventTunerId])
+  @@index([personaId])
+}
+
+model event_tuner_states {
+  id           String       @id
+  eventTunerId String
+  state        String
+  createdAt    DateTime     @default(now())
+  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
+
+  @@unique([eventTunerId, state])
+  @@index([eventTunerId])
+  @@index([state])
+}
+
+model event_tuners {
+  id                    String                 @id
+  companyHQId           String
+  ownerId               String
+  name                  String
+  conferencesPerQuarter Int?
+  costRange             EventCostRange?
+  eventSearchRawText    String?
+  travelDistance        TravelDistance?
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime
+  bd_event_ops          bd_event_ops[]
+  event_tuner_personas  event_tuner_personas[]
+  event_tuner_states    event_tuner_states[]
+
+  @@index([companyHQId])
+  @@index([isActive])
+  @@index([ownerId])
+}
+
 model invite_tokens {
   id        String   @id
   contactId String
@@ -797,7 +704,7 @@ model invite_tokens {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
-  contacts  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  contacts @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([email])
@@ -892,34 +799,34 @@ model landing_pages {
 model owners {
   id                                        String                @id
   firebaseId                                String                @unique
-  firstName                                 String?
-  lastName                                  String?
-  name                                      String? // Deprecated: Use firstName and lastName instead
+  name                                      String?
   email                                     String?
   photoURL                                  String?
   teamSize                                  String?
-  tier                                      String?               @default("foundation") // Product tier: foundation, growth, scale
   microsoftAccessToken                      String?
   microsoftRefreshToken                     String?
   microsoftExpiresAt                        DateTime?
   microsoftEmail                            String?
   microsoftDisplayName                      String?
   microsoftTenantId                         String?
-  sendgridVerifiedEmail                     String? // Verified sender email for SendGrid
-  sendgridVerifiedName                      String? // Display name for verified sender
   createdAt                                 DateTime              @default(now())
   updatedAt                                 DateTime
+  firstName                                 String?
+  lastName                                  String?
+  sendgridVerifiedEmail                     String?
+  sendgridVerifiedName                      String?
+  tier                                      String?               @default("foundation")
+  GoogleOAuthToken                          GoogleOAuthToken[]
   assessments                               assessments[]
+  campaigns                                 campaigns[]
   company_hqs_company_hqs_managerIdToowners company_hqs[]         @relation("company_hqs_managerIdToowners")
   company_hqs_company_hqs_ownerIdToowners   company_hqs[]         @relation("company_hqs_ownerIdToowners")
   company_memberships                       company_memberships[]
   email_activities                          email_activities[]
-  campaigns                                 campaigns[]
   email_sequences                           email_sequences[]
+  email_signatures                          email_signatures[]
   super_admins                              super_admins?
-  google_oauth_tokens                       GoogleOAuthToken[]
-  templates                                 Template[] // Templates created by this owner
-  email_signatures                          email_signatures[] // Email signatures created by this owner
+  templates                                 templates[]
 }
 
 model payments {
@@ -965,10 +872,10 @@ model personas {
   updatedAt            DateTime
   productId            String?
   bd_intels            bd_intels?
+  event_tuner_personas event_tuner_personas[]
   company_hqs          company_hqs            @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   products             products?              @relation(fields: [productId], references: [id])
   product_fits         product_fits?
-  event_tuner_personas event_tuner_personas[]
 }
 
 model phase_deliverable_templates {
@@ -1005,10 +912,19 @@ model pipelines {
   stage     String
   createdAt DateTime @default(now())
   updatedAt DateTime
-  contacts  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  contacts @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
-model Presentation {
+model platform {
+  id           String         @id
+  name         String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  company_hqs  company_hqs[]
+  super_admins super_admins[]
+}
+
+model presentations {
   id                String      @id
   companyHQId       String
   title             String
@@ -1026,11 +942,10 @@ model Presentation {
   gammaStatus       String?
   presenter         String?
   gammaGenerationId String?
-  companyHQ         company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  company_hqs       company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@index([companyHQId])
   @@index([published])
-  @@map("presentations")
 }
 
 model product_fits {
@@ -1122,7 +1037,7 @@ model proposals {
   proposal_phases         proposal_phases[]
   company_hqs             company_hqs               @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   companies               companies                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts                Contact                   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts                contacts                  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
 model prospect_candidates {
@@ -1162,33 +1077,77 @@ model saved_events {
   @@index([userId])
 }
 
+model sequence_steps {
+  id               String             @id
+  sequence_id      String
+  step_number      Int
+  name             String?
+  subject          String
+  body             String
+  delay_days       Int                @default(0)
+  delay_hours      Int                @default(0)
+  conditions       Json?
+  from_email       String?
+  from_name        String?
+  total_sent       Int                @default(0)
+  total_opened     Int                @default(0)
+  total_clicked    Int                @default(0)
+  total_replied    Int                @default(0)
+  open_rate        Float?
+  click_rate       Float?
+  reply_rate       Float?
+  created_at       DateTime           @default(now())
+  updated_at       DateTime
+  email_activities email_activities[]
+  email_sequences  email_sequences    @relation(fields: [sequence_id], references: [id], onDelete: Cascade)
+
+  @@unique([sequence_id, step_number])
+  @@index([sequence_id])
+  @@index([sequence_id, step_number])
+}
+
 model super_admins {
   id         String   @id
   ownerId    String   @unique
-  platformId String
   createdAt  DateTime @default(now())
   updatedAt  DateTime
+  platformId String
   owners     owners   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   platform   platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
 
   @@index([platformId])
 }
 
-model Template {
-  id          String       @id @default(uuid())
-  companyHQId String? // company_hqs.id (optional - can be added later as follow-on feature)
-  ownerId     String // owners.id (required - who owns this template)
-  title       String
+model template_relationship_helpers {
+  id               String      @id
+  ownerId          String
+  relationshipType String
+  familiarityLevel String
+  whyReachingOut   String
+  desiredOutcome   String?
+  timeHorizon      String?
+  contextNotes     String?
+  createdAt        DateTime    @default(now())
+  company_hqs      company_hqs @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([ownerId])
+}
+
+model templates {
+  id          String       @id
   subject     String
   body        String
   createdAt   DateTime     @default(now())
+  companyHQId String?
+  title       String
+  ownerId     String
+  campaigns   campaigns[]
   company_hqs company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   owners      owners       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  campaigns   campaigns[]
 
   @@index([companyHQId])
   @@index([ownerId])
-  @@map("templates")
 }
 
 model work_collateral {
@@ -1262,34 +1221,70 @@ model work_package_phases {
 }
 
 model work_packages {
-  id                  String                @id
-  companyId           String // ✅ Required - company-first (client company)
-  workPackageOwnerId  String // ✅ Required - IgniteBD owner/creator (CompanyHQ.id - has editing permissions)
-  workPackageClientId String // ✅ Required - client contact (renamed from workPackageOwnerId)
-  workPackageMemberId String? // ✅ Optional - member contact (1-to-1 for now, can expand later)
-  title               String
-  description         String?
-  prioritySummary     String?
-  totalCost           Float?
-  effectiveStartDate  DateTime?
-  status              WorkPackageStatus     @default(ACTIVE)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime
-  metadata            Json? // Bolt-on capability for extensibility
-  tags                String[]              @default([])
-  invoices            invoices[]
-  work_package_items  work_package_items[]
-  work_package_phases work_package_phases[]
-  companies           companies             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  workPackageOwner    company_hqs           @relation("WorkPackageOwner", fields: [workPackageOwnerId], references: [id], onDelete: Restrict)
-  workPackageClient   Contact               @relation("WorkPackageClient", fields: [workPackageClientId], references: [id], onDelete: Restrict)
-  workPackageMember   Contact?              @relation("WorkPackageMember", fields: [workPackageMemberId], references: [id], onDelete: SetNull)
+  id                                                   String                @id
+  companyId                                            String
+  title                                                String
+  description                                          String?
+  prioritySummary                                      String?
+  totalCost                                            Float?
+  effectiveStartDate                                   DateTime?
+  createdAt                                            DateTime              @default(now())
+  updatedAt                                            DateTime
+  workPackageOwnerId                                   String
+  workPackageClientId                                  String
+  workPackageMemberId                                  String?
+  metadata                                             Json?
+  tags                                                 String[]              @default([])
+  status                                               WorkPackageStatus     @default(ACTIVE)
+  invoices                                             invoices[]
+  work_package_items                                   work_package_items[]
+  work_package_phases                                  work_package_phases[]
+  companies                                            companies             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contacts_work_packages_workPackageClientIdTocontacts contacts              @relation("work_packages_workPackageClientIdTocontacts", fields: [workPackageClientId], references: [id])
+  contacts_work_packages_workPackageMemberIdTocontacts contacts?             @relation("work_packages_workPackageMemberIdTocontacts", fields: [workPackageMemberId], references: [id])
+  company_hqs                                          company_hqs           @relation(fields: [workPackageOwnerId], references: [id])
 
   @@index([companyId])
-  @@index([workPackageOwnerId])
+  @@index([status])
   @@index([workPackageClientId])
   @@index([workPackageMemberId])
-  @@index([status])
+  @@index([workPackageOwnerId])
+}
+
+enum BuyerPerson {
+  BUSINESS_OWNER
+  DIRECTOR_VP
+  PRODUCT_USER
+}
+
+enum BuyingReadiness {
+  NOT_READY
+  READY_NO_MONEY
+  READY_WITH_MONEY
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum CampaignType {
+  EMAIL
+  SEQUENCE
+  ONE_OFF
+}
+
+enum EventCostRange {
+  FREE
+  LOW_0_500
+  MEDIUM_500_2000
+  HIGH_2000_5000
+  PREMIUM_5000_PLUS
+  NO_LIMIT
 }
 
 enum EventOppStatus {
@@ -1299,20 +1294,11 @@ enum EventOppStatus {
   PASSED
 }
 
-model GoogleOAuthToken {
-  id           String   @id @default(uuid())
-  ownerId      String
-  provider     String   @default("google")
-  refreshToken String // TODO: Encrypt in production
-  scopes       String? // Space-separated scopes
-  email        String? // Google account email
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  owner owners @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  @@unique([ownerId, provider])
-  @@index([ownerId])
+enum EventSource {
+  PERSONA
+  USER_PREF
+  MANUAL
+  BD_INTEL
 }
 
 enum EventSourceType {
@@ -1338,6 +1324,37 @@ enum OrganizationArchetype {
   NONPROFIT
   GOVERNMENT
   OTHER
+}
+
+enum RelationshipEnum {
+  COLD
+  WARM
+  ESTABLISHED
+  DORMANT
+}
+
+enum SequenceStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum TravelDistance {
+  LOCAL
+  REGIONAL
+  DOMESTIC
+  INTERNATIONAL
+  NO_LIMIT
+}
+
+enum TypeOfPersonEnum {
+  CURRENT_CLIENT
+  FORMER_CLIENT
+  FORMER_COWORKER
+  PROSPECT
+  PARTNER
+  FRIEND_OF_FRIEND
 }
 
 enum WorkCollateralStatus {
@@ -1376,48 +1393,4 @@ enum WorkPackageItemStatus {
 enum WorkPackageStatus {
   ACTIVE
   COMPLETED
-}
-
-enum BuyerPerson {
-  BUSINESS_OWNER
-  DIRECTOR_VP
-  PRODUCT_USER
-}
-
-enum BuyingReadiness {
-  NOT_READY
-  READY_NO_MONEY
-  READY_WITH_MONEY
-}
-
-enum RelationshipEnum {
-  COLD
-  WARM
-  ESTABLISHED
-  DORMANT
-}
-
-enum TypeOfPersonEnum {
-  CURRENT_CLIENT
-  FORMER_CLIENT
-  FORMER_COWORKER
-  PROSPECT
-  PARTNER
-  FRIEND_OF_FRIEND
-}
-
-model template_relationship_helpers {
-  id               String      @id @default(uuid())
-  ownerId          String
-  relationshipType String // e.g. "FORMER_COWORKER", "FRIEND", "PROSPECT"
-  familiarityLevel String // e.g. "COLD", "WARM", "ESTABLISHED"
-  whyReachingOut   String
-  desiredOutcome   String?
-  timeHorizon      String?
-  contextNotes     String?
-  createdAt        DateTime    @default(now())
-  company_hqs      company_hqs @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-
-  @@index([ownerId])
-  @@index([createdAt])
 }

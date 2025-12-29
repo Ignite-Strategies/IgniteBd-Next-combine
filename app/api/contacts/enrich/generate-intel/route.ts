@@ -16,12 +16,14 @@ import {
   extractReadinessToBuyScore,
   extractCompanyIntelligenceScores,
   generateContactProfileSummary,
-  calculateTenureYears,
-  calculateCareerStats,
   generateCareerTimeline,
   enrichCompanyPositioning,
   type ApolloEnrichmentPayload,
 } from '@/lib/intelligence/EnrichmentParserService';
+import {
+  calculateCareerStats,
+  calculateTenureYears,
+} from '@/lib/services/CareerStatsService';
 
 /**
  * POST /api/contacts/enrich/generate-intel
@@ -120,14 +122,29 @@ export async function POST(request: Request) {
 
     // INFERENCE LAYER - Compute non-score inferences
     // 1. Calculate career statistics
-    const employmentHistory = apolloPayload.person?.employment_history || [];
+    // Log the entire Apollo payload structure to see what we're actually getting
+    console.log('🔍 Apollo payload structure:', {
+      hasPerson: !!apolloPayload.person,
+      personKeys: apolloPayload.person ? Object.keys(apolloPayload.person) : [],
+      hasEmploymentHistory: !!(apolloPayload.person as any)?.employment_history,
+    });
     
-    // Debug logging to diagnose date parsing issues
+    // Try multiple possible paths for employment history
+    const employmentHistory = 
+      (apolloPayload.person as any)?.employment_history || 
+      (apolloPayload.person as any)?.employmentHistory ||
+      (apolloPayload as any)?.employment_history ||
+      [];
+    
+    // Log raw employment history data
     if (employmentHistory.length > 0) {
       console.log('📊 Employment history found:', employmentHistory.length, 'jobs');
-      console.log('📅 Sample job dates:', JSON.stringify(employmentHistory[0], null, 2));
+      console.log('📅 Full employment history:', JSON.stringify(employmentHistory, null, 2));
     } else {
       console.log('⚠️ No employment history found in Apollo payload');
+      // Log the full person object to see what fields are actually available
+      console.log('🔍 Full person object keys:', apolloPayload.person ? Object.keys(apolloPayload.person) : 'no person');
+      console.log('🔍 Sample person data:', JSON.stringify(apolloPayload.person, null, 2));
     }
     
     const tenureYears = calculateTenureYears(employmentHistory); // Keep for backward compatibility
@@ -139,6 +156,8 @@ export async function POST(request: Request) {
       currentTenureYears: careerStats.currentTenureYears,
       totalExperienceYears: careerStats.totalExperienceYears,
       avgTenureYears: careerStats.avgTenureYears,
+      numberOfJobs: careerStats.numberOfJobs,
+      validJobs: careerStats.validJobs,
     });
 
     // 2. Generate contact profile summary (GPT)

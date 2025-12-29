@@ -160,15 +160,34 @@ function LinkedInEnrichContent() {
           linkedinUrl: url,
         });
         
-        await api.post('/api/contacts/enrich/save', {
+        const saveResponse = await api.post('/api/contacts/enrich/save', {
           contactId,
           rawEnrichmentPayload: enrichResponse.data?.rawApolloResponse || enrichResponse.data?.rawEnrichmentPayload, // Send raw payload directly
           companyHQId,
           skipIntelligence: true,
         });
+        
+        // Verify intelligence was NOT saved (should be empty object)
+        const hasIntelligenceInResponse = saveResponse.data?.contact?.seniorityScore !== undefined ||
+          saveResponse.data?.contact?.profileSummary !== undefined;
+        
+        // Step 3: Show success modal for basic save
+        setSaving(false);
+        setShowSuccessModal(true);
+        setSavedContactId(contactId);
+        setSavedWithoutIntelligence(!hasIntelligenceInResponse); // Should be true if no intelligence
+        
+        console.log('✅ Contact saved without intelligence:', {
+          contactId,
+          skipIntelligence: true,
+          hasIntelligenceInResponse,
+          savedWithoutIntelligence: !hasIntelligenceInResponse,
+        });
+        
+        return; // Exit early
       } else {
         // We have everything in intelligenceData - send it all directly!
-        await api.post('/api/contacts/enrich/save', {
+        const saveResponse = await api.post('/api/contacts/enrich/save', {
           contactId,
           rawEnrichmentPayload: intelligenceData.rawEnrichmentPayload, // Send raw payload directly (no Redis!)
           companyHQId,
@@ -182,13 +201,39 @@ function LinkedInEnrichContent() {
           careerTimeline: intelligenceData.careerTimeline,
           companyPositioning: intelligenceData.companyPositioning,
         });
+        
+        // Check the response to confirm intelligence was saved
+        const hasIntelligenceInResponse = saveResponse.data?.contact?.seniorityScore !== undefined ||
+          saveResponse.data?.contact?.profileSummary !== undefined;
+        
+        // Step 3: Show success modal with next steps
+        setSaving(false);
+        setShowSuccessModal(true);
+        setSavedContactId(contactId);
+        // Use response data to determine if intelligence was actually saved
+        setSavedWithoutIntelligence(!hasIntelligenceInResponse);
+        
+        console.log('✅ Contact saved with intelligence:', {
+          contactId,
+          hasIntelligenceInResponse,
+          savedWithoutIntelligence: !hasIntelligenceInResponse,
+          responseHasSeniorityScore: !!saveResponse.data?.contact?.seniorityScore,
+          responseHasProfileSummary: !!saveResponse.data?.contact?.profileSummary,
+        });
+        
+        return; // Exit early since we handled the enriched case
       }
 
-      // Step 3: Show success modal with next steps
+      // Step 3: Show success modal for basic save (skipIntelligence = true)
       setSaving(false);
       setShowSuccessModal(true);
       setSavedContactId(contactId);
-      setSavedWithoutIntelligence(skipIntelligence);
+      setSavedWithoutIntelligence(true);
+      
+      console.log('✅ Contact saved without intelligence:', {
+        contactId,
+        skipIntelligence: true,
+      });
     } catch (err) {
       console.error('Error saving contact:', err);
       // Handle network errors (Redis connection failures, etc.)
@@ -388,19 +433,19 @@ function LinkedInEnrichContent() {
                   Start Over
                 </button>
                 <button
-                  onClick={handleSave}
+                  onClick={() => handleSave(false)}
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? (
                     <>
                       <RefreshCw className="h-4 w-4 animate-spin" />
-                      Saving...
+                      Saving Enriched Contact...
                     </>
                   ) : (
                     <>
-                      <Save className="h-4 w-4" />
-                      Save to CRM
+                      <Sparkles className="h-4 w-4" />
+                      Save Enriched Contact
                     </>
                   )}
                 </button>

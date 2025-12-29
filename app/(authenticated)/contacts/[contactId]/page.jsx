@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2 } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
@@ -119,6 +119,20 @@ export default function ContactDetailPage({ params }) {
     );
   }, [contact]);
 
+  // Check if contact is already enriched
+  const isEnriched = useMemo(() => {
+    if (!contact) return false;
+    return !!(
+      contact.seniorityScore !== null ||
+      contact.buyingPowerScore !== null ||
+      contact.profileSummary ||
+      contact.enrichmentSource ||
+      contact.enrichmentRedisKey
+    );
+  }, [contact]);
+
+  const [showEnrichSuccessModal, setShowEnrichSuccessModal] = useState(false);
+
   const handleEnrichContact = async () => {
     if (!contactId || !contact?.email) {
       setEnrichError('Contact must have an email address to enrich');
@@ -148,6 +162,10 @@ export default function ContactDetailPage({ params }) {
         throw new Error(saveResponse.data?.error || 'Failed to save enrichment');
       }
 
+      // Check if intelligence was actually saved
+      const hasIntelligence = saveResponse.data?.contact?.seniorityScore !== undefined ||
+        saveResponse.data?.contact?.profileSummary !== undefined;
+
       // Step 3: Refresh contact data
       const updatedContactResponse = await api.get(`/api/contacts/${contactId}`);
       if (updatedContactResponse.data?.success && updatedContactResponse.data?.contact) {
@@ -156,6 +174,11 @@ export default function ContactDetailPage({ params }) {
         if (refreshContacts) {
           refreshContacts();
         }
+      }
+
+      // Step 4: Show success modal if intelligence was saved
+      if (hasIntelligence) {
+        setShowEnrichSuccessModal(true);
       }
     } catch (err) {
       console.error('Enrichment error:', err);
@@ -402,23 +425,37 @@ export default function ContactDetailPage({ params }) {
               <h3 className="text-lg font-semibold text-gray-900">
                 Contact Information
               </h3>
-              <button
-                onClick={handleEnrichContact}
-                disabled={enriching || !contact?.email}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {enriching ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Enriching...
-                  </>
+              <div className="flex items-center gap-2">
+                {isEnriched ? (
+                  // Show "Build Persona" button if enriched
+                  <button
+                    onClick={() => router.push(`/personas/from-contact?contactId=${contactId}`)}
+                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+                  >
+                    <UserCircle className="h-4 w-4" />
+                    Build Persona
+                  </button>
                 ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Enrich Contact
-                  </>
+                  // Show "Enrich Contact" button if not enriched
+                  <button
+                    onClick={handleEnrichContact}
+                    disabled={enriching || !contact?.email}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {enriching ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Enriching...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Enrich Contact
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
             </div>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -679,6 +716,81 @@ export default function ContactDetailPage({ params }) {
                 <pre className="text-xs bg-gray-50 p-4 rounded-lg overflow-x-auto">
                   {JSON.stringify(rawJSON, null, 2)}
                 </pre>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enrichment Success Modal */}
+        {showEnrichSuccessModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-xl">
+              <div className="p-6">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="rounded-full p-3 bg-green-100">
+                    <Check className="h-8 w-8 text-green-600" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+                  Contact Enriched Successfully!
+                </h2>
+                <p className="text-gray-600 text-center mb-6">
+                  All intelligence scores and profile data have been saved. What would you like to do next?
+                </p>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowEnrichSuccessModal(false);
+                      router.push(`/personas/from-contact?contactId=${contactId}`);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <UserCircle className="h-5 w-5 text-purple-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">Build Persona</div>
+                        <div className="text-sm text-gray-600">Create a persona from this enriched contact</div>
+                      </div>
+                    </div>
+                    <ArrowLeft className="h-5 w-5 text-purple-600 rotate-180" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowEnrichSuccessModal(false);
+                      // Refresh to show updated contact
+                      window.location.reload();
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Building2 className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">View Contact</div>
+                        <div className="text-sm text-gray-600">See full contact details and intelligence</div>
+                      </div>
+                    </div>
+                    <ArrowLeft className="h-5 w-5 text-blue-600 rotate-180" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowEnrichSuccessModal(false);
+                      router.push(`/outreach/compose?contactId=${contactId}`);
+                    }}
+                    className="w-full flex items-center justify-between rounded-lg border-2 border-red-600 bg-red-50 px-6 py-4 text-left transition hover:bg-red-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-5 w-5 text-red-600" />
+                      <div>
+                        <div className="font-semibold text-gray-900">Send an Email</div>
+                        <div className="text-sm text-gray-600">Compose and send a personalized email</div>
+                      </div>
+                    </div>
+                    <ArrowLeft className="h-5 w-5 text-red-600 rotate-180" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
