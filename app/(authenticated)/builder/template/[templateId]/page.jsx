@@ -19,7 +19,7 @@ export default function TemplateBuilderPage() {
   const isNew = templateId === 'new';
   const cloneFrom = searchParams?.get('cloneFrom');
   
-  const { ownerId, owner } = useOwner();
+  const { ownerId, owner, companyHQId } = useOwner();
 
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
@@ -323,7 +323,7 @@ export default function TemplateBuilderPage() {
                 <label className="block text-sm font-semibold text-gray-700">
                   Body *
                 </label>
-                {isNew && !title && !subject && !body && (
+                {isNew && !title.trim() && !subject.trim() && !body.trim() && (
                   <button
                     type="button"
                     onClick={handleGenerateWithAI}
@@ -348,11 +348,6 @@ export default function TemplateBuilderPage() {
                     )}
                   </button>
                 )}
-              </div>
-              <div className="mb-2 rounded-lg bg-blue-50 border border-blue-200 p-3">
-                <p className="text-sm text-blue-800">
-                  <strong>💡 Tip:</strong> Start with a greeting like &quot;Hey {'{{'}firstName{'}}'},&quot; or &quot;Hi {'{{'}firstName{'}}'},&quot;
-                </p>
               </div>
               <textarea
                 id="body-textarea"
