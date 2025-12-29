@@ -55,6 +55,8 @@ interface IntelligencePreviewProps {
   careerTimeline?: Array<{
     startDate: string;
     endDate: string | null;
+    startYear?: number;
+    endYear?: number | null;
     title: string;
     company: string;
     durationMonths: number;
