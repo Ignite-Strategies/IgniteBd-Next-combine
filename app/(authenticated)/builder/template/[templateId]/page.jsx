@@ -323,7 +323,7 @@ export default function TemplateBuilderPage() {
                 <label className="block text-sm font-semibold text-gray-700">
                   Body *
                 </label>
-                {isNew && !title.trim() && !subject.trim() && !body.trim() && (
+                {isNew && (!title || !title.trim()) && (!subject || !subject.trim()) && (!body || !body.trim()) && (
                   <button
                     type="button"
                     onClick={handleGenerateWithAI}
