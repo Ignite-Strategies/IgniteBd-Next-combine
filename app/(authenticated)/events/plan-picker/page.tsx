@@ -44,14 +44,17 @@ export default function PlanPickerPage() {
         params: {
           companyHQId,
           ownerId,
-          hasNoPlan: 'true',
+          hasNoPlan: 'true', // Filter to events without a plan
         },
       });
 
       if (response.data?.success) {
-        setEvents(response.data.events || []);
+        const eventsWithoutPlan = response.data.eventOps || [];
+        setEvents(eventsWithoutPlan);
         // Pre-select all events (they already "liked" them)
-        setSelectedEventIds(new Set((response.data.events || []).map((e: EventOp) => e.id)));
+        setSelectedEventIds(new Set(eventsWithoutPlan.map((e: EventOp) => e.id)));
+      } else {
+        throw new Error(response.data?.error || 'Failed to load events');
       }
     } catch (err: any) {
       console.error('Error loading events:', err);

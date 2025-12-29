@@ -37,6 +37,14 @@ function getOpenAIClient(): OpenAI {
 export interface PickedEvent {
   eventMetaId: string;
   eventName: string;
+  eventType: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  costMin?: number | null;
+  costMax?: number | null;
   timeFrame: string; // "Q1 2025", "Q2 2025", etc.
   recommendationScore: number; // 0-100
   recommendationRationale: string; // Why this event matches preferences
@@ -210,19 +218,48 @@ Parse time frames from event dates into quarters. Return exactly ${eventsPerQuar
   }
 
   // Map OpenAI results back to actual events using eventIndex
+  const pickedEventIds: string[] = [];
+  for (const eventData of pickerData.events || []) {
+    const eventIndex = eventData.eventIndex;
+    const actualEvent = eventIndexMap.get(eventIndex);
+    if (actualEvent) {
+      pickedEventIds.push(actualEvent.id);
+    }
+  }
+
+  // Fetch full EventMeta details for picked events
+  const eventMetaDetails = await prisma.event_metas.findMany({
+    where: { id: { in: pickedEventIds } },
+  });
+  
+  // Create a map of event details by ID
+  const eventDetailsMap = new Map<string, typeof eventMetaDetails[0]>(eventMetaDetails.map(e => [e.id, e]));
+
+  // Build final picked events with full details
   const pickedEvents: PickedEvent[] = [];
   for (const eventData of pickerData.events || []) {
     const eventIndex = eventData.eventIndex;
     const actualEvent = eventIndexMap.get(eventIndex);
     
     if (actualEvent) {
-      pickedEvents.push({
-        eventMetaId: actualEvent.id, // Use the actual event ID
-        eventName: actualEvent.name,
-        timeFrame: eventData.timeFrame || 'Upcoming',
-        recommendationScore: eventData.recommendationScore || 0,
-        recommendationRationale: eventData.recommendationRationale || '',
-      });
+      const eventDetails = eventDetailsMap.get(actualEvent.id);
+      if (eventDetails) {
+        pickedEvents.push({
+          eventMetaId: actualEvent.id,
+          eventName: actualEvent.name,
+          eventType: eventDetails.eventType,
+          startDate: eventDetails.startDate,
+          endDate: eventDetails.endDate,
+          city: eventDetails.city,
+          state: eventDetails.state,
+          country: eventDetails.country,
+          costMin: eventDetails.costMin,
+          costMax: eventDetails.costMax,
+          timeFrame: eventData.timeFrame || 'Upcoming',
+          recommendationScore: eventData.recommendationScore || 0,
+          recommendationRationale: eventData.recommendationRationale || '',
+        });
+      }
     }
   }
 

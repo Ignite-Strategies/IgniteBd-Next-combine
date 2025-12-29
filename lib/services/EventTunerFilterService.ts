@@ -119,6 +119,7 @@ export async function filterEventsByTuner(
     country?: string | null;
     startDate?: Date | null;
     endDate?: Date | null;
+    dateRange?: string | null;
     eventType?: string;
   }>
 ): Promise<Array<typeof events[0]>> {

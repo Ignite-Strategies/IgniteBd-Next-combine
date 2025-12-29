@@ -10,22 +10,17 @@ import { useOwner } from '@/hooks/useOwner';
 interface PickedEvent {
   eventMetaId: string;
   eventName: string;
-  timeFrame: string;
-  recommendationScore: number;
-  recommendationRationale: string;
-}
-
-interface EventDetails {
-  id: string;
-  name: string;
   eventType: string;
-  startDate?: string | null;
-  endDate?: string | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
   city?: string | null;
   state?: string | null;
   country?: string | null;
   costMin?: number | null;
   costMax?: number | null;
+  timeFrame: string;
+  recommendationScore: number;
+  recommendationRationale: string;
 }
 
 export default function SearchPickPage() {
@@ -38,7 +33,6 @@ export default function SearchPickPage() {
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(true);
   const [likedEventIds, setLikedEventIds] = useState<Set<string>>(new Set());
-  const [eventDetails, setEventDetails] = useState<{ [key: string]: EventDetails }>({});
   const [liking, setLiking] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
@@ -55,13 +49,6 @@ export default function SearchPickPage() {
       if (response.data?.success) {
         setEventsByTimeFrame(response.data.eventsByTimeFrame || {});
         setSummary(response.data.summary || '');
-        
-        // Load event details for all picked events
-        const allEventIds = Object.values(response.data.eventsByTimeFrame || {})
-          .flat()
-          .map((e: PickedEvent) => e.eventMetaId);
-        
-        await loadEventDetails(allEventIds);
       }
     } catch (err: any) {
       console.error('Error loading picked events:', err);
@@ -71,14 +58,6 @@ export default function SearchPickPage() {
     }
   };
 
-  const loadEventDetails = async (eventIds: string[]) => {
-    // Load details from EventMeta (would need an endpoint, for now we'll use what we have)
-    // This is a placeholder - you might want to create a batch endpoint
-    const details: { [key: string]: EventDetails } = {};
-    // For now, we'll fetch individually or create a batch endpoint
-    // TODO: Create batch endpoint for EventMeta details
-    setEventDetails(details);
-  };
 
   const handleLike = async (event: PickedEvent) => {
     if (!ownerId || !companyHQId) {
@@ -183,7 +162,6 @@ export default function SearchPickPage() {
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">{timeFrame}</h2>
                 <div className="space-y-4">
                   {eventsByTimeFrame[timeFrame].map((event) => {
-                    const details = eventDetails[event.eventMetaId];
                     const isLiked = likedEventIds.has(event.eventMetaId);
                     const isLiking = liking[event.eventMetaId];
 
@@ -202,31 +180,29 @@ export default function SearchPickPage() {
                               </span>
                             </div>
 
-                            {details && (
-                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
-                                {details.startDate && (
-                                  <div className="flex items-center gap-1">
-                                    <Calendar className="h-4 w-4" />
-                                    {formatDate(details.startDate)}
-                                  </div>
-                                )}
-                                {(details.city || details.state || details.country) && (
-                                  <div className="flex items-center gap-1">
-                                    <MapPin className="h-4 w-4" />
-                                    {[details.city, details.state, details.country].filter(Boolean).join(', ')}
-                                  </div>
-                                )}
-                                {(details.costMin || details.costMax) && (
-                                  <div className="flex items-center gap-1">
-                                    <DollarSign className="h-4 w-4" />
-                                    {formatCost(details.costMin, details.costMax)}
-                                  </div>
-                                )}
-                                <span className="text-gray-500">
-                                  {formatEventType(details.eventType)}
-                                </span>
-                              </div>
-                            )}
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                              {event.startDate && (
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  {formatDate(event.startDate.toString())}
+                                </div>
+                              )}
+                              {(event.city || event.state || event.country) && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-4 w-4" />
+                                  {[event.city, event.state, event.country].filter(Boolean).join(', ')}
+                                </div>
+                              )}
+                              {(event.costMin || event.costMax) && (
+                                <div className="flex items-center gap-1">
+                                  <DollarSign className="h-4 w-4" />
+                                  {formatCost(event.costMin, event.costMax)}
+                                </div>
+                              )}
+                              <span className="text-gray-500">
+                                {formatEventType(event.eventType)}
+                              </span>
+                            </div>
 
                             <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
                               <p className="text-sm font-medium text-blue-900 mb-1">Why this matches:</p>

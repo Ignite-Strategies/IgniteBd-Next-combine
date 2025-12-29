@@ -61,8 +61,21 @@ export default function WelcomePage() {
               ? localStorage.getItem('companyHQId')
               : null;
             
+            console.log(`🔍 Welcome: Checking stored companyHQId: ${storedCompanyHQId}`);
+            console.log(`🔍 Welcome: Available memberships:`, memberships.map(m => ({
+              companyHqId: m.companyHqId,
+              companyName: m.company_hqs?.companyName
+            })));
+            
             const hasStoredMembership = storedCompanyHQId && 
               memberships.some(m => m.companyHqId === storedCompanyHQId);
+            
+            if (storedCompanyHQId && !hasStoredMembership) {
+              console.warn(`⚠️ Stored companyHQId ${storedCompanyHQId} doesn't match any membership. This might be from a migration. Clearing it.`);
+              // Clear invalid stored companyHQId
+              localStorage.removeItem('companyHQId');
+              localStorage.removeItem('companyHQ');
+            }
             
             // Use stored CompanyHQ if it's valid, otherwise default to first
             const defaultCompanyHqId = hasStoredMembership
@@ -70,11 +83,15 @@ export default function WelcomePage() {
               : (defaultMembership?.companyHqId || memberships[0]?.companyHqId);
             setSelectedCompanyHqId(defaultCompanyHqId);
             
-            // If switching via header, automatically continue with the selected company
-            if (hasStoredMembership && storedCompanyHQId !== owner.companyHQId) {
-              console.log(`🔄 Welcome: Detected CompanyHQ switch to ${storedCompanyHQId}, auto-continuing...`);
+            // If switching via header AND membership is valid, automatically continue
+            if (hasStoredMembership && storedCompanyHQId && storedCompanyHQId !== owner.companyHQId) {
+              console.log(`🔄 Welcome: Detected valid CompanyHQ switch to ${storedCompanyHQId}, auto-continuing...`);
               // Small delay to ensure state is set, then auto-continue
-              setTimeout(() => handleContinue(), 100);
+              setTimeout(() => {
+                if (membershipData?.hasMemberships && selectedCompanyHqId) {
+                  handleContinue();
+                }
+              }, 200);
               return;
             }
             
@@ -127,7 +144,7 @@ export default function WelcomePage() {
 
   const handleContinue = () => {
     // If user has memberships, save selected company and route to dashboard
-    if (membershipData?.hasMemberships && selectedCompanyHqId) {
+    if (membershipData?.hasMemberships && selectedCompanyHqId && membershipData.memberships.length > 0) {
       // Find the selected membership
       const selectedMembership = membershipData.memberships.find(
         m => m.companyHqId === selectedCompanyHqId

@@ -69,8 +69,17 @@ export default function AppShell({ children }) {
 
   // Routes that should never show navigation or context header (even when authenticated)
   const PUBLIC_ROUTES = ['/'];
-  // Auth/onboarding routes that shouldn't show context header
-  const HIDE_CONTEXT_ROUTES = ['/welcome', '/signup', '/signin', '/sign-in', '/sign-up'];
+  // Auth/onboarding/setup routes that shouldn't show context header
+  const HIDE_CONTEXT_ROUTES = [
+    '/welcome', 
+    '/signup', 
+    '/signin', 
+    '/sign-in', 
+    '/sign-up',
+    '/company/', // All company setup routes
+    '/profilesetup',
+    '/owner-identity-survey',
+  ];
   const isPublicRoute = pathname && PUBLIC_ROUTES.includes(pathname);
   const shouldHideContext = pathname && HIDE_CONTEXT_ROUTES.some(route => pathname.startsWith(route));
 
