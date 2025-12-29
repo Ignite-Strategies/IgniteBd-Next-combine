@@ -17,21 +17,21 @@ export default function EventsPage() {
           backLabel="Back to Growth Dashboard"
         />
 
-        {/* Main Content - Research by Persona (Large) + Sidebar (Small) */}
+        {/* Main Content - Find and Select Events (Large) + Sidebar (Small) */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main - Research Events by Persona (2 columns) */}
+          {/* Main - Find and Select Events (2 columns) */}
           <div
-            onClick={() => router.push('/events/build-from-persona')}
+            onClick={() => router.push('/events/preferences')}
             className="lg:col-span-2 cursor-pointer rounded-2xl border-2 border-gray-200 bg-white p-8 shadow-lg hover:shadow-xl transition-all hover:border-red-300"
           >
             <div className="flex items-start gap-4">
               <div className="w-16 h-16 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="h-8 w-8 text-white" />
+                <Calendar className="h-8 w-8 text-white" />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900 mb-3">Research Events by Persona</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-3">Find and Select Events</h2>
                 <p className="text-lg text-gray-600 mb-4">
-                  Lookup events by preferences + persona matching. Generate personalized event recommendations tailored to your target persona.
+                  Set your preferences, get AI-powered event recommendations, and build your event program. The main UX for finding and selecting events that match your criteria.
                 </p>
                 <div className="flex items-center gap-2 text-red-600 font-semibold text-lg">
                   <span>Get Started</span>
@@ -43,7 +43,7 @@ export default function EventsPage() {
             </div>
           </div>
 
-          {/* Sidebar - My Plan & My Events (1 column) */}
+          {/* Sidebar - Research by Persona (1 column) */}
           <div className="lg:col-span-1 space-y-4">
             {/* My Plan */}
             <div
