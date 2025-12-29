@@ -28,9 +28,8 @@ const ROUTES_WITH_SIDEBAR = [
   '/client-operations/execution',
   '/billing',
   '/templates',
-  '/people',
   '/companies',
-  '/contacts', // Contact management routes
+  '/contacts', // Contact management routes (includes /contacts/view, /contacts/manual, etc.)
 ];
 
 
