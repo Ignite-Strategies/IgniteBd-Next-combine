@@ -189,12 +189,12 @@ function LinkedInEnrichContent() {
       setShowSuccessModal(true);
       setSavedContactId(contactId);
       setSavedWithoutIntelligence(skipIntelligence);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error saving contact:', err);
       // Handle network errors (Redis connection failures, etc.)
-      const errorMessage = err.message || err.response?.data?.error || 'Failed to save contact';
+      const errorMessage = err?.message || err?.response?.data?.error || 'Failed to save contact';
       // If it's a network error (status 0) or Redis connection error, show a more helpful message
-      if (err.status === 0 || err.type === 'NETWORK_ERROR' || errorMessage.includes('Redis') || errorMessage.includes('connection')) {
+      if (err?.status === 0 || err?.type === 'NETWORK_ERROR' || errorMessage.includes('Redis') || errorMessage.includes('connection')) {
         alert(`Connection error: ${errorMessage}\n\nThis might be a Redis configuration issue. Please check your Redis settings or try again in a moment.`);
       } else {
         alert(errorMessage);
