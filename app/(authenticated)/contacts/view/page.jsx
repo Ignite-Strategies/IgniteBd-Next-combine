@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users,
@@ -33,14 +33,42 @@ export default function ContactsViewPage() {
   const [assigningCompanyId, setAssigningCompanyId] = useState(null);
   const [selectedCompanyForAssign, setSelectedCompanyForAssign] = useState(null);
   const [savingCompanyAssignment, setSavingCompanyAssignment] = useState(false);
+  const lastValidatedCompanyHQId = useRef(null);
 
+  // Load companyHQId from localStorage and listen for changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const storedCompanyHQId =
-      window.localStorage.getItem('companyHQId') ||
-      window.localStorage.getItem('companyId') ||
-      '';
-    setCompanyHQId(storedCompanyHQId);
+    
+    const loadCompanyHQId = () => {
+      const storedCompanyHQId =
+        window.localStorage.getItem('companyHQId') ||
+        window.localStorage.getItem('companyId') ||
+        '';
+      setCompanyHQId(storedCompanyHQId);
+    };
+    
+    // Load initially
+    loadCompanyHQId();
+    
+    // Listen for storage changes (company switching)
+    const handleStorageChange = (e) => {
+      if (e.key === 'companyHQId' || e.key === 'companyId') {
+        loadCompanyHQId();
+      }
+    };
+    
+    // Listen for custom companyHQ context change events
+    const handleContextChange = () => {
+      loadCompanyHQId();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('companyHQContextChanged', handleContextChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('companyHQContextChanged', handleContextChange);
+    };
   }, []);
 
   const refreshContactsFromAPI = useCallback(
@@ -77,28 +105,63 @@ export default function ContactsViewPage() {
     [companyHQId, pipelineFilter],
   );
 
-  // Load from localStorage only - no auto-fetch
+  // Validate and load cached contacts, or fetch if companyHQId changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const storedCompanyHQId =
-      window.localStorage.getItem('companyHQId') ||
-      window.localStorage.getItem('companyId') ||
-      '';
-    setCompanyHQId(storedCompanyHQId);
+    if (!companyHQId) {
+      setLoading(false);
+      lastValidatedCompanyHQId.current = null;
+      return;
+    }
 
-    // Only load from localStorage
+    // Skip if we've already validated for this companyHQId
+    if (lastValidatedCompanyHQId.current === companyHQId) {
+      return;
+    }
+
+    // Check cached contacts and validate they belong to current companyHQId
     const cachedContacts = window.localStorage.getItem('contacts');
     if (cachedContacts) {
       try {
         const parsed = JSON.parse(cachedContacts);
-        setContacts(parsed);
+        
+        // Validate: Check if any contact has a different crmId than current companyHQId
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasMismatch = parsed.some(contact => 
+            contact.crmId && contact.crmId !== companyHQId
+          );
+          
+          if (hasMismatch) {
+            console.log('🔄 Cached contacts belong to different CompanyHQ, fetching fresh data...');
+            // Clear stale contacts and fetch fresh
+            setContacts([]);
+            lastValidatedCompanyHQId.current = companyHQId;
+            refreshContactsFromAPI(true);
+            return;
+          }
+          
+          // All contacts match current companyHQId, use cached data
+          setContacts(parsed);
+          setLoading(false);
+          lastValidatedCompanyHQId.current = companyHQId;
+        } else {
+          // Empty array, fetch fresh
+          lastValidatedCompanyHQId.current = companyHQId;
+          refreshContactsFromAPI(true);
+        }
       } catch (error) {
         console.warn('Unable to parse cached contacts', error);
+        // On parse error, fetch fresh
+        lastValidatedCompanyHQId.current = companyHQId;
+        refreshContactsFromAPI(true);
       }
+    } else {
+      // No cache, fetch fresh
+      lastValidatedCompanyHQId.current = companyHQId;
+      refreshContactsFromAPI(true);
     }
-    setLoading(false);
-  }, []);
+  }, [companyHQId, refreshContactsFromAPI]);
 
   const handleSelectContact = (contactId) => {
     setSelectedContacts((prev) => {

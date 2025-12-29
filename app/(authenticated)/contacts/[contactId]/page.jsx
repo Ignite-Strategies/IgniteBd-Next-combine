@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
@@ -12,6 +12,8 @@ import CompanySelector from '@/components/CompanySelector';
 export default function ContactDetailPage({ params }) {
   const router = useRouter();
   const { contacts, refreshContacts } = useContactsContext();
+  const [lists, setLists] = useState([]);
+  const [loadingLists, setLoadingLists] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [contact, setContact] = useState(null);
@@ -133,6 +135,27 @@ export default function ContactDetailPage({ params }) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [showAddToListModal, setShowAddToListModal] = useState(false);
+  const [showEnrichmentDetails, setShowEnrichmentDetails] = useState(false);
+  
+  // Load contact lists when modal opens
+  useEffect(() => {
+    if (showAddToListModal && lists.length === 0 && !loadingLists) {
+      setLoadingLists(true);
+      api.get('/api/contact-lists')
+        .then((response) => {
+          if (response.data?.success && Array.isArray(response.data.lists)) {
+            setLists(response.data.lists);
+          }
+        })
+        .catch((error) => {
+          console.error('Error loading contact lists:', error);
+        })
+        .finally(() => {
+          setLoadingLists(false);
+        });
+    }
+  }, [showAddToListModal, lists.length, loadingLists]);
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
@@ -463,35 +486,85 @@ export default function ContactDetailPage({ params }) {
               <h3 className="text-lg font-semibold text-gray-900">
                 Contact Information
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {isEnriched ? (
-                  // Show "Build Persona" button if enriched
-                  <button
-                    onClick={() => router.push(`/personas/from-contact?contactId=${contactId}`)}
-                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
-                  >
-                    <UserCircle className="h-4 w-4" />
-                    Build Persona
-                  </button>
-                ) : (
-                  // Show "Enrich Contact" button if not enriched
-                  <button
-                    onClick={handleEnrichContact}
-                    disabled={enriching || !contact?.email}
-                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {enriching ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Enriching...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Enrich Contact
-                      </>
+                  // Show "Build Persona" as primary, other actions as secondary if enriched
+                  <>
+                    <button
+                      onClick={() => router.push(`/personas/from-contact?contactId=${contactId}`)}
+                      className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+                    >
+                      <UserCircle className="h-4 w-4" />
+                      Build Persona
+                    </button>
+                    {contact?.email && (
+                      <button
+                        onClick={() => router.push(`/outreach/compose?contactId=${contactId}`)}
+                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                        title="Send Email"
+                      >
+                        <Mail className="h-4 w-4" />
+                        Email
+                      </button>
                     )}
-                  </button>
+                    <button
+                      onClick={() => setShowAddToListModal(true)}
+                      className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                      title="Add to List"
+                    >
+                      <List className="h-4 w-4" />
+                      Add to List
+                    </button>
+                    {contact?.enrichmentPayload && (
+                      <button
+                        onClick={() => setShowEnrichmentDetails(true)}
+                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                        title="View Enrichment Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Details
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  // Show "Enrich Contact" as primary, other actions as secondary if not enriched
+                  <>
+                    <button
+                      onClick={handleEnrichContact}
+                      disabled={enriching || !contact?.email}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {enriching ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Enriching...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Enrich Contact
+                        </>
+                      )}
+                    </button>
+                    {contact?.email && (
+                      <button
+                        onClick={() => router.push(`/outreach/compose?contactId=${contactId}`)}
+                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                        title="Send Email"
+                      >
+                        <Mail className="h-4 w-4" />
+                        Email
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowAddToListModal(true)}
+                      className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                      title="Add to List"
+                    >
+                      <List className="h-4 w-4" />
+                      Add to List
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -829,6 +902,101 @@ export default function ContactDetailPage({ params }) {
                     <ArrowLeft className="h-5 w-5 text-red-600 rotate-180" />
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add to List Modal */}
+        {showAddToListModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Add to List</h2>
+                <button
+                  onClick={() => setShowAddToListModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {loadingLists ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                    <span className="ml-2 text-sm text-gray-500">Loading lists...</span>
+                  </div>
+                ) : lists && lists.length > 0 ? (
+                  lists.map((list) => (
+                    <button
+                      key={list.id}
+                      onClick={async () => {
+                        try {
+                          await api.post(`/api/contact-lists/${list.id}/contacts`, {
+                            contactId: contactId,
+                          });
+                          setShowAddToListModal(false);
+                          alert(`Contact added to ${list.name}`);
+                        } catch (error) {
+                          console.error('Error adding contact to list:', error);
+                          alert(error.response?.data?.error || 'Failed to add contact to list');
+                        }
+                      }}
+                      className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
+                    >
+                      <div className="font-medium text-gray-900">{list.name}</div>
+                      {list.description && (
+                        <div className="text-sm text-gray-500">{list.description}</div>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No lists available. Create a list first.</p>
+                )}
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => router.push('/contacts/list-builder')}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50"
+                >
+                  Create New List
+                </button>
+                <button
+                  onClick={() => setShowAddToListModal(false)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* View Enrichment Details Modal */}
+        {showEnrichmentDetails && contact?.enrichmentPayload && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 p-6 max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Enrichment Details</h2>
+                <button
+                  onClick={() => setShowEnrichmentDetails(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg p-4">
+                <pre className="text-xs text-gray-700 whitespace-pre-wrap">
+                  {JSON.stringify(contact.enrichmentPayload, null, 2)}
+                </pre>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setShowEnrichmentDetails(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
