@@ -408,7 +408,7 @@ export default function ContactsViewPage() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/people')}
+                onClick={() => router.push('/people/load')}
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
               >
                 <Plus className="h-5 w-5" />
@@ -461,7 +461,7 @@ export default function ContactsViewPage() {
             {!searchTerm && !pipelineFilter && (
               <button
                 type="button"
-                onClick={() => router.push('/people')}
+                onClick={() => router.push('/people/load')}
                 className="rounded-lg bg-blue-600 px-6 py-3 text-white transition hover:bg-blue-700"
               >
                 Add Your First Contact
