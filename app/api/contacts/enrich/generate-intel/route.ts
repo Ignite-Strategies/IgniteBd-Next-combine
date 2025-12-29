@@ -121,9 +121,25 @@ export async function POST(request: Request) {
     // INFERENCE LAYER - Compute non-score inferences
     // 1. Calculate career statistics
     const employmentHistory = apolloPayload.person?.employment_history || [];
+    
+    // Debug logging to diagnose date parsing issues
+    if (employmentHistory.length > 0) {
+      console.log('📊 Employment history found:', employmentHistory.length, 'jobs');
+      console.log('📅 Sample job dates:', JSON.stringify(employmentHistory[0], null, 2));
+    } else {
+      console.log('⚠️ No employment history found in Apollo payload');
+    }
+    
     const tenureYears = calculateTenureYears(employmentHistory); // Keep for backward compatibility
     const careerStats = calculateCareerStats(employmentHistory);
     const careerTimeline = generateCareerTimeline(employmentHistory);
+    
+    // Debug logging for calculated stats
+    console.log('📈 Career stats calculated:', {
+      currentTenureYears: careerStats.currentTenureYears,
+      totalExperienceYears: careerStats.totalExperienceYears,
+      avgTenureYears: careerStats.avgTenureYears,
+    });
 
     // 2. Generate contact profile summary (GPT)
     let profileSummary = '';

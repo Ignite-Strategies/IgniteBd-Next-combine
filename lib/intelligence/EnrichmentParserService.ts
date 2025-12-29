@@ -768,6 +768,24 @@ Keep it professional, concise, and focused on business context. Return only the 
 }
 
 /**
+ * Helper function to validate and parse a date string
+ * Returns a valid Date object or null if invalid
+ */
+function parseDate(dateString: string | null | undefined): Date | null {
+  if (!dateString || typeof dateString !== 'string' || dateString.trim() === '') {
+    return null;
+  }
+  
+  const date = new Date(dateString);
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return null;
+  }
+  
+  return date;
+}
+
+/**
  * Calculate tenure years from employment history (DEPRECATED - use calculateCareerStats)
  * 
  * @param employmentHistory - Array of employment records
@@ -789,9 +807,17 @@ export function calculateTenureYears(
     return 0;
   }
 
-  const startDate = new Date(currentRole.started_at);
+  const startDate = parseDate(currentRole.started_at);
+  if (!startDate) {
+    return 0;
+  }
+
   const now = new Date();
   const years = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  
+  if (isNaN(years)) {
+    return 0;
+  }
   
   return Math.max(0, Math.round(years * 10) / 10); // Round to 1 decimal
 }
@@ -830,18 +856,36 @@ export function calculateCareerStats(
   // Find current role (no end date) and calculate current tenure
   const currentRole = employmentHistory.find(job => !job.ended_at && job.started_at);
   if (currentRole?.started_at) {
-    const startDate = new Date(currentRole.started_at);
-    const months = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
-    currentTenureYears = Math.max(0, months / 12);
+    const startDate = parseDate(currentRole.started_at);
+    if (startDate) {
+      const months = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+      if (!isNaN(months) && months > 0) {
+        currentTenureYears = Math.max(0, months / 12);
+      }
+    }
   }
 
   // Calculate total experience and average tenure
   for (const job of employmentHistory) {
     if (job.started_at) {
-      const startDate = new Date(job.started_at);
-      const endDate = job.ended_at ? new Date(job.ended_at) : now;
+      const startDate = parseDate(job.started_at);
+      if (!startDate) {
+        continue; // Skip invalid start dates
+      }
+      
+      const endDate = job.ended_at ? parseDate(job.ended_at) : now;
+      if (!endDate) {
+        // If ended_at is invalid but we have a valid start date, use now
+        const months = (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+        if (!isNaN(months) && months > 0) {
+          totalMonths += months;
+          validJobs++;
+        }
+        continue;
+      }
+      
       const months = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
-      if (months > 0) {
+      if (!isNaN(months) && months > 0) {
         totalMonths += months;
         validJobs++;
       }
@@ -885,16 +929,23 @@ export function generateCareerTimeline(
 
   const now = new Date();
   const timeline = employmentHistory
-    .filter(job => job.started_at) // Only include jobs with start dates
+    .filter(job => {
+      // Only include jobs with valid start dates
+      if (!job.started_at) return false;
+      const startDate = parseDate(job.started_at);
+      return startDate !== null;
+    })
     .map(job => {
-      const startDate = new Date(job.started_at!);
-      const endDate = job.ended_at ? new Date(job.ended_at) : now;
-      const months = Math.max(0, (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+      const startDate = parseDate(job.started_at!)!; // We know it's valid from filter
+      const endDate = job.ended_at ? parseDate(job.ended_at) : now;
+      const validEndDate = endDate || now; // Fallback to now if invalid
+      
+      const months = Math.max(0, (validEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
       const years = months / 12;
 
       return {
         startDate: startDate.toISOString().split('T')[0], // YYYY-MM-DD
-        endDate: job.ended_at ? endDate.toISOString().split('T')[0] : null,
+        endDate: job.ended_at && endDate ? endDate.toISOString().split('T')[0] : null,
         title: job.title || 'Unknown Title',
         company: job.organization?.name || 'Unknown Company',
         durationMonths: Math.round(months),
