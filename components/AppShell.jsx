@@ -30,12 +30,14 @@ const ROUTES_WITH_SIDEBAR = [
   '/templates',
   '/people',
   '/companies',
+  '/contacts', // Contact management routes
 ];
 
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Lazy load Firebase and check auth state (only in browser)
   useEffect(() => {
@@ -51,10 +53,12 @@ export default function AppShell({ children }) {
       const auth = firebaseModule.auth;
       unsubscribe = onAuthStateChanged(auth, (user) => {
         setIsAuthenticated(!!user);
+        setAuthChecked(true);
       });
     }).catch((err) => {
       console.warn('Failed to initialize Firebase auth:', err);
       setIsAuthenticated(false);
+      setAuthChecked(true);
     });
 
     return () => {
@@ -84,7 +88,11 @@ export default function AppShell({ children }) {
   const shouldHideContext = pathname && HIDE_CONTEXT_ROUTES.some(route => pathname.startsWith(route));
 
   // Show navigation when authenticated, but not on public routes like splash
-  if (isAuthenticated && !isPublicRoute) {
+  // Also show if auth hasn't been checked yet (optimistic render) to avoid flash
+  // Only hide if explicitly unauthenticated after check
+  const shouldShowShell = !isPublicRoute && (!authChecked || isAuthenticated);
+  
+  if (shouldShowShell) {
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Top Navigation Bar - Global component */}
