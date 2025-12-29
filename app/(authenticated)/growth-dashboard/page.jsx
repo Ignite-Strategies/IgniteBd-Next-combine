@@ -80,7 +80,7 @@ export default function GrowthDashboardPage() {
         </h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <button
-            onClick={() => router.push('/contacts/upload')}
+            onClick={() => router.push('/people/load')}
             className="group flex items-center gap-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-4 text-left transition hover:border-blue-300 hover:bg-blue-100"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500 transition-transform group-hover:scale-110">
@@ -89,7 +89,7 @@ export default function GrowthDashboardPage() {
             <div>
               <div className="font-semibold text-gray-900">Upload Contacts</div>
               <div className="text-sm text-gray-600">
-                Import a CSV or add contacts manually
+                Choose how to add contacts: CSV, LinkedIn, Microsoft, or manual
               </div>
             </div>
           </button>
