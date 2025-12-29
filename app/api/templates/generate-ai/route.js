@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { OpenAI } from 'openai';
+import { normalizeTemplateResponse, validateTemplateStructure } from '@/lib/templateNormalizer';
 
 // Initialize OpenAI client
 let openaiClient = null;
@@ -126,39 +127,37 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
       throw new Error('No response from AI');
     }
 
-    let parsed;
+    // Normalize and parse the AI response using the normalizer function
+    let normalized;
     try {
-      parsed = JSON.parse(responseText);
-    } catch (e) {
-      // Try to extract JSON from markdown if AI wrapped it
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('Failed to parse AI response as JSON');
+      // Try to parse as JSON first
+      let parsed;
+      try {
+        parsed = JSON.parse(responseText);
+      } catch (e) {
+        // Try to extract JSON from markdown if AI wrapped it
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('Failed to parse AI response as JSON');
+        }
       }
+
+      // Normalize the response to ensure consistent structure
+      normalized = normalizeTemplateResponse(parsed);
+
+      // Validate the normalized structure
+      if (!validateTemplateStructure(normalized)) {
+        throw new Error('Normalized template structure is invalid');
+      }
+    } catch (error) {
+      console.error('Error normalizing AI response:', error);
+      throw new Error(`Failed to normalize AI response: ${error.message}`);
     }
 
-    // Validate required fields
-    if (!parsed.subject || typeof parsed.subject !== 'string') {
-      throw new Error('AI response missing subject field');
-    }
-
-    if (!parsed.body || typeof parsed.body !== 'string') {
-      throw new Error('AI response missing body field');
-    }
-
-    // Title is optional, but provide default if missing
-    if (!parsed.title || typeof parsed.title !== 'string') {
-      parsed.title = 'AI Generated Template';
-    }
-
-    // Return template structure matching the template model
-    return NextResponse.json({
-      title: parsed.title.trim(),
-      subject: parsed.subject.trim(),
-      body: parsed.body.trim(),
-    });
+    // Return normalized template structure matching the template model
+    return NextResponse.json(normalized);
   } catch (error) {
     console.error('❌ Template generate-ai error:', error);
     return NextResponse.json(
