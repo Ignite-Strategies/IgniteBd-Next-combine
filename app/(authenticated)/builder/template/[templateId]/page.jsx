@@ -109,8 +109,9 @@ export default function TemplateBuilderPage() {
         ownerId: ownerId,
       });
 
-      if (response.data?.subject && response.data?.body) {
-        // Populate fields directly on this page (no redirect)
+      // Handle response - check for success and required fields (same pattern as relationship-aware)
+      if (response.data?.success && response.data?.subject && response.data?.body) {
+        // Populate fields directly on this page (no redirect) - hydrate on same page
         setTitle(response.data.title || '');
         setSubject(response.data.subject);
         setBody(response.data.body);
