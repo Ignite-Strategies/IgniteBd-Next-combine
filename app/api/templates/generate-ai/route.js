@@ -85,8 +85,8 @@ Based on the above content, enhance or complete the template.` : `Create a new e
 
 === YOUR TASK ===
 Generate a complete email template with:
-1. **Title**: A concise, descriptive title (e.g., "Reconnecting with Former Colleague", "Outreach to Prospect"). Keep it under 60 characters.
-2. **Subject**: A warm, personal email subject line. Should feel human and natural. Can use {{variables}} like {{firstName}}. Keep it under 80 characters. Examples: "Hi {{firstName}}, long time no see" or "Quick check-in, {{firstName}}".
+1. **Title**: A simple descriptive title that infers variables (e.g., "Collaboration Outreach to Old Colleague", "Reconnecting with Former Colleague", "Reaching Out to Prospect"). Keep it under 60 characters.
+2. **Subject**: A simple, human email subject line WITHOUT variables. Should relate to the body content. Examples: "Reaching Out", "Reconnecting", "Collaboration in 2026". Do NOT use variables like {{firstName}} in the subject - that's spammy.
 3. **Body**: The email body content with {{variables}} for personalization.
 
 === REQUIREMENTS ===
@@ -116,8 +116,8 @@ Return ONLY valid JSON in this exact format:
 
 === EXAMPLE OUTPUT ===
 {
-  "title": "Reconnecting with Former Colleague",
-  "subject": "Hi {{firstName}}, long time no see",
+  "title": "Collaboration Outreach to Old Colleague",
+  "subject": "Reconnecting",
   "body": "Hi {{firstName}},\\n\\nI hope this email finds you well. It's been a while since we connected, and I wanted to reach out.\\n\\nI saw you're now at {{companyName}} - congratulations on the new role!\\n\\nI'd love to catch up and see how things are going. No pressure at all, just thought it'd be nice to reconnect.\\n\\nBest,\\n${ownerName}"
 }
 
@@ -170,9 +170,16 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
         normalized.body = normalized.body.replace(/\[Your name\]/g, ownerName);
       }
 
-      // Ensure subject includes {{firstName}} if it doesn't already
-      if (!normalized.subject.includes('{{firstName}}')) {
-        normalized.subject = `Hi {{firstName}}, ${normalized.subject}`;
+      // Ensure subject is simple (no variables) - if it has variables, generate simple fallback
+      if (normalized.subject && normalized.subject.includes('{{')) {
+        // Extract simple subject from body context or use defaults
+        if (normalized.body.toLowerCase().includes('collaboration')) {
+          normalized.subject = 'Collaboration in 2026';
+        } else if (normalized.body.toLowerCase().includes('reconnect') || normalized.body.toLowerCase().includes('long time')) {
+          normalized.subject = 'Reconnecting';
+        } else {
+          normalized.subject = 'Reaching Out';
+        }
       }
 
       // Validate the normalized structure

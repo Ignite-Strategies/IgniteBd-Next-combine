@@ -119,6 +119,7 @@ Idea: "build me a quick note to a friend and tell him I want to meet"
 
 Response:
 {
+  "title": "Reconnecting with Friend",
   "content": "Hi {{firstName}},\\n\\nHope you're doing well! Been thinking about you and wanted to reach out.\\n\\nWould love to catch up in person if you're open to it — maybe grab coffee or lunch?\\n\\nNo pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nCheers,\\n${ownerName}",
   "subject": "Reconnecting",
   "inferred": {
@@ -133,6 +134,7 @@ Idea: "I want to reach out to my old coworker Sarah who I haven't talked to in 2
 
 Response:
 {
+  "title": "Collaboration Outreach to Old Colleague",
   "content": "Hi {{firstName}},\\n\\nI know it's been a while since we connected — saw you moved to {{companyName}} and wanted to reach out!\\n\\nWould love to catch up over coffee if you're open to it. No pressure at all, just thought it'd be nice to reconnect.\\n\\nLet me know if you're interested!\\n\\nBest,\\n${ownerName}",
   "subject": "Reconnecting",
   "inferred": {
@@ -185,7 +187,22 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
       throw new Error('AI response missing content field');
     }
 
-    // Generate subject if not provided (use simple default)
+    // Generate title if not provided
+    let title = parsed.title;
+    if (!title || typeof title !== 'string') {
+      const inferred = parsed.inferred || {};
+      if (inferred.ask) {
+        if (inferred.ask.includes('collaboration')) {
+          title = inferred.relationship === 'DORMANT' ? 'Collaboration Outreach to Old Colleague' : 'Collaboration Outreach';
+        } else {
+          title = inferred.relationship === 'DORMANT' ? 'Reconnecting with Former Colleague' : 'Reaching Out';
+        }
+      } else {
+        title = 'AI Generated Template';
+      }
+    }
+
+    // Generate subject if not provided (use simple default, NO variables)
     let subject = parsed.subject;
     if (!subject || typeof subject !== 'string') {
       // Default to simple subject based on inferred ask
@@ -204,15 +221,13 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
       templateContent = templateContent.replace(/\[Your name\]/g, ownerName);
     }
 
-    // Extract variables from both subject and content
+    // Extract variables from content only (subject has no variables)
     const extractedVariablesFromContent = extractVariableNames(templateContent);
-    const extractedVariablesFromSubject = extractVariableNames(subject);
     
     // Merge with AI's suggested variables
     const allVariables = Array.from(
       new Set([
         ...extractedVariablesFromContent,
-        ...extractedVariablesFromSubject,
         ...(parsed.suggestedVariables || [])
       ])
     );
@@ -220,6 +235,7 @@ Now create a quick note template from this idea. Return ONLY the JSON object, no
     return NextResponse.json({
       success: true,
       template: templateContent,
+      title: title,
       subject: subject,
       inferred: parsed.inferred || {},
       variables: allVariables, // Simple string array

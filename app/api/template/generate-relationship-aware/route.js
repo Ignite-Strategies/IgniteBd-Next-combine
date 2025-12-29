@@ -184,8 +184,8 @@ Use {{variableName}} ONLY for contact-specific data that will be filled in later
 - Context Notes: "${contextNotes || 'none'}" - Use any additional context notes to inform the message tone and content
 
 === REQUIREMENTS ===
-1. **Title**: Create a concise, descriptive title (e.g., "Reconnecting with Former Co-worker", "Catching up with Friend", "Outreach to Prospect"). Keep it under 60 characters. This is for template organization, not the email subject.
-2. **Subject**: Create a warm, personal email subject line. Should feel human and natural. Can use {{variables}} like {{firstName}}. Keep it under 80 characters. Examples: "Hi {{firstName}}, long time no see" or "Quick check-in, {{firstName}}".
+1. **Title**: Create a simple descriptive title that infers variables (e.g., "Collaboration Outreach to Old Colleague", "Reconnecting with Former Co-worker", "Reaching Out to Prospect"). Keep it under 60 characters. This is for template organization, not the email subject.
+2. **Subject**: Create a simple, human email subject line WITHOUT variables. Should relate to the body content. Examples: "Reaching Out", "Reconnecting", "Collaboration in 2026". Do NOT use variables like {{firstName}} in the subject - that's spammy.
 3. **Contact Variables Only**: Use {{variableName}} for contact-specific data from the list above (firstName, goesBy, lastName, fullName, companyName, title, seniority, department, city, state, country, email, phone, linkedinUrl). Choose variables that make sense for the context.
 4. **Bake in Context**: Time, business description, desired outcome should be PLAIN TEXT (not {{variables}})
 5. **Follow Logic Rules**: Apply the relationship-aware logic rules above
@@ -281,30 +281,33 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
       templateContent = templateContent.replace(/\[Your name\]/g, ownerName);
     }
 
-    // Generate title if not provided (fallback)
-    const title = parsed.title || `Relationship: ${typeOfPerson} - ${relationship}`;
+    // Generate title if not provided (simple descriptive title)
+    let title = parsed.title;
+    if (!title || typeof title !== 'string') {
+      if (whatWantFromThem && whatWantFromThem.toLowerCase().includes('collaboration')) {
+        title = relationship === 'DORMANT' ? 'Collaboration Outreach to Old Colleague' : 'Collaboration Outreach';
+      } else {
+        title = relationship === 'DORMANT' ? 'Reconnecting with Former Colleague' : 'Reaching Out';
+      }
+    }
     
-    // Generate subject if not provided (must include {{firstName}})
+    // Generate subject if not provided (simple, NO variables)
     let subject = parsed.subject;
     if (!subject || typeof subject !== 'string') {
-      // Default to greeting with firstName
-      subject = 'Hi {{firstName}},';
-    }
-    
-    // Ensure subject includes {{firstName}} if it doesn't already
-    if (!subject.includes('{{firstName}}')) {
-      subject = `Hi {{firstName}}, ${subject}`;
+      if (whatWantFromThem && whatWantFromThem.toLowerCase().includes('collaboration')) {
+        subject = 'Collaboration in 2026';
+      } else {
+        subject = relationship === 'DORMANT' ? 'Reconnecting' : 'Reaching Out';
+      }
     }
 
-    // Extract variables from both subject and content
+    // Extract variables from content only (subject has no variables)
     const extractedVariablesFromContent = extractVariableNames(templateContent);
-    const extractedVariablesFromSubject = extractVariableNames(subject);
     
     // Merge with AI's suggested variables
     const allVariables = Array.from(
       new Set([
         ...extractedVariablesFromContent,
-        ...extractedVariablesFromSubject,
         ...(parsed.suggestedVariables || [])
       ])
     );

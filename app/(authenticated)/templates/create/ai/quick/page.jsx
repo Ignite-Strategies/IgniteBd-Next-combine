@@ -42,15 +42,10 @@ export default function QuickIdeaTemplatePage() {
 
       if (response.data?.success && response.data?.template) {
         // Navigate to template builder with generated data
-        // The generate-quick endpoint returns: { success: true, template, subject, inferred, variables }
+        // The generate-quick endpoint returns: { success: true, template, title, subject, inferred, variables }
         const templateBody = response.data.template || '';
-        const subject = response.data.subject || 'Hi {{firstName}},';
-        const inferred = response.data.inferred || {};
-        
-        // Generate title from inferred data
-        const title = inferred.ask 
-          ? `Quick Note: ${inferred.ask}`
-          : 'AI Generated Template';
+        const subject = response.data.subject || 'Reaching Out';
+        const title = response.data.title || 'AI Generated Template';
         
         // Create params for template builder - URL encode properly
         const params = new URLSearchParams({
