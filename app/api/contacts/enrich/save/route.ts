@@ -109,20 +109,11 @@ export async function POST(request: Request) {
       }
     }
     
-    // Validate that contact belongs to the companyHQ being used (if provided)
+    // Contacts are global - allow enriching even if contact belongs to different CompanyHQ
+    // Multiple CompanyHQs can work with the same contact
     if (companyHQId && existingContact.crmId !== companyHQId) {
-      console.warn(`⚠️ Contact ${contactId} has crmId ${existingContact.crmId} but enrich request has companyHQId ${companyHQId}`);
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Contact belongs to a different companyHQ and cannot be enriched in this context.',
-          details: {
-            contactCrmId: existingContact.crmId,
-            requestedCompanyHQId: companyHQId,
-          },
-        },
-        { status: 403 },
-      );
+      console.log(`ℹ️ Contact ${contactId} has crmId ${existingContact.crmId} but enrich request is from CompanyHQ ${companyHQId} - allowing cross-CompanyHQ enrichment`);
+      // Don't block - just log it. The contact can be enriched regardless of which CompanyHQ owns it
     }
 
     // Get raw enrichment data from Redis

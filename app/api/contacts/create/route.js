@@ -121,41 +121,39 @@ export async function POST(request) {
       },
     });
 
-    // If contact exists but belongs to different companyHQ, return error
-    if (existingContact && existingContact.crmId !== crmId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Contact already exists in a different company. Cannot update across company boundaries.',
-          details: {
-            existingCrmId: existingContact.crmId,
-            requestedCrmId: crmId,
-          },
-        },
-        { status: 409 },
-      );
-    }
-
-    // Upsert by email
+    // Contacts are global - if exists, just update name fields
+    // Don't block cross-CompanyHQ - multiple people can know the same contact
     const now = new Date();
-    const contact = await prisma.contact.upsert({
-      where: {
-        email: normalizedEmail,
-      },
-      update: {
-        firstName,
-        lastName,
-        updatedAt: now,
-        // Don't update crmId - it's a tenant identifier and shouldn't change
-      },
-      create: {
-        crmId,
-        firstName,
-        lastName,
-        email: normalizedEmail,
-        updatedAt: now,
-      },
-    });
+    let contact;
+    
+    if (existingContact) {
+      // Contact exists globally - update name fields (but keep original crmId)
+      // This allows multiple CompanyHQs to work with the same contact
+      contact = await prisma.contact.update({
+        where: {
+          email: normalizedEmail,
+        },
+        data: {
+          firstName,
+          lastName,
+          updatedAt: now,
+          // Note: We keep the original crmId - the contact "belongs" to the first CompanyHQ that created it
+          // But this doesn't prevent other CompanyHQs from enriching/working with them
+        },
+      });
+      console.log(`ℹ️ Contact ${normalizedEmail} already exists in CompanyHQ ${existingContact.crmId}, updating name fields for CompanyHQ ${crmId} context`);
+    } else {
+      // Create new contact
+      contact = await prisma.contact.create({
+        data: {
+          crmId,
+          firstName,
+          lastName,
+          email: normalizedEmail,
+          updatedAt: now,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
