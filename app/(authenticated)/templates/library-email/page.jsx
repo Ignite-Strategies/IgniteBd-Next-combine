@@ -83,8 +83,8 @@ function EmailTemplateLibraryContent() {
         const updatedTemplates = templates.filter(t => t.id !== templateId);
         setTemplates(updatedTemplates);
         // Update localStorage cache
-        if (ownerId) {
-          localStorage.setItem(`templates_${ownerId}`, JSON.stringify(updatedTemplates));
+        if (companyHQId) {
+          localStorage.setItem(`templates_${companyHQId}`, JSON.stringify(updatedTemplates));
         }
       } else {
         alert('Failed to delete template');

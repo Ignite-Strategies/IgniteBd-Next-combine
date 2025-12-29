@@ -203,9 +203,9 @@ export default function TemplateBuilderPage() {
       }
 
       // Update localStorage cache
-      if (ownerId && typeof window !== 'undefined') {
+      if (companyHQId && typeof window !== 'undefined') {
         try {
-          const cached = localStorage.getItem(`templates_${ownerId}`);
+          const cached = localStorage.getItem(`templates_${companyHQId}`);
           const templates = cached ? JSON.parse(cached) : [];
           if (isNew) {
             // Add new template to cache
@@ -219,7 +219,7 @@ export default function TemplateBuilderPage() {
               templates.unshift(template);
             }
           }
-          localStorage.setItem(`templates_${ownerId}`, JSON.stringify(templates));
+          localStorage.setItem(`templates_${companyHQId}`, JSON.stringify(templates));
           console.log('✅ Updated templates cache in localStorage');
         } catch (e) {
           console.warn('Failed to update templates cache:', e);
