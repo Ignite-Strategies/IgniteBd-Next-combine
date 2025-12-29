@@ -55,9 +55,28 @@ export default function WelcomePage() {
               companyHQ: m.company_hqs || null, // Full companyHQ object
             }));
             
-            // Set selected company to first (already sorted by role priority)
-            const defaultCompanyHqId = defaultMembership?.companyHqId || memberships[0]?.companyHqId;
+            // Check if there's already a companyHQId in localStorage (from header switch)
+            // If it matches a membership, use it; otherwise default to first membership
+            const storedCompanyHQId = typeof window !== 'undefined' 
+              ? localStorage.getItem('companyHQId')
+              : null;
+            
+            const hasStoredMembership = storedCompanyHQId && 
+              memberships.some(m => m.companyHqId === storedCompanyHQId);
+            
+            // Use stored CompanyHQ if it's valid, otherwise default to first
+            const defaultCompanyHqId = hasStoredMembership
+              ? storedCompanyHQId
+              : (defaultMembership?.companyHqId || memberships[0]?.companyHqId);
             setSelectedCompanyHqId(defaultCompanyHqId);
+            
+            // If switching via header, automatically continue with the selected company
+            if (hasStoredMembership && storedCompanyHQId !== owner.companyHQId) {
+              console.log(`🔄 Welcome: Detected CompanyHQ switch to ${storedCompanyHQId}, auto-continuing...`);
+              // Small delay to ensure state is set, then auto-continue
+              setTimeout(() => handleContinue(), 100);
+              return;
+            }
             
             // Set membership data for display/routing
             setMembershipData({
