@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { OpenAI } from 'openai';
 import { normalizeTemplateResponse, validateTemplateStructure } from '@/lib/templateNormalizer';
+import { extractVariableNames } from '@/lib/templateVariables';
 
 // Initialize OpenAI client
 let openaiClient = null;
@@ -156,8 +157,27 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanation.`;
       throw new Error(`Failed to normalize AI response: ${error.message}`);
     }
 
-    // Return normalized template structure matching the template model
-    return NextResponse.json(normalized);
+    // Extract variables from both subject and body
+    const extractedVariablesFromBody = extractVariableNames(normalized.body);
+    const extractedVariablesFromSubject = extractVariableNames(normalized.subject);
+    
+    // Merge all variables
+    const allVariables = Array.from(
+      new Set([
+        ...extractedVariablesFromBody,
+        ...extractedVariablesFromSubject,
+      ])
+    );
+
+    // Return structure matching the relationship-aware pattern
+    return NextResponse.json({
+      success: true,
+      title: normalized.title,
+      subject: normalized.subject,
+      body: normalized.body,
+      template: normalized.body, // Keep for backward compatibility
+      variables: allVariables, // Simple string array
+    });
   } catch (error) {
     console.error('❌ Template generate-ai error:', error);
     return NextResponse.json(
