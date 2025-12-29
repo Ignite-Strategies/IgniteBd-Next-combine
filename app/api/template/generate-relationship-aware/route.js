@@ -148,7 +148,7 @@ Create a warm, human, low-pressure outreach message template using VARIABLE TAGS
 
 Return ONLY valid JSON in this exact format:
 {
-  "title": "Template title/name (e.g., 'Reconnecting with {{typeOfPerson}} - {{relationship}}')",
+  "title": "Simple descriptive title that infers variables (e.g., 'Collaboration Outreach to Old Colleague')",
   "subject": "Simple subject line WITHOUT variables (e.g., 'Reaching Out', 'Reconnecting', 'Collaboration in 2026')",
   "content": "The email body template with {{variableName}} tags for dynamic content",
   "suggestedVariables": ["firstName", "companyName", etc.]
