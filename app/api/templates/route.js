@@ -83,7 +83,7 @@ export async function POST(request) {
     }
 
     // Create template (company-scoped, ownerId optional for audit trail)
-    const template = await prisma.template.create({
+    const template = await prisma.templates.create({
       data: {
         companyHQId,
         ownerId: ownerId || owner.id, // Use provided ownerId or current owner as creator
@@ -165,7 +165,7 @@ export async function GET(request) {
     }
 
     // List templates for this company (company-scoped)
-    const templates = await prisma.template.findMany({
+    const templates = await prisma.templates.findMany({
       where: {
         companyHQId,
       },

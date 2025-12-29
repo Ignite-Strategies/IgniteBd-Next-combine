@@ -35,7 +35,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const template = await prisma.template.findUnique({
+    const template = await prisma.templates.findUnique({
       where: { id },
     });
 
@@ -105,7 +105,7 @@ export async function PATCH(request, { params }) {
     }
 
     // Get existing template to validate access
-    const existingTemplate = await prisma.template.findUnique({
+    const existingTemplate = await prisma.templates.findUnique({
       where: { id },
     });
 
@@ -133,7 +133,7 @@ export async function PATCH(request, { params }) {
     if (subject !== undefined) updateData.subject = subject.trim();
     if (bodyText !== undefined) updateData.body = bodyText.trim();
 
-    const template = await prisma.template.update({
+    const template = await prisma.templates.update({
       where: { id },
       data: updateData,
     });
@@ -188,7 +188,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Get existing template to validate access
-    const existingTemplate = await prisma.template.findUnique({
+    const existingTemplate = await prisma.templates.findUnique({
       where: { id },
     });
 
@@ -208,7 +208,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    await prisma.template.delete({
+    await prisma.templates.delete({
       where: { id },
     });
 
