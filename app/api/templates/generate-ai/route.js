@@ -109,8 +109,8 @@ Generate a complete email template with:
 === OUTPUT FORMAT ===
 Return ONLY valid JSON in this exact format:
 {
-  "title": "Template title",
-  "subject": "Email subject line with optional {{variables}}",
+  "title": "Simple descriptive title that infers variables",
+  "subject": "Simple subject line WITHOUT variables (e.g., 'Reaching Out', 'Reconnecting', 'Collaboration in 2026')",
   "body": "Email body content with {{variables}} like {{firstName}}, {{companyName}}, etc."
 }
 
