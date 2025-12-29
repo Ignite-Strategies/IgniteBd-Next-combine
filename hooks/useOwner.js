@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 /**
  * useOwner Hook
@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
  * Reads owner data from localStorage (hydrated by welcome page).
  * Welcome page is the single hydration point - this hook just reads cached data.
  * 
- * @returns {Object} { ownerId, owner, companyHQId, companyHQ, memberships, loading, hydrated, error }
+ * @returns {Object} { ownerId, owner, companyHQId, companyHQ, memberships, loading, hydrated, error, refresh }
  */
 export function useOwner() {
   const [ownerId, setOwnerId] = useState(null);
@@ -19,8 +19,8 @@ export function useOwner() {
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
-  // Load from localStorage (hydrated by welcome page)
-  useEffect(() => {
+  // Function to load data from localStorage
+  const loadFromStorage = useCallback(() => {
     if (typeof window === 'undefined') {
       setLoading(false);
       return;
@@ -73,6 +73,41 @@ export function useOwner() {
     setLoading(false);
   }, []);
 
+  // Load from localStorage on mount
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+
+  // Listen for storage changes (for cross-tab sync and context switching)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleStorageChange = (e) => {
+      // When companyHQId or companyHQ changes, refresh
+      if (e.key === 'companyHQId' || e.key === 'companyHQ' || e.key === 'memberships') {
+        console.log('🔄 Storage changed, refreshing owner context:', e.key);
+        loadFromStorage();
+      }
+    };
+
+    // Listen for storage events (fires when localStorage is changed in another tab)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events (for same-tab changes)
+    window.addEventListener('companyHQContextChanged', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('companyHQContextChanged', handleStorageChange);
+    };
+  }, [loadFromStorage]);
+
+  // Refresh function - manually reload from localStorage
+  const refresh = useCallback(() => {
+    console.log('🔄 Manually refreshing owner context...');
+    loadFromStorage();
+  }, [loadFromStorage]);
+
   return {
     ownerId,
     owner,
@@ -82,6 +117,7 @@ export function useOwner() {
     loading,
     hydrated,
     error: null, // No errors - just reads from localStorage
+    refresh, // Add refresh function
     // Microsoft connection status (computed server-side, no tokens in owner object)
     isMicrosoftConnected: owner?.microsoftConnected || false,
     microsoftEmail: owner?.microsoftEmail || null,
