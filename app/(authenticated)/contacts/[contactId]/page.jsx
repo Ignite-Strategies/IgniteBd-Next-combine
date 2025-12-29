@@ -62,15 +62,39 @@ export default function ContactDetailPage({ params }) {
             // The contact detail is already fresh, no need to refresh the list
           } else {
             if (!cachedContact && isMounted) {
-              setError(response.data?.error || 'Contact not found.');
+              const errorMsg = response.data?.error || response.data?.details || 'Contact not found.';
+              console.error('API returned error:', response.data);
+              setError(errorMsg);
               setLoading(false);
             }
           }
         } catch (apiErr) {
           console.error('Error fetching contact from API:', apiErr);
+          console.error('Error details:', {
+            message: apiErr?.message,
+            status: apiErr?.status,
+            type: apiErr?.type,
+            response: apiErr?.response?.data,
+            stack: apiErr?.stack,
+          });
+          
           // If we have cached contact, keep showing it even if API fails
           if (!cachedContact && isMounted) {
-            setError('Unable to load contact details.');
+            // Extract error message from various possible error formats
+            const errorMsg = 
+              apiErr?.response?.data?.error ||
+              apiErr?.response?.data?.details ||
+              apiErr?.message ||
+              apiErr?.type ||
+              'Unable to load contact details.';
+            
+            // Include status code if available for debugging
+            const statusCode = apiErr?.status || apiErr?.response?.status;
+            const fullErrorMsg = statusCode 
+              ? `${errorMsg} (Status: ${statusCode})`
+              : errorMsg;
+            
+            setError(fullErrorMsg);
             setLoading(false);
           } else if (isMounted) {
             setLoading(false); // We have cached data, just stop loading

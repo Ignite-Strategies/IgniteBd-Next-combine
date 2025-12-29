@@ -110,7 +110,7 @@ export async function calculateBDOSScore(
 
     // Fetch all required data
     const [contact, product, company, persona] = await Promise.all([
-      prisma.contacts.findUnique({
+      prisma.contact.findUnique({
         where: { id: contactId },
         include: {
           company: true, // Universal company relation
@@ -120,7 +120,7 @@ export async function calculateBDOSScore(
       prisma.product.findUnique({
         where: { id: productId },
       }),
-      prisma.contacts.findUnique({
+      prisma.contact.findUnique({
         where: { id: contactId },
         include: {
           company: true,

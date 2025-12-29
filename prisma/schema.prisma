@@ -258,7 +258,7 @@ model companies {
   revenueTier           String?
   stabilityScore        Int?
   company_hqs           company_hqs     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts              contacts[]
+  contacts              Contact[]
   proposals             proposals[]
   work_packages         work_packages[]
 
@@ -288,14 +288,14 @@ model company_hqs {
   blogs                                         blogs[]
   campaigns                                     campaigns[]
   companies                                     companies[]
-  contacts_company_hqs_contactOwnerIdTocontacts contacts?                       @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
+  contacts_company_hqs_contactOwnerIdTocontacts Contact?                       @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
   owners_company_hqs_ownerIdToowners            owners?                         @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
   platform                                      platform?                       @relation(fields: [platformId], references: [id])
   company_memberships                           company_memberships[]
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
-  contacts_contacts_crmIdTocompany_hqs          contacts[]                      @relation("contacts_crmIdTocompany_hqs")
+  contacts_contacts_crmIdTocompany_hqs          Contact[]                      @relation("contacts_crmIdTocompany_hqs")
   deliverable_templates                         deliverable_templates[]
   domain_registry                               domain_registry?
   email_sequences                               email_sequences[]
@@ -346,7 +346,7 @@ model consultant_deliverables {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime
   company_hqs      company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts         contacts    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts         Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
   proposals        proposals?  @relation(fields: [proposalId], references: [id])
 
   @@index([companyHQId])
@@ -368,14 +368,14 @@ model contact_lists {
   isActive      Boolean     @default(true)
   campaigns     campaigns[]
   company_hqs   company_hqs @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts      contacts[]
+  contacts      Contact[]
 
   @@unique([companyId, name])
   @@index([companyId])
   @@index([isActive])
 }
 
-model contacts {
+model Contact {
   id                                                        String                    @id
   crmId                                                     String
   firstName                                                 String?
@@ -457,6 +457,7 @@ model contacts {
   work_packages_work_packages_workPackageClientIdTocontacts work_packages[]           @relation("work_packages_workPackageClientIdTocontacts")
   work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]           @relation("work_packages_workPackageMemberIdTocontacts")
 
+  @@map("contacts")
   @@unique([email, crmId])
   @@index([companyDomain])
   @@index([companyId])
@@ -704,7 +705,7 @@ model invite_tokens {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
-  contacts  contacts @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([email])
@@ -912,7 +913,7 @@ model pipelines {
   stage     String
   createdAt DateTime @default(now())
   updatedAt DateTime
-  contacts  contacts @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts  Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
 model platform {
@@ -1037,7 +1038,7 @@ model proposals {
   proposal_phases         proposal_phases[]
   company_hqs             company_hqs               @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   companies               companies                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts                contacts                  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contacts                Contact                  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 }
 
 model prospect_candidates {
@@ -1240,8 +1241,8 @@ model work_packages {
   work_package_items                                   work_package_items[]
   work_package_phases                                  work_package_phases[]
   companies                                            companies             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts_work_packages_workPackageClientIdTocontacts contacts              @relation("work_packages_workPackageClientIdTocontacts", fields: [workPackageClientId], references: [id])
-  contacts_work_packages_workPackageMemberIdTocontacts contacts?             @relation("work_packages_workPackageMemberIdTocontacts", fields: [workPackageMemberId], references: [id])
+  contacts_work_packages_workPackageClientIdTocontacts Contact              @relation("work_packages_workPackageClientIdTocontacts", fields: [workPackageClientId], references: [id])
+  contacts_work_packages_workPackageMemberIdTocontacts Contact?             @relation("work_packages_workPackageMemberIdTocontacts", fields: [workPackageMemberId], references: [id])
   company_hqs                                          company_hqs           @relation(fields: [workPackageOwnerId], references: [id])
 
   @@index([companyId])
