@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 
 /**
  * Quick Idea AI Template Page
- * TODO: Implement AI generation from free-text idea
+ * User enters an idea, AI generates template, then navigates to template builder
  */
 export default function QuickIdeaTemplatePage() {
   const router = useRouter();
@@ -16,7 +17,9 @@ export default function QuickIdeaTemplatePage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (e) => {
+    e.preventDefault();
+    
     if (!idea.trim()) {
       setError('Please enter an idea');
       return;
@@ -27,9 +30,54 @@ export default function QuickIdeaTemplatePage() {
       return;
     }
 
-    // TODO: Implement AI generation
-    // For now, redirect to manual template builder with the idea as a note
-    router.push(`/builder/template/new?idea=${encodeURIComponent(idea)}`);
+    try {
+      setGenerating(true);
+      setError('');
+
+      // Call the generate-quick endpoint
+      const response = await api.post('/api/template/generate-quick', {
+        idea: idea.trim(),
+      });
+
+      if (response.data?.success && response.data?.template) {
+        // Navigate to template builder with generated data
+        // The generate-quick endpoint returns: { success: true, template, inferred, variables }
+        // template = body content, inferred = { relationship, ask, intent }
+        const templateBody = response.data.template || '';
+        const inferred = response.data.inferred || {};
+        
+        // Generate title from inferred data
+        const title = inferred.ask 
+          ? `Quick Note: ${inferred.ask}`
+          : 'AI Generated Template';
+        
+        // Generate subject from first line of template or default
+        let subject = 'Hi {{firstName}}';
+        if (templateBody) {
+          const firstLine = templateBody.split('\\n')[0].replace(/{{.*?}}/g, '').trim();
+          if (firstLine && firstLine.length < 80) {
+            subject = firstLine;
+          }
+        }
+        
+        // Create params for template builder - URL encode properly
+        const params = new URLSearchParams({
+          title: title,
+          subject: subject,
+          body: templateBody,
+        });
+        
+        // Navigate to template builder
+        router.push(`/builder/template/new?${params.toString()}`);
+      } else {
+        setError(response.data?.error || 'Failed to generate template');
+        setGenerating(false);
+      }
+    } catch (err) {
+      console.error('Error generating template:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to generate template');
+      setGenerating(false);
+    }
   };
 
   return (
@@ -56,7 +104,7 @@ export default function QuickIdeaTemplatePage() {
               {error}
             </div>
           )}
-          <div className="space-y-4">
+          <form onSubmit={handleGenerate} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Your Idea *
@@ -67,22 +115,40 @@ export default function QuickIdeaTemplatePage() {
                 placeholder="e.g., I want to reach out to my old coworker Sarah who just started at TechCorp. I'd like to see if we can collaborate on some projects."
                 rows={6}
                 className="w-full rounded border border-gray-300 px-3 py-2"
+                disabled={generating}
               />
             </div>
 
             <div className="flex justify-end gap-4">
               <button
-                onClick={handleGenerate}
-                disabled={generating || !idea.trim()}
-                className="flex items-center gap-2 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+                type="button"
+                onClick={() => router.back()}
+                disabled={generating}
+                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                {generating ? 'Generating...' : 'Generate Template'}
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={generating || !idea.trim()}
+                className="flex items-center gap-2 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Generating...
+                  </>
+                ) : (
+                  'Generate Template'
+                )}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
     </div>
   );
 }
-
