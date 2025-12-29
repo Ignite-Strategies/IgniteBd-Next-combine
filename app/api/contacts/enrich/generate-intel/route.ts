@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 // @ts-ignore - firebaseAdmin is a JS file
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { enrichPerson, normalizeApolloResponse } from '@/lib/apollo';
-import { getRedis } from '@/lib/redis';
 import { normalizeContactApollo } from '@/lib/enrichment/normalizeContactApollo';
 import { normalizeCompanyApollo } from '@/lib/enrichment/normalizeCompanyApollo';
 import {
@@ -44,12 +43,17 @@ import {
  *   "normalizedCompany": {...},
  *   "intelligenceScores": {...},
  *   "companyIntelligence": {...},
- *   "redisKey": "apollo:preview:abc123"
+ *   "rawEnrichmentPayload": {...},
+ *   "profileSummary": "...",
+ *   "currentTenureYears": 2.5,
+ *   "totalExperienceYears": 10.0,
+ *   "avgTenureYears": 3.3,
+ *   "careerTimeline": [...],
+ *   "companyPositioning": {...}
  * }
  * 
- * Stores in Redis:
- * - Raw Apollo JSON under redisKey
- * - Normalized data + intelligence scores under previewId
+ * NO Redis storage - all data returned in response
+ * Frontend stores in component state and sends directly to save route
  * 
  * NO database writes - this is preview only
  */
@@ -204,60 +208,17 @@ export async function POST(request: Request) {
       console.warn('⚠️ Company positioning enrichment failed (non-critical):', error.message);
     }
 
-    // Generate preview ID
+    // Generate preview ID (for backward compatibility, but not used since we don't store in Redis)
     const previewId = `preview:${Date.now()}:${Math.random().toString(36).substring(7)}`;
     const redisKey = `apollo:${previewId}`;
 
-    // Store in Redis
-    try {
-      const redisClient = getRedis();
-      const ttl = 7 * 24 * 60 * 60; // 7 days
-
-      // Store raw Apollo JSON
-      await redisClient.setex(
-        redisKey,
-        ttl,
-        JSON.stringify({
-          rawEnrichmentPayload: rawApolloResponse,
-          enrichedAt: new Date().toISOString(),
-        })
-      );
-
-      // Store normalized data + intelligence scores + inferences under previewId
-      await redisClient.setex(
-        previewId,
-        ttl,
-        JSON.stringify({
-          previewId,
-          redisKey,
-          linkedinUrl: linkedinUrl || null,
-          email: email || null,
-          contactId: contactId || null,
-          normalizedContact,
-          normalizedCompany,
-          intelligenceScores,
-          companyIntelligence,
-          // Inference layer fields
-          profileSummary,
-          tenureYears, // Keep for backward compatibility
-          currentTenureYears: careerStats.currentTenureYears,
-          totalExperienceYears: careerStats.totalExperienceYears,
-          avgTenureYears: careerStats.avgTenureYears,
-          careerTimeline,
-          companyPositioning,
-          createdAt: new Date().toISOString(),
-        })
-      );
-
-      console.log(`✅ Intelligence data stored in Redis: ${previewId}`);
-    } catch (redisError: any) {
-      console.warn('⚠️ Redis store failed (non-critical):', redisError.message);
-      // Continue - we can still return preview data
-    }
+    // NOTE: Redis storage removed - user stays on same page, all data returned in response
+    // Frontend stores data in component state and sends directly to save route
+    // This eliminates unnecessary Redis calls and makes the flow more reliable
 
     // Return preview data with intelligence scores + inferences
     // IMPORTANT: Also return rawApolloResponse so frontend can send it directly to save route (no Redis needed!)
-    return NextResponse.json({
+    const response = {
       success: true,
       previewId,
       redisKey,
@@ -275,7 +236,18 @@ export async function POST(request: Request) {
       careerTimeline,
       companyPositioning,
       message: 'Intelligence generated successfully. Use previewId to retrieve data.',
+    };
+    
+    console.log('📤 Generate-intel response structure:', {
+      hasRawEnrichmentPayload: !!response.rawEnrichmentPayload,
+      rawPayloadHasPerson: !!response.rawEnrichmentPayload?.person,
+      intelligenceScoresKeys: Object.keys(intelligenceScores),
+      intelligenceScoresValues: intelligenceScores,
+      hasProfileSummary: !!profileSummary,
+      careerStats,
     });
+    
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('❌ Generate intelligence error:', error);
     return NextResponse.json(

@@ -7,7 +7,7 @@ import { useContactsContext } from '@/hooks/useContacts';
 import { usePipelinesContext } from '@/hooks/usePipelines';
 
 const FALLBACK_PIPELINES = {
-  prospect: ['interest', 'meeting', 'proposal', 'contract', 'contract-signed'],
+  prospect: ['need-to-engage', 'interest', 'meeting', 'proposal', 'contract', 'contract-signed'],
   client: ['kickoff', 'work-started', 'work-delivered', 'sustainment', 'renewal'],
   collaborator: ['interest', 'meeting', 'agreement'],
   institution: ['interest', 'meeting', 'agreement'],

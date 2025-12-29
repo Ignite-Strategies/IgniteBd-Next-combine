@@ -120,14 +120,25 @@ export default function ContactDetailPage({ params }) {
   }, [contact]);
 
   // Check if contact is already enriched
+  // Uses useMemo (not useEffect) - automatically recalculates when contact changes
+  // No useEffect needed since this is a derived value from contact state
   const isEnriched = useMemo(() => {
     if (!contact) return false;
+    
+    // Primary indicators of enrichment (most reliable first):
+    // 1. enrichmentPayload - raw Apollo JSON stored in DB (most reliable)
+    // 2. enrichmentSource - indicates which service enriched this contact
+    // 3. profileSummary - GPT-generated summary from enrichment
+    // 4. Intelligence scores - computed from enrichment data
+    // 5. enrichmentRedisKey - legacy Redis reference (less reliable now)
+    
     return !!(
-      contact.seniorityScore !== null ||
-      contact.buyingPowerScore !== null ||
-      contact.profileSummary ||
-      contact.enrichmentSource ||
-      contact.enrichmentRedisKey
+      contact.enrichmentPayload || // Raw enrichment JSON (most reliable)
+      contact.enrichmentSource || // Which service enriched (e.g., "apollo")
+      contact.profileSummary || // GPT summary from enrichment
+      (contact.seniorityScore !== null && contact.seniorityScore !== undefined) || // Intelligence score
+      (contact.buyingPowerScore !== null && contact.buyingPowerScore !== undefined) || // Intelligence score
+      contact.enrichmentRedisKey // Legacy Redis key (fallback)
     );
   }, [contact]);
 
@@ -275,6 +286,8 @@ export default function ContactDetailPage({ params }) {
                   // Reset stage when pipeline changes (unless it's unassigned)
                   if (e.target.value === 'unassigned') {
                     setSelectedStage('');
+                  } else if (e.target.value === 'prospect') {
+                    setSelectedStage('need-to-engage');
                   } else {
                     setSelectedStage('interest');
                   }
@@ -295,6 +308,7 @@ export default function ContactDetailPage({ params }) {
                 >
                   {selectedPipeline === 'prospect' && (
                     <>
+                      <option value="need-to-engage">Need to Engage</option>
                       <option value="interest">Interest</option>
                       <option value="meeting">Meeting</option>
                       <option value="proposal">Proposal</option>

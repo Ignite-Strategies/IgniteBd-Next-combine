@@ -84,7 +84,7 @@ export default function ContactManualPage() {
       } catch (error) {
         console.warn('Failed to load pipeline config, using defaults.', error);
         setPipelineConfig({
-          prospect: ['interest', 'meeting', 'proposal', 'contract', 'contract-signed'],
+          prospect: ['need-to-engage', 'interest', 'meeting', 'proposal', 'contract', 'contract-signed'],
           client: ['kickoff', 'work-started', 'work-delivered', 'sustainment', 'renewal', 'terminated-contract'],
           collaborator: ['interest', 'meeting', 'moa', 'agreement'],
           institution: ['interest', 'meeting', 'moa', 'agreement'],

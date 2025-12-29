@@ -39,6 +39,7 @@ model Pipeline {
 ### Pipeline Stages
 
 **Prospect Pipeline**:
+- `need-to-engage` - Contact in CRM but hasn't been emailed yet
 - `interest` - Initial interest expressed
 - `meeting` - Meeting scheduled/held
 - `proposal` - Proposal sent

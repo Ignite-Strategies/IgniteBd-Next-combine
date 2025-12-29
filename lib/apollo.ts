@@ -44,8 +44,32 @@ export interface ApolloPersonMatchResponse {
       name?: string;
       website_url?: string;
       primary_domain?: string;
+      employees?: number;
+      estimated_num_employees?: number;
+      annual_revenue?: number;
+      revenue_range?: string;
+      growth_rate?: number;
+      funding_events?: Array<{
+        date?: string;
+        amount?: number;
+      }>;
     };
     photo_url?: string; // Avatar URL
+    // Employment history - Apollo returns this in enrich endpoint
+    employment_history?: Array<{
+      started_at?: string;
+      started_on?: string;
+      start_date?: string;
+      ended_at?: string | null;
+      ended_on?: string | null;
+      end_date?: string | null;
+      title?: string;
+      organization?: {
+        name?: string;
+      };
+      company?: string;
+      company_name?: string;
+    }>;
   };
 }
 

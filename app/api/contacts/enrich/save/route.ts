@@ -43,6 +43,24 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
+    
+    // Log what we're receiving
+    console.log('📥 Enrich save request received:', {
+      contactId: body.contactId,
+      hasRedisKey: !!body.redisKey,
+      hasRawEnrichmentPayload: !!body.rawEnrichmentPayload,
+      skipIntelligence: body.skipIntelligence,
+      hasCompanyHQId: !!body.companyHQId,
+      hasProfileSummary: !!body.profileSummary,
+      hasTenureYears: body.tenureYears !== undefined,
+      hasCurrentTenureYears: body.currentTenureYears !== undefined,
+      hasTotalExperienceYears: body.totalExperienceYears !== undefined,
+      hasAvgTenureYears: body.avgTenureYears !== undefined,
+      hasCareerTimeline: !!body.careerTimeline,
+      hasCompanyPositioning: !!body.companyPositioning,
+      rawPayloadKeys: body.rawEnrichmentPayload ? Object.keys(body.rawEnrichmentPayload) : [],
+    });
+    
     const { 
       contactId, 
       redisKey, 
@@ -182,12 +200,38 @@ export async function POST(request: Request) {
         rawApolloResponse = redisData.rawEnrichmentPayload;
       } else if (redisData.enrichedData?.rawApolloResponse) {
         rawApolloResponse = redisData.enrichedData.rawApolloResponse;
+      } else if (redisData.rawApolloResponse) {
+        // Direct format
+        rawApolloResponse = redisData.rawApolloResponse;
       } else {
+        console.error('❌ Invalid Redis data format:', {
+          redisKey,
+          redisDataKeys: Object.keys(redisData),
+          hasRawEnrichmentPayload: !!redisData.rawEnrichmentPayload,
+          hasEnrichedData: !!redisData.enrichedData,
+          hasRawApolloResponse: !!redisData.rawApolloResponse,
+        });
         return NextResponse.json(
           { success: false, error: 'Invalid enrichment data format in Redis' },
           { status: 400 },
         );
       }
+      
+      console.log('✅ Retrieved rawEnrichmentPayload from Redis:', {
+        redisKey,
+        hasPerson: !!rawApolloResponse?.person,
+        hasEmploymentHistory: !!rawApolloResponse?.person?.employment_history,
+        employmentHistoryLength: rawApolloResponse?.person?.employment_history?.length || 0,
+      });
+    }
+    
+    // CRITICAL: rawEnrichmentPayload should ALWAYS be present at this point
+    if (!rawApolloResponse) {
+      console.error('❌ CRITICAL: rawEnrichmentPayload is missing after retrieval!');
+      return NextResponse.json(
+        { success: false, error: 'Failed to retrieve enrichment payload. Please try enriching again.' },
+        { status: 500 },
+      );
     }
 
     // Get inference fields - use from request body if provided, otherwise try Redis previewId
@@ -233,6 +277,12 @@ export async function POST(request: Request) {
     // Compute intelligence scores (skip if skipIntelligence is true)
     const apolloPayload = rawApolloResponse as ApolloEnrichmentPayload;
     
+    console.log('🔍 Enrichment save debug:', {
+      skipIntelligence,
+      hasApolloPayload: !!apolloPayload,
+      hasPerson: !!apolloPayload.person,
+    });
+    
     const intelligenceScores = skipIntelligence ? {} : {
       seniorityScore: extractSeniorityScore(apolloPayload),
       buyingPowerScore: extractBuyingPowerScore(apolloPayload),
@@ -243,6 +293,12 @@ export async function POST(request: Request) {
       careerMomentumScore: extractCareerMomentumScore(apolloPayload),
       careerStabilityScore: extractCareerStabilityScore(apolloPayload),
     };
+    
+    console.log('📊 Intelligence scores computed:', {
+      skipIntelligence,
+      scores: intelligenceScores,
+      hasScores: Object.values(intelligenceScores).some(v => v !== null && v !== undefined),
+    });
 
     const companyIntelligence = skipIntelligence 
       ? null 
@@ -251,23 +307,42 @@ export async function POST(request: Request) {
     // ============================================
     // STEP 1: Update Contact with all enrichment data
     // ============================================
+    // CRITICAL: Store rawEnrichmentPayload in database for future reference
+    // This should ALWAYS be present regardless of Redis
+    const enrichmentPayloadJson = rawApolloResponse ? JSON.stringify(rawApolloResponse) : null;
+    
+    // Generate a redisKey if we have rawEnrichmentPayload but no redisKey
+    // This allows us to track enrichment even when bypassing Redis
+    const finalRedisKey = redisKey || (rawEnrichmentPayload ? `apollo:contact:${contactId}:${Date.now()}` : null);
+    
     const contactUpdateData: any = {
       // Enrichment metadata
       enrichmentSource: 'Apollo',
       enrichmentFetchedAt: new Date(),
-      enrichmentRedisKey: redisKey,
+      enrichmentPayload: enrichmentPayloadJson, // ALWAYS store raw payload in database
+      ...(finalRedisKey ? { enrichmentRedisKey: finalRedisKey } : {}),
       
       // Intelligence scores (only if not skipping)
-      ...(skipIntelligence ? {} : intelligenceScores),
+      // Include scores even if they're null - this indicates we tried to compute them
+      ...(skipIntelligence ? {} : {
+        seniorityScore: intelligenceScores.seniorityScore ?? null,
+        buyingPowerScore: intelligenceScores.buyingPowerScore ?? null,
+        urgencyScore: intelligenceScores.urgencyScore ?? null,
+        rolePowerScore: intelligenceScores.rolePowerScore ?? null,
+        buyerLikelihoodScore: intelligenceScores.buyerLikelihoodScore ?? null,
+        readinessToBuyScore: intelligenceScores.readinessToBuyScore ?? null,
+        careerMomentumScore: intelligenceScores.careerMomentumScore ?? null,
+        careerStabilityScore: intelligenceScores.careerStabilityScore ?? null,
+      }),
       
       // Inference layer fields (only if not skipping)
       ...(skipIntelligence ? {} : {
-        profileSummary: finalProfileSummary || undefined,
-        tenureYears: finalTenureYears ?? undefined, // Keep for backward compatibility
-        currentTenureYears: finalCurrentTenureYears ?? undefined,
-        totalExperienceYears: finalTotalExperienceYears ?? undefined,
-        avgTenureYears: finalAvgTenureYears ?? undefined,
-        careerTimeline: finalCareerTimeline || undefined,
+        profileSummary: finalProfileSummary || null,
+        tenureYears: finalTenureYears ?? null,
+        currentTenureYears: finalCurrentTenureYears ?? null,
+        totalExperienceYears: finalTotalExperienceYears ?? null,
+        avgTenureYears: finalAvgTenureYears ?? null,
+        careerTimeline: finalCareerTimeline || null,
       }),
       
       // Normalized contact fields
@@ -299,11 +374,20 @@ export async function POST(request: Request) {
       // Don't set contactCompanyId here - we'll handle that in STEP 2 after finding/creating company
     };
 
-    // Only update fields that have values
+    // Only update fields that have values (but preserve null values for explicit fields)
+    // Don't delete intelligence scores if they're null - they might be legitimately null
     Object.keys(contactUpdateData).forEach(key => {
       if (contactUpdateData[key] === undefined) {
         delete contactUpdateData[key];
       }
+    });
+    
+    // Log what we're about to save
+    console.log('💾 Contact update data:', {
+      hasIntelligenceScores: !skipIntelligence && Object.keys(intelligenceScores).length > 0,
+      intelligenceScoreKeys: !skipIntelligence ? Object.keys(intelligenceScores) : [],
+      hasProfileSummary: !skipIntelligence && !!finalProfileSummary,
+      enrichmentRedisKey: finalRedisKey,
     });
 
     // Update email if provided

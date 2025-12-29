@@ -6,6 +6,7 @@
  */
 
 import type { ApolloPersonMatchResponse } from '@/lib/apollo';
+import { inferTimezoneFromLocation, detectRecentPromotion } from './apolloFieldMapper';
 
 export interface NormalizedContactFields {
   // Basic Info
@@ -79,7 +80,13 @@ export function normalizeContactApollo(apolloData: ApolloPersonMatchResponse): N
   if (person.city) normalized.city = person.city;
   if (person.state) normalized.state = person.state;
   if (person.country) normalized.country = person.country;
-  // Timezone would need to be inferred from location or separate API
+  
+  // Infer timezone from location
+  normalized.timezone = inferTimezoneFromLocation(
+    normalized.city,
+    normalized.state,
+    normalized.country
+  ) || undefined;
 
   // Career signals - extract from employment_history if available
   const employmentHistory = (apolloData as any).person?.employment_history || [];
@@ -141,6 +148,9 @@ export function normalizeContactApollo(apolloData: ApolloPersonMatchResponse): N
     } else {
       normalized.careerProgression = 'stable';
     }
+    
+    // Detect recent promotion (within last 12 months, same company, title upgrade)
+    normalized.recentPromotion = detectRecentPromotion(employmentHistory);
   }
 
   // Company context
