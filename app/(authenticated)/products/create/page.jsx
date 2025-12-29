@@ -10,7 +10,7 @@ import { ArrowLeft, Sparkles, FileEdit } from 'lucide-react';
 export default function ProductCreatePage() {
   const router = useRouter();
 
-  const handleOptionSelect = async (option: string) => {
+  const handleOptionSelect = async (option) => {
     switch (option) {
       case 'manual': {
         // Route to manual product builder

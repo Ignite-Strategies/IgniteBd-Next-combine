@@ -8,21 +8,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ContactAnalysisService } from '@/lib/services/ContactAnalysisService';
 import { prisma } from '@/lib/prisma';
-import { getCompanyHQId } from '@/lib/auth';
+import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    const companyHQId = await getCompanyHQId(request);
-    if (!companyHQId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - no companyHQId' },
-        { status: 401 }
-      );
-    }
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
 
+  try {
     const { contactId } = await params;
     const body = await request.json();
     const { productId } = body;
@@ -130,17 +131,18 @@ export async function GET(
   { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    const companyHQId = await getCompanyHQId(request);
-    if (!companyHQId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - no companyHQId' },
-        { status: 401 }
-      );
-    }
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
 
+  try {
     const { contactId } = await params;
 
-    // Verify contact exists and belongs to companyHQ
+    // Verify contact exists
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
       select: {
@@ -153,14 +155,6 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: 'Contact not found' },
         { status: 404 }
-      );
-    }
-
-    // Verify contact belongs to companyHQ
-    if (contact.crmId !== companyHQId) {
-      return NextResponse.json(
-        { success: false, error: 'Contact does not belong to this company' },
-        { status: 403 }
       );
     }
 

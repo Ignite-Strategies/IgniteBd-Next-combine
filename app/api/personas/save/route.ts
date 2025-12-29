@@ -7,21 +7,29 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCompanyHQId } from '@/lib/auth';
+import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { PersonaJSON } from '@/lib/services/PersonaGeneratorService';
 
 export async function POST(request: NextRequest) {
   try {
-    const companyHQId = await getCompanyHQId(request);
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const { persona, personaId, companyHQId } = body as { persona: PersonaJSON; personaId?: string; companyHQId: string };
+
     if (!companyHQId) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized - no companyHQId' },
-        { status: 401 }
+        { success: false, error: 'companyHQId is required' },
+        { status: 400 }
       );
     }
-
-    const body = await request.json();
-    const { persona, personaId } = body as { persona: PersonaJSON; personaId?: string };
 
     if (!persona) {
       return NextResponse.json(

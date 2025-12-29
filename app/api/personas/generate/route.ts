@@ -7,27 +7,36 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { PersonaGeneratorService } from '@/lib/services/PersonaGeneratorService';
-import { getCompanyHQId } from '@/lib/auth';
+import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 export async function POST(request: NextRequest) {
   try {
-    const companyHQId = await getCompanyHQId(request);
-    if (!companyHQId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - no companyHQId' },
-        { status: 401 }
-      );
-    }
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
 
+  try {
     const body = await request.json();
     const {
       contactId,
       redisKey,
       description,
+      companyHQId,
       productId,
       productDescription,
       notes,
     } = body;
+
+    if (!companyHQId) {
+      return NextResponse.json(
+        { success: false, error: 'companyHQId is required' },
+        { status: 400 }
+      );
+    }
 
     // Validate product context
     if (!productId && !productDescription) {
