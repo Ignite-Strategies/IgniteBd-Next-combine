@@ -16,7 +16,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId') || DEFAULT_COMPANY_HQ_ID;
 
-    const products = await prisma.product.findMany({
+    const products = await prisma.products.findMany({
       where: companyHQId ? { companyHQId } : undefined,
       select: getProductSelect(),
       orderBy: { createdAt: 'desc' },
