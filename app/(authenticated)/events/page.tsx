@@ -43,38 +43,54 @@ export default function EventsPage() {
             </div>
           </div>
 
-          {/* Sidebar - Research by Persona (1 column) */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* My Plan */}
+          {/* Sidebar - Research by Persona & See Events (1 column) */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Research Best Events by Persona */}
             <div
-              onClick={() => router.push('/events/preferences')}
-              className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition-all hover:border-gray-300"
+              onClick={() => router.push('/events/build-from-persona')}
+              className="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md hover:shadow-lg transition-all hover:border-blue-300"
             >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="rounded-lg bg-purple-100 p-2">
-                  <Calendar className="h-5 w-5 text-purple-600" />
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="h-6 w-6 text-blue-600" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">My Plan</h3>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Research Best Events by Persona</h3>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Get scores and see optimal BD alignment for your goals. Research events with persona-based intelligence.
+                  </p>
+                  <div className="flex items-center gap-1 text-blue-600 font-medium text-sm">
+                    <span>Research Events</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-gray-600">
-                Set preferences and build your event program
-              </p>
             </div>
 
-            {/* My Events */}
+            {/* See Events */}
             <div
               onClick={() => router.push('/events/list')}
-              className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition-all hover:border-gray-300"
+              className="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md hover:shadow-lg transition-all hover:border-orange-300"
             >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="rounded-lg bg-orange-100 p-2">
-                  <List className="h-5 w-5 text-orange-600" />
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                  <List className="h-6 w-6 text-orange-600" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">My Events</h3>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">See Events</h3>
+                  <p className="text-sm text-gray-600 mb-3">
+                    View all your selected events
+                  </p>
+                  <div className="flex items-center gap-1 text-orange-600 font-medium text-sm">
+                    <span>View Events</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-gray-600">
-                View all your selected events
-              </p>
             </div>
           </div>
         </div>
