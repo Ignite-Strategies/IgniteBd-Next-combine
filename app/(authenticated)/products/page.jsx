@@ -156,7 +156,7 @@ export default function ProductsPage() {
               Define your value propositions to match contacts with the right offers
             </p>
             <Link
-              href="/products/builder"
+              href="/products/create"
               className="rounded-lg bg-blue-600 px-8 py-3 text-lg font-semibold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg"
             >
               Get Started →

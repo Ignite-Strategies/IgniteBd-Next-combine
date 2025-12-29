@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { Package, Sparkles } from 'lucide-react';
+import { Package } from 'lucide-react';
 import api from '@/lib/api';
 import { PRODUCT_CONFIG } from '@/lib/config/productConfig';
 import { mapDatabaseToForm } from '@/lib/services/ProductServiceMapper';
@@ -32,6 +32,7 @@ const DEFAULT_VALUES = {
 export default function ProductBuilderPage({ searchParams }) {
   const router = useRouter();
   const productId = searchParams?.productId || null;
+  const buildWithAI = searchParams?.buildWithAI === 'true';
 
   const [isHydrating, setIsHydrating] = useState(Boolean(productId));
   const [fetchError, setFetchError] = useState(null);
@@ -96,6 +97,13 @@ export default function ProductBuilderPage({ searchParams }) {
       fetchPersonas();
     }
   }, [derivedCompanyId, productId, setValue, reset, hasInitialized]);
+
+  // Open AI modal if coming from "Build with AI" fork
+  useEffect(() => {
+    if (buildWithAI && derivedCompanyId && !productId) {
+      setIsParserModalOpen(true);
+    }
+  }, [buildWithAI, derivedCompanyId, productId]);
 
   // Fetch product data if editing
   useEffect(() => {
@@ -285,19 +293,6 @@ export default function ProductBuilderPage({ searchParams }) {
               {submitError}
             </div>
           )}
-
-          {/* AI Parser Button - Independent of form state */}
-          <div className="mb-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsParserModalOpen(true)}
-                disabled={!derivedCompanyId}
-                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="h-4 w-4" />
-                Build with AI
-              </button>
-          </div>
 
           <form onSubmit={onSubmit} className="space-y-6">
             <input

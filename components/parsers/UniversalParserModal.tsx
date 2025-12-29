@@ -42,7 +42,7 @@ export default function UniversalParserModal({
     if (!rawText.trim()) {
       setParseResult({
         success: false,
-        error: 'Please provide raw text to parse',
+        error: 'Please describe your product',
       });
       return;
     }
@@ -135,21 +135,21 @@ export default function UniversalParserModal({
               </select>
             </div>
 
-            {/* Raw Text Input */}
+            {/* Product Description Input */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Raw Text / Facts <span className="text-red-500">*</span>
+                Describe Your Product <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
-                placeholder="Paste raw text, JSON, or facts about the product/service here..."
+                placeholder="Tell us about your product or service. For example: 'We offer a business development platform that helps companies automate their outreach and track relationships. It costs $99/month and is designed for mid-market companies with 100-999 employees. The sales cycle is typically 1-3 months...'"
                 rows={8}
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 resize-none"
                 disabled={isParsing}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Paste any text containing product information - descriptions, features, pricing, etc.
+                Describe your product in natural language. Include details about what it does, who it's for, pricing, features, or any other relevant information.
               </p>
             </div>
 
