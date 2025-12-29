@@ -1,8 +1,20 @@
 # Contact Multi-CompanyHQ Architecture Decision
 
 **Date**: December 29, 2024  
-**Status**: 🟡 **DECISION PENDING**  
+**Status**: ✅ **CANON DECISION - IMPLEMENTED**  
 **Context**: MVP1 vs MVP3 approach for handling contacts that exist across multiple CompanyHQs
+
+---
+
+## ✅ FINAL DECISION (CANON)
+
+**Contacts are CompanyHQ-scoped CRM records.**
+- Each CompanyHQ has its own contact records
+- Duplicate emails across CompanyHQs are explicitly allowed
+- `@@unique([email, crmId])` ensures one contact per email per CompanyHQ
+- No junction tables, no global contacts, no cross-CompanyHQ sync
+
+**This decision is final for MVP1.**
 
 ---
 
