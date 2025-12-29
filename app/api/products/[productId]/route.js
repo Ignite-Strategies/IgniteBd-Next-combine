@@ -15,7 +15,7 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId') || DEFAULT_COMPANY_HQ_ID;
 
-    const product = await prisma.product.findFirst({
+    const product = await prisma.products.findFirst({
       where: {
         id: productId,
         ...(companyHQId ? { companyHQId } : {}),
@@ -82,7 +82,7 @@ export async function PUT(request, { params }) {
     const productData = getProductData(body);
 
     // Update the product
-    const product = await prisma.product.update({
+      const product = await prisma.products.update({
       where: { id: productId },
       data: productData,
       select: getProductSelect(),

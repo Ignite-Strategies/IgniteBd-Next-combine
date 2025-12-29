@@ -60,7 +60,7 @@ export async function POST(request) {
 
     const productData = getProductData(body);
 
-    const product = await prisma.product.create({
+      const product = await prisma.products.create({
       data: {
         companyHQId: tenantId,
         ...productData,
