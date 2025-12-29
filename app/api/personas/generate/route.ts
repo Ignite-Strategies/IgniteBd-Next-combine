@@ -38,16 +38,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate product context
-    if (!productId && !productDescription) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Product context required. Provide productId or productDescription.',
-        },
-        { status: 400 }
-      );
-    }
+    // Product context is helpful but not strictly required - we'll use a generic context if missing
+    // This allows personas to be generated even without products (soft fallback)
 
     // Generate persona
     const result = await PersonaGeneratorService.generate({

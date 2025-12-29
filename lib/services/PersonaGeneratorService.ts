@@ -85,13 +85,8 @@ export class PersonaGeneratorService {
     try {
       const { contactId, redisKey, description, companyHQId, productId, productDescription, notes } = options;
 
-      // Validate product context
-      if (!productId && !productDescription) {
-        return {
-          success: false,
-          error: 'Product context required. Provide productId or productDescription.',
-        };
-      }
+      // Product context is helpful but not strictly required
+      // If missing, we'll use a generic context in the prompt
 
       // Step 1: Fetch product (if productId provided)
       let product: any = null;
@@ -248,7 +243,7 @@ Description: ${product.description || 'Not specified'}
 Value Prop: ${product.valueProp || 'Not specified'}`
       : productDescription
       ? `Our Product Description: ${productDescription}`
-      : 'No product context provided';
+      : `Our Product: Not yet defined. Generate a persona that would be interested in business development services.`;
 
     const companyContext = `Our Company:
 Name: ${companyHQ.companyName}

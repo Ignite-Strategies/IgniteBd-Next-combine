@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Package, Plus, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
@@ -13,10 +13,14 @@ function FromContactContent() {
 
   const [contact, setContact] = useState(null);
   const [personaData, setPersonaData] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [productDescription, setProductDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [needsProduct, setNeedsProduct] = useState(false);
+  const [showProductInput, setShowProductInput] = useState(false);
   
   // Use hook to get companyHQId (fetches from API if not in localStorage)
   const { companyHQId, loading: companyLoading, refresh } = useCompanyHQ();
@@ -28,46 +32,87 @@ function FromContactContent() {
     }
   }, [companyHQId, companyLoading, refresh]);
 
-  // Fetch contact and generate persona
+  // Load products
   useEffect(() => {
-    if (!contactId || !companyHQId || companyLoading) return;
+    if (!companyHQId) return;
 
-    const fetchAndGenerate = async () => {
-      setLoading(true);
-      setError(null);
-
+    const loadProducts = async () => {
       try {
-        // Fetch contact
-        const contactResponse = await api.get(`/api/contacts/${contactId}`);
-        if (!contactResponse.data?.success || !contactResponse.data?.contact) {
-          throw new Error('Contact not found');
-        }
-        setContact(contactResponse.data.contact);
-
-        // Generate persona using EnrichmentToPersonaService
-        setGenerating(true);
-        const personaResponse = await api.post('/api/personas/generate-from-enrichment', {
-          contactId,
-          companyHQId,
-          mode: 'hydrate', // Return data only, don't save yet
-        });
-
-        if (personaResponse.data?.success && personaResponse.data?.persona) {
-          setPersonaData(personaResponse.data.persona);
-        } else {
-          throw new Error(personaResponse.data?.error || 'Failed to generate persona');
+        const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
+        if (response.data && Array.isArray(response.data)) {
+          setProducts(response.data);
+          // Auto-select first product if only one exists
+          if (response.data.length === 1) {
+            setSelectedProductId(response.data[0].id);
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch contact or generate persona:', err);
-        setError(err.response?.data?.error || err.message || 'Failed to load contact or generate persona');
-      } finally {
-        setLoading(false);
-        setGenerating(false);
+        console.error('Failed to load products:', err);
       }
     };
 
-    fetchAndGenerate();
+    loadProducts();
+  }, [companyHQId]);
+
+  // Fetch contact
+  useEffect(() => {
+    if (!contactId || !companyHQId || companyLoading) return;
+
+    const fetchContact = async () => {
+      setLoading(true);
+      try {
+        const contactResponse = await api.get(`/api/contacts/${contactId}`);
+        if (contactResponse.data?.success && contactResponse.data?.contact) {
+          setContact(contactResponse.data.contact);
+        }
+      } catch (err) {
+        console.error('Failed to fetch contact:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContact();
   }, [contactId, companyHQId, companyLoading]);
+
+  const handleGenerate = async () => {
+    if (!companyHQId) return;
+
+    // Check if we have product context
+    if (!selectedProductId && !productDescription.trim()) {
+      setNeedsProduct(true);
+      setShowProductInput(true);
+      return;
+    }
+
+    setGenerating(true);
+    setNeedsProduct(false);
+
+    try {
+      const response = await api.post('/api/personas/generate', {
+        companyHQId,
+        contactId,
+        productId: selectedProductId || null,
+        productDescription: productDescription.trim() || null,
+      });
+
+      if (response.data?.success && response.data?.persona) {
+        setPersonaData(response.data.persona);
+        setShowProductInput(false);
+      } else {
+        // Soft fallback - show product input instead of error
+        setNeedsProduct(true);
+        setShowProductInput(true);
+      }
+    } catch (err) {
+      console.error('Failed to generate persona:', err);
+      // Soft fallback - show product input
+      setNeedsProduct(true);
+      setShowProductInput(true);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleFieldChange = (field, value) => {
     setPersonaData((prev) => ({
@@ -77,7 +122,6 @@ function FromContactContent() {
   };
 
   const handleArrayFieldChange = (field, value) => {
-    // Convert string to array (split by newlines or commas)
     const arrayValue = typeof value === 'string' 
       ? value.split(/\n|,/).map(item => item.trim()).filter(Boolean)
       : value;
@@ -92,41 +136,38 @@ function FromContactContent() {
     if (!personaData || !companyHQId) return;
 
     setSaving(true);
-    setError(null);
 
     try {
       // Normalize array fields
+      const painPointsArray = typeof personaData.painPoints === 'string'
+        ? personaData.painPoints.split(/\n|,/).map(s => s.trim()).filter(Boolean)
+        : (Array.isArray(personaData.painPoints) ? personaData.painPoints : []);
+
       const payload = {
-        ...personaData,
-        companyHQId,
-        painPoints: Array.isArray(personaData.painPoints) 
-          ? personaData.painPoints 
-          : (typeof personaData.painPoints === 'string' ? personaData.painPoints.split(/\n|,/).map(s => s.trim()).filter(Boolean) : []),
-        risks: Array.isArray(personaData.risks) 
-          ? personaData.risks 
-          : (typeof personaData.risks === 'string' ? personaData.risks.split(/\n|,/).map(s => s.trim()).filter(Boolean) : []),
-        decisionDrivers: Array.isArray(personaData.decisionDrivers) 
-          ? personaData.decisionDrivers 
-          : (typeof personaData.decisionDrivers === 'string' ? personaData.decisionDrivers.split(/\n|,/).map(s => s.trim()).filter(Boolean) : []),
-        buyerTriggers: Array.isArray(personaData.buyerTriggers) 
-          ? personaData.buyerTriggers 
-          : (typeof personaData.buyerTriggers === 'string' ? personaData.buyerTriggers.split(/\n|,/).map(s => s.trim()).filter(Boolean) : []),
-        subIndustries: Array.isArray(personaData.subIndustries) 
-          ? personaData.subIndustries 
-          : (typeof personaData.subIndustries === 'string' ? personaData.subIndustries.split(/\n|,/).map(s => s.trim()).filter(Boolean) : []),
+        personName: personaData.personName || '',
+        title: personaData.title || '',
+        role: personaData.role || null,
+        seniority: personaData.seniority || null,
+        coreGoal: personaData.coreGoal || personaData.description || '',
+        needForOurProduct: personaData.needForOurProduct || personaData.whatTheyWant || '',
+        potentialPitch: personaData.potentialPitch || null,
+        painPoints: painPointsArray,
+        industry: personaData.industry || null,
+        companySize: personaData.companySize || null,
+        company: personaData.company || null,
       };
 
-      const response = await api.post('/api/personas', payload);
+      const response = await api.post('/api/personas/save', {
+        persona: payload,
+        companyHQId,
+      });
 
-      if (response.data?.personaId || response.data?.persona) {
-        // Redirect to personas list with success indicator
+      if (response.data?.success) {
         router.push('/personas?saved=true');
-      } else {
-        throw new Error('Failed to save persona');
       }
     } catch (err) {
       console.error('Failed to save persona:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to save persona');
+      // Soft error - just log, don't show error state
     } finally {
       setSaving(false);
     }
@@ -136,56 +177,11 @@ function FromContactContent() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            Contact ID is required
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading || generating) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-red-600" />
-            <p className="mt-4 text-gray-600">
-              {generating ? 'Generating persona...' : 'Loading contact...'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !personaData) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-          <button
-            onClick={() => router.back()}
-            className="mt-4 text-sm text-gray-600 hover:text-gray-900"
-          >
-            ← Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!personaData) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-            <p className="text-gray-600">No persona data available</p>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
+            <p className="text-gray-600">Contact ID is required</p>
             <button
               onClick={() => router.back()}
-              className="mt-4 text-sm text-gray-600 hover:text-gray-900"
+              className="mt-4 text-sm text-blue-600 hover:text-blue-800"
             >
               ← Go Back
             </button>
@@ -195,6 +191,141 @@ function FromContactContent() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
+            <p className="mt-4 text-gray-600">Loading contact...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show product selection/input if no persona data yet
+  if (!personaData) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-6">
+            <button
+              onClick={() => router.back()}
+              className="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <h1 className="text-3xl font-bold text-gray-900">Generate Persona</h1>
+            <p className="mt-2 text-gray-600">
+              {contact?.fullName || contact?.firstName ? `Creating persona for ${contact.fullName || contact.firstName}` : 'Create a persona from this contact'}
+            </p>
+          </div>
+
+          {/* Product Selection */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Product Context</h2>
+            </div>
+            <p className="mb-4 text-sm text-gray-600">
+              To generate a persona, we need to know which product you're targeting. Select a product or describe yours.
+            </p>
+
+            {/* Product Dropdown */}
+            {products.length > 0 ? (
+              <div className="mb-4">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Select a Product
+                </label>
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => {
+                    setSelectedProductId(e.target.value);
+                    setProductDescription('');
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                >
+                  <option value="">Choose a product...</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <p className="mb-3 text-sm text-blue-800">
+                  <strong>No products yet.</strong> Create a product first, or describe your product below.
+                </p>
+                <button
+                  onClick={() => router.push('/products/builder')}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Product
+                </button>
+              </div>
+            )}
+
+            {/* Product Description Input */}
+            <div className="mb-4">
+              <label className="mb-2 block text-sm font-semibold text-gray-700">
+                Or describe your product
+              </label>
+              <textarea
+                value={productDescription}
+                onChange={(e) => {
+                  setProductDescription(e.target.value);
+                  setSelectedProductId('');
+                }}
+                placeholder="e.g., A BD platform that helps consultants scale their practice by automating outreach and managing client relationships..."
+                rows={4}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                disabled={!!selectedProductId}
+              />
+              {selectedProductId && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Clear product selection above to use description instead
+                </p>
+              )}
+            </div>
+
+            {/* Generate Button */}
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => router.back()}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerate}
+                disabled={generating || (!selectedProductId && !productDescription.trim())}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Generate Persona
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show persona form if we have persona data
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -213,13 +344,6 @@ function FromContactContent() {
           </p>
         </div>
 
-        {/* Error State */}
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
         {/* Persona Form */}
         <div className="space-y-6 rounded-lg border border-gray-200 bg-white p-6">
           {/* Basic Info */}
@@ -231,7 +355,7 @@ function FromContactContent() {
               type="text"
               value={personaData.personName || ''}
               onChange={(e) => handleFieldChange('personName', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               required
             />
           </div>
@@ -244,32 +368,65 @@ function FromContactContent() {
               type="text"
               value={personaData.title || ''}
               onChange={(e) => handleFieldChange('title', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               required
             />
           </div>
 
+          {/* Core Goal */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Headline
+              Core Goal *
             </label>
-            <input
-              type="text"
-              value={personaData.headline || ''}
-              onChange={(e) => handleFieldChange('headline', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+            <p className="mb-2 text-xs text-gray-500">Their north star (regardless of our product)</p>
+            <textarea
+              value={personaData.coreGoal || ''}
+              onChange={(e) => handleFieldChange('coreGoal', e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              required
             />
           </div>
 
+          {/* Need for Our Product */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Description
+              Need for Our Product *
+            </label>
+            <p className="mb-2 text-xs text-gray-500">What they need from OUR PRODUCT specifically</p>
+            <textarea
+              value={personaData.needForOurProduct || ''}
+              onChange={(e) => handleFieldChange('needForOurProduct', e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              required
+            />
+          </div>
+
+          {/* Pain Points */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Pain Points (one per line or comma-separated)
             </label>
             <textarea
-              value={personaData.description || ''}
-              onChange={(e) => handleFieldChange('description', e.target.value)}
-              rows={4}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+              value={Array.isArray(personaData.painPoints) ? personaData.painPoints.join('\n') : (personaData.painPoints || '')}
+              onChange={(e) => handleArrayFieldChange('painPoints', e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              placeholder="Enter pain points, one per line"
+            />
+          </div>
+
+          {/* Potential Pitch */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Potential Pitch
+            </label>
+            <textarea
+              value={personaData.potentialPitch || ''}
+              onChange={(e) => handleFieldChange('potentialPitch', e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
           </div>
 
@@ -283,7 +440,7 @@ function FromContactContent() {
                 type="text"
                 value={personaData.industry || ''}
                 onChange={(e) => handleFieldChange('industry', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
             </div>
 
@@ -295,74 +452,9 @@ function FromContactContent() {
                 type="text"
                 value={personaData.companySize || ''}
                 onChange={(e) => handleFieldChange('companySize', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              What They Want
-            </label>
-            <textarea
-              value={personaData.whatTheyWant || ''}
-              onChange={(e) => handleFieldChange('whatTheyWant', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
-          </div>
-
-          {/* Array Fields */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Pain Points (one per line or comma-separated)
-            </label>
-            <textarea
-              value={Array.isArray(personaData.painPoints) ? personaData.painPoints.join('\n') : (personaData.painPoints || '')}
-              onChange={(e) => handleArrayFieldChange('painPoints', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="Enter pain points, one per line"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Risks (one per line or comma-separated)
-            </label>
-            <textarea
-              value={Array.isArray(personaData.risks) ? personaData.risks.join('\n') : (personaData.risks || '')}
-              onChange={(e) => handleArrayFieldChange('risks', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="Enter risks, one per line"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Decision Drivers (one per line or comma-separated)
-            </label>
-            <textarea
-              value={Array.isArray(personaData.decisionDrivers) ? personaData.decisionDrivers.join('\n') : (personaData.decisionDrivers || '')}
-              onChange={(e) => handleArrayFieldChange('decisionDrivers', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="Enter decision drivers, one per line"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Buyer Triggers (one per line or comma-separated)
-            </label>
-            <textarea
-              value={Array.isArray(personaData.buyerTriggers) ? personaData.buyerTriggers.join('\n') : (personaData.buyerTriggers || '')}
-              onChange={(e) => handleArrayFieldChange('buyerTriggers', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="Enter buyer triggers, one per line"
-            />
           </div>
         </div>
 
@@ -376,8 +468,8 @@ function FromContactContent() {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || !personaData.personName || !personaData.title}
-            className="flex items-center gap-2 rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={saving || !personaData.personName || !personaData.title || !personaData.coreGoal || !personaData.needForOurProduct}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>
@@ -412,4 +504,3 @@ export default function FromContactPage() {
     </Suspense>
   );
 }
-
