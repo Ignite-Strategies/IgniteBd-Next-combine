@@ -44,14 +44,6 @@ export async function POST(
       );
     }
 
-    // Verify contact belongs to companyHQ
-    if (contact.crmId !== companyHQId) {
-      return NextResponse.json(
-        { success: false, error: 'Contact does not belong to this company' },
-        { status: 403 }
-      );
-    }
-
     // Generate analysis
     const result = await ContactAnalysisService.generate({
       contactId,
