@@ -71,8 +71,7 @@ export class EnrichmentToPersonaService {
         contactData = await prisma.contact.findUnique({
           where: { id: contactId },
           include: {
-            company: true,
-            contactCompany: true,
+            companies: true, // Company relation via contactCompanyId
           },
         });
 
@@ -100,6 +99,17 @@ export class EnrichmentToPersonaService {
 
       // If no Apollo data but we have contact, use contact data as fallback
       if (!apolloData && contactData) {
+        // Map Company object to Apollo organization format
+        const organization = contactData.companies
+          ? {
+              name: contactData.companies.companyName,
+              industry: contactData.companies.industry || null,
+            }
+          : {
+              name: contactData.companyName,
+              industry: contactData.companyIndustry,
+            };
+
         apolloData = {
           person: {
             first_name: contactData.firstName,
@@ -108,10 +118,7 @@ export class EnrichmentToPersonaService {
             headline: contactData.title,
             employment_history: contactData.careerTimeline || [],
           },
-          organization: contactData.company || contactData.contactCompany || {
-            name: contactData.companyName,
-            industry: contactData.companyIndustry,
-          },
+          organization,
         };
       }
 
