@@ -55,32 +55,8 @@ export default function WelcomePage() {
               companyHQ: m.company_hqs || null, // Full companyHQ object
             }));
             
-            // Check if there's already a companyHQId in localStorage (from header switch)
-            // If it matches a membership, use it; otherwise default to first membership
-            const storedCompanyHQId = typeof window !== 'undefined' 
-              ? localStorage.getItem('companyHQId')
-              : null;
-            
-            console.log(`🔍 Welcome: Checking stored companyHQId: ${storedCompanyHQId}`);
-            console.log(`🔍 Welcome: Available memberships:`, memberships.map(m => ({
-              companyHqId: m.companyHqId,
-              companyName: m.company_hqs?.companyName
-            })));
-            
-            const hasStoredMembership = storedCompanyHQId && 
-              memberships.some(m => m.companyHqId === storedCompanyHQId);
-            
-            if (storedCompanyHQId && !hasStoredMembership) {
-              console.warn(`⚠️ Stored companyHQId ${storedCompanyHQId} doesn't match any membership. This might be from a migration. Clearing it.`);
-              // Clear invalid stored companyHQId
-              localStorage.removeItem('companyHQId');
-              localStorage.removeItem('companyHQ');
-            }
-            
-            // Use stored CompanyHQ if it's valid, otherwise default to first
-            const defaultCompanyHqId = hasStoredMembership
-              ? storedCompanyHQId
-              : (defaultMembership?.companyHqId || memberships[0]?.companyHqId);
+            // Set selected company to first (already sorted by role priority)
+            const defaultCompanyHqId = defaultMembership?.companyHqId || memberships[0]?.companyHqId;
             setSelectedCompanyHqId(defaultCompanyHqId);
             
             // If switching via header AND membership is valid, automatically continue

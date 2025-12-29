@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 
-export default function ConfirmPlanPage() {
+function ConfirmPlanContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdsParam = searchParams.get('eventIds');
@@ -151,6 +151,23 @@ export default function ConfirmPlanPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ConfirmPlanPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ConfirmPlanContent />
+    </Suspense>
   );
 }
 

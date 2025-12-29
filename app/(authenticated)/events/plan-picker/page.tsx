@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { CheckCircle2, Calendar, MapPin, DollarSign } from 'lucide-react';
@@ -20,7 +20,7 @@ interface EventOp {
   whyGo?: string | null;
 }
 
-export default function PlanPickerPage() {
+function PlanPickerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tunerId = searchParams.get('tunerId');
@@ -235,6 +235,23 @@ export default function PlanPickerPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PlanPickerPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <PlanPickerContent />
+    </Suspense>
   );
 }
 
