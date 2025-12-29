@@ -1,115 +1,155 @@
-# Email Signatures Feature - Implementation Plan
+# Email Signatures Feature - Implementation Summary
 
-## Status: 🔴 Not Implemented (Commented Out)
+## Status: ✅ Implemented (Simplified Approach)
 
-This feature is **fully commented out** in the codebase to allow 1:1 outreach testing. All signature-related code is disabled but marked with TODO comments for future implementation.
+This feature implements email signatures at the owner level. Signatures are appended to email bodies during payload building, making them universal across all email types (1:1, campaigns, sequences).
 
 ## Overview
 
-Email signatures allow users to create reusable HTML signatures that can be:
-- Assigned to campaigns
-- Used in email sequence steps
-- Selected in 1:1 outreach compose
+Email signatures allow users to create reusable HTML signatures that are:
+- Stored at the owner level (not per campaign/sequence)
+- Automatically appended to email bodies during payload building
+- Fetched by `owner_id` and included in the payload before it's saved to Redis
+- Universal - same signature logic works for 1:1 emails, campaigns, and sequences
 
 ## Database Schema
 
-### Planned Model: `email_signatures`
+### Model: `email_signatures`
 
 ```prisma
 model email_signatures {
-  id                String            @id @default(uuid())
-  owner_id          String            // Owner who created this signature
-  name              String            // Display name (e.g., "Default", "Sales Team", "Support")
-  content           String            // HTML signature content
-  is_default        Boolean           @default(false) // Default signature for this owner
-  created_at        DateTime          @default(now())
-  updated_at        DateTime          @updatedAt
-  owners            owners            @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  campaigns         campaigns[]       @relation("campaign_signatures")
-  sequence_steps    sequence_steps[]  @relation("sequence_step_signatures")
+  id                String   @id @default(uuid())
+  owner_id          String   // Owner who created this signature
+  name              String   // Display name (e.g., "Default", "Sales Team", "Support")
+  content           String   // HTML signature content
+  is_default        Boolean  @default(false) // Default signature for this owner
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  owners            owners   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
 
   @@index([owner_id])
   @@index([owner_id, is_default])
 }
 ```
 
-### Planned Relations
+### Relations
 
-1. **campaigns** table:
-   - `signature_id String?` (foreign key to email_signatures)
-   - `email_signatures?` relation
-
-2. **sequence_steps** table:
-   - `signature_id String?` (foreign key to email_signatures)
-   - `email_signatures?` relation
-
-3. **owners** table:
+1. **owners** table:
    - `email_signatures[]` relation (one-to-many)
+
+**Note:** Signatures are NOT stored on campaigns or sequence_steps. They are fetched by `owner_id` and appended to the body during payload building.
 
 ## Migration File
 
 **Location:** `prisma/migrations/20250130000000_create_email_signatures_relational/migration.sql`
 
-**Status:** ✅ Ready but not applied
+**Status:** ✅ Ready to apply
 
-This migration will:
-- Create `email_signatures` table
-- Add `signature_id` fields to `campaigns` and `sequence_steps`
-- Add foreign key constraints
-- Create indexes for performance
+This migration:
+- Creates `email_signatures` table with `owner_id` foreign key
+- Creates indexes for performance
+- Removes old `emailSignature` column from `owners` table if it exists
+
+## Implementation Details
+
+### How It Works
+
+1. **Payload Building** (`/api/outreach/build-payload`):
+   - Fetches owner's default signature (or specified signature via `signatureId` parameter)
+   - Appends signature content to `finalBody` before saving payload to Redis
+   - Signature becomes part of the payload JSON blob
+
+2. **Signature Selection**:
+   - If `signatureId` is provided in request body, use that specific signature
+   - Otherwise, use owner's default signature (`is_default = true`)
+   - If no default exists, no signature is appended
+
+3. **Universal Application**:
+   - Same logic applies to 1:1 emails, campaigns, and sequences
+   - All use the same payload building flow
+   - Signature is included in the body before payload is saved
+
+### API Routes
+
+**GET** `/api/email-signatures`
+- List all signatures for authenticated owner
+- Returns signatures ordered by: default first, then newest first
+
+**POST** `/api/email-signatures`
+- Create a new signature
+- Body: `{ name, content, is_default? }`
+- If `is_default = true`, automatically unsets other defaults
+
+**PUT** `/api/email-signatures/[id]`
+- Update a signature
+- Body: `{ name?, content?, is_default? }`
+
+**DELETE** `/api/email-signatures/[id]`
+- Delete a signature
+
+### Code Integration
+
+**build-payload route** (`app/api/outreach/build-payload/route.js`):
+- Fetches signature after template hydration
+- Appends signature to `finalBody` before building payload
+- Supports optional `signatureId` parameter for specific signature selection
+
+**Schema** (`prisma/schema.prisma`):
+- `email_signatures` model added
+- `owners.email_signatures[]` relation added
+- No changes to `campaigns` or `sequence_steps` models
 
 ## Current State
 
-### Schema Status
-- ❌ `email_signatures` model: **Commented out** (doesn't exist in schema)
-- ❌ `campaigns.signature_id`: **Commented out**
-- ❌ `sequence_steps.signature_id`: **Commented out**
-- ❌ All signature relations: **Commented out**
+### ✅ Implemented
 
-### Code Status
-- ❌ Settings page signature UI: **Commented out**
-- ❌ Compose page signature checkbox: **Commented out**
-- ❌ Profile API signature handling: **Commented out**
-- ❌ Signature state/loading logic: **Commented out**
+- ✅ `email_signatures` model in schema
+- ✅ Migration file ready
+- ✅ API routes for CRUD operations
+- ✅ Signature appending in build-payload route
+- ✅ Owner-level signature management
 
-## Implementation Steps (Future)
+### ⚠️ Frontend Not Yet Implemented
 
-1. **Uncomment schema** - Add `email_signatures` model and relations
-2. **Run migration** - Apply `20250130000000_create_email_signatures_relational/migration.sql`
-3. **Create API routes**:
-   - `POST /api/email-signatures` - Create signature
-   - `GET /api/email-signatures?ownerId=xxx` - List owner's signatures
-   - `PUT /api/email-signatures/[id]` - Update signature
-   - `DELETE /api/email-signatures/[id]` - Delete signature
-4. **Update Settings page** - Uncomment and refactor to use relational model
-5. **Update Compose page** - Uncomment and add signature selector
-6. **Update Campaigns** - Add signature selector to campaign creation/editing
-7. **Update Sequences** - Add signature selector to sequence steps
+- ⚠️ Settings page signature UI (still commented out)
+- ⚠️ Compose page signature selector (still commented out)
+- ⚠️ Signature management UI components
 
-## Files to Update (When Re-enabling)
+## Next Steps (Frontend)
 
-1. `prisma/schema.prisma` - Uncomment email_signatures model and relations
-2. `app/(authenticated)/settings/page.jsx` - Uncomment signature UI
-3. `app/(authenticated)/outreach/compose/page.jsx` - Uncomment signature logic
-4. `app/api/owner/[ownerId]/profile/route.js` - Remove signature handling (will use separate API)
+1. **Settings Page** (`app/(authenticated)/settings/page.jsx`):
+   - Uncomment signature UI
+   - Connect to `/api/email-signatures` endpoints
+   - Add signature CRUD interface
 
-## Testing Checklist (Future)
+2. **Compose Page** (`app/(authenticated)/outreach/compose/page.jsx`):
+   - Add signature selector dropdown
+   - Pass `signatureId` to build-payload if specific signature selected
+   - Show signature preview in email preview
+
+3. **Signature Display**:
+   - Show signature preview in compose preview modal
+   - Display signature in email preview
+
+## Testing Checklist
 
 - [ ] Create signature in Settings
 - [ ] Set default signature
-- [ ] Select signature in 1:1 compose
+- [ ] List all signatures
+- [ ] Update signature
+- [ ] Delete signature
+- [ ] Select signature in 1:1 compose (when frontend implemented)
 - [ ] Signature appears in preview
 - [ ] Signature included in sent email
-- [ ] Assign signature to campaign
-- [ ] Assign signature to sequence step
+- [ ] Default signature used automatically if no selection
 - [ ] Multiple signatures per owner
-- [ ] Delete signature (handle campaigns using it)
+- [ ] Only one default signature at a time
 
 ## Notes
 
 - Signatures are **HTML** (allows formatting with `<p>`, `<br>`, etc.)
 - Each owner can have **multiple signatures**
 - One signature can be marked as **default**
-- Signatures are **reusable** across campaigns and sequences
+- Signatures are appended to body during payload building (not stored on campaigns/sequences)
+- This simplified approach avoids overbuilding - signatures are universal to the owner
 - Migration uses `IF NOT EXISTS` / `IF EXISTS` for safe application
-

@@ -57,6 +57,7 @@ export async function POST(request) {
       sequenceId,
       sequenceStepId,
       templateId, // Optional: if provided, hydrate template into body
+      signatureId, // Optional: if provided, use this signature; otherwise use default
     } = body;
     
     console.log('📦 Request body parsed:', {
@@ -112,8 +113,41 @@ export async function POST(request) {
       });
     }
     
+    // Step 3.6: Append signature to body if available
+    // Fetch owner's signature (default or specified one)
+    let signature = null;
+    if (signatureId) {
+      // Fetch specific signature
+      signature = await prisma.email_signatures.findFirst({
+        where: {
+          id: signatureId,
+          owner_id: owner.id,
+        },
+        select: { content: true },
+      });
+    } else {
+      // Fetch default signature
+      signature = await prisma.email_signatures.findFirst({
+        where: {
+          owner_id: owner.id,
+          is_default: true,
+        },
+        select: { content: true },
+      });
+    }
+    
+    // Append signature to body if found
+    if (signature?.content) {
+      finalBody = finalBody + '\n\n' + signature.content;
+      console.log('✅ Signature appended to body:', {
+        signatureLength: signature.content.length,
+        finalBodyLength: finalBody.length,
+      });
+    }
+    
     // Validation (minimal - just required fields)
     // Note: If templateId is provided, finalBody will be from template
+    // Note: Signature (if available) has been appended to finalBody
     if (!to || !finalSubject || !finalBody || !senderEmail) {
       console.error('❌ Missing required fields:', { 
         to: !!to, 

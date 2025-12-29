@@ -128,7 +128,7 @@ export async function calculateBDOSScore(
         },
       }).then(c => c?.company || c?.contactCompany || null), // Prefer company, fallback to contactCompany
       personaId
-        ? prisma.persona.findUnique({
+        ? prisma.personas.findUnique({
             where: { id: personaId },
           })
         : null,
@@ -156,7 +156,7 @@ export async function calculateBDOSScore(
       }
       if (finalPersonaId) {
         // Fetch the matched persona
-        finalPersona = await prisma.persona.findUnique({
+        finalPersona = await prisma.personas.findUnique({
           where: { id: finalPersonaId },
         });
       }

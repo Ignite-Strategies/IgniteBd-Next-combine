@@ -135,7 +135,7 @@ export async function POST(request) {
     for (const persona of personas) {
       try {
         // Skip if already exists (check by name and companyHQId)
-        const existing = await prisma.persona.findFirst({
+        const existing = await prisma.personas.findFirst({
           where: {
             companyHQId,
             personName: persona.personName || persona.name || '',
@@ -148,7 +148,7 @@ export async function POST(request) {
           continue;
         }
 
-        await prisma.persona.create({
+        await prisma.personas.create({
           data: {
             companyHQId,
             personName: persona.personName || persona.name || '',

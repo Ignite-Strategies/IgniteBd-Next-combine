@@ -51,7 +51,7 @@ export async function GET(request) {
       }),
 
       // Personas
-      prisma.persona.findMany({
+      prisma.personas.findMany({
         where: { companyHQId },
         include: {
           product: {

@@ -102,7 +102,7 @@ export async function POST(request) {
       }
     } else {
       // Verify persona exists and belongs to same tenant
-      const persona = await prisma.persona.findUnique({
+      const persona = await prisma.personas.findUnique({
         where: { id: finalPersonaId },
         select: { companyHQId: true },
       });

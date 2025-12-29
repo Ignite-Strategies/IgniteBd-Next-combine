@@ -1,0 +1,55 @@
+'use client';
+
+import { useRouter, useSearchParams } from 'next/navigation';
+import PageHeader from '@/components/PageHeader.jsx';
+
+export default function ReadyToPlanPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tunerId = searchParams.get('tunerId');
+
+  const handleContinue = () => {
+    if (tunerId) {
+      // Redirect to search/pick page
+      router.push(`/events/search-pick/${tunerId}`);
+    } else {
+      router.push('/events/preferences');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <PageHeader
+          title="Ready to Plan"
+          subtitle="Your preferences are saved. Now let's find events that match."
+          backTo="/events/preferences"
+          backLabel="Back to Preferences"
+        />
+
+        <div className="mt-8">
+          <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Preferences Saved</h3>
+              <p className="text-gray-600 mb-6">
+                Your preferences have been saved. We'll use AI to find events that match your criteria. 
+                Even if you requested fewer events per quarter, we'll show you multiple options so you can choose the best ones.
+              </p>
+              <button
+                onClick={handleContinue}
+                className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+              >
+                Find Events →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

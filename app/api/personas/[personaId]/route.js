@@ -26,10 +26,10 @@ export async function GET(request, { params }) {
       );
     }
 
-    const persona = await prisma.persona.findUnique({
+    const persona = await prisma.personas.findUnique({
       where: { id: personaId },
       include: {
-        productFit: {
+        product_fits: {
           include: {
             product: {
               select: {

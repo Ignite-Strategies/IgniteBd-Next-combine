@@ -46,10 +46,10 @@ export async function POST(
     const { personaId } = await params;
 
     // Fetch persona with product fit
-    const persona = await prisma.persona.findUnique({
+    const persona = await prisma.personas.findUnique({
       where: { id: personaId },
       include: {
-        productFit: {
+        product_fits: {
           include: {
             product: {
               select: {
@@ -76,7 +76,7 @@ export async function POST(
       );
     }
 
-    if (!persona.productFit) {
+    if (!persona.product_fits) {
       return NextResponse.json(
         { success: false, error: 'Product fit not found. Generate product fit first.' },
         { status: 400 },
@@ -124,9 +124,9 @@ ${JSON.stringify({
 
 Product Fit:
 ${JSON.stringify({
-  product: persona.productFit.product,
-  valuePropToThem: persona.productFit.valuePropToThem,
-  alignmentReasoning: persona.productFit.alignmentReasoning,
+  product: persona.product_fits.product,
+  valuePropToThem: persona.product_fits.valuePropToThem,
+  alignmentReasoning: persona.product_fits.alignmentReasoning,
 }, null, 2)}
 
 Generate BD intelligence.`;

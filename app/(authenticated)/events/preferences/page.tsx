@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { DollarSign, MapPin, Search, Calendar, Users, Loader2 } from 'lucide-react';
+import { DollarSign, MapPin, Search, Calendar, Users } from 'lucide-react';
+import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
 import PersonaSearch from '../build-from-persona/PersonaSearch';
 
@@ -34,10 +35,11 @@ interface EventTuner {
   event_tuner_personas?: { personas: Persona }[];
 }
 
-export default function SetPlanPage() {
+export default function PreferencesPage() {
   const router = useRouter();
+  const { ownerId, companyHQId, hydrated } = useOwner();
   const [loading, setLoading] = useState(true);
-  const [existingTuner, setExistingTuner] = useState<EventTuner | null>(null);
+  const [existingTunerId, setExistingTunerId] = useState<string | null>(null);
   
   const [name, setName] = useState('');
   const [costRange, setCostRange] = useState<string>('');
@@ -49,26 +51,22 @@ export default function SetPlanPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadPreviousTuner();
-  }, []);
+    if (hydrated && ownerId && companyHQId) {
+      loadPreviousTuner();
+    }
+  }, [hydrated, ownerId, companyHQId]);
 
   const loadPreviousTuner = async () => {
     try {
       setLoading(true);
-      const companyHQId = localStorage.getItem('companyHQId') || '';
-      const ownerId = localStorage.getItem('ownerId') || '';
-
-      if (!companyHQId || !ownerId) {
-        setLoading(false);
-        return;
-      }
+      if (!companyHQId || !ownerId) return;
 
       // Get the most recent active tuner
       const response = await api.get(`/api/event-tuners/list?companyHQId=${companyHQId}&ownerId=${ownerId}&isActive=true`);
       
       if (response.data?.success && response.data.tuners && response.data.tuners.length > 0) {
         const tuner = response.data.tuners[0]; // Most recent
-        setExistingTuner(tuner);
+        setExistingTunerId(tuner.id);
         
         // Populate form with existing tuner data
         setName(tuner.name || '');
@@ -85,7 +83,7 @@ export default function SetPlanPage() {
       }
     } catch (err: any) {
       console.error('Error loading previous tuner:', err);
-      // Don't show error - just proceed with new tuner
+      // Don't show error - just proceed with new preferences
     } finally {
       setLoading(false);
     }
@@ -99,27 +97,26 @@ export default function SetPlanPage() {
     );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSave = async () => {
     if (!name.trim()) {
-      alert('Please enter a name for your event program');
+      alert('Please enter a name for your preferences');
+      return;
+    }
+
+    if (!ownerId || !companyHQId) {
+      alert('Please ensure you are logged in and have a company selected.');
       return;
     }
 
     try {
       setSaving(true);
 
-      const companyHQId = localStorage.getItem('companyHQId') || '';
-      const ownerId = localStorage.getItem('ownerId') || '';
-
-      if (!companyHQId || !ownerId) {
-        alert('Please ensure you are logged in and have a company selected.');
-        return;
+      if (existingTunerId) {
+        // TODO: Update existing tuner instead of creating new one
+        // For now, create a new one (we'll add update endpoint later)
       }
 
-      // If we have an existing tuner, we could update it, but for now let's create a new one
-      // (or we could update - depends on UX preference)
+      // Create/Update EventTuner (this IS the preferences)
       const response = await api.post('/api/event-tuners/create', {
         companyHQId,
         ownerId,
@@ -134,25 +131,26 @@ export default function SetPlanPage() {
 
       if (response.data?.success) {
         const tunerId = response.data.tuner.id;
-        router.push(`/events/build/tuner/${tunerId}/select`);
+        // Redirect to ready-to-plan with the tuner ID
+        router.push(`/events/ready-to-plan?tunerId=${tunerId}`);
       } else {
-        throw new Error('Failed to create event tuner');
+        throw new Error('Failed to save preferences');
       }
     } catch (err: any) {
-      console.error('Error creating event tuner:', err);
-      alert(err.response?.data?.error || 'Failed to create event program. Please try again.');
+      console.error('Error saving preferences:', err);
+      alert(err.response?.data?.error || 'Failed to save preferences. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
+  if (!hydrated || loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
-            <Loader2 className="h-12 w-12 animate-spin text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">Loading your plan...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
           </div>
         </div>
       </div>
@@ -163,38 +161,35 @@ export default function SetPlanPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title={existingTuner ? "Edit Your Event Program" : "Set Your Event Program"}
-          subtitle={existingTuner 
-            ? "Your previous program has been loaded. Update your constraints and preferences."
-            : "Define your program constraints and preferences to find matching events"
-          }
+          title="Set Preferences"
+          subtitle="Name your preference based on something you can remember. You can have more preferences later or edit this same version."
           backTo="/events"
           backLabel="Back to Events"
         />
 
-        {existingTuner && (
+        {existingTunerId && (
           <div className="mt-4 mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4">
             <p className="text-sm text-blue-800">
-              <strong>Previous program loaded:</strong> {existingTuner.name}
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              Updating will create a new program. You can edit this form and proceed to select events.
+              <strong>Previous preferences loaded.</strong> You can update them here. This gets us started to help you choose your events.
             </p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          {/* Program Name */}
+        <div className="mt-8 space-y-6">
+          {/* Preference Name */}
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Program Name</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Preference Name</h3>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Q1 2025 Event Program"
+              placeholder="e.g., Q1 2025 Preferences, West Coast Events, Budget-Friendly"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
             />
+            <p className="text-sm text-gray-500 mt-2">
+              Give your preferences a name you can remember. You can create more preferences later or edit this one.
+            </p>
           </div>
 
           {/* Cost Range */}
@@ -313,8 +308,8 @@ export default function SetPlanPage() {
             />
           </div>
 
-          {/* Submit */}
-          <div className="flex justify-end gap-4">
+          {/* Save Button */}
+          <div className="flex justify-end gap-4 pt-4">
             <button
               type="button"
               onClick={() => router.back()}
@@ -323,16 +318,15 @@ export default function SetPlanPage() {
               Cancel
             </button>
             <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              onClick={handleSave}
+              disabled={saving || !name.trim()}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Creating...' : 'Continue to Select Events'}
+              {saving ? 'Saving...' : 'Save Preferences & Ready to Plan'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
 }
-

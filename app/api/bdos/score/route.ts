@@ -102,7 +102,7 @@ export async function POST(request: Request) {
 
     // Verify persona if provided
     if (personaId) {
-      const persona = await prisma.persona.findUnique({
+      const persona = await prisma.personas.findUnique({
         where: { id: personaId },
         select: { companyHQId: true },
       });

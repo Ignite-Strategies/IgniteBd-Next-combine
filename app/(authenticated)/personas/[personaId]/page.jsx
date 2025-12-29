@@ -177,17 +177,17 @@ export default function PersonaDetailPage({ params }) {
                   </div>
                 </div>
               )}
-              {persona.productFit && (
+              {persona.product_fits && (
                 <div>
                   <p className="font-semibold text-gray-800">Product Fit</p>
                   <div className="mt-1 text-sm text-gray-600">
-                    <p><strong>Product:</strong> {persona.productFit.product?.name || 'N/A'}</p>
+                    <p><strong>Product:</strong> {persona.product_fits.product?.name || 'N/A'}</p>
                     <p className="mt-2"><strong>Value Prop to Them:</strong></p>
-                    <p className="mt-1">{persona.productFit.valuePropToThem || 'N/A'}</p>
-                    {persona.productFit.alignmentReasoning && (
+                    <p className="mt-1">{persona.product_fits.valuePropToThem || 'N/A'}</p>
+                    {persona.product_fits.alignmentReasoning && (
                       <>
                         <p className="mt-2"><strong>Alignment Reasoning:</strong></p>
-                        <p className="mt-1">{persona.productFit.alignmentReasoning}</p>
+                        <p className="mt-1">{persona.product_fits.alignmentReasoning}</p>
                       </>
                     )}
                   </div>
@@ -205,23 +205,23 @@ export default function PersonaDetailPage({ params }) {
                   </div>
                 </div>
               )}
-              {persona.bdIntel && (
+              {persona.bd_intels && (
                 <div>
                   <p className="font-semibold text-gray-800">BD Intelligence</p>
                   <div className="mt-1 text-sm text-gray-600 space-y-2">
-                    <p><strong>Fit Score:</strong> {persona.bdIntel.fitScore}/100</p>
-                    <p><strong>Pain Alignment:</strong> {persona.bdIntel.painAlignmentScore}/100</p>
-                    <p><strong>Workflow Fit:</strong> {persona.bdIntel.workflowFitScore}/100</p>
-                    {persona.bdIntel.recommendedTalkTrack && (
+                    <p><strong>Fit Score:</strong> {persona.bd_intels.fitScore}/100</p>
+                    <p><strong>Pain Alignment:</strong> {persona.bd_intels.painAlignmentScore}/100</p>
+                    <p><strong>Workflow Fit:</strong> {persona.bd_intels.workflowFitScore}/100</p>
+                    {persona.bd_intels.recommendedTalkTrack && (
                       <>
                         <p className="mt-2"><strong>Recommended Talk Track:</strong></p>
-                        <p className="mt-1">{persona.bdIntel.recommendedTalkTrack}</p>
+                        <p className="mt-1">{persona.bd_intels.recommendedTalkTrack}</p>
                       </>
                     )}
-                    {persona.bdIntel.finalSummary && (
+                    {persona.bd_intels.finalSummary && (
                       <>
                         <p className="mt-2"><strong>Summary:</strong></p>
-                        <p className="mt-1">{persona.bdIntel.finalSummary}</p>
+                        <p className="mt-1">{persona.bd_intels.finalSummary}</p>
                       </>
                     )}
                   </div>

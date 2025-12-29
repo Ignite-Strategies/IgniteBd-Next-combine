@@ -4,7 +4,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
  * GET /api/events/ops/list
- * List bd_event_ops records for a company/owner
+ * List bd_event_ops for a user, optionally filtered by eventPlanId
  */
 export async function GET(request: Request) {
   try {
@@ -21,29 +21,40 @@ export async function GET(request: Request) {
     const companyHQId = searchParams.get('companyHQId');
     const ownerId = searchParams.get('ownerId');
     const eventPlanId = searchParams.get('eventPlanId');
-    const source = searchParams.get('source');
-    const status = searchParams.get('status');
+    const hasNoPlan = searchParams.get('hasNoPlan') === 'true'; // Get events not yet in a plan
 
-    const where: any = {};
-    if (companyHQId) where.companyHQId = companyHQId;
-    if (ownerId) where.ownerId = ownerId;
-    if (eventPlanId) where.eventPlanId = eventPlanId;
-    if (source) where.source = source;
-    if (status) where.status = status;
+    if (!companyHQId || !ownerId) {
+      return NextResponse.json(
+        { success: false, error: 'companyHQId and ownerId are required' },
+        { status: 400 }
+      );
+    }
 
-    const eventOps = await prisma.bdEventOps.findMany({
+    const where: any = {
+      companyHQId,
+      ownerId,
+    };
+
+    if (eventPlanId) {
+      where.eventPlanId = eventPlanId;
+    } else if (hasNoPlan) {
+      where.eventPlanId = null;
+    }
+
+    const events = await prisma.bdEventOps.findMany({
       where,
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        { startDate: 'asc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     return NextResponse.json({
       success: true,
-      eventOps,
+      events,
     });
   } catch (error: any) {
-    console.error('❌ List bd_event_ops error:', error);
+    console.error('❌ List events ops error:', error);
     return NextResponse.json(
       {
         success: false,
@@ -54,4 +65,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

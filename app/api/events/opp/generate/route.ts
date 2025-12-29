@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     // Get persona
-    const persona = await prisma.persona.findUnique({
+    const persona = await prisma.personas.findUnique({
       where: { id: personaId },
       include: {
         companyHQ: true,

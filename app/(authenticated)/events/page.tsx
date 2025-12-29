@@ -2,14 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Sparkles, Settings, Calendar, List } from 'lucide-react';
+import { Sparkles, Calendar, List } from 'lucide-react';
 
 export default function EventsPage() {
   const router = useRouter();
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Event Intelligence Planner"
           subtitle="Discover and evaluate events that align with your business development goals"
@@ -17,82 +17,65 @@ export default function EventsPage() {
           backLabel="Back to Growth Dashboard"
         />
 
-        {/* Super Fork - Four Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          {/* 1. Research Events by Persona */}
+        {/* Main Content - Research by Persona (Large) + Sidebar (Small) */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main - Research Events by Persona (2 columns) */}
           <div
             onClick={() => router.push('/events/build-from-persona')}
-            className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-shadow"
+            className="lg:col-span-2 cursor-pointer rounded-2xl border-2 border-gray-200 bg-white p-8 shadow-lg hover:shadow-xl transition-all hover:border-red-300"
           >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="rounded-lg bg-blue-100 p-3">
-                <Sparkles className="h-6 w-6 text-blue-600" />
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Research Events by Persona</h3>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-900 mb-3">Research Events by Persona</h2>
+                <p className="text-lg text-gray-600 mb-4">
+                  Lookup events by preferences + persona matching. Generate personalized event recommendations tailored to your target persona.
+                </p>
+                <div className="flex items-center gap-2 text-red-600 font-semibold text-lg">
+                  <span>Get Started</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
-              Generate personalized event recommendations
-            </p>
-            <p className="text-sm text-gray-600">
-              Select a persona and configure filters to generate event recommendations tailored to their needs and interests
-            </p>
           </div>
 
-          {/* 2. Set Your Plan */}
-          <div
-            onClick={() => router.push('/events/set-plan')}
-            className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-shadow"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="rounded-lg bg-purple-100 p-3">
-                <Settings className="h-6 w-6 text-purple-600" />
+          {/* Sidebar - My Plan & My Events (1 column) */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* My Plan */}
+            <div
+              onClick={() => router.push('/events/preferences')}
+              className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition-all hover:border-gray-300"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="rounded-lg bg-purple-100 p-2">
+                  <Calendar className="h-5 w-5 text-purple-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">My Plan</h3>
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Set Your Plan</h3>
+              <p className="text-sm text-gray-600">
+                Set preferences and build your event program
+              </p>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
-              Create or edit your event program with constraints
-            </p>
-            <p className="text-sm text-gray-600">
-              Define your program constraints (cost, location, travel preferences) and select from matching events. Loads your previous plan if you have one.
-            </p>
-          </div>
 
-          {/* 3. See Plans */}
-          <div
-            onClick={() => router.push('/events/plans')}
-            className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-shadow"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="rounded-lg bg-green-100 p-3">
-                <Calendar className="h-6 w-6 text-green-600" />
+            {/* My Events */}
+            <div
+              onClick={() => router.push('/events/list')}
+              className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition-all hover:border-gray-300"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="rounded-lg bg-orange-100 p-2">
+                  <List className="h-5 w-5 text-orange-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">My Events</h3>
               </div>
-              <h3 className="text-xl font-bold text-gray-900">See Plans</h3>
+              <p className="text-sm text-gray-600">
+                View all your selected events
+              </p>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
-              View and manage your event plans
-            </p>
-            <p className="text-sm text-gray-600">
-              Browse all your event plans and see the events organized within each plan
-            </p>
-          </div>
-
-          {/* 4. See Events */}
-          <div
-            onClick={() => router.push('/events/list')}
-            className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-6 shadow-lg hover:shadow-xl transition-shadow"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="rounded-lg bg-orange-100 p-3">
-                <List className="h-6 w-6 text-orange-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">See Events</h3>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">
-              View all your selected events
-            </p>
-            <p className="text-sm text-gray-600">
-              See all events you've chosen, whether they're in plans or standalone
-            </p>
           </div>
         </div>
       </div>

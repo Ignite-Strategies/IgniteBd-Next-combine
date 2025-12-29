@@ -46,7 +46,7 @@ export async function POST(
     const { personaId } = await params;
 
     // Fetch persona
-    const persona = await prisma.persona.findUnique({
+    const persona = await prisma.personas.findUnique({
       where: { id: personaId },
       include: {
         companyHQ: {
@@ -177,7 +177,7 @@ Match the persona to the best product and return the JSON.`;
     }
 
     // Create or update ProductFit
-    const productFit = await prisma.productFit.upsert({
+    const productFit = await prisma.product_fits.upsert({
       where: { personaId },
       create: {
         personaId,

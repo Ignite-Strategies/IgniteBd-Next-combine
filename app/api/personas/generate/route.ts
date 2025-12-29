@@ -166,7 +166,7 @@ ${JSON.stringify(rawApolloResponse, null, 2)}`;
     }
 
     // Save persona to database
-    const persona = await prisma.persona.create({
+    const persona = await prisma.personas.create({
       data: {
         companyHQId,
         personName: personaData.personName,

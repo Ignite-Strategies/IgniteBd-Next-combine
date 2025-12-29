@@ -405,7 +405,7 @@ Generate a persona that represents the ROLE ARCHETYPE and COMPANY TYPE, not the 
     }
 
     // Create Persona
-    const saved = await prisma.persona.create({
+    const saved = await prisma.personas.create({
       data: {
         companyHQId,
         personName: persona.personName,
@@ -426,8 +426,8 @@ Generate a persona that represents the ROLE ARCHETYPE and COMPANY TYPE, not the 
         buyerTriggers: persona.buyerTriggers,
       },
       include: {
-        productFit: true,
-        bdIntel: true,
+        product_fits: true,
+        bd_intels: true,
       },
     });
 

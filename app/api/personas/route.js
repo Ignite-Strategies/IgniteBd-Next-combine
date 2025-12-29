@@ -53,7 +53,7 @@ export async function GET(request) {
       );
     }
 
-    const personas = await prisma.persona.findMany({
+    const personas = await prisma.personas.findMany({
       where: {
         companyHQId,
         ...(productId ? { 
@@ -63,7 +63,7 @@ export async function GET(request) {
         } : {}),
       },
       include: {
-        productFit: {
+        product_fits: {
           include: {
             product: {
               select: {
@@ -207,7 +207,7 @@ export async function POST(request) {
 
     let persona;
     if (id) {
-      const existing = await prisma.persona.findUnique({
+      const existing = await prisma.personas.findUnique({
         where: { id },
       });
 
@@ -218,7 +218,7 @@ export async function POST(request) {
         );
       }
 
-      persona = await prisma.persona.update({
+      persona = await prisma.personas.update({
         where: { id },
         data: personaData,
         include: {
@@ -237,7 +237,7 @@ export async function POST(request) {
         },
       });
     } else {
-      persona = await prisma.persona.create({
+      persona = await prisma.personas.create({
         data: personaData,
         include: {
           productFit: {
