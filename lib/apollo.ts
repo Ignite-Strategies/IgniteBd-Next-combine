@@ -57,6 +57,7 @@ export interface ApolloPersonMatchResponse {
     photo_url?: string; // Avatar URL
     // Employment history - Apollo returns this in enrich endpoint
     // Apollo may use different field names, so we check all variants
+    // According to Apollo docs, organization_name is a top-level field
     employment_history?: Array<{
       started_at?: string;
       started_on?: string;
@@ -65,6 +66,7 @@ export interface ApolloPersonMatchResponse {
       ended_on?: string | null;
       end_date?: string | null;
       title?: string;
+      organization_name?: string; // Apollo's documented field (top-level)
       organization?: {
         name?: string;
       };

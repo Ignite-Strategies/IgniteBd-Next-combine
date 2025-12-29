@@ -2,432 +2,324 @@
 
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import { Sparkles, RefreshCw, AlertCircle, Save } from 'lucide-react';
 import api from '@/lib/api';
-import EnrichmentModal from '@/components/enrichment/EnrichmentModal';
+import PageHeader from '@/components/PageHeader.jsx';
 
 const DEFAULT_VALUES = {
-  personaName: '',
+  personName: '',
+  title: '',
   role: '',
-  description: '',
+  seniority: '',
+  coreGoal: '',
   painPoints: '',
-  goals: '',
-  whatTheyWant: '',
-  companyId: '',
+  needForOurProduct: '',
+  potentialPitch: '',
+  industry: '',
+  companySize: '',
+  company: '',
 };
 
 function PersonaBuilderContent({ searchParams }) {
   const router = useRouter();
   const urlSearchParams = useSearchParams();
   const personaId = searchParams?.personaId || urlSearchParams?.get('personaId') || null;
-  const mode = searchParams?.mode || urlSearchParams?.get('mode') || null;
-  const enrichedKey = searchParams?.enrichedKey || urlSearchParams?.get('enrichedKey') || null;
   const contactId = searchParams?.contactId || urlSearchParams?.get('contactId') || null;
+  const redisKey = searchParams?.redisKey || urlSearchParams?.get('redisKey') || null;
+  const productId = searchParams?.productId || urlSearchParams?.get('productId') || null;
+  const mode = searchParams?.mode || urlSearchParams?.get('mode') || null;
 
-  const [isHydrating, setIsHydrating] = useState(Boolean(personaId));
-  const [fetchError, setFetchError] = useState(null);
-  const [submitError, setSubmitError] = useState(null);
-  const [toastMessage, setToastMessage] = useState(null);
-  const toastTimerRef = useRef(null);
-  const [hasInitialized, setHasInitialized] = useState(false);
-  
-  // AI generation state
-  const [showAIGeneration, setShowAIGeneration] = useState(mode === 'ai');
-  const [aiDescription, setAiDescription] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiError, setAiError] = useState(null);
+  const [formData, setFormData] = useState(DEFAULT_VALUES);
+  const [companyHQId, setCompanyHQId] = useState('');
+  const [products, setProducts] = useState([]);
+  const [selectedProductId, setSelectedProductId] = useState(productId || '');
+  const [productDescription, setProductDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  const derivedCompanyId = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    return (
-      window.localStorage.getItem('companyId') ||
+  // Load companyHQId and products
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const storedCompanyHQId =
       window.localStorage.getItem('companyHQId') ||
-      ''
-    );
-  }, []);
+      window.localStorage.getItem('companyId') ||
+      '';
+    setCompanyHQId(storedCompanyHQId);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    defaultValues: DEFAULT_VALUES,
-    mode: 'onBlur',
-  });
-
-  // Watch personaName to enable/disable save button
-  const personaName = watch('personaName');
-
-  useEffect(() => () => {
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current);
+    if (storedCompanyHQId) {
+      // Load products for dropdown
+      loadProducts(storedCompanyHQId);
     }
   }, []);
 
-  // Initialize companyId and handle prefill/enrichedKey/contactId
-  useEffect(() => {
-    if (!hasInitialized && !personaId) {
-      // Handle contactId from enrichment flow
-      if (contactId && derivedCompanyId) {
-        setIsHydrating(true);
-        (async () => {
-          try {
-            const contactResponse = await api.get(`/api/contacts/${contactId}`);
-            if (contactResponse.data?.success && contactResponse.data?.contact) {
-              const contact = contactResponse.data.contact;
-              
-              // Build description with profile summary and LinkedIn URL if available
-              let description = contact.profileSummary || '';
-              if (contact.linkedinUrl) {
-                if (description) {
-                  description += `\n\nLinkedIn: ${contact.linkedinUrl}`;
-                } else {
-                  description = `LinkedIn: ${contact.linkedinUrl}`;
-                }
-              }
-              
-              reset({
-                personaName: contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'New Persona',
-                role: contact.title || '',
-                description: description,
-                painPoints: Array.isArray(contact.painPoints) ? contact.painPoints.join('\n') : (contact.painPoints || ''),
-                goals: Array.isArray(contact.goals) ? contact.goals.join('\n') : (contact.goals || ''),
-                whatTheyWant: contact.notes || '',
-                companyId: derivedCompanyId,
-              });
-              handleShowToast('Persona pre-filled from enriched contact!');
-            }
-          } catch (err) {
-            console.error('Failed to load contact for persona:', err);
-            setFetchError('Failed to load contact data');
-          } finally {
-            setIsHydrating(false);
-            setHasInitialized(true);
-          }
-        })();
-        return;
+  const loadProducts = async (companyHQId) => {
+    try {
+      const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
+      if (response.data && Array.isArray(response.data)) {
+        setProducts(response.data);
       }
-
-      // Handle enrichedKey from enrichment flow
-      if (enrichedKey && derivedCompanyId) {
-        setIsHydrating(true);
-        (async () => {
-          try {
-            const response = await api.post('/api/personas/generate', {
-              redisKey: enrichedKey,
-              companyHQId: derivedCompanyId,
-            });
-            
-            if (response.data?.success && response.data?.persona) {
-              const personaData = response.data.persona;
-              reset({
-                personaName: personaData.personName || '',
-                role: personaData.title || '',
-                painPoints: Array.isArray(personaData.painPoints) 
-                  ? personaData.painPoints.join('\n')
-                  : (personaData.painPoints || ''),
-                goals: Array.isArray(personaData.goals)
-                  ? personaData.goals.join('\n')
-                  : (personaData.goals || ''),
-                whatTheyWant: personaData.whatTheyWant || '',
-                companyId: derivedCompanyId,
-              });
-              handleShowToast('Persona generated from enrichment!');
-            }
-          } catch (err) {
-            console.error('Failed to generate persona from enrichment:', err);
-            setFetchError('Failed to generate persona from enriched data');
-          } finally {
-            setIsHydrating(false);
-            setHasInitialized(true);
-          }
-        })();
-        return;
-      }
-
-      // Check for prefill data from AI generation
-      if (typeof window !== 'undefined') {
-        const prefill = sessionStorage.getItem('personaPrefill');
-        if (prefill) {
-          try {
-            const personaData = JSON.parse(prefill);
-            // Map AI-generated persona to form fields
-            reset({
-              personaName: personaData.personName || personaData.name || '',
-              role: personaData.title || personaData.role || '',
-              description: personaData.description || '',
-              painPoints: Array.isArray(personaData.painPoints) 
-                ? personaData.painPoints.join('\n')
-                : (personaData.painPoints || ''),
-              goals: Array.isArray(personaData.goals)
-                ? personaData.goals.join('\n')
-                : (personaData.goals || ''),
-              whatTheyWant: personaData.whatTheyWant || personaData.valueProp || '',
-              companyId: derivedCompanyId || '',
-            });
-            sessionStorage.removeItem('personaPrefill');
-            setHasInitialized(true);
-            return;
-          } catch (err) {
-            console.warn('Failed to parse prefill data:', err);
-          }
-        }
-      }
-      
-      // No prefill - just set companyId
-      if (derivedCompanyId) {
-        setValue('companyId', derivedCompanyId);
-        setHasInitialized(true);
-      }
+    } catch (err) {
+      console.error('Failed to load products:', err);
     }
-  }, [derivedCompanyId, personaId, enrichedKey, setValue, reset, hasInitialized]);
+  };
 
+  // Load existing persona if editing
   useEffect(() => {
-    if (!personaId) {
-      setIsHydrating(false);
-      return;
-    }
+    if (!personaId) return;
 
-    let isMounted = true;
-    setIsHydrating(true);
-    setFetchError(null);
-
-    (async () => {
+    const loadPersona = async () => {
+      setLoading(true);
+      setError('');
       try {
         const response = await api.get(`/api/personas/${personaId}`);
-        const persona = response.data?.persona ?? null;
-
-        if (!isMounted) return;
+        const persona = response.data;
 
         if (!persona) {
-          setFetchError('Persona not found.');
+          setError('Persona not found');
           return;
         }
 
-        reset({
-          personaName: persona.name ?? '',
-          role: persona.role ?? persona.title ?? '',
-          description: persona.description ?? '',
-          painPoints: persona.painPoints ?? '',
-          goals: persona.goals ?? '',
-          whatTheyWant: persona.valuePropToPersona ?? persona.whatTheyWant ?? '',
-          companyId: persona.companyHQId ?? derivedCompanyId ?? '',
+        setFormData({
+          personName: persona.personName || '',
+          title: persona.title || '',
+          role: persona.role || '',
+          seniority: persona.seniority || '',
+          coreGoal: persona.coreGoal || '',
+          painPoints: Array.isArray(persona.painPoints)
+            ? persona.painPoints.join('\n')
+            : persona.painPoints || '',
+          needForOurProduct: persona.needForOurProduct || persona.whatTheyWant || '',
+          potentialPitch: persona.potentialPitch || '',
+          industry: persona.industry || '',
+          companySize: persona.companySize || '',
+          company: persona.company || '',
         });
-        setHasInitialized(true);
-      } catch (error) {
-        if (!isMounted) return;
-        const message =
-          error instanceof Error
-            ? error.message
-            : 'Failed to load persona.';
-        setFetchError(message);
+      } catch (err) {
+        console.error('Failed to load persona:', err);
+        setError(err.response?.data?.error || 'Failed to load persona');
       } finally {
-        if (isMounted) {
-          setIsHydrating(false);
-        }
+        setLoading(false);
       }
-    })();
-
-    return () => {
-      isMounted = false;
     };
-  }, [personaId, reset, derivedCompanyId]);
 
-  const handleShowToast = (message, callback) => {
-    setToastMessage(message);
-    toastTimerRef.current = window.setTimeout(() => {
-      setToastMessage(null);
-      if (callback) callback();
-    }, 1200);
-  };
+    loadPersona();
+  }, [personaId]);
 
-  const handleAIGenerate = async () => {
-    if (!aiDescription.trim()) {
-      setAiError('Please enter a description');
+  // Generate persona (hydrate mode)
+  const handleGenerate = async () => {
+    if (!companyHQId) {
+      setError('Company context is required');
       return;
     }
 
-    if (!derivedCompanyId) {
-      setAiError('Company context is required');
+    if (!selectedProductId && !productDescription.trim()) {
+      setError('Please select a product or enter a product description');
       return;
     }
 
-    setAiGenerating(true);
-    setAiError(null);
+    setGenerating(true);
+    setError('');
 
     try {
-      const response = await api.post('/api/personas/generate-from-description', {
-        description: aiDescription.trim(),
-        companyHQId: derivedCompanyId,
+      const response = await api.post('/api/personas/generate', {
+        companyHQId,
+        contactId: contactId || null,
+        redisKey: redisKey || null,
+        productId: selectedProductId || null,
+        productDescription: productDescription.trim() || null,
       });
 
       if (response.data?.success && response.data?.persona) {
-        const personaData = response.data.persona;
-        // Pre-fill form with generated data
-        reset({
-          personaName: personaData.personName || personaData.name || '',
-          role: personaData.title || personaData.role || '',
-          description: personaData.description || '',
-          painPoints: Array.isArray(personaData.painPoints) 
-            ? personaData.painPoints.join('\n')
-            : (personaData.painPoints || ''),
-          goals: Array.isArray(personaData.goals)
-            ? personaData.goals.join('\n')
-            : (personaData.goals || ''),
-          whatTheyWant: personaData.whatTheyWant || personaData.valueProp || '',
-          companyId: derivedCompanyId || '',
+        const persona = response.data.persona;
+        setFormData({
+          personName: persona.personName || '',
+          title: persona.title || '',
+          role: persona.role || '',
+          seniority: persona.seniority || '',
+          coreGoal: persona.coreGoal || '',
+          painPoints: Array.isArray(persona.painPoints)
+            ? persona.painPoints.join('\n')
+            : persona.painPoints || '',
+          needForOurProduct: persona.needForOurProduct || '',
+          potentialPitch: persona.potentialPitch || '',
+          industry: persona.industry || '',
+          companySize: persona.companySize || '',
+          company: persona.company || '',
         });
-        setShowAIGeneration(false);
-        handleShowToast('Persona generated! Review and edit as needed.');
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
       } else {
         throw new Error(response.data?.error || 'Failed to generate persona');
       }
     } catch (err) {
       console.error('Failed to generate persona:', err);
-      setAiError(err.response?.data?.error || err.message || 'Failed to generate persona. Please try again.');
+      setError(err.response?.data?.error || err.message || 'Failed to generate persona');
     } finally {
-      setAiGenerating(false);
+      setGenerating(false);
     }
   };
 
-  const onSubmit = handleSubmit(async (values) => {
-    setSubmitError(null);
-
-    if (!values.companyId) {
-      setSubmitError('Company context is required to save a persona.');
+  // Save persona
+  const handleSave = async () => {
+    if (!companyHQId) {
+      setError('Company context is required');
       return;
     }
 
-    try {
-      const response = await api.post('/api/personas', {
-        id: personaId,
-        name: values.personaName,
-        title: values.role,
-        description: values.description,
-        painPoints: values.painPoints,
-        goals: values.goals,
-        whatTheyWant: values.whatTheyWant,
-        companyHQId: values.companyId,
-      });
-
-      const savedPersona = response.data?.persona;
-      if (!savedPersona) {
-        throw new Error('Persona save response was missing data.');
-      }
-
-      // Immediately save to localStorage (hydration pattern)
-      if (typeof window !== 'undefined') {
-        const cached = window.localStorage.getItem('personas');
-        const existing = cached ? JSON.parse(cached) : [];
-        // Update if exists, otherwise add
-        const existingIndex = existing.findIndex(p => p.id === savedPersona.id);
-        const updated = existingIndex >= 0
-          ? existing.map((p, i) => i === existingIndex ? savedPersona : p)
-          : [...existing, savedPersona];
-        window.localStorage.setItem('personas', JSON.stringify(updated));
-      }
-
-      handleShowToast('Persona saved.', () => {
-        router.push('/personas');
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'We could not save the persona. Please try again.';
-      setSubmitError(message);
+    if (!formData.personName.trim() || !formData.title.trim()) {
+      setError('Person Name and Title are required');
+      return;
     }
-  });
 
-  const isBusy = isHydrating || isSubmitting;
+    if (!formData.coreGoal.trim() || !formData.needForOurProduct.trim()) {
+      setError('Core Goal and Need for Our Product are required');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      // Convert painPoints string to array
+      const painPointsArray = formData.painPoints
+        .split('\n')
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      const personaData = {
+        personName: formData.personName.trim(),
+        title: formData.title.trim(),
+        role: formData.role.trim() || null,
+        seniority: formData.seniority.trim() || null,
+        coreGoal: formData.coreGoal.trim(),
+        painPoints: painPointsArray,
+        needForOurProduct: formData.needForOurProduct.trim(),
+        potentialPitch: formData.potentialPitch.trim() || null,
+        industry: formData.industry.trim() || null,
+        companySize: formData.companySize.trim() || null,
+        company: formData.company.trim() || null,
+      };
+
+      const response = await api.post('/api/personas/save', {
+        persona: personaData,
+        personaId: personaId || null,
+        companyHQId,
+      });
+
+      if (response.data?.success) {
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/personas');
+        }, 1000);
+      } else {
+        throw new Error(response.data?.error || 'Failed to save persona');
+      }
+    } catch (err) {
+      console.error('Failed to save persona:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to save persona');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="rounded-2xl bg-white p-8 text-center shadow">
+            <RefreshCw className="mx-auto h-6 w-6 animate-spin text-gray-500 mb-4" />
+            <p className="text-sm font-semibold text-gray-600">Loading persona...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative mx-auto max-w-3xl space-y-6 p-6">
-      {toastMessage && (
-        <div className="fixed inset-x-0 top-6 z-50 flex justify-center px-4">
-          <div className="rounded-lg bg-green-600 px-4 py-2 text-white shadow-lg">
-            {toastMessage}
-          </div>
-        </div>
-      )}
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <PageHeader
+          title={personaId ? 'Edit Persona' : 'Create Persona'}
+          subtitle="Help you think through who you're targeting"
+          backTo="/personas"
+          backLabel="Back to Personas"
+        />
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {personaId ? 'Edit Persona' : 'Create Persona'}
-              </h1>
-              <p className="text-sm text-gray-600">
-                Keep the details aligned with your activation strategy and
-                messaging.
-              </p>
-            </div>
-            {!personaId && (
-              <button
-                type="button"
-                onClick={() => router.push('/contacts/enrich/linkedin?returnTo=persona')}
-                disabled={isBusy}
-                className="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="h-4 w-4" />
-                Build from LinkedIn
-              </button>
-            )}
-          </div>
-        </div>
-
-        {fetchError && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {fetchError}
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
-        {submitError && (
-          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {submitError}
+        {success && (
+          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            {personaId ? 'Persona updated!' : 'Persona generated! Review and edit as needed, then save.'}
           </div>
         )}
 
-        {/* AI Generation Mode */}
-        {showAIGeneration && !personaId && (
+        {/* Generate Section (only show if not editing) */}
+        {!personaId && (
           <div className="mb-6 rounded-xl border-2 border-purple-200 bg-purple-50 p-6">
             <div className="mb-4 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-purple-600" />
               <h2 className="text-lg font-bold text-gray-900">Generate with AI</h2>
             </div>
             <p className="mb-4 text-sm text-gray-600">
-              Describe your ideal customer and AI will generate a detailed persona for you.
+              Provide product context and optionally a contact/enrichment to generate a persona.
             </p>
-            
-            {aiError && (
-              <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                <AlertCircle className="h-4 w-4" />
-                {aiError}
+
+            <div className="space-y-4">
+              {/* Product Selection */}
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Product (Required for generation)
+                </label>
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  disabled={generating}
+                >
+                  <option value="">Select a product...</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
 
-            <textarea
-              value={aiDescription}
-              onChange={(e) => setAiDescription(e.target.value)}
-              placeholder="e.g., A solo business owner who's maxed out on delivery time and needs help growing revenue without working more hours. They struggle with sales and marketing while trying to focus on client work..."
-              rows={6}
-              className="mb-4 w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-              disabled={aiGenerating}
-            />
+              {/* Product Description Fallback */}
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Or enter product description
+                </label>
+                <textarea
+                  value={productDescription}
+                  onChange={(e) => setProductDescription(e.target.value)}
+                  placeholder="e.g., A BD platform that helps consultants scale their practice..."
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  disabled={generating || !!selectedProductId}
+                />
+              </div>
 
-            <div className="flex gap-3">
               <button
                 type="button"
-                onClick={handleAIGenerate}
-                disabled={aiGenerating || !aiDescription.trim() || !derivedCompanyId}
+                onClick={handleGenerate}
+                disabled={generating || (!selectedProductId && !productDescription.trim())}
                 className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                {aiGenerating ? (
+                {generating ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
                     Generating...
@@ -439,145 +331,221 @@ function PersonaBuilderContent({ searchParams }) {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Form Fields */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+          <div className="space-y-6">
+            {/* WHO IS THIS PERSON */}
+            <div>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">Who is this person?</h3>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Person Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.personName}
+                    onChange={(e) => handleInputChange('personName', e.target.value)}
+                    placeholder="e.g., Enterprise CMO"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => handleInputChange('title', e.target.value)}
+                    placeholder="e.g., Chief Marketing Officer"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Role (Additional context)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.role}
+                    onChange={(e) => handleInputChange('role', e.target.value)}
+                    placeholder="Additional role context beyond title"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Seniority</label>
+                  <input
+                    type="text"
+                    value={formData.seniority}
+                    onChange={(e) => handleInputChange('seniority', e.target.value)}
+                    placeholder="e.g., C-Level, Director"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* WHAT DO THEY WANT */}
+            <div>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">What do they want?</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Core Goal <span className="text-red-500">*</span>
+                  </label>
+                  <p className="mb-2 text-xs text-gray-500">
+                    Their north star (regardless of our product)
+                  </p>
+                  <textarea
+                    value={formData.coreGoal}
+                    onChange={(e) => handleInputChange('coreGoal', e.target.value)}
+                    placeholder="What they want in general..."
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Pain Points</label>
+                  <textarea
+                    value={formData.painPoints}
+                    onChange={(e) => handleInputChange('painPoints', e.target.value)}
+                    placeholder="One per line - What problems do they have?"
+                    rows={4}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Need for Our Product <span className="text-red-500">*</span>
+                  </label>
+                  <p className="mb-2 text-xs text-gray-500">
+                    What they need from OUR PRODUCT specifically (key field!)
+                  </p>
+                  <textarea
+                    value={formData.needForOurProduct}
+                    onChange={(e) => handleInputChange('needForOurProduct', e.target.value)}
+                    placeholder="What do they need from our product?"
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Potential Pitch
+                  </label>
+                  <p className="mb-2 text-xs text-gray-500">
+                    How we would pitch to them (inferred from pain + needs)
+                  </p>
+                  <textarea
+                    value={formData.potentialPitch}
+                    onChange={(e) => handleInputChange('potentialPitch', e.target.value)}
+                    placeholder="How we'd pitch to them..."
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* WHAT COMPANY ARE THEY AT */}
+            <div>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">What company are they at?</h3>
+              <div className="grid gap-6 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Industry</label>
+                  <input
+                    type="text"
+                    value={formData.industry}
+                    onChange={(e) => handleInputChange('industry', e.target.value)}
+                    placeholder="Industry type"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Company Size</label>
+                  <input
+                    type="text"
+                    value={formData.companySize}
+                    onChange={(e) => handleInputChange('companySize', e.target.value)}
+                    placeholder="e.g., 51-200, 200-1000"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Company Type</label>
+                  <input
+                    type="text"
+                    value={formData.company}
+                    onChange={(e) => handleInputChange('company', e.target.value)}
+                    placeholder="e.g., mid-market SaaS"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end gap-4 border-t border-gray-100 pt-6">
               <button
                 type="button"
-                onClick={() => setShowAIGeneration(false)}
-                disabled={aiGenerating}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                onClick={() => router.back()}
+                className="rounded-lg bg-gray-100 px-6 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-200 disabled:opacity-60"
+                disabled={saving}
               >
                 Cancel
               </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={
+                  saving ||
+                  !formData.personName.trim() ||
+                  !formData.title.trim() ||
+                  !formData.coreGoal.trim() ||
+                  !formData.needForOurProduct.trim()
+                }
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save Persona
+                  </>
+                )}
+              </button>
             </div>
           </div>
-        )}
-
-        {/* Toggle AI Mode Button (when not in AI mode and not editing) */}
-        {!showAIGeneration && !personaId && (
-          <div className="mb-6">
-            <button
-              type="button"
-              onClick={() => setShowAIGeneration(true)}
-              disabled={isBusy}
-              className="flex items-center gap-2 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-700 transition hover:bg-purple-100 disabled:opacity-60"
-            >
-              <Sparkles className="h-4 w-4" />
-              Generate with AI Instead
-            </button>
-          </div>
-        )}
-
-        <form onSubmit={onSubmit} className="space-y-6">
-          <input
-            type="hidden"
-            defaultValue={derivedCompanyId}
-            {...register('companyId', { required: true })}
-          />
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Persona Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Sarah the Scaling COO"
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
-                disabled={isBusy}
-                {...register('personaName', {
-                  required: 'Persona name is required.',
-                })}
-              />
-              {errors.personaName && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.personaName.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Role
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., COO, Head of Growth"
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
-                disabled={isBusy}
-                {...register('role')}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Description
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Brief description of this persona (who they are, their context)"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
-              disabled={isBusy}
-              {...register('description')}
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Pain Points
-            </label>
-            <textarea
-              rows={4}
-              placeholder="Where are they feeling friction? What slows them down?"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
-              disabled={isBusy}
-              {...register('painPoints')}
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Goals
-            </label>
-            <textarea
-              rows={4}
-              placeholder="What outcomes do they care about most?"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
-              disabled={isBusy}
-              {...register('goals')}
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              What They Want From Us
-            </label>
-            <textarea
-              rows={4}
-              placeholder="What are they hoping Ignite will help them achieve or solve?"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-green-500 focus:ring-2 focus:ring-green-200"
-              disabled={isBusy}
-              {...register('whatTheyWant')}
-            />
-          </div>
-
-          <div className="flex justify-end gap-4 border-t border-gray-100 pt-6">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="rounded-lg bg-gray-100 px-6 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-200 disabled:opacity-60"
-              disabled={isBusy}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="rounded-lg bg-green-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-70 disabled:cursor-not-allowed"
-              disabled={isBusy || !personaName?.trim()}
-            >
-              {isSubmitting ? 'Saving…' : 'Save Persona'}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );
@@ -585,16 +553,19 @@ function PersonaBuilderContent({ searchParams }) {
 
 export default function PersonaBuilderPage({ searchParams }) {
   return (
-    <Suspense fallback={
-      <div className="relative mx-auto max-w-3xl space-y-6 p-6">
-        <div className="text-center py-8">
-          <RefreshCw className="animate-spin h-6 w-6 mx-auto mb-2 text-gray-400" />
-          <p className="text-gray-600">Loading...</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="mx-auto max-w-4xl px-4">
+            <div className="rounded-2xl bg-white p-8 text-center shadow">
+              <RefreshCw className="mx-auto h-6 w-6 animate-spin text-gray-500 mb-4" />
+              <p className="text-sm font-semibold text-gray-600">Loading...</p>
+            </div>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <PersonaBuilderContent searchParams={searchParams} />
     </Suspense>
   );
 }
-

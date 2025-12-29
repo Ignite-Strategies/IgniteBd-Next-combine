@@ -917,6 +917,7 @@ export function generateCareerTimeline(
     ended_on?: string | null;
     end_date?: string | null;
     title?: string;
+    organization_name?: string; // Apollo's documented field (top-level)
     organization?: { name?: string };
     company?: string;
     company_name?: string;
@@ -957,11 +958,30 @@ export function generateCareerTimeline(
       const years = months / 12;
 
       // Extract company name from multiple possible fields
+      // According to Apollo docs, employment_history uses organization_name as a top-level field
+      // We check both nested (organization.name) and flat (organization_name) variants
       const companyName = 
-        job.organization?.name || 
+        (job as any).organization_name ||  // Apollo's documented field (top-level)
+        job.organization?.name ||          // Nested variant
+        (job.organization as any)?.organization_name ||
         job.company || 
-        job.company_name || 
+        job.company_name ||
+        (job as any).org_name ||
+        (job as any).employer ||
+        (job as any).employer_name ||
         'Unknown Company';
+      
+      // Log when we fall back to "Unknown Company" to help debug Apollo data structure
+      if (companyName === 'Unknown Company') {
+        console.warn('⚠️ Missing company name in employment history entry:', {
+          jobKeys: Object.keys(job),
+          organization: job.organization,
+          hasOrganization: !!job.organization,
+          organizationKeys: job.organization ? Object.keys(job.organization) : [],
+          hasOrganizationName: !!(job as any).organization_name,
+          sampleJob: JSON.stringify(job, null, 2),
+        });
+      }
 
       return {
         startDate: startDate.toISOString().split('T')[0], // YYYY-MM-DD

@@ -144,6 +144,23 @@ export async function POST(request: Request) {
     if (employmentHistory.length > 0) {
       console.log('📊 Employment history found:', employmentHistory.length, 'jobs');
       console.log('📅 Full employment history:', JSON.stringify(employmentHistory, null, 2));
+      
+      // Debug: Check what company name fields are actually present in each job
+      employmentHistory.forEach((job, index) => {
+        const companyFields = {
+          'organization?.name': (job as any).organization?.name,
+          'organization.organization_name': (job as any).organization?.organization_name,
+          'company': (job as any).company,
+          'company_name': (job as any).company_name,
+          'org_name': (job as any).org_name,
+          'organization_name': (job as any).organization_name,
+          'employer': (job as any).employer,
+          'employer_name': (job as any).employer_name,
+          'allKeys': Object.keys(job),
+          'organizationKeys': (job as any).organization ? Object.keys((job as any).organization) : [],
+        };
+        console.log(`🔍 Job ${index + 1} company name fields:`, JSON.stringify(companyFields, null, 2));
+      });
     } else {
       console.log('⚠️ No employment history found in Apollo payload');
       // Log the full person object to see what fields are actually available
