@@ -32,27 +32,6 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { idea } = body ?? {};
-
-    if (!idea || idea.trim() === '') {
-      return NextResponse.json(
-        { error: 'idea is required' },
-        { status: 400 },
-      );
-    }
-
-export async function POST(request) {
-  try {
-    await verifyFirebaseToken(request);
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 },
-    );
-  }
-
-  try {
-    const body = await request.json();
     const { idea, ownerId } = body ?? {};
 
     if (!idea || idea.trim() === '') {
