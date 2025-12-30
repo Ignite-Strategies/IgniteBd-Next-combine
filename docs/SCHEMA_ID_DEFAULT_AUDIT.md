@@ -107,16 +107,28 @@ When adding a default to an ID column:
 ## Summary
 
 **What happened:**
-- Migrations added `gen_random_uuid()` defaults to database
+- Migrations added `gen_random_uuid()` defaults to database (likely by Cursor agent without universal strategy)
 - Schema wasn't updated to match
 - Prisma validation failed because schema said "no default" but database said "has default"
 
-**Fix:**
-- Updated schema to use `@default(dbgenerated("gen_random_uuid()"))` to match database
-- This tells Prisma: "database will generate this, don't require it"
+**Decision: Revert to Prisma cuid() Pattern (Dec 29, 2025)**
+
+Instead of patching every model, we're reverting to Prisma's default `cuid()` pattern:
+- **Client-side generation**: Prisma generates IDs using `cuid()` (no database defaults)
+- **No drift risk**: Schema and database stay in sync (no database-level defaults to drift)
+- **Universal pattern**: All models use `@default(cuid())` consistently
+
+**Revert Migration:**
+- `20251229200000_revert_uuid_defaults_to_cuid`: Removed database defaults from contacts and templates
+- Updated schema: Both models now use `@default(cuid())`
 
 **Status:**
-- ✅ Contacts: Fixed
-- ✅ Templates: Fixed
-- ⚠️ Other models: Need audit
+- ✅ Contacts: Reverted to `@default(cuid())`
+- ✅ Templates: Reverted to `@default(cuid())`
+- ✅ All models: Now consistently use `@default(cuid())` or no default (Prisma handles it)
+
+**Going Forward:**
+- **Standard**: Use `@default(cuid())` in Prisma schema
+- **NO database defaults**: Don't add `gen_random_uuid()` to database
+- **Let Prisma handle it**: Prisma generates IDs client-side, no drift risk
 
