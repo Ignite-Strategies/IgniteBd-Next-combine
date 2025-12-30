@@ -1,14 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useOwner } from '@/hooks/useOwner';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, Users, Download } from 'lucide-react';
 
-export default function MicrosoftEmailIngest() {
+function MicrosoftEmailIngestContent() {
   const router = useRouter();
-  const { ownerId, isMicrosoftConnected, microsoftEmail } = useOwner();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Direct read from localStorage for ownerId and owner - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  const [owner, setOwner] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedOwnerId = localStorage.getItem('ownerId');
+    const storedOwner = localStorage.getItem('owner');
+    if (storedOwnerId) setOwnerId(storedOwnerId);
+    if (storedOwner) {
+      try {
+        setOwner(JSON.parse(storedOwner));
+      } catch (e) {
+        console.warn('Failed to parse owner', e);
+      }
+    }
+  }, []);
+  
+  const isMicrosoftConnected = owner?.microsoftAccessToken ? true : false;
+  const microsoftEmail = owner?.microsoftEmail || null;
   
   const [source, setSource] = useState(null); // null = landing page, 'email' or 'contacts'
   const [previewLoading, setPreviewLoading] = useState(false);
