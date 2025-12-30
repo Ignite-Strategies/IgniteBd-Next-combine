@@ -35,19 +35,7 @@ function RelationshipAwareTemplateContent() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
-  // Redirect if no companyHQId in URL
-  useEffect(() => {
-    if (!companyHQId && typeof window !== 'undefined') {
-      const stored = localStorage.getItem('companyHQId');
-      if (stored) {
-        router.replace(`/templates/create/ai/relationship?companyHQId=${stored}`);
-      } else {
-        router.push('/templates');
-      }
-    }
-  }, [companyHQId, router]);
-
-  // No logging needed - URL param is source of truth
+  // URL param is source of truth - no redirect needed
 
   const handleGenerate = async (e) => {
     e.preventDefault();
