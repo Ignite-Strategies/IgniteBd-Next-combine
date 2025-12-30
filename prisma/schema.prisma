@@ -1164,7 +1164,7 @@ model template_relationship_helpers {
 }
 
 model templates {
-  id          String      @id
+  id          String      @id @default(dbgenerated("gen_random_uuid()"))
   subject     String
   body        String
   createdAt   DateTime    @default(now())
