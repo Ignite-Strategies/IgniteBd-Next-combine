@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { auth } from '@/lib/firebase';
 import { confirmPasswordReset } from 'firebase/auth';
 import { Loader2, CheckCircle2, XCircle, Lock } from 'lucide-react';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
@@ -182,6 +182,32 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center space-y-8 bg-white/10 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center">
+                <Lock className="h-8 w-8 text-white" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-white">
+              Reset Your Password
+            </h1>
+            <p className="text-white/80 text-lg">
+              Loading...
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
 
