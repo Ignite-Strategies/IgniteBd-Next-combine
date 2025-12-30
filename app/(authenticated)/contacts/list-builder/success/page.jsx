@@ -56,7 +56,12 @@ function ContactListSuccessContent() {
             </button>
             <button
               type="button"
-              onClick={() => router.push(`/outreach/compose?contactListId=${listId}`)}
+              onClick={() => {
+                const url = companyHQId 
+                  ? `/outreach/compose?contactListId=${listId}&companyHQId=${companyHQId}`
+                  : `/outreach/compose?contactListId=${listId}`;
+                router.push(url);
+              }}
               className="flex flex-col items-center gap-3 rounded-xl bg-white border-2 border-blue-200 p-6 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all"
             >
               <div className="rounded-full bg-blue-100 p-3">
