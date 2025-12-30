@@ -141,10 +141,10 @@ export async function POST(request: Request) {
 
     const orgData = organizations[0];
     
-    // Structure the Apollo response to match the format expected by normalizeCompanyApollo
+    // Structure the Apollo response to match ApolloPersonMatchResponse format
     // normalizeCompanyApollo expects ApolloPersonMatchResponse with person.organization
-    // Apollo organization search returns organizations array with org objects
-    const structuredResponse: ApolloEnrichmentPayload = {
+    // This structure includes website_url and primary_domain which are needed for normalization
+    const structuredResponse = {
       person: {
         organization: {
           name: orgData.name || orgData.company_name,
@@ -161,11 +161,12 @@ export async function POST(request: Request) {
       },
     };
 
-    // Normalize company fields
+    // Normalize company fields (expects ApolloPersonMatchResponse which has website_url/primary_domain)
     const normalizedCompany = normalizeCompanyApollo(structuredResponse as any);
 
-    // Extract company intelligence scores
-    const companyIntelligence = extractCompanyIntelligenceScores(structuredResponse);
+    // Extract company intelligence scores (expects ApolloEnrichmentPayload which doesn't need website_url/primary_domain)
+    // We can safely cast because extractCompanyIntelligenceScores only uses the fields that exist in ApolloEnrichmentPayload
+    const companyIntelligence = extractCompanyIntelligenceScores(structuredResponse as ApolloEnrichmentPayload);
 
     // Enrich company positioning (GPT + deterministic tiers)
     let companyPositioning = {
