@@ -288,27 +288,71 @@ function ComposeContent() {
     setPreviewData(null);
 
     try {
-      // Append signature to body if enabled and signature exists - TODO: Re-enable after relational model
-      // let finalBody = body || '';
-      // if (includeSignature && emailSignature) {
-      //   finalBody = finalBody + '\n\n' + emailSignature;
-      // }
-      
       // Hydrate template directly (like sandbox) - NO requestId
       let hydratedSubject = subject || '';
       let hydratedBody = body || '';
       
-      // If template is selected, hydrate it with contact data
-      if (selectedTemplateId && contactId) {
-        const hydrateResponse = await api.post('/api/template/hydrate-with-contact', {
-          templateId: selectedTemplateId,
-          contactId: contactId,
-          metadata: {},
-        });
-        
-        if (hydrateResponse.data?.success) {
-          hydratedSubject = hydrateResponse.data.hydratedSubject || subject;
-          hydratedBody = hydrateResponse.data.hydratedBody || body;
+      // Always hydrate variables if contact is selected (even without template)
+      if (contactId) {
+        if (selectedTemplateId) {
+          // Use template hydration API if template is selected
+          const hydrateResponse = await api.post('/api/template/hydrate-with-contact', {
+            templateId: selectedTemplateId,
+            contactId: contactId,
+            metadata: {},
+          });
+          
+          if (hydrateResponse.data?.success) {
+            hydratedSubject = hydrateResponse.data.hydratedSubject || subject;
+            hydratedBody = hydrateResponse.data.hydratedBody || body;
+          }
+        } else {
+          // No template selected, but contact exists - hydrate manually entered variables
+          // Check if there are variables in subject or body
+          const subjectVars = extractVariableNames(subject || '');
+          const bodyVars = extractVariableNames(body || '');
+          
+          if (subjectVars.length > 0 || bodyVars.length > 0) {
+            // Fetch contact data and hydrate variables manually
+            try {
+              const contactResponse = await api.get(`/api/contacts/${contactId}`);
+              if (contactResponse.data?.success && contactResponse.data?.contact) {
+                const contact = contactResponse.data.contact;
+                
+                // Hydrate subject
+                if (subjectVars.length > 0) {
+                  hydratedSubject = subject || '';
+                  subjectVars.forEach(varName => {
+                    const varDef = VariableCatalogue[varName];
+                    if (varDef && varDef.source === 'CONTACT') {
+                      const value = contact[varDef.dbField] || contact[varName] || '';
+                      hydratedSubject = hydratedSubject.replace(
+                        new RegExp(`\\{\\{${varName}\\}\\}`, 'g'),
+                        value
+                      );
+                    }
+                  });
+                }
+                
+                // Hydrate body
+                if (bodyVars.length > 0) {
+                  hydratedBody = body || '';
+                  bodyVars.forEach(varName => {
+                    const varDef = VariableCatalogue[varName];
+                    if (varDef && varDef.source === 'CONTACT') {
+                      const value = contact[varDef.dbField] || contact[varName] || '';
+                      hydratedBody = hydratedBody.replace(
+                        new RegExp(`\\{\\{${varName}\\}\\}`, 'g'),
+                        value
+                      );
+                    }
+                  });
+                }
+              }
+            } catch (err) {
+              console.warn('Failed to fetch contact for variable hydration:', err);
+            }
+          }
         }
       }
       
