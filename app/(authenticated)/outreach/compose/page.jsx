@@ -98,6 +98,13 @@ function ComposeContent() {
   const [savingQuickContact, setSavingQuickContact] = useState(false);
   const [quickContactError, setQuickContactError] = useState(null);
   
+  // Live preview state - hydrated email preview
+  const [hydratedPreview, setHydratedPreview] = useState({
+    subject: '',
+    body: '',
+    loading: false,
+  });
+  
   // Check if companyHQId is missing from URL params - just show error, no redirect
   const missingCompanyKey = !companyHQId;
 
@@ -437,11 +444,52 @@ function ComposeContent() {
           backLabel="Back to Outreach"
         />
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Compose Form - Left Column (2/3 width) */}
-          <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Main Compose Form - Left Column (1/2 width) */}
+          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-6">Compose Email</h2>
+            
+            {/* Template Selector - Moved to top of form */}
+            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900">Choose Template</h3>
+              </div>
+              <div className="p-4 max-h-48 overflow-y-auto">
+                {loadingTemplates ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                    <span className="ml-2 text-xs text-gray-600">Loading templates...</span>
+                  </div>
+                ) : templates.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-4">No templates available</p>
+                ) : (
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTemplateId(template.id);
+                          setSubject(template.subject || '');
+                          setBody(template.body || '');
+                        }}
+                        className={`w-full text-left p-2 rounded border transition text-xs ${
+                          selectedTemplateId === template.id
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="font-medium text-gray-900">{template.title}</div>
+                        {template.subject && (
+                          <div className="text-gray-600 truncate">{template.subject}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             
             {success && (
               <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 flex items-center gap-2">
@@ -734,72 +782,82 @@ function ComposeContent() {
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="submit"
+                  disabled={sending || !ownerId || !hasVerifiedSender || !senderEmail || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
+                  className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Send Email
+                    </>
+                  )}
+                </button>
               </div>
               </form>
             </div>
           </div>
 
-          {/* Template Selector Sidebar - Right Column (1/3 width) */}
-          <div className="lg:col-span-1 rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div className="p-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-900">Choose from Template</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                Select a template to fill subject and body
-              </p>
-            </div>
-            <div className="p-4">
-              {loadingTemplates ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                  <span className="ml-2 text-sm text-gray-600">Loading templates...</span>
-                </div>
-              ) : templates.length === 0 ? (
-                <div className="text-center py-8">
-                  <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No templates available</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Create templates in the Templates section
-                  </p>
+          {/* Live Preview - Right Column (1/2 width) */}
+          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Preview</h2>
+              
+              {hydratedPreview.loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-600">Hydrating preview...</span>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
-                  {templates.map((template) => (
-                    <button
-                      key={template.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTemplateId(template.id);
-                        // Fill subject and body with template content (variables shown as-is)
-                        setSubject(template.subject || '');
-                        setBody(template.body || '');
-                      }}
-                      className={`w-full text-left p-3 rounded-lg border-2 transition ${
-                        selectedTemplateId === template.id
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="font-medium text-sm text-gray-900 mb-1">
-                        {template.title}
-                      </div>
-                      {template.subject && (
-                        <div className="text-xs text-gray-600 truncate mb-1" title={template.subject}>
-                          {template.subject}
-                        </div>
-                      )}
-                      {template.body && (
-                        <div className="text-xs text-gray-500 line-clamp-2">
-                          {template.body.replace(/\{\{(\w+)\}\}/g, '[var]').substring(0, 60)}...
-                        </div>
-                      )}
-                      {selectedTemplateId === template.id && (
-                        <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          <span>Selected</span>
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                <div className="space-y-4">
+                  {/* From */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+                    <div className="text-sm text-gray-900">
+                      {senderName && senderEmail ? `${senderName} <${senderEmail}>` : senderEmail || 'Not set'}
+                    </div>
+                  </div>
+                  
+                  {/* To */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+                    <div className="text-sm text-gray-900">
+                      {toName && to ? `${toName} <${to}>` : to || 'Not set'}
+                    </div>
+                  </div>
+                  
+                  {/* Subject */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                    <div className="text-sm text-gray-900 font-medium">
+                      {hydratedPreview.subject || subject || 'No subject'}
+                    </div>
+                  </div>
+                  
+                  {/* Body Preview */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 min-h-[400px]">
+                      <div 
+                        className="text-sm text-gray-900 whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{ __html: hydratedPreview.body || body || 'No message' }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {selectedTemplateId && !contactId && (
+                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+                      <p className="text-xs text-amber-800">
+                        💡 Select a contact to see variables hydrated with real data
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
