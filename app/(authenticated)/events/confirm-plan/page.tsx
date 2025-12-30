@@ -5,14 +5,21 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Loader2 } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 function ConfirmPlanContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const eventIdsParam = searchParams.get('eventIds');
   const tunerId = searchParams.get('tunerId');
-  const { ownerId, companyHQId, hydrated } = useOwner();
+  const companyHQId = searchParams.get('companyHQId') || '';
+  
+  // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) setOwnerId(stored);
+  }, []);
 
   const [eventIds] = useState<string[]>(() => {
     return eventIdsParam ? eventIdsParam.split(',').filter(Boolean) : [];

@@ -1,74 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Building2, RefreshCw, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 export default function CreatePresentationPage() {
   const router = useRouter();
-  const { companyHQId, companyHQ, loading: companyLoading, refresh: refreshCompany } = useCompanyHQ();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Direct read from localStorage - NO HOOKS
+  const [companyHQ, setCompanyHQ] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !companyHQId) return;
+    const stored = localStorage.getItem('companyHQ');
+    if (stored) {
+      try {
+        setCompanyHQ(JSON.parse(stored));
+      } catch (e) {
+        console.warn('Failed to parse companyHQ', e);
+      }
+    }
+  }, [companyHQId]);
+  
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [slideCount, setSlideCount] = useState(10);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-  const [resolvedCompanyHQId, setResolvedCompanyHQId] = useState(null);
-
-  // Resolve companyHQId from multiple sources
-  useEffect(() => {
-    if (companyHQId) {
-      setResolvedCompanyHQId(companyHQId);
-      return;
-    }
-
-    // Check localStorage directly
-    const storedId = typeof window !== 'undefined' 
-      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
-      : null;
-    
-    if (storedId) {
-      setResolvedCompanyHQId(storedId);
-      return;
-    }
-
-    // Try to refresh from API
-    if (!companyLoading && !refreshing) {
-      setRefreshing(true);
-      refreshCompany().then(() => {
-        const refreshedId = typeof window !== 'undefined'
-          ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
-          : null;
-        if (refreshedId) {
-          setResolvedCompanyHQId(refreshedId);
-        }
-      }).finally(() => setRefreshing(false));
-    }
-  }, [companyHQId, companyLoading, refreshCompany, refreshing]);
-
-  const handleRefreshCompany = async () => {
-    setRefreshing(true);
-    setError('');
-    try {
-      await refreshCompany();
-      // Check localStorage after refresh
-      const refreshedId = typeof window !== 'undefined'
-        ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
-        : null;
-      if (refreshedId) {
-        setResolvedCompanyHQId(refreshedId);
-      } else {
-        setError('Company data not found. Please set up your company profile.');
-      }
-    } catch (err) {
-      console.error('Error refreshing company:', err);
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const handleGenerate = () => {
     // Description is now the main field - title is optional

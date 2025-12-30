@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { DollarSign, MapPin, Search, Calendar, Users } from 'lucide-react';
-import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
 import PersonaSearch from '../build-from-persona/PersonaSearch';
 
@@ -37,7 +36,16 @@ interface EventTuner {
 
 export default function PreferencesPage() {
   const router = useRouter();
-  const { ownerId, companyHQId, hydrated } = useOwner();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) setOwnerId(stored);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [existingTunerId, setExistingTunerId] = useState<string | null>(null);
   
@@ -51,10 +59,10 @@ export default function PreferencesPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (hydrated && ownerId && companyHQId) {
+    if (ownerId && companyHQId) {
       loadPreviousTuner();
     }
-  }, [hydrated, ownerId, companyHQId]);
+  }, [ownerId, companyHQId]);
 
   const loadPreviousTuner = async () => {
     try {

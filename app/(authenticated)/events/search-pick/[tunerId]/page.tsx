@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Heart, Loader2, MapPin, Calendar, DollarSign, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 interface PickedEvent {
   eventMetaId: string;
@@ -26,8 +25,17 @@ interface PickedEvent {
 export default function SearchPickPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const tunerId = params?.tunerId as string;
-  const { ownerId, companyHQId, hydrated } = useOwner();
+  const companyHQId = searchParams.get('companyHQId') || '';
+  
+  // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) setOwnerId(stored);
+  }, []);
 
   const [eventsByTimeFrame, setEventsByTimeFrame] = useState<{ [key: string]: PickedEvent[] }>({});
   const [summary, setSummary] = useState('');
@@ -36,10 +44,10 @@ export default function SearchPickPage() {
   const [liking, setLiking] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
-    if (tunerId && hydrated) {
+    if (tunerId) {
       loadPickedEvents();
     }
-  }, [tunerId, hydrated]);
+  }, [tunerId]);
 
   const loadPickedEvents = async () => {
     try {

@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { CheckCircle2, Calendar, MapPin, DollarSign } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 interface EventOp {
   id: string;
@@ -24,17 +23,25 @@ function PlanPickerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tunerId = searchParams.get('tunerId');
-  const { ownerId, companyHQId, hydrated } = useOwner();
+  const companyHQId = searchParams.get('companyHQId') || '';
+  
+  // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) setOwnerId(stored);
+  }, []);
 
   const [events, setEvents] = useState<EventOp[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (hydrated && ownerId && companyHQId) {
+    if (ownerId && companyHQId) {
       loadEvents();
     }
-  }, [hydrated, ownerId, companyHQId]);
+  }, [ownerId, companyHQId]);
 
   const loadEvents = async () => {
     try {
