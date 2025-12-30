@@ -12,10 +12,10 @@ function ReadyToPlanContent() {
 
   const handleContinue = () => {
     if (tunerId) {
-      // Redirect to search/pick page with companyHQId if available
+      // Redirect to search/pick page with both tunerId and companyHQId in search params
       const url = companyHQId 
-        ? `/events/search-pick/${tunerId}?companyHQId=${companyHQId}`
-        : `/events/search-pick/${tunerId}`;
+        ? `/events/search-pick/${tunerId}?tunerId=${tunerId}&companyHQId=${companyHQId}`
+        : `/events/search-pick/${tunerId}?tunerId=${tunerId}`;
       router.push(url);
     } else {
       // Redirect to preferences with companyHQId if available

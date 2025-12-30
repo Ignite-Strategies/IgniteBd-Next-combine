@@ -26,8 +26,33 @@ function SearchPickPageContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const tunerId = params?.tunerId as string;
+  // Get tunerId from params (URL path) or search params (for consistency)
+  const tunerIdFromPath = params?.tunerId as string;
+  const tunerIdFromParams = searchParams.get('tunerId') || '';
+  const tunerId = tunerIdFromPath || tunerIdFromParams;
   const companyHQId = searchParams.get('companyHQId') || '';
+  
+  // Redirect if tunerId is missing
+  useEffect(() => {
+    if (!tunerId && typeof window !== 'undefined') {
+      console.error('❌ No tunerId found in URL');
+      router.push('/events/preferences');
+    }
+  }, [tunerId, router]);
+
+  // Ensure tunerId and companyHQId are in URL params
+  useEffect(() => {
+    if (tunerId && companyHQId && typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      const needsUpdate = !currentUrl.searchParams.has('tunerId') || !currentUrl.searchParams.has('companyHQId');
+      
+      if (needsUpdate) {
+        currentUrl.searchParams.set('tunerId', tunerId);
+        currentUrl.searchParams.set('companyHQId', companyHQId);
+        router.replace(currentUrl.pathname + currentUrl.search);
+      }
+    }
+  }, [tunerId, companyHQId, router]);
   
   // Direct read from localStorage - NO HOOKS
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -40,27 +65,61 @@ function SearchPickPageContent() {
   const [eventsByTimeFrame, setEventsByTimeFrame] = useState<{ [key: string]: PickedEvent[] }>({});
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [likedEventIds, setLikedEventIds] = useState<Set<string>>(new Set());
   const [liking, setLiking] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
-    if (tunerId) {
+    if (tunerId && companyHQId) {
       loadPickedEvents();
     }
-  }, [tunerId]);
+  }, [tunerId, companyHQId]);
 
   const loadPickedEvents = async () => {
+    if (!tunerId) {
+      console.error('❌ Cannot load events: tunerId is missing');
+      setError('Event preferences not found. Please go back and select preferences.');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
+      console.log('🔄 Loading picked events for tunerId:', tunerId);
+      
       const response = await api.get(`/api/event-tuners/${tunerId}/pick-events`);
+      
+      console.log('✅ Picked events response:', response.data);
       
       if (response.data?.success) {
         setEventsByTimeFrame(response.data.eventsByTimeFrame || {});
         setSummary(response.data.summary || '');
+        
+        if (!response.data.eventsByTimeFrame || Object.keys(response.data.eventsByTimeFrame).length === 0) {
+          setError('No events found matching your preferences. The system may need to generate events.');
+        }
+      } else {
+        throw new Error(response.data?.error || 'Failed to load events');
       }
     } catch (err: any) {
-      console.error('Error loading picked events:', err);
-      alert(err.response?.data?.error || 'Failed to load events. Please try again.');
+      console.error('❌ Error loading picked events:', err);
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to load events. Please try again.';
+      setError(errorMessage);
+      
+      // Show alert for critical errors
+      if (err.response?.status === 401) {
+        alert('Authentication failed. Please sign in again.');
+      } else if (err.response?.status === 404) {
+        alert('Event preferences not found. Please go back and create new preferences.');
+      } else {
+        // Don't show alert for other errors, just show in UI
+        console.error('Error details:', {
+          status: err.response?.status,
+          data: err.response?.data,
+          message: err.message,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -156,12 +215,29 @@ function SearchPickPageContent() {
           backLabel="Back to Preferences"
         />
 
-        {Object.keys(eventsByTimeFrame).length === 0 ? (
+        {error ? (
+          <div className="text-center py-12 mt-8 rounded-xl border border-red-200 bg-red-50">
+            <p className="text-lg font-semibold text-red-800 mb-2">Error Loading Events</p>
+            <p className="text-sm text-red-600 mb-4">{error}</p>
+            <button
+              onClick={() => router.push(`/events/preferences?companyHQId=${companyHQId}`)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Go Back to Preferences
+            </button>
+          </div>
+        ) : Object.keys(eventsByTimeFrame).length === 0 ? (
           <div className="text-center py-12 mt-8 rounded-xl border border-gray-200 bg-white">
             <p className="text-lg font-semibold text-gray-800 mb-2">No events found</p>
-            <p className="text-sm text-gray-500">
-              No events match your preferences. Try adjusting your constraints.
+            <p className="text-sm text-gray-500 mb-4">
+              No events match your preferences. Try adjusting your constraints or the system may need to generate events.
             </p>
+            <button
+              onClick={loadPickedEvents}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
           </div>
         ) : (
           <div className="mt-8 space-y-8">
@@ -268,7 +344,7 @@ function SearchPickPageContent() {
                 </p>
               </div>
               <button
-                onClick={() => router.push(`/events/plan-picker?tunerId=${tunerId}`)}
+                onClick={() => router.push(`/events/plan-picker?tunerId=${tunerId}${companyHQId ? `&companyHQId=${companyHQId}` : ''}`)}
                 className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
               >
                 Continue to Plan →

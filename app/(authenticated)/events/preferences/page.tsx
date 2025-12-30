@@ -38,6 +38,7 @@ function PreferencesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
+  const tunerIdFromParams = searchParams?.get('tunerId') || '';
   
   // Direct read from localStorage - NO HOOKS
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -47,7 +48,8 @@ function PreferencesPageContent() {
     if (stored) setOwnerId(stored);
   }, []);
   const [loading, setLoading] = useState(true);
-  const [existingTunerId, setExistingTunerId] = useState<string | null>(null);
+  const [existingTunerId, setExistingTunerId] = useState<string | null>(tunerIdFromParams || null);
+  const [isEditing, setIsEditing] = useState(!!tunerIdFromParams);
   
   const [name, setName] = useState('');
   const [costRange, setCostRange] = useState<string>('');
@@ -73,7 +75,13 @@ function PreferencesPageContent() {
 
   useEffect(() => {
     if (ownerId && companyHQId) {
-      loadPreviousTuner();
+      if (tunerIdFromParams) {
+        // Load specific tuner for editing
+        loadTunerForEdit(tunerIdFromParams);
+      } else {
+        // Load most recent tuner to pre-populate (optional)
+        loadPreviousTuner();
+      }
     } else if (!companyHQId) {
       // If we don't have companyHQId yet, keep loading
       setLoading(true);
@@ -81,14 +89,49 @@ function PreferencesPageContent() {
       // If we have companyHQId but no ownerId, stop loading
       setLoading(false);
     }
-  }, [ownerId, companyHQId]);
+  }, [ownerId, companyHQId, tunerIdFromParams]);
+
+  const loadTunerForEdit = async (tunerId: string) => {
+    try {
+      setLoading(true);
+      if (!companyHQId || !ownerId) return;
+
+      const response = await api.get(`/api/event-tuners/${tunerId}`);
+      
+      if (response.data?.success && response.data.tuner) {
+        const tuner = response.data.tuner;
+        setExistingTunerId(tuner.id);
+        setIsEditing(true);
+        
+        // Populate form with existing tuner data
+        setName(tuner.name || '');
+        setCostRange(tuner.costRange || '');
+        setTravelDistance(tuner.travelDistance || '');
+        setEventSearchRawText(tuner.eventSearchRawText || '');
+        setConferencesPerQuarter(tuner.conferencesPerQuarter || '');
+        setPreferredStates(tuner.event_tuner_states?.map((ps: any) => ps.state) || []);
+        
+        // Set persona if exists
+        if (tuner.event_tuner_personas && tuner.event_tuner_personas.length > 0) {
+          setSelectedPersona(tuner.event_tuner_personas[0].personas);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error loading tuner for edit:', err);
+      alert(err.response?.data?.error || 'Failed to load preferences. Please try again.');
+      // Redirect back to select page
+      router.push(`/events/preferences/select?companyHQId=${companyHQId}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadPreviousTuner = async () => {
     try {
       setLoading(true);
       if (!companyHQId || !ownerId) return;
 
-      // Get the most recent active tuner
+      // Get the most recent active tuner (optional pre-population)
       const response = await api.get(`/api/event-tuners/list?companyHQId=${companyHQId}&ownerId=${ownerId}&isActive=true`);
       
       if (response.data?.success && response.data.tuners && response.data.tuners.length > 0) {
@@ -101,7 +144,7 @@ function PreferencesPageContent() {
         setTravelDistance(tuner.travelDistance || '');
         setEventSearchRawText(tuner.eventSearchRawText || '');
         setConferencesPerQuarter(tuner.conferencesPerQuarter || '');
-        setPreferredStates(tuner.event_tuner_states?.map(ps => ps.state) || []);
+        setPreferredStates(tuner.event_tuner_states?.map((ps: any) => ps.state) || []);
         
         // Set persona if exists
         if (tuner.event_tuner_personas && tuner.event_tuner_personas.length > 0) {
@@ -138,12 +181,32 @@ function PreferencesPageContent() {
     try {
       setSaving(true);
 
-      if (existingTunerId) {
-        // TODO: Update existing tuner instead of creating new one
-        // For now, create a new one (we'll add update endpoint later)
+      if (existingTunerId && isEditing) {
+        // Update existing tuner
+        const response = await api.patch(`/api/event-tuners/${existingTunerId}`, {
+          name: name.trim(),
+          costRange: costRange || null,
+          travelDistance: travelDistance || null,
+          preferredStates: preferredStates.length > 0 ? preferredStates : undefined,
+          eventSearchRawText: eventSearchRawText.trim() || null,
+          conferencesPerQuarter: conferencesPerQuarter ? Number(conferencesPerQuarter) : null,
+          personaIds: selectedPersona ? [selectedPersona.id] : undefined,
+        });
+
+        if (response.data?.success) {
+          const tunerId = response.data.tuner.id;
+          // Redirect to ready-to-plan with the tuner ID and companyHQId
+          const url = companyHQId 
+            ? `/events/ready-to-plan?tunerId=${tunerId}&companyHQId=${companyHQId}`
+            : `/events/ready-to-plan?tunerId=${tunerId}`;
+          router.push(url);
+        } else {
+          throw new Error('Failed to update preferences');
+        }
+        return;
       }
 
-      // Create/Update EventTuner (this IS the preferences)
+      // Create new EventTuner
       const response = await api.post('/api/event-tuners/create', {
         companyHQId,
         ownerId,
@@ -191,16 +254,19 @@ function PreferencesPageContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Set Preferences"
-          subtitle="Name your preference based on something you can remember. You can have more preferences later or edit this same version."
-          backTo="/events"
+          title={isEditing ? "Edit Preferences" : "Set Preferences"}
+          subtitle={isEditing 
+            ? "Update your preferences below. Changes will be saved when you continue."
+            : "Name your preference based on something you can remember. You can have more preferences later or edit this same version."
+          }
+          backTo={companyHQId ? `/events?companyHQId=${companyHQId}` : "/events"}
           backLabel="Back to Events"
         />
 
-        {existingTunerId && (
+        {isEditing && (
           <div className="mt-4 mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4">
             <p className="text-sm text-blue-800">
-              <strong>Previous preferences loaded.</strong> You can update them here. This gets us started to help you choose your events.
+              <strong>Editing existing preferences.</strong> Make your changes below and save to continue.
             </p>
           </div>
         )}
@@ -352,7 +418,7 @@ function PreferencesPageContent() {
               disabled={saving || !name.trim()}
               className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Saving...' : 'Save Preferences & Ready to Plan'}
+              {saving ? 'Saving...' : isEditing ? 'Update Preferences & Continue' : 'Save Preferences & Ready to Plan'}
             </button>
           </div>
         </div>
