@@ -49,6 +49,19 @@ export async function POST(request) {
       );
     }
 
+    // Verify companyHQ exists
+    const companyHQ = await prisma.company_hqs.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+
+    if (!companyHQ) {
+      return NextResponse.json(
+        { error: `CompanyHQ not found: ${tenantId}` },
+        { status: 404 },
+      );
+    }
+
     // Validate and map request data
     const validation = validateAndMapRequest(body);
     if (!validation.valid) {
