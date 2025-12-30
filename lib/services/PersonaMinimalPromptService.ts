@@ -61,7 +61,10 @@ Generate a minimal persona with just the essentials:
    - Should reflect their actual or inferred title
 3. **company**: Company name or company type/archetype (e.g., "X Firm", "Mid-size Asset Manager", "B2B SaaS Company")
    - Use actual company name if available, otherwise infer type
-4. **coreGoal**: Their main goal/north star (one sentence)
+4. **coreGoal**: Their main goal/north star
+   - MUST be exactly ONE sentence
+   - NO bullet points, NO semicolons
+   - Maximum ~25 words
    - Should be a single, clear statement of their primary objective
    - Should be role/industry-appropriate
    - Should be actionable and specific
@@ -75,13 +78,31 @@ CRITICAL: Return ONLY valid JSON in this exact format:
   "coreGoal": "string (one sentence describing their main goal/north star)"
 }
 
+=== PRIORITY RULES (CRITICAL) ===
+1. **Data Precedence**: If real contact or company data is provided, it MUST be used exactly as provided
+   - NEVER replace provided factual data with inferred data
+   - NEVER use archetyping when real data exists
+   - Inference or archetyping is allowed ONLY when data is missing or incomplete
+   - Example: If contact title is "Deputy Counsel", use "Deputy Counsel" - do NOT infer "Legal Manager"
+
+2. **personName Semantics (CRITICAL)**:
+   - personName MUST be a role archetype label (e.g., "Compliance Manager", "Operations Director")
+   - NEVER use a real person's name (e.g., "John Smith" is INVALID)
+   - NEVER imply a specific individual
+   - Always return a role/archetype label that represents the function, not the person
+
 === REQUIREMENTS ===
-1. **personName**: Must be a role archetype, never use the actual contact's name
-2. **title**: Should match or be derived from the contact's title if available
-3. **company**: Use the actual company name from context if provided, otherwise infer company type
-4. **coreGoal**: Must be one sentence, specific to their role and industry context
+1. **personName**: Must be a role archetype label, NEVER the actual contact's name or any individual identifier
+2. **title**: MUST use the contact's actual title if provided in context. Only infer if title is missing or "Not specified"
+3. **company**: MUST use the actual company name from context if provided. Only infer company type if company name is missing or "Not specified"
+4. **coreGoal**: 
+   - MUST be exactly ONE sentence
+   - NO bullet points
+   - NO semicolons
+   - Maximum ~25 words
+   - Specific to their role and industry context
 5. **All fields required**: Every field must have a non-empty string value
-6. **Be specific**: Avoid generic placeholders - use the context to infer realistic values
+6. **Be specific**: Avoid generic placeholders - use the context to infer realistic values when data is missing
 
 === EXAMPLES ===
 

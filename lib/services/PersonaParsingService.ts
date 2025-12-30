@@ -15,20 +15,16 @@ export interface MinimalPersonaJSON {
 export class PersonaParsingService {
   /**
    * Parse OpenAI response into MinimalPersonaJSON
-   * Includes validation matching template service pattern
+   * Strict parsing - no fallbacks. Malformed output is treated as a prompt bug.
+   * With response_format: { type: 'json_object' }, malformed output should not occur.
    */
   static parse(content: string): MinimalPersonaJSON {
     let parsed;
     try {
       parsed = JSON.parse(content);
     } catch (parseError) {
-      // Try to extract JSON from markdown code blocks (fallback)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('Failed to parse AI response as JSON');
-      }
+      // No fallback parsing - malformed output is a prompt bug, not recoverable
+      throw new Error(`Failed to parse AI response as JSON: ${parseError.message}. This indicates a prompt issue, not a parsing issue.`);
     }
 
     // Extract persona data (could be nested or flat, but should be flat with response_format: json_object)
