@@ -32,6 +32,21 @@ function LinkedInEnrichContent() {
     }
   }, [companyHQId]);
 
+  // Debug: Track enrichmentData changes
+  useEffect(() => {
+    if (enrichmentData) {
+      console.log('🔄 enrichmentData state updated:', {
+        hasData: !!enrichmentData,
+        hasNormalizedContact: !!enrichmentData.normalizedContact,
+        normalizedContactKeys: enrichmentData.normalizedContact ? Object.keys(enrichmentData.normalizedContact) : [],
+        firstName: enrichmentData.normalizedContact?.firstName,
+        lastName: enrichmentData.normalizedContact?.lastName,
+        email: enrichmentData.normalizedContact?.email,
+        fullData: enrichmentData,
+      });
+    }
+  }, [enrichmentData]);
+
   // Option B: URL params primary, localStorage fallback
   // If missing from URL, check localStorage and add to URL
   // If neither exists, show error instead of redirecting
@@ -268,11 +283,18 @@ function LinkedInEnrichContent() {
             </div>
 
             <div className="space-y-2">
-              {enrichmentData.normalizedContact.firstName || enrichmentData.normalizedContact.lastName ? (
+              {/* Name - show fullName, or firstName + lastName, or email as fallback */}
+              {(enrichmentData.normalizedContact.fullName || 
+                enrichmentData.normalizedContact.firstName || 
+                enrichmentData.normalizedContact.lastName ||
+                enrichmentData.normalizedContact.email) && (
                 <p className="font-semibold text-gray-900 text-lg">
-                  {enrichmentData.normalizedContact.firstName} {enrichmentData.normalizedContact.lastName}
+                  {enrichmentData.normalizedContact.fullName || 
+                   `${enrichmentData.normalizedContact.firstName || ''} ${enrichmentData.normalizedContact.lastName || ''}`.trim() ||
+                   enrichmentData.normalizedContact.email ||
+                   'Contact'}
                 </p>
-              ) : null}
+              )}
 
               {enrichmentData.normalizedContact.title && (
                 <p className="text-gray-700 text-sm">
