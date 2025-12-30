@@ -107,7 +107,7 @@ export default function WelcomePage() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     // If user has memberships, save selected company and route to dashboard
     if (membershipData?.hasMemberships && selectedCompanyHqId) {
       // Find the selected membership
