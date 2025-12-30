@@ -46,7 +46,7 @@ export async function generateSelectableEvents(
   const tuner = await prisma.event_tuners.findUnique({
     where: { id: eventTunerId },
     include: {
-      preferredStates: true,
+      event_tuner_states: true,
       event_tuner_personas: {
         include: {
           personas: true,

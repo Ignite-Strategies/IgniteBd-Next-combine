@@ -35,7 +35,7 @@ export async function checkEventTunerConstraints(
   const tuner = await prisma.event_tuners.findUnique({
     where: { id: eventTunerId },
     include: {
-      preferredStates: true,
+      event_tuner_states: true,
     },
   });
 
@@ -54,8 +54,8 @@ export async function checkEventTunerConstraints(
   }
 
   // Geography constraint check (preferred states)
-  if (tuner.preferredStates.length > 0 && event.state) {
-    const allowedStates = tuner.preferredStates.map(ps => ps.state);
+  if (tuner.event_tuner_states.length > 0 && event.state) {
+    const allowedStates = tuner.event_tuner_states.map(ps => ps.state);
     if (!allowedStates.includes(event.state)) {
       return { passed: false, reason: `State ${event.state} not in preferred states` };
     }

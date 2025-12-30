@@ -11,38 +11,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 
-const ACTION_CARDS = [
-  {
-    id: 'load',
-    title: 'Load Up',
-    description: 'Get people into Ignite BD.',
-    route: '/people/load',
-    icon: Upload,
-    containerClasses:
-      'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
-    iconClasses: 'bg-blue-500 text-white',
-  },
-  {
-    id: 'manage',
-    title: 'Manage',
-    description: 'View all contacts and filter by deal stage.',
-    route: '/contacts/view',
-    icon: Users,
-    containerClasses:
-      'from-green-50 to-green-100 border-green-200 hover:border-green-400',
-    iconClasses: 'bg-green-500 text-white',
-  },
-  {
-    id: 'outreach-prep',
-    title: 'Outreach Prep',
-    description: 'Build or select contact lists for outreach.',
-    route: '/people/outreach-prep',
-    icon: List,
-    containerClasses:
-      'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
-    iconClasses: 'bg-purple-500 text-white',
-  },
-];
+// ACTION_CARDS will be generated with companyHQId in the component
 
 export default function PeopleHubPage() {
   const router = useRouter();
@@ -138,6 +107,39 @@ export default function PeopleHubPage() {
       return () => clearTimeout(syncTimer);
     }
   }, [syncContacts]);
+
+  const ACTION_CARDS = [
+    {
+      id: 'load',
+      title: 'Load Up',
+      description: 'Get people into Ignite BD.',
+      route: '/people/load',
+      icon: Upload,
+      containerClasses:
+        'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
+      iconClasses: 'bg-blue-500 text-white',
+    },
+    {
+      id: 'manage',
+      title: 'Manage',
+      description: 'View all contacts and filter by deal stage.',
+      route: companyHQId ? `/contacts/view?companyHQId=${companyHQId}` : '/contacts/view',
+      icon: Users,
+      containerClasses:
+        'from-green-50 to-green-100 border-green-200 hover:border-green-400',
+      iconClasses: 'bg-green-500 text-white',
+    },
+    {
+      id: 'outreach-prep',
+      title: 'Outreach Prep',
+      description: 'Build or select contact lists for outreach.',
+      route: '/people/outreach-prep',
+      icon: List,
+      containerClasses:
+        'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
+      iconClasses: 'bg-purple-500 text-white',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

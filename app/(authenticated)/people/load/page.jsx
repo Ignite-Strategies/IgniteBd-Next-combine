@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Upload,
   Sparkles,
@@ -11,66 +11,68 @@ import {
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 
-const LOAD_OPTIONS = [
-  {
-    id: 'upload-csv',
-    title: 'Upload CSV',
-    description: 'Bulk import contacts from a CSV file',
-    route: '/contacts/upload',
-    icon: FileSpreadsheet,
-    containerClasses:
-      'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
-    iconClasses: 'bg-blue-500 text-white',
-    primary: true,
-  },
-  {
-    id: 'discover-linkedin',
-    title: 'Discover from LinkedIn',
-    description: 'Find people in your network and add them as contacts',
-    route: '/contacts/enrich/linkedin',
-    icon: Sparkles,
-    containerClasses:
-      'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
-    iconClasses: 'bg-purple-500 text-white',
-    primary: true,
-  },
-  {
-    id: 'import-microsoft',
-    title: 'Import from Microsoft',
-    description: 'Extract contacts from Outlook',
-    route: '/contacts/ingest/microsoft',
-    icon: Mail,
-    containerClasses:
-      'from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-400',
-    iconClasses: 'bg-indigo-500 text-white',
-    primary: true,
-  },
-  {
-    id: 'import-google',
-    title: 'Import from Google',
-    description: 'Import contacts from Google Workspace (coming soon - similar to Microsoft)',
-    route: '/people/load/google', // Placeholder route
-    icon: Mail,
-    containerClasses:
-      'from-green-50 to-green-100 border-green-200 hover:border-green-400 opacity-75',
-    iconClasses: 'bg-green-500 text-white',
-    primary: true,
-    disabled: true,
-  },
-];
-
-const SECONDARY_OPTIONS = [
-  {
-    id: 'manual-add',
-    title: 'Add Manually',
-    description: 'Enter a single contact one at a time (name, email, company, etc.)',
-    route: '/contacts/manual',
-    icon: User,
-  },
-];
-
 export default function LoadUpPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId');
+
+  const LOAD_OPTIONS = [
+    {
+      id: 'upload-csv',
+      title: 'Upload CSV',
+      description: 'Bulk import contacts from a CSV file',
+      route: companyHQId ? `/contacts/upload?companyHQId=${companyHQId}` : '/contacts/upload',
+      icon: FileSpreadsheet,
+      containerClasses:
+        'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
+      iconClasses: 'bg-blue-500 text-white',
+      primary: true,
+    },
+    {
+      id: 'discover-linkedin',
+      title: 'Discover from LinkedIn',
+      description: 'Find people in your network and add them as contacts',
+      route: companyHQId ? `/contacts/enrich/linkedin?companyHQId=${companyHQId}` : '/contacts/enrich/linkedin',
+      icon: Sparkles,
+      containerClasses:
+        'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
+      iconClasses: 'bg-purple-500 text-white',
+      primary: true,
+    },
+    {
+      id: 'import-microsoft',
+      title: 'Import from Microsoft',
+      description: 'Extract contacts from Outlook',
+      route: companyHQId ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}` : '/contacts/ingest/microsoft',
+      icon: Mail,
+      containerClasses:
+        'from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-400',
+      iconClasses: 'bg-indigo-500 text-white',
+      primary: true,
+    },
+    {
+      id: 'import-google',
+      title: 'Import from Google',
+      description: 'Import contacts from Google Workspace (coming soon - similar to Microsoft)',
+      route: companyHQId ? `/people/load/google?companyHQId=${companyHQId}` : '/people/load/google',
+      icon: Mail,
+      containerClasses:
+        'from-green-50 to-green-100 border-green-200 hover:border-green-400 opacity-75',
+      iconClasses: 'bg-green-500 text-white',
+      primary: true,
+      disabled: true,
+    },
+  ];
+
+  const SECONDARY_OPTIONS = [
+    {
+      id: 'manual-add',
+      title: 'Add Manually',
+      description: 'Enter a single contact one at a time (name, email, company, etc.)',
+      route: companyHQId ? `/contacts/manual?companyHQId=${companyHQId}` : '/contacts/manual',
+      icon: User,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -78,7 +80,7 @@ export default function LoadUpPage() {
         <PageHeader
           title="📥 Load Up"
           subtitle="Get people into Ignite BD"
-          backTo="/people"
+          backTo={companyHQId ? `/people?companyHQId=${companyHQId}` : '/people'}
           backLabel="Back to People Hub"
         />
 

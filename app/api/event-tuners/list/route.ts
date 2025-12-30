@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     const tuners = await prisma.event_tuners.findMany({
       where,
       include: {
-        preferredStates: true,
+        event_tuner_states: true,
         event_tuner_personas: {
           include: {
             personas: {

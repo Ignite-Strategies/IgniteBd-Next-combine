@@ -9,6 +9,7 @@ function LinkedInEnrichContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get('returnTo');
+  const companyHQId = searchParams?.get('companyHQId');
   
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,29 +18,26 @@ function LinkedInEnrichContent() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedContactId, setSavedContactId] = useState(null);
 
-  // Log CompanyHQ on load
+  // Log CompanyHQ from URL params
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const companyHQId = localStorage.getItem('companyHQId');
-    const companyHQ = localStorage.getItem('companyHQ');
-    
-    let companyName = 'Unknown';
-    if (companyHQ) {
-      try {
-        const parsed = JSON.parse(companyHQ);
-        companyName = parsed.companyName || companyName;
-      } catch (e) {
-        // Ignore parse errors
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      console.warn('⚠️ No companyHQId in URL params - redirecting to get it');
+      // Redirect to get companyHQId if not in URL
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('companyHQId');
+        if (stored) {
+          router.replace(`/contacts/enrich/linkedin?companyHQId=${stored}`);
+        } else {
+          router.push('/people');
+        }
       }
     }
-    
-    console.log('🏢 CompanyHQ Loaded:', {
-      companyHQId,
-      companyName,
-      timestamp: new Date().toISOString(),
-    });
-  }, []);
+  }, [companyHQId, router]);
 
   // Apollo enrich call
   async function handleEnrich() {
@@ -82,20 +80,19 @@ function LinkedInEnrichContent() {
       return;
     }
 
+    if (!companyHQId) {
+      alert('Company context required. Please refresh the page with a companyHQId parameter.');
+      return;
+    }
+
     setSaving(true);
 
     try {
-      const companyHQId = typeof window !== 'undefined' 
-        ? localStorage.getItem('companyHQId')
-        : null;
-      
-      if (!companyHQId) {
-        alert('Company context required. Please set your company first.');
-        setSaving(false);
-        return;
-      }
-
-      console.log('💾 Saving contact to CompanyHQ:', companyHQId);
+      console.log('💾 Saving contact to CompanyHQ:', {
+        companyHQId,
+        contactEmail: enrichmentData.normalizedContact?.email,
+        timestamp: new Date().toISOString(),
+      });
 
       // Step 1: Create contact
       const contactData = {
@@ -106,19 +103,30 @@ function LinkedInEnrichContent() {
         title: enrichmentData.normalizedContact?.title || null,
       };
 
+      console.log('📤 Creating contact with data:', { crmId: companyHQId, ...contactData });
+
       const contactResponse = await api.post('/api/contacts', {
         crmId: companyHQId,
         ...contactData,
       });
 
       if (!contactResponse.data?.contact) {
+        console.error('❌ Contact creation failed - no contact in response:', contactResponse.data);
         throw new Error('Failed to create contact');
       }
 
       const contactId = contactResponse.data.contact.id;
-      console.log('✅ Contact created:', contactId);
+      const createdContact = contactResponse.data.contact;
+      console.log('✅ Contact created:', {
+        contactId,
+        email: createdContact.email,
+        crmId: createdContact.crmId,
+        companyHQId,
+        matches: createdContact.crmId === companyHQId,
+      });
 
       // Step 2: Save enrichment
+      console.log('📤 Saving enrichment for contact:', { contactId, companyHQId });
       const saveResponse = await api.post('/api/contacts/enrich/save', {
         contactId,
         rawEnrichmentPayload: enrichmentData.rawEnrichmentPayload,
@@ -126,7 +134,13 @@ function LinkedInEnrichContent() {
         skipIntelligence: true, // Skip intelligence for now
       });
 
-      console.log('✅ Enrichment saved:', saveResponse.data?.success);
+      console.log('✅ Enrichment saved:', {
+        success: saveResponse.data?.success,
+        contactId: saveResponse.data?.contact?.id,
+        contactCrmId: saveResponse.data?.contact?.crmId,
+        companyHQId,
+        matches: saveResponse.data?.contact?.crmId === companyHQId,
+      });
 
       setSaving(false);
       setShowSuccessModal(true);
@@ -266,7 +280,7 @@ function LinkedInEnrichContent() {
                   <button
                     onClick={() => {
                       setShowSuccessModal(false);
-                      router.push(`/outreach/compose?contactId=${savedContactId}`);
+                      router.push(`/outreach/compose?contactId=${savedContactId}&companyHQId=${companyHQId}`);
                     }}
                     className="w-full flex items-center justify-between rounded-lg border-2 border-red-600 bg-red-50 px-6 py-4 text-left transition hover:bg-red-100"
                   >
@@ -283,7 +297,7 @@ function LinkedInEnrichContent() {
                   <button
                     onClick={() => {
                       setShowSuccessModal(false);
-                      router.push(`/contacts/${savedContactId}`);
+                      router.push(`/contacts/${savedContactId}?companyHQId=${companyHQId}`);
                     }}
                     className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
                   >

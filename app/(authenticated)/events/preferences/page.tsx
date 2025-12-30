@@ -31,7 +31,7 @@ interface EventTuner {
   costRange?: string | null;
   travelDistance?: string | null;
   eventSearchRawText?: string | null;
-  preferredStates?: { state: string }[];
+  event_tuner_states?: { state: string }[];
   event_tuner_personas?: { personas: Persona }[];
 }
 
@@ -74,7 +74,7 @@ export default function PreferencesPage() {
         setTravelDistance(tuner.travelDistance || '');
         setEventSearchRawText(tuner.eventSearchRawText || '');
         setConferencesPerQuarter(tuner.conferencesPerQuarter || '');
-        setPreferredStates(tuner.preferredStates?.map(ps => ps.state) || []);
+        setPreferredStates(tuner.event_tuner_states?.map(ps => ps.state) || []);
         
         // Set persona if exists
         if (tuner.event_tuner_personas && tuner.event_tuner_personas.length > 0) {

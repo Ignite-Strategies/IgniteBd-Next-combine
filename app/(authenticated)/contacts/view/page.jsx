@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users,
   Mail,
@@ -19,9 +19,11 @@ import {
 import api from '@/lib/api';
 import CompanySelector from '@/components/CompanySelector';
 
-export default function ContactsViewPage() {
+function ContactsViewPageContent() {
   const router = useRouter();
-  const [companyHQId, setCompanyHQId] = useState('');
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,45 +37,24 @@ export default function ContactsViewPage() {
   const [savingCompanyAssignment, setSavingCompanyAssignment] = useState(false);
   const lastValidatedCompanyHQId = useRef(null);
 
-  // Load companyHQId from localStorage and listen for changes
+  // Redirect if no companyHQId in URL
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const loadCompanyHQId = () => {
-      const storedCompanyHQId =
-        window.localStorage.getItem('companyHQId') ||
-        window.localStorage.getItem('companyId') ||
-        '';
-      setCompanyHQId(storedCompanyHQId);
-    };
-    
-    // Load initially
-    loadCompanyHQId();
-    
-    // Listen for storage changes (company switching)
-    const handleStorageChange = (e) => {
-      if (e.key === 'companyHQId' || e.key === 'companyId') {
-        loadCompanyHQId();
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/contacts/view?companyHQId=${stored}`);
+      } else {
+        router.push('/people');
       }
-    };
-    
-    // Listen for custom companyHQ context change events
-    const handleContextChange = () => {
-      loadCompanyHQId();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('companyHQContextChanged', handleContextChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('companyHQContextChanged', handleContextChange);
-    };
-  }, []);
+    }
+  }, [companyHQId, router]);
 
   const refreshContactsFromAPI = useCallback(
     async (showLoading = true) => {
-      if (!companyHQId) return;
+      if (!companyHQId) {
+        console.log('⚠️ No companyHQId - skipping contact fetch');
+        return;
+      }
 
       try {
         if (showLoading) setLoading(true);
@@ -81,10 +62,18 @@ export default function ContactsViewPage() {
         if (pipelineFilter) {
           params.append('pipeline', pipelineFilter);
         }
+        
+        console.log('📞 Fetching contacts from API:', {
+          companyHQId,
+          pipelineFilter: pipelineFilter || 'all',
+          url: `/api/contacts?${params.toString()}`,
+        });
+        
         const response = await api.get(`/api/contacts?${params.toString()}`);
 
         if (response.data?.success && response.data.contacts) {
           const fetchedContacts = response.data.contacts;
+          console.log(`✅ Fetched ${fetchedContacts.length} contacts for CompanyHQ: ${companyHQId}`);
           setContacts(fetchedContacts);
           if (typeof window !== 'undefined') {
             window.localStorage.setItem(
@@ -93,10 +82,16 @@ export default function ContactsViewPage() {
             );
           }
         } else {
+          console.warn('⚠️ API response missing contacts:', response.data);
           setContacts([]);
         }
       } catch (error) {
-        console.error('Error fetching contacts:', error);
+        console.error('❌ Error fetching contacts:', error);
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          companyHQId,
+        });
         if (showLoading) setContacts([]);
       } finally {
         if (showLoading) setLoading(false);
@@ -120,7 +115,10 @@ export default function ContactsViewPage() {
     }
 
     // Always fetch from API - no localStorage cache
-    console.log('🔄 Fetching contacts from API for companyHQId:', companyHQId);
+    console.log('🔄 Fetching contacts from API:', {
+      companyHQId,
+      timestamp: new Date().toISOString(),
+    });
     lastValidatedCompanyHQId.current = companyHQId;
     refreshContactsFromAPI(true);
   }, [companyHQId, refreshContactsFromAPI]);
@@ -361,14 +359,14 @@ export default function ContactsViewPage() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/people')}
+                onClick={() => router.push(companyHQId ? `/people?companyHQId=${companyHQId}` : '/people')}
                 className="rounded-lg bg-gray-600 px-4 py-2 text-white transition hover:bg-gray-700"
               >
                 ← Back to People Hub
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/people/load')}
+                onClick={() => router.push(companyHQId ? `/people/load?companyHQId=${companyHQId}` : '/people/load')}
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
               >
                 <Plus className="h-5 w-5" />
@@ -483,7 +481,7 @@ export default function ContactsViewPage() {
                     <tr
                       key={contact.id}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => router.push(`/contacts/${contact.id}`)}
+                      onClick={() => router.push(`/contacts/${contact.id}${companyHQId ? `?companyHQId=${companyHQId}` : ''}`)}
                     >
                       <td
                         className="px-6 py-4"
@@ -618,7 +616,7 @@ export default function ContactsViewPage() {
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              router.push(`/contacts/${contact.id}`);
+                              router.push(`/contacts/${contact.id}${companyHQId ? `?companyHQId=${companyHQId}` : ''}`);
                             }}
                             className="rounded-lg p-2 bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
                             title="View contact details"
@@ -652,3 +650,18 @@ export default function ContactsViewPage() {
   );
 }
 
+export default function ContactsViewPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mb-2 text-2xl font-bold text-gray-900">
+            Loading Contacts…
+          </div>
+        </div>
+      </div>
+    }>
+      <ContactsViewPageContent />
+    </Suspense>
+  );
+}

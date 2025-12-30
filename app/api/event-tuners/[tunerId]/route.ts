@@ -32,7 +32,7 @@ export async function GET(
     const tuner = await prisma.event_tuners.findUnique({
       where: { id: tunerId },
       include: {
-        preferredStates: true,
+        event_tuner_states: true,
         event_tuner_personas: {
           include: {
             personas: {

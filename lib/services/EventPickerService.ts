@@ -69,7 +69,7 @@ export async function pickEventsByPreferences(
   const tuner = await prisma.event_tuners.findUnique({
     where: { id: eventTunerId },
     include: {
-      preferredStates: true,
+      event_tuner_states: true,
       event_tuner_personas: {
         include: {
           personas: true,
@@ -291,8 +291,8 @@ function buildPreferencesSummary(tuner: any): string {
     parts.push(`- Travel Distance: ${formatTravelDistance(tuner.travelDistance)}`);
   }
   
-  if (tuner.preferredStates.length > 0) {
-    const states = tuner.preferredStates.map((ps: any) => ps.state).join(', ');
+  if (tuner.event_tuner_states.length > 0) {
+    const states = tuner.event_tuner_states.map((ps: any) => ps.state).join(', ');
     parts.push(`- Preferred States: ${states}`);
   }
   
