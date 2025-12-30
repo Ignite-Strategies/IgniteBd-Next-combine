@@ -79,7 +79,7 @@ export async function POST(request) {
       console.log('📧 Template ID provided, hydrating template with variable mapper service...');
       
       // Fetch template
-      const template = await prisma.template.findUnique({
+      const template = await prisma.templates.findUnique({
         where: { id: templateId },
         select: { subject: true, body: true },
       });
