@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Users } from 'lucide-react';
 import api from '@/lib/api';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
-import { useOwner } from '@/hooks/useOwner';
 
 /**
  * ContactSelector Component - SEARCH FIRST
  * Simple search input that shows dropdown results when typing
  * No auto-select, no localStorage persistence - pure search
+ * 
+ * REQUIRES companyHQId prop (from URL params) - NO HOOKS
  */
 export default function ContactSelector({ 
   contactId, 
@@ -19,12 +19,22 @@ export default function ContactSelector({
   showLabel = true,
   className = '',
   companyId, // Optional: filter contacts by company
-  companyHQId: propCompanyHQId = undefined, // Optional: pass companyHQId from URL params (preferred)
+  companyHQId: propCompanyHQId = undefined, // REQUIRED: pass companyHQId from URL params
 }) {
-  // Use prop companyHQId if provided, otherwise fall back to hook (for backward compatibility)
-  const { companyHQId: hookCompanyHQId, hydrated: companyHydrated } = useCompanyHQ();
-  const companyHQId = propCompanyHQId || hookCompanyHQId;
-  const { ownerId, hydrated: ownerHydrated } = useOwner();
+  // Direct read from localStorage for ownerId - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  const [ownerHydrated, setOwnerHydrated] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) {
+      setOwnerId(stored);
+      setOwnerHydrated(true);
+    }
+  }, []);
+  
+  // Use prop companyHQId (from URL params) - REQUIRED
+  const companyHQId = propCompanyHQId;
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contactSearch, setContactSearch] = useState('');
@@ -35,7 +45,6 @@ export default function ContactSelector({
     console.log('🔍 ContactSelector props:', {
       companyId,
       companyHQId: propCompanyHQId,
-      usingHook: !propCompanyHQId,
     });
   }, [companyId, propCompanyHQId]);
 
@@ -50,16 +59,12 @@ export default function ContactSelector({
         return;
       }
       
-      // Use prop companyHQId if provided (from URL params), otherwise use hook
+      // Use prop companyHQId (from URL params) - REQUIRED
       const finalCompanyHQId = companyHQId;
       
       if (!finalCompanyHQId) {
-        // Still no companyHQId - if not hydrated yet, wait; otherwise show error
-        if (!companyHydrated && !propCompanyHQId) {
-          // Still loading company data, keep loading state (only if using hook)
-          return;
-        }
-        console.warn('ContactSelector: No companyHQId available');
+        // No companyHQId - required prop
+        console.warn('ContactSelector: No companyHQId available (required prop)');
         setLoading(false);
         return;
       }
@@ -114,7 +119,7 @@ export default function ContactSelector({
     };
 
     fetchContacts();
-  }, [companyHQId, companyHydrated, refreshCompanyHQ, companyId, ownerId, ownerHydrated]); // Wait for auth before fetching
+  }, [companyHQId, companyId, ownerId, ownerHydrated]); // Wait for auth before fetching
 
   // Initialize from props only
   useEffect(() => {
@@ -256,7 +261,7 @@ export default function ContactSelector({
         </div>
         
         {/* Show message if no companyHQId */}
-        {!companyHQId && companyHydrated && !loading && (
+        {!companyHQId && !loading && (
           <p className="mt-2 text-xs text-amber-600">
             Unable to load contacts. Please refresh the page or check your company settings.
           </p>
