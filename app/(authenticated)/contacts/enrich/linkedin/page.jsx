@@ -23,6 +23,7 @@ function LinkedInEnrichContent() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedContactId, setSavedContactId] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [savedWithIntelligence, setSavedWithIntelligence] = useState(false);
   const [missingCompanyKey, setMissingCompanyKey] = useState(false);
 
   // Log CompanyHQ from URL params
@@ -230,8 +231,9 @@ function LinkedInEnrichContent() {
         savedWithIntelligence: hasIntelligence && !saveResponse.data?.contact?.seniorityScore === undefined,
       });
 
-      // Set appropriate success message based on fork
+      // Set appropriate success message and track fork type
       setSaving(false);
+      setSavedWithIntelligence(hasIntelligence);
       if (hasIntelligence) {
         setSuccessMessage('Contact Enriched Successfully!');
       } else {
@@ -522,46 +524,124 @@ function LinkedInEnrichContent() {
                 </p>
                 
                 <div className="space-y-3">
-                  <button
-                    onClick={() => {
-                      setShowSuccessModal(false);
-                      router.push(`/outreach/compose?contactId=${savedContactId}&companyHQId=${companyHQId}`);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg border-2 border-red-600 bg-red-50 px-6 py-4 text-left transition hover:bg-red-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-5 w-5 text-red-600" />
-                      <div>
-                        <div className="font-semibold text-gray-900">Send an Email</div>
-                        <div className="text-sm text-gray-600">Compose and send a personalized email</div>
-                      </div>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-red-600" />
-                  </button>
+                  {savedWithIntelligence ? (
+                    // Enriched save options
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowSuccessModal(false);
+                          router.push(`/contacts/${savedContactId}?companyHQId=${companyHQId}`);
+                        }}
+                        className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <User className="h-5 w-5 text-blue-600" />
+                          <div>
+                            <div className="font-semibold text-gray-900">View Contact</div>
+                            <div className="text-sm text-gray-600">See full contact details and intelligence</div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-blue-600" />
+                      </button>
 
-                  <button
-                    onClick={() => {
-                      setShowSuccessModal(false);
-                      router.push(`/contacts/${savedContactId}?companyHQId=${companyHQId}`);
-                    }}
-                    className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <User className="h-5 w-5 text-blue-600" />
-                      <div>
-                        <div className="font-semibold text-gray-900">View Contact</div>
-                        <div className="text-sm text-gray-600">See contact details</div>
-                      </div>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-blue-600" />
-                  </button>
+                      <button
+                        onClick={() => {
+                          setShowSuccessModal(false);
+                          router.push(`/outreach/compose?contactId=${savedContactId}&companyHQId=${companyHQId}`);
+                        }}
+                        className="w-full flex items-center justify-between rounded-lg border-2 border-red-600 bg-red-50 px-6 py-4 text-left transition hover:bg-red-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Mail className="h-5 w-5 text-red-600" />
+                          <div>
+                            <div className="font-semibold text-gray-900">Send an Email</div>
+                            <div className="text-sm text-gray-600">Compose and send a personalized email</div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-red-600" />
+                      </button>
 
+                      <button
+                        onClick={() => {
+                          setShowSuccessModal(false);
+                          router.push(`/personas/from-contact?contactId=${savedContactId}&companyHQId=${companyHQId}`);
+                        }}
+                        className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Sparkles className="h-5 w-5 text-purple-600" />
+                          <div>
+                            <div className="font-semibold text-gray-900">Start Persona Flow</div>
+                            <div className="text-sm text-gray-600">Create a persona from this enriched contact</div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-purple-600" />
+                      </button>
+                    </>
+                  ) : (
+                    // Basic save options
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowSuccessModal(false);
+                          router.push(`/outreach/compose?contactId=${savedContactId}&companyHQId=${companyHQId}`);
+                        }}
+                        className="w-full flex items-center justify-between rounded-lg border-2 border-red-600 bg-red-50 px-6 py-4 text-left transition hover:bg-red-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Mail className="h-5 w-5 text-red-600" />
+                          <div>
+                            <div className="font-semibold text-gray-900">Email this Contact</div>
+                            <div className="text-sm text-gray-600">Compose and send a personalized email</div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-red-600" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowSuccessModal(false);
+                          router.push(`/contacts/${savedContactId}?companyHQId=${companyHQId}`);
+                        }}
+                        className="w-full flex items-center justify-between rounded-lg border-2 border-indigo-600 bg-indigo-50 px-6 py-4 text-left transition hover:bg-indigo-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Sparkles className="h-5 w-5 text-indigo-600" />
+                          <div>
+                            <div className="font-semibold text-gray-900">Enrich Contact</div>
+                            <div className="text-sm text-gray-600">Generate intelligence scores and profile analysis</div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-indigo-600" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowSuccessModal(false);
+                          router.push(`/contacts/${savedContactId}?companyHQId=${companyHQId}`);
+                        }}
+                        className="w-full flex items-center justify-between rounded-lg border border-gray-300 bg-white px-6 py-4 text-left transition hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <User className="h-5 w-5 text-gray-600" />
+                          <div>
+                            <div className="font-semibold text-gray-900">View Contact</div>
+                            <div className="text-sm text-gray-600">See contact details</div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-gray-600" />
+                      </button>
+                    </>
+                  )}
+
+                  {/* Common: Enrich Another Contact */}
                   <button
                     onClick={() => {
                       setShowSuccessModal(false);
                       setEnrichmentData(null);
                       setUrl('');
                       setSavedContactId(null);
+                      setSavedWithIntelligence(false);
                     }}
                     className="w-full flex items-center justify-between rounded-lg border border-gray-300 bg-white px-6 py-4 text-left transition hover:bg-gray-50"
                   >
