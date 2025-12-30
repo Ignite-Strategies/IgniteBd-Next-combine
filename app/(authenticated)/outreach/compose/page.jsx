@@ -8,21 +8,16 @@ import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
-import { auth } from '@/lib/firebase';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
 import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
 function ComposeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
-  const hasRedirectedRef = useRef(false);
   
-  // Read companyHQId from URL first, fallback to localStorage immediately (for ContactSelector)
-  const [companyHQId, setCompanyHQId] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    return urlCompanyHQId || localStorage.getItem('companyHQId') || '';
-  });
+  // Read companyHQId DIRECTLY from URL params - NO localStorage fallback
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  const hasRedirectedRef = useRef(false);
   
   // Direct read from localStorage for ownerId - needed for auth/authoring
   const [ownerId, setOwnerId] = useState(null);
@@ -33,44 +28,6 @@ function ComposeContent() {
       setOwnerId(storedOwnerId);
     }
   }, []);
-  
-  // Auth ready check - wait for Firebase auth to be ready before making API calls
-  const [authReady, setAuthReady] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const checkAuth = async () => {
-      // Check if auth is already ready
-      if (auth.currentUser) {
-        setAuthReady(true);
-        return;
-      }
-      
-      // Poll for auth (max 2 seconds)
-      let attempts = 0;
-      const interval = setInterval(() => {
-        attempts++;
-        if (auth.currentUser) {
-          clearInterval(interval);
-          setAuthReady(true);
-        } else if (attempts >= 40) {
-          clearInterval(interval);
-          setAuthReady(false);
-        }
-      }, 50);
-      
-      return () => clearInterval(interval);
-    };
-    
-    checkAuth();
-  }, []);
-  
-  // Sync companyHQId from URL params (after redirect)
-  useEffect(() => {
-    if (urlCompanyHQId && urlCompanyHQId !== companyHQId) {
-      setCompanyHQId(urlCompanyHQId);
-    }
-  }, [urlCompanyHQId, companyHQId]);
   
   // Form state
   const [selectedContact, setSelectedContact] = useState(null);
@@ -118,9 +75,7 @@ function ComposeContent() {
   const [savingQuickContact, setSavingQuickContact] = useState(false);
   const [quickContactError, setQuickContactError] = useState(null);
   
-  // Option B: URL params primary, localStorage fallback
-  // If missing from URL, check localStorage and add to URL
-  // If neither exists, show error instead of redirecting
+  // Check if companyHQId is missing from URL params
   const [missingCompanyKey, setMissingCompanyKey] = useState(false);
   
   useEffect(() => {
@@ -134,10 +89,9 @@ function ComposeContent() {
       return;
     }
     
-    // URL doesn't have companyHQId - check localStorage (Option B fallback)
+    // URL doesn't have companyHQId - check localStorage and add to URL
     const stored = localStorage.getItem('companyHQId');
     if (stored) {
-      // Add companyHQId to URL from localStorage
       hasRedirectedRef.current = true;
       console.log(`🔄 Outreach Compose: Adding companyHQId from localStorage to URL: ${stored}`);
       router.replace(`/outreach/compose?companyHQId=${stored}`);
@@ -173,9 +127,10 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates - SEQUENTIAL: Only after auth + ownerId + companyHQId are ready
+  // Load templates - Only after ownerId + companyHQId are ready
+  // Axios interceptor handles auth token automatically
   useEffect(() => {
-    if (!authReady || !ownerId || !companyHQId) return;
+    if (!ownerId || !companyHQId) return;
 
     const loadTemplates = async () => {
       setLoadingTemplates(true);
@@ -192,12 +147,11 @@ function ComposeContent() {
     };
 
     loadTemplates();
-  }, [authReady, ownerId, companyHQId]); // Wait for ALL prerequisites
+  }, [ownerId, companyHQId]); // Wait for ownerId and companyHQId
 
   // Handle contactId from URL params (when navigating from success modal)
-  // SEQUENTIAL: Only after auth is ready
   useEffect(() => {
-    if (!authReady || !ownerId) return;
+    if (!ownerId) return;
     
     const urlContactId = searchParams?.get('contactId');
     if (urlContactId && urlContactId !== contactId) {
@@ -216,7 +170,7 @@ function ComposeContent() {
       fetchAndSelectContact();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, searchParams, ownerId]);
+  }, [searchParams, ownerId]);
   
   // Quick contact creation
   const handleQuickSaveContact = async () => {
@@ -514,7 +468,6 @@ function ComposeContent() {
                 </label>
                 <SenderIdentityPanel 
                   ownerId={ownerId}
-                  authReady={authReady}
                   onSenderChange={(hasSender, email, name) => {
                     // Callback to track if sender is verified
                     setHasVerifiedSender(hasSender);
@@ -545,7 +498,6 @@ function ComposeContent() {
                   selectedContact={selectedContact}
                   showLabel={false}
                   companyHQId={companyHQId}
-                  authReady={authReady}
                 />
               </div>
 

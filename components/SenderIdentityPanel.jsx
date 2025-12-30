@@ -12,10 +12,9 @@ import api from '@/lib/api';
  * Handles all sender-related logic - parent components should not duplicate this
  * 
  * @param {string} ownerId - Owner ID from localStorage (required)
- * @param {boolean} authReady - Whether Firebase auth is ready (required)
  * @param {Function} onSenderChange - Optional callback when sender state changes (hasSender: boolean, email: string, name: string)
  */
-export default function SenderIdentityPanel({ ownerId, authReady, onSenderChange }) {
+export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
   const router = useRouter();
   const [senderEmail, setSenderEmail] = useState(null);
   const [senderName, setSenderName] = useState(null);
@@ -26,10 +25,11 @@ export default function SenderIdentityPanel({ ownerId, authReady, onSenderChange
   const [changingSender, setChangingSender] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load sender status - ONLY after auth is ready
+  // Load sender status - ONLY after ownerId is ready
+  // Axios interceptor handles auth token automatically
   useEffect(() => {
-    if (!authReady || !ownerId) {
-      // Auth not ready or no ownerId - clear state
+    if (!ownerId) {
+      // No ownerId - clear state
       setSenderEmail(null);
       setSenderName(null);
       setLoading(false);
@@ -40,9 +40,9 @@ export default function SenderIdentityPanel({ ownerId, authReady, onSenderChange
       return;
     }
 
-    // Auth ready and ownerId exists - load sender status
+    // OwnerId exists - load sender status
     loadSenderStatus();
-  }, [authReady, ownerId]);
+  }, [ownerId]);
 
   // Notify parent when sender state changes
   useEffect(() => {

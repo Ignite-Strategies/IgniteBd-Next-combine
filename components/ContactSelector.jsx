@@ -20,7 +20,6 @@ export default function ContactSelector({
   className = '',
   companyId, // Optional: filter contacts by company
   companyHQId: propCompanyHQId = undefined, // REQUIRED: pass companyHQId from URL params
-  authReady = false, // Optional: wait for auth to be ready
 }) {
   // Direct read from localStorage for ownerId - NO HOOKS
   const [ownerId, setOwnerId] = useState(null);
@@ -49,20 +48,15 @@ export default function ContactSelector({
     });
   }, [companyId, propCompanyHQId]);
 
-  // Fetch contacts from API - WAIT FOR AUTH
+  // Fetch contacts from API - WAIT FOR ownerId
+  // Axios interceptor handles auth token automatically
   useEffect(() => {
     const fetchContacts = async () => {
       if (typeof window === 'undefined') return;
       
-      // CRITICAL: Wait for auth to be ready before making API calls
+      // CRITICAL: Wait for ownerId before making API calls
       if (!ownerId || !ownerHydrated) {
-        // Auth not ready yet - wait
-        return;
-      }
-      
-      // Wait for authReady if provided
-      if (authReady === false) {
-        // Auth not ready yet - wait
+        // OwnerId not ready yet - wait
         return;
       }
       
@@ -126,7 +120,7 @@ export default function ContactSelector({
     };
 
     fetchContacts();
-  }, [companyHQId, companyId, ownerId, ownerHydrated, authReady]); // Wait for auth before fetching
+  }, [companyHQId, companyId, ownerId, ownerHydrated]); // Wait for ownerId before fetching
 
   // Initialize from props only
   useEffect(() => {
