@@ -739,18 +739,14 @@ function ComposeContent() {
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    // First build payload, then show preview
-                    await handleBuildAndPreview(e);
-                  }}
+                  onClick={handlePreview}
                   disabled={previewLoading || sending || !ownerId || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
                   className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {previewLoading || sending ? (
+                  {previewLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Building...
+                      Loading...
                     </>
                   ) : (
                     <>
