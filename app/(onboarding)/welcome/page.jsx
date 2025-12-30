@@ -151,6 +151,21 @@ export default function WelcomePage() {
           }
         }
         
+        // Fetch contacts from API before routing
+        try {
+          console.log('🔄 Fetching contacts from API for companyHQId:', selectedCompanyHqId);
+          const contactsResponse = await api.get(`/api/contacts?companyHQId=${selectedCompanyHqId}`);
+          if (contactsResponse.data?.success && Array.isArray(contactsResponse.data.contacts)) {
+            console.log('✅ Fetched contacts from API:', contactsResponse.data.contacts.length);
+            // NO localStorage - contacts are fetched fresh on each page load
+          } else {
+            console.warn('⚠️ Contacts API response missing contacts array');
+          }
+        } catch (err) {
+          console.error('❌ Failed to fetch contacts on welcome page:', err);
+          // Continue to dashboard even if contacts fetch fails
+        }
+        
         // Route to growth dashboard (no gating)
         router.push('/growth-dashboard');
       }

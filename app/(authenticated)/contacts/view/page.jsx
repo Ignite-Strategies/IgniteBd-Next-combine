@@ -105,62 +105,24 @@ export default function ContactsViewPage() {
     [companyHQId, pipelineFilter],
   );
 
-  // Validate and load cached contacts, or fetch if companyHQId changes
+  // NO localStorage - always fetch from API when companyHQId changes
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
     if (!companyHQId) {
       setLoading(false);
+      setContacts([]);
       lastValidatedCompanyHQId.current = null;
       return;
     }
 
-    // Skip if we've already validated for this companyHQId
+    // Skip if we've already fetched for this companyHQId
     if (lastValidatedCompanyHQId.current === companyHQId) {
       return;
     }
 
-    // Check cached contacts and validate they belong to current companyHQId
-    const cachedContacts = window.localStorage.getItem('contacts');
-    if (cachedContacts) {
-      try {
-        const parsed = JSON.parse(cachedContacts);
-        
-        // Validate: Check if any contact has a different crmId than current companyHQId
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasMismatch = parsed.some(contact => 
-            contact.crmId && contact.crmId !== companyHQId
-          );
-          
-          if (hasMismatch) {
-            console.log('🔄 Cached contacts belong to different CompanyHQ, fetching fresh data...');
-            // Clear stale contacts and fetch fresh
-            setContacts([]);
-            lastValidatedCompanyHQId.current = companyHQId;
-            refreshContactsFromAPI(true);
-            return;
-          }
-          
-          // All contacts match current companyHQId, use cached data
-          setContacts(parsed);
-          setLoading(false);
-          lastValidatedCompanyHQId.current = companyHQId;
-        } else {
-          // Empty array, fetch fresh
-          lastValidatedCompanyHQId.current = companyHQId;
-          refreshContactsFromAPI(true);
-        }
-      } catch (error) {
-        console.warn('Unable to parse cached contacts', error);
-        // On parse error, fetch fresh
-        lastValidatedCompanyHQId.current = companyHQId;
-        refreshContactsFromAPI(true);
-      }
-    } else {
-      // No cache, fetch fresh
-      lastValidatedCompanyHQId.current = companyHQId;
-      refreshContactsFromAPI(true);
-    }
+    // Always fetch from API - no localStorage cache
+    console.log('🔄 Fetching contacts from API for companyHQId:', companyHQId);
+    lastValidatedCompanyHQId.current = companyHQId;
+    refreshContactsFromAPI(true);
   }, [companyHQId, refreshContactsFromAPI]);
 
   const handleSelectContact = (contactId) => {
@@ -377,10 +339,8 @@ export default function ContactsViewPage() {
                     if (response.data?.success && Array.isArray(response.data.contacts)) {
                       const hydratedContacts = response.data.contacts;
                       setContacts(hydratedContacts);
-                      if (typeof window !== 'undefined') {
-                        window.localStorage.setItem('contacts', JSON.stringify(hydratedContacts));
-                      }
-                      console.log(`✅ Synced ${hydratedContacts.length} contacts`);
+                      // NO localStorage - API only
+                      console.log(`✅ Synced ${hydratedContacts.length} contacts from API`);
                     } else {
                       // Fallback to regular refresh
                       await refreshContactsFromAPI(true);
@@ -601,13 +561,10 @@ export default function ContactsViewPage() {
                                         c.id === contact.id ? updatedContact : c
                                       );
                                       setContacts(updatedContacts);
-                                      // Update localStorage immediately
-                                      if (typeof window !== 'undefined') {
-                                        window.localStorage.setItem('contacts', JSON.stringify(updatedContacts));
-                                      }
+                                      // NO localStorage - API only
                                       setAssigningCompanyId(null);
                                       setSelectedCompanyForAssign(null);
-                                      console.log('✅ Company assigned and localStorage updated');
+                                      console.log('✅ Company assigned');
                                     } else {
                                       alert(response.data?.error || 'Failed to assign company');
                                     }

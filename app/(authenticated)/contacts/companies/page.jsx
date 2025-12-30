@@ -1,17 +1,39 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, Users, TrendingUp, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useLocalStorage } from '@/hooks/useLocalStorage.js';
 import { useDynamics } from '@/hooks/useDynamics.js';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import api from '@/lib/api';
 
 export default function CompaniesPage() {
   const router = useRouter();
   const [companies, setCompanies] = useLocalStorage('companies', []);
-  const [contacts] = useLocalStorage('contacts', []);
+  const [contacts, setContacts] = useState([]);
+  const { companyHQId } = useCompanyHQ();
   const { syncAccounts, loading } = useDynamics();
+
+  // Fetch contacts from API - NO localStorage
+  useEffect(() => {
+    if (!companyHQId) return;
+
+    const fetchContacts = async () => {
+      try {
+        const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+        if (response.data?.success && Array.isArray(response.data.contacts)) {
+          setContacts(response.data.contacts);
+        }
+      } catch (err) {
+        console.error('Failed to fetch contacts:', err);
+        setContacts([]);
+      }
+    };
+
+    fetchContacts();
+  }, [companyHQId]);
 
   const contactCounts = useMemo(() => {
     return contacts.reduce((acc, contact) => {

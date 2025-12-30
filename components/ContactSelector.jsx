@@ -84,38 +84,18 @@ export default function ContactSelector({
       try {
         setLoading(true);
         
-        console.log('🔍 ContactSelector: Fetching contacts', {
+        console.log('🔍 ContactSelector: Fetching contacts from API', {
           companyHQId: finalCompanyHQId,
           companyId: companyId,
           hasCompanyIdFilter: !!companyId
         });
         
-        // Try localStorage first for quick display
-        const cached = window.localStorage.getItem('contacts');
-        let cachedContacts = [];
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              cachedContacts = parsed;
-              // Don't set contacts yet if we have companyId filter - wait for API
-              if (!companyId) {
-                setContacts(parsed);
-                setLoading(false);
-              }
-            }
-          } catch (err) {
-            console.warn('Failed to parse cached contacts', err);
-          }
-        }
-        
-        // Fetch from API to get latest data
-        // If companyId is provided, pass it to API for server-side filtering
+        // NO localStorage - always fetch from API
         let apiUrl = `/api/contacts?companyHQId=${finalCompanyHQId}`;
         if (companyId) {
           apiUrl += `&companyId=${encodeURIComponent(companyId)}`;
         }
-        console.log('🔍 ContactSelector: Fetching from API:', apiUrl);
+        
         const response = await api.get(apiUrl);
         if (response.data?.success && response.data.contacts) {
           let fetched = response.data.contacts;
@@ -137,39 +117,14 @@ export default function ContactSelector({
           }
           
           setContacts(fetched);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('contacts', JSON.stringify(fetched));
-          }
+          // NO localStorage - API only
         } else {
           console.warn('API response missing contacts:', response.data);
-          // If API fails but we have cached contacts, keep using them
-          if (cachedContacts.length > 0) {
-            let filtered = cachedContacts;
-            // Filter cached contacts by companyId if provided
-            if (companyId) {
-              filtered = cachedContacts.filter(contact => {
-                return contact.contactCompanyId === companyId || 
-                       contact.contactCompany?.id === companyId ||
-                       contact.companies?.id === companyId;
-              });
-            }
-            setContacts(filtered);
-          }
+          setContacts([]);
         }
       } catch (err) {
         console.error('Error fetching contacts:', err);
-        // If API fails but we have cached contacts, keep using them
-        const cached = window.localStorage.getItem('contacts');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setContacts(parsed);
-            }
-          } catch (parseErr) {
-            console.warn('Failed to use cached contacts after API error', parseErr);
-          }
-        }
+        setContacts([]);
       } finally {
         setLoading(false);
       }

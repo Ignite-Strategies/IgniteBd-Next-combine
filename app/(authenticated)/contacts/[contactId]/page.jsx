@@ -649,21 +649,7 @@ export default function ContactDetailPage({ params }) {
                                 setContact(updatedContact);
                                 setEditingCompany(false);
                                 
-                                // Update localStorage immediately
-                                if (typeof window !== 'undefined') {
-                                  const cachedContacts = window.localStorage.getItem('contacts');
-                                  if (cachedContacts) {
-                                    try {
-                                      const contacts = JSON.parse(cachedContacts);
-                                      const updatedContacts = contacts.map((c) =>
-                                        c.id === contactId ? updatedContact : c
-                                      );
-                                      window.localStorage.setItem('contacts', JSON.stringify(updatedContacts));
-                                    } catch (err) {
-                                      console.warn('Failed to update localStorage:', err);
-                                    }
-                                  }
-                                }
+                                // NO localStorage - API only
                                 
                                 // Refresh contacts list via context
                                 if (refreshContacts) {

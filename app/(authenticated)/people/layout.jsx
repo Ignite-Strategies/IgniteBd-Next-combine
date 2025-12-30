@@ -8,7 +8,6 @@ import {
 } from 'react';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
-import { getValidatedContactsCache } from '@/lib/utils/validateContactsCache';
 import { ContactsContext } from '../contacts/ContactsContext';
 
 export default function PeopleLayout({ children }) {
@@ -17,24 +16,17 @@ export default function PeopleLayout({ children }) {
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
 
-  // Step 1: Check localStorage cache with validation (only when companyHQId is available)
+  // NO localStorage - always fetch from API when companyHQId is available
   useEffect(() => {
-    if (typeof window === 'undefined' || !companyHQId) return;
-
-    // Use validation utility to safely get cached contacts
-    const cacheResult = getValidatedContactsCache(companyHQId);
-    
-    if (cacheResult.isValid && cacheResult.contacts.length > 0) {
-      console.log('✅ Using validated contacts cache:', cacheResult.contacts.length);
-      setContacts(cacheResult.contacts);
-      setHydrated(true);
-    } else {
-      // Invalid or empty cache - will be fetched by refreshContacts
-      console.log('⚠️ Contacts cache invalid or empty:', cacheResult.reason);
+    if (!companyHQId) {
       setContacts([]);
       setHydrated(false);
+      return;
     }
-  }, [companyHQId]);
+    
+    // Always fetch from API - no localStorage cache
+    refreshContacts();
+  }, [companyHQId, refreshContacts]);
 
   // Step 2: Fetch from API when companyHQId is available
   const refreshContacts = useCallback(async () => {
@@ -50,13 +42,9 @@ export default function PeopleLayout({ children }) {
       
       if (response.data?.success && Array.isArray(response.data.contacts)) {
         const fetchedContacts = response.data.contacts;
-        console.log('✅ Fetched contacts:', fetchedContacts.length);
+        console.log('✅ Fetched contacts from API:', fetchedContacts.length, 'for companyHQId:', companyHQId);
         setContacts(fetchedContacts);
-        
-        // Step 3: Store in localStorage (includes pipeline data)
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem('contacts', JSON.stringify(fetchedContacts));
-        }
+        // NO localStorage - API only
         setHydrated(true);
       } else {
         console.warn('⚠️ API response missing success or contacts array:', response.data);
@@ -73,50 +61,25 @@ export default function PeopleLayout({ children }) {
     }
   }, [companyHQId]);
 
-  // Auto-refresh contacts when companyHQId changes (if cache is invalid or empty)
-  useEffect(() => {
-    if (!companyHQId) return;
-    
-    // If we don't have valid cached contacts, fetch from API
-    if (!hydrated || contacts.length === 0) {
-      console.log('🔄 Fetching contacts - no valid cache');
-      refreshContacts();
-    }
-  }, [companyHQId, hydrated, contacts.length, refreshContacts]);
+  // Contacts are always fetched from API when companyHQId changes (handled above)
 
-  // Helper: Update a single contact in state and localStorage
+  // Helper: Update a single contact in state (NO localStorage)
   const updateContact = useCallback((contactId, updates) => {
     setContacts((prev) => {
-      const updated = prev.map((contact) =>
+      return prev.map((contact) =>
         contact.id === contactId ? { ...contact, ...updates } : contact
       );
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('contacts', JSON.stringify(updated));
-      }
-      return updated;
     });
   }, []);
 
-  // Helper: Add a new contact to state and localStorage
+  // Helper: Add a new contact to state (NO localStorage)
   const addContact = useCallback((contact) => {
-    setContacts((prev) => {
-      const updated = [...prev, contact];
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('contacts', JSON.stringify(updated));
-      }
-      return updated;
-    });
+    setContacts((prev) => [...prev, contact]);
   }, []);
 
-  // Helper: Remove a contact from state and localStorage
+  // Helper: Remove a contact from state (NO localStorage)
   const removeContact = useCallback((contactId) => {
-    setContacts((prev) => {
-      const updated = prev.filter((contact) => contact.id !== contactId);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('contacts', JSON.stringify(updated));
-      }
-      return updated;
-    });
+    setContacts((prev) => prev.filter((contact) => contact.id !== contactId));
   }, []);
 
   const contextValue = useMemo(
