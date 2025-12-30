@@ -3,13 +3,8 @@
 import { useMemo, useEffect, Suspense, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Mail, Users } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
-
-const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
-  ssr: false,
-});
 
 function GrowthDashboardPageContent() {
   const router = useRouter();
@@ -69,15 +64,6 @@ function GrowthDashboardPageContent() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {hasCompany && (
-        <div className="mb-6 transition-opacity duration-300 ease-in">
-          <SetupWizard
-            companyHQ={companyHQ}
-            hasContacts={totalContacts > 0}
-          />
-        </div>
-      )}
-
       {/* Header */}
       <div className="mb-8 rounded-2xl bg-white p-8 shadow-lg">
         <h1 className="mb-2 text-3xl font-bold text-gray-900">

@@ -17,6 +17,14 @@ interface MinimalPersonaJSON {
 
 interface GenerateParams {
   contactId?: string;
+  contactData?: {
+    firstName?: string;
+    lastName?: string;
+    title?: string;
+    companyName?: string;
+    companyIndustry?: string;
+    fullName?: string;
+  };
   companyHQId: string;
   description?: string;
 }
@@ -31,7 +39,13 @@ export class PersonaMinimalService {
     error?: string;
   }> {
     try {
-      const { contactId, companyHQId, description } = params;
+      const { contactId, contactData: providedContactData, companyHQId, description } = params;
+
+      // Ensure prisma is initialized
+      if (!prisma) {
+        console.error('❌ PersonaMinimalService: Prisma client is not initialized');
+        return { success: false, error: 'Database connection not available' };
+      }
 
       // Fetch company context
       const companyHQ = await prisma.companyHQ.findUnique({
@@ -47,9 +61,9 @@ export class PersonaMinimalService {
         return { success: false, error: 'Company not found' };
       }
 
-      // Fetch contact if provided
-      let contactData = null;
-      if (contactId) {
+      // Use provided contact data if available, otherwise fetch if contactId is provided
+      let contactData = providedContactData || null;
+      if (!contactData && contactId) {
         contactData = await prisma.contact.findUnique({
           where: { id: contactId },
           select: {

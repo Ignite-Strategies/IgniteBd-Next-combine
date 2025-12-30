@@ -10,7 +10,6 @@ export default function MicrosoftEmailIngest() {
   const router = useRouter();
   const { ownerId, isMicrosoftConnected, microsoftEmail } = useOwner();
   
-  const [companyHQId, setCompanyHQId] = useState('');
   const [source, setSource] = useState(null); // null = landing page, 'email' or 'contacts'
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -18,14 +17,6 @@ export default function MicrosoftEmailIngest() {
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
-  // Get companyHQId from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
-      if (stored) setCompanyHQId(stored);
-    }
-  }, []);
 
   // Don't auto-load - user selects source first
 
@@ -457,5 +448,22 @@ export default function MicrosoftEmailIngest() {
 
       </div>
     </div>
+  );
+}
+
+export default function MicrosoftEmailIngest() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <MicrosoftEmailIngestContent />
+    </Suspense>
   );
 }

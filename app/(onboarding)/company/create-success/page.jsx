@@ -22,12 +22,19 @@ export default function CompanyCreateSuccessPage() {
   });
 
   useEffect(() => {
+    if (!companyId) {
+      // No company ID - redirect to company setup
+      router.push('/company/profile');
+      return;
+    }
+
     const timer = setTimeout(() => {
-      router.push('/growth-dashboard');
+      // Redirect to dashboard with companyHQId param
+      router.push(`/growth-dashboard?companyHQId=${companyId}`);
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [router, companyId]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-8">
@@ -75,7 +82,13 @@ export default function CompanyCreateSuccessPage() {
 
           <div className="flex gap-4">
             <button
-              onClick={() => router.push('/growth-dashboard')}
+              onClick={() => {
+                if (companyId) {
+                  router.push(`/growth-dashboard?companyHQId=${companyId}`);
+                } else {
+                  router.push('/company/profile');
+                }
+              }}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-lg hover:shadow-lg transition-all"
             >
               Go to Dashboard →

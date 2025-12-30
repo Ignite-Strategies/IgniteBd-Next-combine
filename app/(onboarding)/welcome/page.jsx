@@ -161,10 +161,9 @@ export default function WelcomePage() {
                 setLoading(false);
                 return; // Show UI with Continue button
               } else {
-                // No memberships and no owner.companyHQId - show error instead of redirecting
-                console.log('⚠️ Welcome: No memberships and no owner.companyHQId');
-                setError('No company found. Please contact support to set up your account.');
-                setLoading(false);
+                // No memberships and no owner.companyHQId - redirect to company setup
+                console.log('⚠️ Welcome: No memberships and no owner.companyHQId - redirecting to company setup');
+                router.push('/company/profile');
                 return;
               }
             }

@@ -3,14 +3,13 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import { Users, Mail, FileText, CheckCircle, Save, Plus } from 'lucide-react';
 import api from '@/lib/api';
 
 function CampaignEditContent({ params }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { companyHQId } = useCompanyHQ();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const campaignId = params.campaignId;
 
   // Campaign Details

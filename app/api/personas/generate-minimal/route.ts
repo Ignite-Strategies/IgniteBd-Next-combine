@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { contactId, companyHQId, description } = body;
+    const { contactId, contactData, companyHQId, description } = body;
 
     if (!companyHQId) {
       return NextResponse.json(
@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate minimal persona
+    // Generate minimal persona - pass contactData if provided to avoid fetching
     const result = await PersonaMinimalService.generate({
       contactId,
+      contactData, // Pass contact data directly if available
       companyHQId,
       description,
     });

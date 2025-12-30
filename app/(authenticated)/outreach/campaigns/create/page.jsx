@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 
-export default function CampaignCreatePage() {
+function CampaignCreatePageContent() {
   const router = useRouter();
-  const { companyHQId } = useCompanyHQ();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,8 +33,11 @@ export default function CampaignCreatePage() {
         });
 
         if (response.data?.success && response.data.campaign?.id) {
-          // Redirect to edit page
-          router.push(`/outreach/campaigns/${response.data.campaign.id}/edit`);
+          // Redirect to edit page with companyHQId if available
+          const editUrl = companyHQId 
+            ? `/outreach/campaigns/${response.data.campaign.id}/edit?companyHQId=${companyHQId}`
+            : `/outreach/campaigns/${response.data.campaign.id}/edit`;
+          router.push(editUrl);
         } else {
           setError(response.data?.error || 'Failed to create campaign');
         }
@@ -95,5 +98,22 @@ export default function CampaignCreatePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CampaignCreatePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Creating campaign...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <CampaignCreatePageContent />
+    </Suspense>
   );
 }

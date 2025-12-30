@@ -1,12 +1,30 @@
 'use client';
 
-import { useState } from 'react';
-import { useOwner } from '@/hooks/useOwner';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Mail, RefreshCw, Sparkles, Check } from 'lucide-react';
 
-export default function MicrosoftEnrich() {
-  const { owner, ownerId } = useOwner(); // Get owner from hook (no deprecated status API)
+function MicrosoftEnrichContent() {
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Direct read from localStorage for ownerId and owner - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  const [owner, setOwner] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedOwnerId = localStorage.getItem('ownerId');
+    const storedOwner = localStorage.getItem('owner');
+    if (storedOwnerId) setOwnerId(storedOwnerId);
+    if (storedOwner) {
+      try {
+        setOwner(JSON.parse(storedOwner));
+      } catch (e) {
+        console.warn('Failed to parse owner', e);
+      }
+    }
+  }, []);
   const [loading, setLoading] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState(new Set());
@@ -169,6 +187,23 @@ export default function MicrosoftEnrich() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MicrosoftEnrich() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <MicrosoftEnrichContent />
+    </Suspense>
   );
 }
 

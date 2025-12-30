@@ -7,8 +7,6 @@ import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useContactLists } from '../../ContactListsContext';
 import { useContacts } from '../../ContactsContext';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
-import { useOwner } from '@/hooks/useOwner';
 import CompanySelector from '@/components/CompanySelector';
 import { OFFICIAL_PIPELINES, PIPELINE_STAGES } from '@/lib/config/pipelineConfig';
 
@@ -18,11 +16,18 @@ function ContactListPreviewContent() {
   const filterType = searchParams.get('filter') || 'all';
   const selectAllParam = searchParams.get('selectAll') === 'true';
   const returnTo = searchParams.get('returnTo');
+  const companyHQId = searchParams?.get('companyHQId') || '';
   
   const { contacts, hydrated, refreshContacts } = useContacts(); // Use existing ContactsContext
   const { addList } = useContactLists();
-  const { companyHQId } = useCompanyHQ();
-  const { ownerId } = useOwner(); // Get ownerId like templates do
+  
+  // Direct read from localStorage for ownerId - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) setOwnerId(stored);
+  }, []);
   
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [listName, setListName] = useState('');

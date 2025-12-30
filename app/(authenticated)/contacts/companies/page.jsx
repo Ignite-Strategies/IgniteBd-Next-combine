@@ -1,19 +1,20 @@
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Users, TrendingUp, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useLocalStorage } from '@/hooks/useLocalStorage.js';
 import { useDynamics } from '@/hooks/useDynamics.js';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 
-export default function CompaniesPage() {
+function CompaniesPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
   const [companies, setCompanies] = useLocalStorage('companies', []);
   const [contacts, setContacts] = useState([]);
-  const { companyHQId } = useCompanyHQ();
   const { syncAccounts, loading } = useDynamics();
 
   // Fetch contacts from API - NO localStorage
@@ -165,5 +166,22 @@ export default function CompaniesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CompaniesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <CompaniesPageContent />
+    </Suspense>
   );
 }

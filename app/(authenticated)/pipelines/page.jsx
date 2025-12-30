@@ -1,10 +1,9 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { usePipelinesContext } from './PipelinesContext';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 
 const FALLBACK_PIPELINES = {
@@ -38,10 +37,11 @@ const slugify = (value) =>
     .toLowerCase()
     .replace(/\s+/g, '-');
 
-export default function PipelinesPage() {
+function PipelinesPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const { pipelineConfig, hydrating } = usePipelinesContext();
-  const { companyHQId } = useCompanyHQ();
   const [contacts, setContacts] = useState([]);
   const [contactsHydrating, setContactsHydrating] = useState(false);
   
@@ -300,6 +300,23 @@ export default function PipelinesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PipelinesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading pipelines...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <PipelinesPageContent />
+    </Suspense>
   );
 }
 

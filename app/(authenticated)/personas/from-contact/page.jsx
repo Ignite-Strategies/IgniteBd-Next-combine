@@ -29,37 +29,73 @@ function FromContactContent() {
         // Fetch contact
         const contactResponse = await api.get(`/api/contacts/${contactId}`);
         if (contactResponse.data?.success && contactResponse.data?.contact) {
-          setContact(contactResponse.data.contact);
+          const fetchedContact = contactResponse.data.contact;
+          setContact(fetchedContact);
 
           // Generate minimal persona (MVP1 - just basics)
+          // Pass contact data directly to avoid service fetching it again
           try {
             const personaResponse = await api.post('/api/personas/generate-minimal', {
               companyHQId,
               contactId,
+              contactData: {
+                firstName: fetchedContact.firstName,
+                lastName: fetchedContact.lastName,
+                title: fetchedContact.title,
+                companyName: fetchedContact.companyName,
+                companyIndustry: fetchedContact.companyIndustry,
+                fullName: fetchedContact.fullName,
+              },
             });
 
             if (personaResponse.data?.success && personaResponse.data?.persona) {
               const persona = personaResponse.data.persona;
               setPersonaData({
-                personName: persona.personName || contact.fullName || 'New Persona',
-                title: persona.title || contact.title || '',
-                company: persona.company || contact.companyName || '',
+                personName: persona.personName || fetchedContact.fullName || `${fetchedContact.firstName || ''} ${fetchedContact.lastName || ''}`.trim() || 'New Persona',
+                title: persona.title || fetchedContact.title || '',
+                company: persona.company || fetchedContact.companyName || '',
                 coreGoal: persona.coreGoal || '',
               });
             }
           } catch (err) {
             console.error('Failed to generate minimal persona:', err);
-            // Soft fallback - use contact data
-            setPersonaData({
-              personName: contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'New Persona',
-              title: contact.title || '',
-              company: contact.companyName || '',
-              coreGoal: '',
-            });
+            // Soft fallback - use contact data (only if contact was successfully fetched)
+            if (fetchedContact) {
+              setPersonaData({
+                personName: fetchedContact.fullName || `${fetchedContact.firstName || ''} ${fetchedContact.lastName || ''}`.trim() || 'New Persona',
+                title: fetchedContact.title || '',
+                company: fetchedContact.companyName || '',
+                coreGoal: '',
+              });
+            } else {
+              // If no contact data, set minimal defaults
+              setPersonaData({
+                personName: 'New Persona',
+                title: '',
+                company: '',
+                coreGoal: '',
+              });
+            }
           }
+        } else {
+          // Contact fetch failed or returned no data
+          console.error('Failed to fetch contact or contact not found');
+          setPersonaData({
+            personName: 'New Persona',
+            title: '',
+            company: '',
+            coreGoal: '',
+          });
         }
       } catch (err) {
         console.error('Failed to fetch contact:', err);
+        // Set minimal defaults on error
+        setPersonaData({
+          personName: 'New Persona',
+          title: '',
+          company: '',
+          coreGoal: '',
+        });
       } finally {
         setLoading(false);
         setGenerating(false);

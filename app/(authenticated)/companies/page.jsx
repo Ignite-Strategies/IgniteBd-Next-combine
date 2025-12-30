@@ -1,16 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Check, Sparkles, Search, ExternalLink, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
-import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
 
-export default function CompanyHubPage() {
+function CompanyHubPageContent() {
   const router = useRouter();
-  const { companyHQId, hydrated: ownerHydrated } = useOwner();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Direct read from localStorage for ownerId - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  const [ownerHydrated, setOwnerHydrated] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) {
+      setOwnerId(stored);
+      setOwnerHydrated(true);
+    }
+  }, []);
   
   // Search state
   const [companySearch, setCompanySearch] = useState('');
@@ -325,5 +337,22 @@ export default function CompanyHubPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CompanyHubPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <CompanyHubPageContent />
+    </Suspense>
   );
 }
