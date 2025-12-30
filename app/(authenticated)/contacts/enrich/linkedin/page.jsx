@@ -200,15 +200,16 @@ function LinkedInEnrichContent() {
         matches: createdContact.crmId === companyHQId,
       });
 
-      // Step 2: Save enrichment with intelligence if available
+      // Step 2: Save enrichment - Fork: Basic contact OR Full intelligence
       console.log('📤 Saving enrichment for contact:', { contactId, companyHQId });
       const hasIntelligence = !!(enrichmentData.intelligenceScores && enrichmentData.companyIntelligence);
+      
       const saveResponse = await api.post('/api/contacts/enrich/save', {
         contactId,
         rawEnrichmentPayload: enrichmentData.rawEnrichmentPayload,
         companyHQId,
-        skipIntelligence: !hasIntelligence,
-        // Send intelligence data directly if available
+        skipIntelligence: !hasIntelligence, // Skip intelligence if not available
+        // Send intelligence data directly if available (enriched fork)
         ...(hasIntelligence ? {
           profileSummary: enrichmentData.profileSummary,
           tenureYears: enrichmentData.tenureYears,
@@ -225,11 +226,17 @@ function LinkedInEnrichContent() {
         contactId: saveResponse.data?.contact?.id,
         contactCrmId: saveResponse.data?.contact?.crmId,
         companyHQId,
-        matches: saveResponse.data?.contact?.crmId === companyHQId,
+        hasIntelligence,
+        savedWithIntelligence: hasIntelligence && !saveResponse.data?.contact?.seniorityScore === undefined,
       });
 
+      // Set appropriate success message based on fork
       setSaving(false);
-      setSuccessMessage('Contact saved successfully!');
+      if (hasIntelligence) {
+        setSuccessMessage('Contact Enriched Successfully!');
+      } else {
+        setSuccessMessage('Contact Saved Successfully!');
+      }
       setShowSuccessModal(true);
       setSavedContactId(contactId);
     } catch (err) {
@@ -396,46 +403,48 @@ function LinkedInEnrichContent() {
               </a>
             </div>
 
-            {/* Action Buttons */}
-            <div className="mt-6 border-t pt-6 space-y-3">
-              {/* Enrich Full Profile Button */}
-              <button
-                onClick={handleEnrichFullProfile}
-                disabled={saving || enrichingFullProfile}
-                className="w-full bg-purple-600 text-white px-6 py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-purple-700 transition shadow-md"
-              >
-                {enrichingFullProfile ? (
-                  <>
-                    <RefreshCw className="animate-spin h-5 w-5" />
-                    <span>Generating Intelligence...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-5 w-5" />
-                    <span>Enrich Full Profile</span>
-                  </>
-                )}
-              </button>
+            {/* Action Buttons - Fork: Save basic OR Enrich full */}
+            {!enrichmentData.intelligenceScores && (
+              <div className="mt-6 border-t pt-6 space-y-3">
+                {/* Save Contact Button - Saves basic contact details only */}
+                <button
+                  onClick={handleSave}
+                  disabled={saving || enrichingFullProfile}
+                  className="w-full bg-green-600 text-white px-6 py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-green-700 transition shadow-md"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="animate-spin h-5 w-5" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5" />
+                      <span>Save Contact</span>
+                    </>
+                  )}
+                </button>
 
-              {/* Save Contact Button */}
-              <button
-                onClick={handleSave}
-                disabled={saving || enrichingFullProfile}
-                className="w-full bg-green-600 text-white px-6 py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-green-700 transition shadow-md"
-              >
-                {saving ? (
-                  <>
-                    <RefreshCw className="animate-spin h-5 w-5" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-5 w-5" />
-                    <span>Save Contact</span>
-                  </>
-                )}
-              </button>
-            </div>
+                {/* Enrich Full Profile Button - Generates intelligence */}
+                <button
+                  onClick={handleEnrichFullProfile}
+                  disabled={saving || enrichingFullProfile}
+                  className="w-full bg-purple-600 text-white px-6 py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-purple-700 transition shadow-md"
+                >
+                  {enrichingFullProfile ? (
+                    <>
+                      <RefreshCw className="animate-spin h-5 w-5" />
+                      <span>Generating Intelligence...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-5 w-5" />
+                      <span>Enrich Full Profile</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -457,36 +466,39 @@ function LinkedInEnrichContent() {
               companyPositioning={enrichmentData.companyPositioning}
             />
 
-            {/* Save Button for Intelligence-Enriched Contact */}
-            <div className="flex justify-end gap-3 bg-white rounded-lg p-4 shadow">
-              <button
-                onClick={() => {
-                  setEnrichmentData(null);
-                  setUrl('');
-                }}
-                className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                disabled={saving}
-              >
-                Start Over
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Saving Enriched Contact...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Save Enriched Contact
-                  </>
-                )}
-              </button>
-            </div>
+          </div>
+        )}
+
+        {/* Save Button - Show at bottom after all intelligence data */}
+        {enrichmentData && enrichmentData.intelligenceScores && enrichmentData.companyIntelligence && (
+          <div className="flex justify-end gap-3 bg-white rounded-lg p-4 shadow">
+            <button
+              onClick={() => {
+                setEnrichmentData(null);
+                setUrl('');
+              }}
+              className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              disabled={saving}
+            >
+              Start Over
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Saving Enriched Contact...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Save Enriched Contact
+                </>
+              )}
+            </button>
           </div>
         )}
 
@@ -504,9 +516,9 @@ function LinkedInEnrichContent() {
                   {successMessage || 'Contact Saved Successfully!'}
                 </h2>
                 <p className="text-gray-600 text-center mb-6">
-                  {successMessage.includes('Full Profile') 
-                    ? 'Contact has been enriched with full intelligence scores and saved to your CRM.'
-                    : 'Contact has been saved to your CRM.'}
+                  {successMessage.includes('Enriched') 
+                    ? 'All intelligence scores, profile analysis, and company data have been saved. What would you like to do next?'
+                    : 'Contact has been saved to your CRM. You can enrich it later to get intelligence scores and profile analysis.'}
                 </p>
                 
                 <div className="space-y-3">
