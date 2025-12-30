@@ -833,67 +833,6 @@ function ComposeContent() {
         </div>
       </div>
 
-      {/* Live Preview Section - Full Width Below */}
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Preview</h2>
-              
-              {hydratedPreview.loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                  <span className="ml-2 text-sm text-gray-600">Hydrating preview...</span>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* From */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
-                    <div className="text-sm text-gray-900">
-                      {senderName && senderEmail ? `${senderName} <${senderEmail}>` : senderEmail || 'Not set'}
-                    </div>
-                  </div>
-                  
-                  {/* To */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
-                    <div className="text-sm text-gray-900">
-                      {toName && to ? `${toName} <${to}>` : to || 'Not set'}
-                    </div>
-                  </div>
-                  
-                  {/* Subject */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
-                    <div className="text-sm text-gray-900 font-medium">
-                      {hydratedPreview.subject || subject || 'No subject'}
-                    </div>
-                  </div>
-                  
-                  {/* Body Preview */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
-                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 min-h-[400px]">
-                      <div 
-                        className="text-sm text-gray-900 whitespace-pre-wrap"
-                        dangerouslySetInnerHTML={{ __html: hydratedPreview.body || body || 'No message' }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {selectedTemplateId && !contactId && (
-                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
-                      <p className="text-xs text-amber-800">
-                        💡 Select a contact to see variables hydrated with real data
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Preview Modal - Split Screen, Inline Editable (like sandbox) */}
       {showPreviewModal && previewData && (
         <div className="fixed inset-0 z-50 bg-gray-50">
