@@ -5,13 +5,15 @@ import {
   useEffect,
   useMemo,
   useState,
+  Suspense,
 } from 'react';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { ContactsContext } from '../contacts/ContactsContext';
 
-export default function PeopleLayout({ children }) {
-  const { companyHQId } = useCompanyHQ();
+function PeopleLayoutContent({ children }) {
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [contacts, setContacts] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
@@ -139,6 +141,14 @@ export default function PeopleLayout({ children }) {
     <ContactsContext.Provider value={contextValue}>
       {children}
     </ContactsContext.Provider>
+  );
+}
+
+export default function PeopleLayout({ children }) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PeopleLayoutContent>{children}</PeopleLayoutContent>
+    </Suspense>
   );
 }
 

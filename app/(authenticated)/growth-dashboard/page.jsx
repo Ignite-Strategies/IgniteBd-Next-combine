@@ -4,8 +4,8 @@ import { useMemo, useEffect, Suspense, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Mail, Users } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useCompanyHydration } from '@/hooks/useCompanyHydration';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
+import api from '@/lib/api';
 
 const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
   ssr: false,
@@ -15,66 +15,42 @@ function GrowthDashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
-  const hasRedirectedRef = useRef(false);
   
-  // Option B: URL params primary, localStorage fallback
-  // If missing from URL, check localStorage and add to URL
-  // If neither exists, show error instead of redirecting
-  const [missingCompanyKey, setMissingCompanyKey] = useState(false);
-  
-  useEffect(() => {
-    if (hasRedirectedRef.current) return;
-    
-    if (typeof window === 'undefined') return;
-    
-    // If URL has companyHQId, we're good
-    if (companyHQId) {
-      setMissingCompanyKey(false);
-      return;
-    }
-    
-    // URL doesn't have companyHQId - check localStorage (Option B fallback)
-    const stored = localStorage.getItem('companyHQId');
-    if (stored) {
-      // Add companyHQId to URL from localStorage
-      hasRedirectedRef.current = true;
-      console.log(`🔄 Dashboard: Adding companyHQId from localStorage to URL: ${stored}`);
-      router.replace(`/growth-dashboard?companyHQId=${stored}`);
-      return;
-    }
-    
-    // Neither URL nor localStorage has companyHQId - show error
-    hasRedirectedRef.current = true;
-    console.warn('⚠️ Dashboard: No companyHQId in URL or localStorage');
-    setMissingCompanyKey(true);
-  }, [companyHQId, router]);
+  // URL param is source of truth - welcome page sets it, no checking needed
+  const missingCompanyKey = !companyHQId;
 
-  // Log CompanyHQ from URL params and confirm it's set
+  // Just read directly from localStorage - no hooks, no checking
+  const [companyHQ, setCompanyHQ] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  
   useEffect(() => {
-    if (companyHQId) {
-      console.log('🏢 CompanyHQ from URL params:', {
-        companyHQId,
-        timestamp: new Date().toISOString(),
-      });
-      
-      // ✅ CONFIRMATION: URL param is our source of truth - sync to localStorage
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('companyHQId');
-        if (stored !== companyHQId) {
-          console.log(`🔄 Syncing localStorage to match URL param: ${companyHQId}`);
-          localStorage.setItem('companyHQId', companyHQId);
-        } else {
-          console.log(`✅ Confirmed: localStorage matches URL param: ${companyHQId}`);
-        }
+    if (typeof window === 'undefined' || !companyHQId) return;
+    
+    // Read companyHQ directly from localStorage
+    const stored = localStorage.getItem('companyHQ');
+    if (stored) {
+      try {
+        setCompanyHQ(JSON.parse(stored));
+      } catch (e) {
+        console.warn('Failed to parse companyHQ', e);
+      }
+    }
+    
+    // Read contacts directly from localStorage
+    const storedContacts = localStorage.getItem('contacts');
+    if (storedContacts) {
+      try {
+        const parsed = JSON.parse(storedContacts);
+        // Filter by companyHQId if needed
+        const filtered = Array.isArray(parsed) 
+          ? parsed.filter(c => c.companyHQId === companyHQId)
+          : [];
+        setContacts(filtered);
+      } catch (e) {
+        console.warn('Failed to parse contacts', e);
       }
     }
   }, [companyHQId]);
-  
-  // Use the hydration hook - loads from localStorage immediately, no auto-fetch
-  const { data, loading, hydrated } = useCompanyHydration(companyHQId);
-  
-  const companyHQ = data.companyHQ;
-  const contacts = data.contacts || [];
 
   const hasCompany = !!companyHQ && !!companyHQId;
   const companyName = companyHQ?.companyName ?? 'Your Company';
@@ -89,25 +65,6 @@ function GrowthDashboardPageContent() {
   // Show error if company key is missing
   if (missingCompanyKey) {
     return <CompanyKeyMissingError />;
-  }
-
-  // Show loading screen only if we have no cached data
-  if (loading && !hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mb-4 flex justify-center">
-            <div className="h-16 w-16 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
-          </div>
-          <h2 className="mb-2 text-2xl font-bold text-gray-900">
-            Getting your dashboard ready...
-          </h2>
-          <p className="text-gray-600">
-            Loading your company data and metrics
-          </p>
-        </div>
-      </div>
-    );
   }
 
   return (

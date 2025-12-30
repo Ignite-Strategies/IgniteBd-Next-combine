@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import { Plus, RefreshCw, Sparkles, Users, UserCircle, FileEdit, Trash2, CheckCircle2 } from 'lucide-react';
+import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 function PersonasPageContent() {
   // TODO WEDNESDAY FIX #3: Personas must be tenant-scoped using companyHQId, not ownerId
@@ -13,7 +13,16 @@ function PersonasPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
-  const { ownerId, hydrated: ownerHydrated } = useOwner();
+  
+  // Get ownerId directly from localStorage - no hook needed
+  const [ownerId, setOwnerId] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) {
+      setOwnerId(stored);
+    }
+  }, []);
   const [personas, setPersonas] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -21,27 +30,44 @@ function PersonasPageContent() {
   const [showBuildOptions, setShowBuildOptions] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [missingCompanyKey, setMissingCompanyKey] = useState(false);
+  const hasRedirectedRef = useRef(false);
 
-  // Auto-fetch personas on mount and when companyHQId changes - WAIT FOR AUTH
+  // Option B: URL params primary, localStorage fallback
+  // If missing from URL, check localStorage and add to URL
+  // If neither exists, show error instead of redirecting
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    
+    if (typeof window === 'undefined') return;
+    
+    // If URL has companyHQId, we're good
+    if (companyHQId) {
+      setMissingCompanyKey(false);
+    } else {
+      // URL doesn't have companyHQId - check localStorage (Option B fallback)
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        // Add companyHQId to URL from localStorage
+        hasRedirectedRef.current = true;
+        console.log(`🔄 Personas: Adding companyHQId from localStorage to URL: ${stored}`);
+        router.replace(`/personas?companyHQId=${stored}`);
+        return;
+      } else {
+        // Neither URL nor localStorage has companyHQId - show error
+        hasRedirectedRef.current = true;
+        console.warn('⚠️ Personas: No companyHQId in URL or localStorage');
+        setMissingCompanyKey(true);
+        return;
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Load personas from localStorage immediately (don't wait for auth)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    // CRITICAL: Wait for auth to be ready before making API calls
-    if (!ownerId || !ownerHydrated) {
-      return;
-    }
-
-    if (!companyHQId) {
-      setError('Company context is required');
-      return;
-    }
-
-    if (!storedCompanyHQId) {
-      setError('Company context is required');
-      return;
-    }
-
-    // Load from localStorage first for instant display
+    
+    // Load from localStorage first for instant display (no auth required)
     const cached = window.localStorage.getItem('personas');
     if (cached) {
       try {
@@ -54,34 +80,10 @@ function PersonasPageContent() {
         console.warn('Failed to parse cached personas', error);
       }
     }
+  }, []); // Run once on mount
 
-    // DISABLED: Auto-fetch personas - user can manually sync if needed
-    // Then fetch fresh data from API
-    // const fetchPersonas = async () => {
-    //   setLoading(true);
-    //   try {
-    //     const response = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
-    //     const personasData = Array.isArray(response.data) ? response.data : [];
-    //     setPersonas(personasData);
-    //     setError(null);
-    //     
-    //     // Update localStorage
-    //     if (typeof window !== 'undefined') {
-    //       window.localStorage.setItem('personas', JSON.stringify(personasData));
-    //     }
-    //   } catch (err) {
-    //     // Silent fail - no console spam
-    //     // Don't set error if we have cached data
-    //     if (!cached) {
-    //       setError('Failed to load personas. Click Sync to retry.');
-    //     }
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
-
-    // fetchPersonas();
-  }, [ownerId, ownerHydrated]); // Wait for auth before fetching
+  // No need to wait for auth hooks - we have companyHQId from URL and ownerId from localStorage
+  // Auto-fetch is disabled - user can manually sync if needed
 
   // Check for success message in URL params
   useEffect(() => {
@@ -160,6 +162,21 @@ function PersonasPageContent() {
     }
   };
 
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Personas Page Render State:', {
+      companyHQId,
+      ownerId,
+      missingCompanyKey,
+      personasCount: personas.length,
+      hasError: !!error,
+    });
+  }, [companyHQId, ownerId, missingCompanyKey, personas.length, error]);
+
+  // Show error if company key is missing
+  if (missingCompanyKey) {
+    return <CompanyKeyMissingError />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

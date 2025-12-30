@@ -5,16 +5,17 @@ import {
   useEffect,
   useMemo,
   useState,
+  Suspense,
 } from 'react';
-import { usePathname } from 'next/navigation';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { usePathname, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { ContactsContext } from './ContactsContext';
 import { ContactListsContext } from './ContactListsContext';
 
-export default function ContactsLayout({ children }) {
+function ContactsLayoutContent({ children }) {
   const pathname = usePathname();
-  const { companyHQId } = useCompanyHQ(); // Get companyHQId from hook
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [contacts, setContacts] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
@@ -311,5 +312,13 @@ export default function ContactsLayout({ children }) {
         {children}
       </ContactListsContext.Provider>
     </ContactsContext.Provider>
+  );
+}
+
+export default function ContactsLayout({ children }) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ContactsLayoutContent>{children}</ContactsLayoutContent>
+    </Suspense>
   );
 }
