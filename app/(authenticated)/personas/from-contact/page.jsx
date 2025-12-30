@@ -11,12 +11,6 @@ function FromContactContent() {
   const contactId = searchParams?.get('contactId');
   const companyHQId = searchParams?.get('companyHQId') || '';
 
-  // Get generated data from query params (passed from contact-select page after API call)
-  const generatedPersonName = searchParams?.get('personName') || '';
-  const generatedTitle = searchParams?.get('title') || '';
-  const generatedCompany = searchParams?.get('company') || '';
-  const generatedCoreGoal = searchParams?.get('coreGoal') || '';
-
   // Individual field state - matches template builder pattern
   const [personName, setPersonName] = useState('');
   const [title, setTitle] = useState('');
@@ -26,15 +20,26 @@ function FromContactContent() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Populate form fields from query params (data was generated on previous page)
+  // Load generated persona data from localStorage (temporary state from contact-select page)
   useEffect(() => {
-    if (generatedPersonName || generatedTitle || generatedCompany || generatedCoreGoal) {
-      setPersonName(generatedPersonName);
-      setTitle(generatedTitle);
-      setCompany(generatedCompany);
-      setCoreGoal(generatedCoreGoal);
+    if (typeof window === 'undefined') return;
+    
+    const tempData = localStorage.getItem('tempPersonaData');
+    if (tempData) {
+      try {
+        const persona = JSON.parse(tempData);
+        setPersonName(persona.personName || '');
+        setTitle(persona.title || '');
+        setCompany(persona.company || '');
+        setCoreGoal(persona.coreGoal || '');
+        
+        // Clean up temp data after using it
+        localStorage.removeItem('tempPersonaData');
+      } catch (err) {
+        console.error('Failed to parse temp persona data:', err);
+      }
     }
-  }, [generatedPersonName, generatedTitle, generatedCompany, generatedCoreGoal]);
+  }, []);
 
   const handleSave = async () => {
     if (!companyHQId) {

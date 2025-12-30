@@ -126,17 +126,17 @@ export default function BuildFromContactsPage() {
         const persona = response.data.persona;
         console.log('✅ Persona generated successfully, navigating...');
         
-        // Navigate with generated data in query params (like template flow)
-        const params = new URLSearchParams({
-          contactId,
-          companyHQId,
+        // Store generated persona in localStorage (temporary state, like template pattern)
+        const tempPersonaData = {
           personName: persona.personName || '',
           title: persona.title || '',
           company: persona.company || '',
           coreGoal: persona.coreGoal || '',
-        });
+        };
+        localStorage.setItem('tempPersonaData', JSON.stringify(tempPersonaData));
         
-        router.push(`/personas/from-contact?${params.toString()}`);
+        // Navigate with just contactId and companyHQId
+        router.push(`/personas/from-contact?contactId=${contactId}&companyHQId=${companyHQId}`);
       } else {
         setError(response.data?.error || 'Failed to generate persona');
         setGeneratingContactId(null);
@@ -285,7 +285,7 @@ export default function BuildFromContactsPage() {
             <div className="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-xl">
               <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
               <p className="mt-4 text-lg font-semibold text-gray-900">Generating persona...</p>
-              <p className="mt-2 text-sm text-gray-600">Let OpenAI cook - this may take a moment</p>
+              <p className="mt-2 text-sm text-gray-600">This may take a moment</p>
             </div>
           </div>
         )}
