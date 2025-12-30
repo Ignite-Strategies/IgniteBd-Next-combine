@@ -39,9 +39,48 @@ export async function POST(request) {
           photoURL: photoURL || null,
         },
       });
-      console.log('✅ Created new owner:', owner.id);
+      console.log('✅ Created new owner:', owner.id, { firebaseId, email });
     } else {
-      console.log('✅ Found existing owner:', owner.id);
+      // Update existing owner with latest info from sign-in (but preserve existing data)
+      const updateData = {};
+      
+      // Only update fields if new values are provided and different
+      if (email && email !== owner.email) {
+        updateData.email = email;
+      }
+      if (photoURL && photoURL !== owner.photoURL) {
+        updateData.photoURL = photoURL;
+      }
+      // Update name fields if provided and different (trim whitespace)
+      if (firstName && firstName.trim() !== (owner.firstName || '').trim()) {
+        updateData.firstName = firstName.trim();
+      }
+      if (lastName && lastName.trim() !== (owner.lastName || '').trim()) {
+        updateData.lastName = lastName.trim();
+      }
+      
+      // Update name field if firstName/lastName changed
+      if (updateData.firstName || updateData.lastName) {
+        const newFirstName = updateData.firstName || owner.firstName || '';
+        const newLastName = updateData.lastName || owner.lastName || '';
+        if (newFirstName || newLastName) {
+          updateData.name = `${newFirstName} ${newLastName}`.trim();
+        }
+      }
+      
+      // Only update if there are changes
+      if (Object.keys(updateData).length > 0) {
+        owner = await prisma.owners.update({
+          where: { id: owner.id },
+          data: {
+            ...updateData,
+            updatedAt: new Date(),
+          },
+        });
+        console.log('✅ Updated existing owner:', owner.id, { firebaseId, email, updates: Object.keys(updateData) });
+      } else {
+        console.log('✅ Found existing owner (no updates needed):', owner.id, { firebaseId, email });
+      }
     }
 
     return NextResponse.json({

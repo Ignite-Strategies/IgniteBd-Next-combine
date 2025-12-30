@@ -16,11 +16,19 @@ export default function SigninPage() {
   });
 
   const createOrFindOwner = async (payload) => {
+    console.log('🔍 Signin: Looking up owner with firebaseId:', payload.firebaseId);
     const response = await api.post('/api/owner/create', payload);
     const { owner } = response.data || {};
     if (!owner) {
+      console.error('❌ Signin: Owner creation failed - no owner returned', response.data);
       throw new Error('Owner creation failed - no owner returned');
     }
+    console.log('✅ Signin: Owner found/created:', owner.id, { 
+      email: owner.email, 
+      firstName: owner.firstName, 
+      lastName: owner.lastName,
+      hasCompany: !!owner.companyHQId 
+    });
     return owner;
   };
 
@@ -50,6 +58,11 @@ export default function SigninPage() {
       });
 
       await persistSession(result, owner);
+      
+      // Store full owner object in localStorage for welcome page
+      localStorage.setItem('owner', JSON.stringify(owner));
+      
+      console.log('✅ Signin: Session persisted, redirecting to welcome');
       router.push('/welcome');
     } catch (error) {
       console.error('Google sign-in failed:', error);
@@ -75,6 +88,11 @@ export default function SigninPage() {
       });
 
       await persistSession(result, owner);
+      
+      // Store full owner object in localStorage for welcome page
+      localStorage.setItem('owner', JSON.stringify(owner));
+      
+      console.log('✅ Signin: Session persisted, redirecting to welcome');
       router.push('/welcome');
     } catch (error) {
       console.error('Email sign-in failed:', error);
