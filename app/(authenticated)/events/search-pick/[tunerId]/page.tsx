@@ -61,6 +61,7 @@ function SearchPickPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [likedEventTitles, setLikedEventTitles] = useState<Set<string>>(new Set());
   const [liking, setLiking] = useState<{ [key: string]: boolean }>({});
+  const [keywords, setKeywords] = useState<string>(''); // Keywords from tuner
 
   // Load generated events from localStorage first (following OpenAI pattern)
   useEffect(() => {
@@ -87,10 +88,25 @@ function SearchPickPageContent() {
     // If no localStorage data, load from API
     if (tunerId && companyHQId) {
       loadPickedEvents();
+      loadTunerKeywords();
     } else {
       setLoading(false);
     }
   }, [tunerId, companyHQId]);
+
+  const loadTunerKeywords = async () => {
+    if (!tunerId) return;
+    
+    try {
+      const response = await api.get(`/api/event-tuners/${tunerId}`);
+      if (response.data?.success && response.data.tuner) {
+        const searchText = response.data.tuner.eventSearchRawText || '';
+        setKeywords(searchText);
+      }
+    } catch (err) {
+      console.error('Error loading tuner keywords:', err);
+    }
+  };
 
   const loadPickedEvents = async () => {
     if (!tunerId) {
@@ -226,26 +242,25 @@ function SearchPickPageContent() {
             </button>
           </div>
         ) : (
-          <div className="mt-8 space-y-4">
-            {events
-              .sort((a, b) => {
-                // Sort by timeFrame chronologically
-                const timeFrameOrder: { [key: string]: number } = {
-                  'Early 2025': 1,
-                  'Q1 2025': 2,
-                  'Spring 2025': 3,
-                  'Mid-2025': 4,
-                  'Q2 2025': 5,
-                  'Q3 2025': 6,
-                  'Late 2025': 7,
-                  'Q4 2025': 8,
-                  'Upcoming': 9,
-                };
-                const aOrder = timeFrameOrder[a.timeFrame || ''] || 99;
-                const bOrder = timeFrameOrder[b.timeFrame || ''] || 99;
-                return aOrder - bOrder;
-              })
-              .map((event, index) => {
+          <div className="mt-8 space-y-8">
+            {/* Keywords Badge */}
+            {keywords && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <p className="text-sm font-medium text-blue-900 mb-1">Keywords:</p>
+                <p className="text-sm text-blue-700">{keywords}</p>
+              </div>
+            )}
+
+            {/* Group events by quarter */}
+            {['Q1 2025', 'Q2 2025', 'Q3 2025', 'Q4 2025'].map((quarter) => {
+              const quarterEvents = events.filter(e => e.timeFrame === quarter);
+              if (quarterEvents.length === 0) return null;
+
+              return (
+                <div key={quarter} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">{quarter}</h2>
+                  <div className="space-y-4">
+                    {quarterEvents.map((event, index) => {
               const isLiked = likedEventTitles.has(event.eventTitle);
               const isLiking = liking[event.eventTitle];
 
@@ -326,6 +341,10 @@ function SearchPickPageContent() {
                         </>
                       )}
                     </button>
+                  </div>
+                </div>
+              );
+            })}
                   </div>
                 </div>
               );

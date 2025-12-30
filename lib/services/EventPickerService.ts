@@ -119,7 +119,7 @@ ${JSON.stringify(hydratedContext, null, 2)}
 
 OUTPUT FORMAT (STRICT)
 
-You MUST return JSON in exactly this format:
+You MUST return JSON in exactly this format, organized by quarters:
 
 {
   "eventPickerModel": [
@@ -128,18 +128,24 @@ You MUST return JSON in exactly this format:
       "description": "What this event is about in plain language",
       "whyGo": "Why this event makes sense given the preferences",
       "location": "City, State or City, Country (e.g., 'San Francisco, CA' or 'New York, NY')",
-      "timeFrame": "General timeframe like 'Q1 2025', 'Spring 2025', 'Early 2025', 'Mid-2025', 'Late 2025', 'Upcoming' - DO NOT use exact years like '2026' unless you're certain",
+      "timeFrame": "Q1 2025, Q2 2025, Q3 2025, or Q4 2025 - use quarter format",
       "sponsor": "Main sponsor or organizer name (optional, only if known)",
       "costEstimate": "Cost estimate like '$500-$2,000', 'Free', '$5,000+', 'TBD' (optional)"
     }
   ]
 }
 
+CRITICAL ORGANIZATION RULES:
+- Return events organized by quarters: Q1 2025, Q2 2025, Q3 2025, Q4 2025
+- Return at least 3 events per quarter (3+N format - 3 options plus more if relevant)
+- Distribute events evenly across quarters
+- If user specified conferencesPerQuarter, use that as the minimum per quarter, but still give 3+ options
+- Use timeFrame format: "Q1 2025", "Q2 2025", "Q3 2025", "Q4 2025" (not "Spring 2025" or "Early 2025")
+
 Rules:
 - eventPickerModel MUST be an array
-- Return at least 1 event
+- Return at least 12 events total (3 per quarter minimum)
 - Be concise but thoughtful
-- Use general timeframes, not exact future years unless you're certain
 - Include location and timeFrame for all events
 - Include sponsor and costEstimate only if you have reasonable information
 - Do not invent IDs or metadata
