@@ -1,17 +1,64 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send, Lock, Copy, Check } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { owner, ownerId, companyHQ, companyHQId, refresh: refreshOwner } = useOwner();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Direct read from localStorage for ownerId, owner, companyHQ - needed for auth/authoring
+  const [ownerId, setOwnerId] = useState(null);
+  const [owner, setOwner] = useState(null);
+  const [companyHQ, setCompanyHQ] = useState(null);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedOwnerId = localStorage.getItem('ownerId');
+    const storedOwner = localStorage.getItem('owner');
+    const storedCompanyHQ = localStorage.getItem('companyHQ');
+    if (storedOwnerId) {
+      setOwnerId(storedOwnerId);
+    }
+    if (storedOwner) {
+      try {
+        setOwner(JSON.parse(storedOwner));
+      } catch (e) {
+        console.warn('Failed to parse owner', e);
+      }
+    }
+    if (storedCompanyHQ) {
+      try {
+        setCompanyHQ(JSON.parse(storedCompanyHQ));
+      } catch (e) {
+        console.warn('Failed to parse companyHQ', e);
+      }
+    }
+  }, []);
+  
+  // Refresh owner data from API (replaces refreshOwner from hook)
+  const refreshOwner = useCallback(async () => {
+    try {
+      const response = await api.get('/api/owner/hydrate');
+      if (response.data?.success) {
+        const ownerData = response.data.owner;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('ownerId', ownerData.id);
+          localStorage.setItem('owner', JSON.stringify(ownerData));
+          setOwnerId(ownerData.id);
+          setOwner(ownerData);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh owner:', error);
+    }
+  }, []);
   const [microsoftAuth, setMicrosoftAuth] = useState(null);
   const [sendGridConfig, setSendGridConfig] = useState(null);
   const [error, setError] = useState(null);

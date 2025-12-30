@@ -8,7 +8,6 @@ import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
 import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
@@ -17,7 +16,25 @@ function ComposeContent() {
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
   const hasRedirectedRef = useRef(false);
-  const { ownerId, owner } = useOwner();
+  
+  // Direct read from localStorage for ownerId and owner - needed for auth/authoring
+  const [ownerId, setOwnerId] = useState(null);
+  const [owner, setOwner] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedOwnerId = localStorage.getItem('ownerId');
+    const storedOwner = localStorage.getItem('owner');
+    if (storedOwnerId) {
+      setOwnerId(storedOwnerId);
+    }
+    if (storedOwner) {
+      try {
+        setOwner(JSON.parse(storedOwner));
+      } catch (e) {
+        console.warn('Failed to parse owner', e);
+      }
+    }
+  }, []);
   
   // Form state
   const [selectedContact, setSelectedContact] = useState(null);
