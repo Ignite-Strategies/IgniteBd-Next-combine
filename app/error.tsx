@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import * as Sentry from '@sentry/nextjs';
 
 /**
  * Global Error Boundary for App Router
@@ -27,18 +26,6 @@ export default function Error({
       message: error.message,
       stack: error.stack,
       digest: error.digest,
-    });
-
-    // Capture in Sentry (client-side)
-    Sentry.captureException(error, {
-      tags: {
-        component: 'client',
-        errorBoundary: 'error.tsx',
-      },
-      extra: {
-        digest: error.digest,
-      },
-      level: 'error',
     });
   }, [error]);
 

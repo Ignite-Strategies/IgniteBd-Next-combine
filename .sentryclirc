@@ -1,7 +1,0 @@
-[auth]
-token=
-
-[defaults]
-org=ignite-strategies
-project=ignitebd-logge
-

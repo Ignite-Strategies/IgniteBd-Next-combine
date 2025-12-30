@@ -173,7 +173,6 @@ async function verifySetup() {
           select: {
             id: true,
             companyName: true,
-            platformId: true,
           }
         }
       },
@@ -191,7 +190,6 @@ async function verifySetup() {
           select: {
             id: true,
             companyName: true,
-            platformId: true,
           }
         }
       },

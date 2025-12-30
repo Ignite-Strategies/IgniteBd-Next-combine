@@ -529,3 +529,4 @@ The primary bottleneck is **Sentry source map uploads during build**, which can 
 
 **Recommended First Step**: Disable Sentry source map uploads during build (5-minute fix, saves 2-4 minutes per build).
 
+

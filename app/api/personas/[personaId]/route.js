@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { resolveMembership } from '@/lib/membership';
 
 const DEFAULT_COMPANY_HQ_ID = process.env.DEFAULT_COMPANY_HQ_ID || null;
 
 export async function GET(request, { params }) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
+    console.error('❌ Firebase token verification failed:', error.message);
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 },
@@ -25,6 +28,35 @@ export async function GET(request, { params }) {
       return NextResponse.json(
         { error: 'personaId is required' },
         { status: 400 },
+      );
+    }
+
+    if (!companyHQId) {
+      return NextResponse.json(
+        { error: 'companyHQId is required' },
+        { status: 400 },
+      );
+    }
+
+    // Get owner from firebaseId
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: { id: true }
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
+    // Membership guard - ensure user has access to this CompanyHQ
+    const { membership } = await resolveMembership(owner.id, companyHQId);
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'Forbidden: No membership in this CompanyHQ' },
+        { status: 403 },
       );
     }
 
@@ -63,9 +95,10 @@ export async function GET(request, { params }) {
       );
     }
 
-    if (companyHQId && persona.companyHQId !== companyHQId) {
+    // Verify persona belongs to the requested companyHQId
+    if (persona.companyHQId !== companyHQId) {
       return NextResponse.json(
-        { error: 'Persona does not belong to this tenant' },
+        { error: 'Persona does not belong to this CompanyHQ' },
         { status: 403 },
       );
     }

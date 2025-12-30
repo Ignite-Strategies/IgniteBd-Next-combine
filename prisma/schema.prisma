@@ -309,7 +309,6 @@ model company_hqs {
   managerId                                     String?
   companyAnnualRev                              String?
   yearsInBusiness                               String?
-  platformId                                    String?
   tier                                          String?
   assessments                                   assessments[]
   blogs                                         blogs[]
@@ -318,7 +317,6 @@ model company_hqs {
   contacts_company_hqs_contactOwnerIdTocontacts Contact?                        @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
   owners_company_hqs_ownerIdToowners            owners?                         @relation("company_hqs_ownerIdToowners", fields: [ownerId], references: [id])
-  platform                                      platform?                       @relation(fields: [platformId], references: [id])
   company_memberships                           company_memberships[]
   consultant_deliverables                       consultant_deliverables[]
   contact_lists                                 contact_lists[]
@@ -335,8 +333,6 @@ model company_hqs {
   template_relationship_helpers                 template_relationship_helpers[]
   templates                                     templates[]
   work_packages                                 work_packages[]
-
-  @@index([platformId])
 }
 
 model company_memberships {
@@ -854,7 +850,6 @@ model owners {
   email_activities                          email_activities[]
   email_sequences                           email_sequences[]
   email_signatures                          email_signatures[]
-  super_admins                              super_admins?
   templates                                 templates[]
 }
 
@@ -946,15 +941,6 @@ model pipelines {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   contacts  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-}
-
-model platform {
-  id           String         @id @default(cuid())
-  name         String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  company_hqs  company_hqs[]
-  super_admins super_admins[]
 }
 
 model presentations {
@@ -1137,18 +1123,6 @@ model sequence_steps {
   @@unique([sequence_id, step_number])
   @@index([sequence_id])
   @@index([sequence_id, step_number])
-}
-
-model super_admins {
-  id         String   @id @default(cuid())
-  ownerId    String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  platformId String
-  owners     owners   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  platform   platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
-
-  @@index([platformId])
 }
 
 model template_relationship_helpers {

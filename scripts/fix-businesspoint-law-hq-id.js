@@ -73,7 +73,6 @@ async function fixBusinessPointLawHQId() {
         managerId: oldHQ.managerId,
         companyAnnualRev: oldHQ.companyAnnualRev,
         yearsInBusiness: oldHQ.yearsInBusiness,
-        platformId: oldHQ.platformId,
         tier: oldHQ.tier,
         createdAt: oldHQ.createdAt,
         updatedAt: new Date(),

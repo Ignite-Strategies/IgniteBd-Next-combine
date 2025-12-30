@@ -218,7 +218,7 @@ export async function POST(request) {
       statusCode: statusCode || 202,
     });
   } catch (error) {
-    // Handle error globally (logs to Vercel + Sentry)
+      // Handle error globally (logs to Vercel)
     const normalizedError = handleServerError(error, {
       route: '/api/outreach/send',
       requestUrl: request.url,

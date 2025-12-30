@@ -4,8 +4,7 @@
  * Centralized error handling for server-side code (API routes, server components).
  * Ensures all errors are:
  * 1. Logged to Vercel logs (console.error)
- * 2. Captured by Sentry
- * 3. Re-thrown to propagate properly
+ * 2. Re-thrown to propagate properly
  * 
  * Usage:
  *   try {
@@ -14,8 +13,6 @@
  *     throw handleServerError(error, { route: '/api/example' });
  *   }
  */
-
-import * as Sentry from '@sentry/nextjs';
 
 interface ErrorContext {
   route?: string;
@@ -27,11 +24,10 @@ interface ErrorContext {
 /**
  * Handle a server-side error:
  * - Logs to console (appears in Vercel logs)
- * - Captures in Sentry with context
  * - Returns the normalized error (caller decides whether to re-throw or return HTTP response)
  * 
- * For API routes: Log/capture then return NextResponse.json
- * For server components: Log/capture then re-throw
+ * For API routes: Log then return NextResponse.json
+ * For server components: Log then re-throw
  * 
  * @param error - The error to handle (unknown type for safety)
  * @param context - Optional context for better debugging
@@ -57,20 +53,6 @@ export function handleServerError(
     name: errorName,
     stack: errorStack,
     ...context,
-  });
-
-  // Capture in Sentry with context
-  Sentry.captureException(normalizedError, {
-    tags: {
-      component: 'server',
-      ...(context?.route && { route: context.route }),
-    },
-    extra: {
-      ...context,
-      errorName,
-      errorMessage,
-    },
-    level: 'error',
   });
 
   // Return normalized error (caller decides next step)

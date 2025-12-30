@@ -68,7 +68,7 @@ export async function GET(request) {
       name: owner.sendgridVerifiedName || process.env.SENDGRID_FROM_NAME || null,
     });
   } catch (error) {
-    // Handle error globally (logs to Vercel + Sentry)
+    // Handle error globally (logs to Vercel)
     const normalizedError = handleServerError(error, {
       route: '/api/outreach/verified-senders',
     });
@@ -184,7 +184,7 @@ export async function PUT(request) {
       verifiedName: owner.sendgridVerifiedName,
     });
   } catch (error) {
-    // Handle error globally (logs to Vercel + Sentry)
+    // Handle error globally (logs to Vercel)
     const normalizedError = handleServerError(error, {
       route: '/api/outreach/verified-senders',
     });

@@ -19,9 +19,6 @@ export async function GET(request) {
     // Get Owner
     const owner = await prisma.owners.findUnique({
       where: { firebaseId },
-      include: {
-        superAdmin: true,
-      },
     });
 
     if (!owner) {
@@ -31,20 +28,11 @@ export async function GET(request) {
       );
     }
 
-    // Check if SuperAdmin
-    const isSuperAdmin = !!owner.superAdmin; // If SuperAdmin record exists, they're active
-
-    if (!isSuperAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized: SuperAdmin access required' },
-        { status: 403 },
-      );
-    }
+    // NOTE: SuperAdmin check has been moved to platform manager
+    // This endpoint may need to be moved to platform manager or use a different auth mechanism
 
     // Fetch all CompanyHQs
-    let companyHQs;
-    try {
-      companyHQs = await prisma.companyHQ.findMany({
+    const companyHQs = await prisma.company_hqs.findMany({
         include: {
           owner: {
             select: {
@@ -93,22 +81,6 @@ export async function GET(request) {
           createdAt: 'desc',
         },
       });
-    } catch (error) {
-      // If platformId column doesn't exist, migration hasn't been run
-      if (error.code === 'P2022' && error.message?.includes('platformId')) {
-        console.error('❌ Migration not applied: platformId column missing');
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Database migration required',
-            message: 'The platformId column does not exist. Please run: node scripts/migrate-to-platform-model.js',
-            code: 'MIGRATION_REQUIRED',
-          },
-          { status: 500 },
-        );
-      }
-      throw error;
-    }
 
     return NextResponse.json({
       success: true,

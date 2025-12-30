@@ -4,13 +4,6 @@ import { useEffect } from 'react';
 import { ActivationProvider } from '@/context/ActivationContext.jsx';
 import AppShell from '@/components/AppShell.jsx';
 
-// Lazy load Sentry client config (only in browser, not during build/SSR)
-if (typeof window !== 'undefined') {
-  import('../sentry.client.config').catch(() => {
-    // Silently fail if Sentry config can't be loaded
-  });
-}
-
 export default function Providers({ children }) {
   // Lazy load Firebase and error handler only in browser
   useEffect(() => {
