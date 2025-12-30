@@ -1,25 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { OpenAI } from 'openai';
-import { normalizeTemplateResponse, validateTemplateStructure } from '@/lib/templateNormalizer';
-import { extractVariableNames } from '@/lib/templateVariables';
-
-// Initialize OpenAI client
-let openaiClient = null;
-
-function getOpenAIClient() {
-  if (openaiClient) {
-    return openaiClient;
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
-
-  openaiClient = new OpenAI({ apiKey });
-  return openaiClient;
-}
+import { generateTemplateFromContent } from '@/lib/services/TemplateAIGeneratorService';
 
 /**
  * POST /api/templates/generate-ai

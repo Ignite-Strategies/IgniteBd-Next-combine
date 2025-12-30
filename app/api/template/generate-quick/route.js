@@ -78,14 +78,8 @@ ${idea.trim()}
 Return ONLY valid JSON in this exact format:
 {
   "title": "Simple descriptive title that infers variables (e.g., 'Collaboration Outreach to Old Colleague')",
-  "content": "The email template with {{variableName}} tags",
   "subject": "Simple, human subject line WITHOUT variables (e.g., 'Reaching Out', 'Reconnecting', 'Collaboration in 2026')",
-  "inferred": {
-    "relationship": "COLD" | "WARM" | "ESTABLISHED" | "DORMANT",
-    "ask": "What they want (e.g., 'meet for coffee', 'catch up', 'explore collaboration')",
-    "intent": "Why reaching out (1-2 sentences)"
-  },
-  "suggestedVariables": ["firstName", "companyName", etc.]
+  "body": "The email template with {{variableName}} tags"
 }
 
 IMPORTANT: 

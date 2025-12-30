@@ -39,12 +39,34 @@ export default function TemplateBuilderPage() {
     } else if (isNew) {
       // Check for pre-filled data from query params (AI generation)
       const titleParam = searchParams?.get('title');
-      const subjectParam = searchParams?.get('subject');
+      let subjectParam = searchParams?.get('subject');
       const bodyParam = searchParams?.get('body');
       
       if (titleParam || subjectParam || bodyParam) {
+        // Validate and fix subject - strip variables and fix "Hi," patterns
+        if (subjectParam) {
+          subjectParam = subjectParam.trim();
+          // Remove any {{variables}} from subject
+          subjectParam = subjectParam.replace(/{{.*?}}/g, '').trim();
+          // Fix common bad patterns like "Hi," or "Hi {{firstName}},"
+          if (!subjectParam || subjectParam.match(/^(Hi|Hey|Hello)[,\s]*$/i)) {
+            // Generate simple subject based on body content
+            const bodyLower = (bodyParam || '').toLowerCase();
+            if (bodyLower.includes('collaboration')) {
+              subjectParam = 'Collaboration in 2026';
+            } else if (bodyLower.includes('reconnect') || bodyLower.includes('long time')) {
+              subjectParam = 'Reconnecting';
+            } else {
+              subjectParam = 'Reaching Out';
+            }
+          }
+        } else {
+          subjectParam = '';
+        }
+        
         setTitle(titleParam || '');
-        setSubject(subjectParam || '');
+        setSubject(subjectParam);
+        
         // Replace [Your name] with actual owner name if present
         let bodyContent = bodyParam || '';
         if (owner) {
@@ -59,7 +81,7 @@ export default function TemplateBuilderPage() {
         setLoading(false);
       }
     }
-  }, [templateId, isNew, cloneFrom, searchParams]);
+  }, [templateId, isNew, cloneFrom, searchParams, owner]);
 
   const loadTemplate = async () => {
     try {
