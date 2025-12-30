@@ -9,6 +9,7 @@ import { PRODUCT_CONFIG } from '@/lib/config/productConfig';
 import { mapDatabaseToForm } from '@/lib/services/ProductServiceMapper';
 import { ProductFormFields } from '@/components/forms/ProductFormFields';
 import UniversalParserModal from '@/components/parsers/UniversalParserModal';
+import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 // Default values from config
 const DEFAULT_VALUES = {
@@ -50,16 +51,15 @@ export default function ProductBuilderPage({ searchParams }) {
   const [personas, setPersonas] = useState([]);
   const [isParserModalOpen, setIsParserModalOpen] = useState(false);
 
-  // TODO WEDNESDAY FIX #2: Product creation must store companyHQId (not ownerId)
-  // TODO WEDNESDAY FIX #2: Product editing must maintain companyHQId (not ownerId)
-  const derivedCompanyId = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    return (
-      window.localStorage.getItem('companyId') ||
-      window.localStorage.getItem('companyHQId') ||
-      ''
-    );
-  }, []);
+  // Use hook to get companyHQId (handles refresh if localStorage is empty)
+  const { companyHQId: derivedCompanyId, loading: companyLoading, refresh: refreshCompanyHQ } = useCompanyHQ();
+
+  // Auto-refresh companyHQ if not in localStorage
+  useEffect(() => {
+    if (!derivedCompanyId && !companyLoading && typeof window !== 'undefined') {
+      refreshCompanyHQ();
+    }
+  }, [derivedCompanyId, companyLoading, refreshCompanyHQ]);
 
   const {
     register,
@@ -304,7 +304,7 @@ export default function ProductBuilderPage({ searchParams }) {
           <form onSubmit={onSubmit} className="space-y-6">
             <input
               type="hidden"
-              defaultValue={derivedCompanyId}
+              value={derivedCompanyId || ''}
               {...register('companyId', { required: true })}
             />
 
