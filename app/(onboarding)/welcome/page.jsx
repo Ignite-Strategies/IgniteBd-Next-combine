@@ -190,12 +190,17 @@ export default function WelcomePage() {
       : null;
     
     // If switching to a different company, wipe tenant data first
+    // CRITICAL: Don't wipe companyHQId - we're setting a new one, so just wipe tenant-scoped data
     if (currentCompanyHQId && currentCompanyHQId !== selectedCompanyHqId) {
       console.log(`🔄 Switching tenant from ${currentCompanyHQId} to ${selectedCompanyHqId} - wiping tenant data...`);
+      // Wipe tenant data but preserve companyHQId (we'll set the new one after)
       wipeTenantData({ 
-        preserveCompanyHQ: false,
-        newCompanyHQId: selectedCompanyHqId 
+        preserveCompanyHQ: true, // Preserve companyHQId during wipe
       });
+      // Set new companyHQId after wipe
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('companyHQId', selectedCompanyHqId);
+      }
     }
     
     // Find the selected membership/company data

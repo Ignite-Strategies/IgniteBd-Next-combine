@@ -1,45 +1,66 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo, Suspense, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, User, Building2, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
-export default function ContactSelectPage() {
+function ContactSelectPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  const hasRedirectedRef = useRef(false);
+  
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(null);
-  
-  // Use hook to get companyHQId (fetches from API if not in localStorage)
-  const { companyHQId, loading: companyLoading, refresh } = useCompanyHQ();
 
-  // Fetch companyHQId from API if not in localStorage
+  // Redirect if no companyHQId in URL
   useEffect(() => {
-    if (!companyHQId && !companyLoading) {
-      refresh();
+    if (hasRedirectedRef.current) return;
+    
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        hasRedirectedRef.current = true;
+        router.replace(`/personas/contact-select?companyHQId=${stored}`);
+      } else {
+        hasRedirectedRef.current = true;
+        router.push('/welcome');
+      }
     }
-  }, [companyHQId, companyLoading, refresh]);
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 Contact Select: CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
 
   // Fetch contacts
   useEffect(() => {
-    if (!companyHQId || companyLoading) return;
+    if (!companyHQId) return;
 
     const fetchContacts = async () => {
       setLoading(true);
       setError(null);
       try {
+        console.log('📞 Contact Select: Fetching contacts for companyHQId:', companyHQId);
         const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
         if (response.data?.success && Array.isArray(response.data.contacts)) {
+          console.log(`✅ Contact Select: Fetched ${response.data.contacts.length} contacts for CompanyHQ: ${companyHQId}`);
           setContacts(response.data.contacts);
         } else {
           setError('Failed to load contacts');
         }
       } catch (err) {
-        console.error('Failed to fetch contacts:', err);
+        console.error('❌ Contact Select: Failed to fetch contacts:', err);
         setError(err.response?.data?.error || 'Failed to load contacts');
       } finally {
         setLoading(false);
@@ -47,7 +68,7 @@ export default function ContactSelectPage() {
     };
 
     fetchContacts();
-  }, [companyHQId, companyLoading]);
+  }, [companyHQId]);
 
   // Filter contacts by search query
   const filteredContacts = useMemo(() => {
@@ -69,35 +90,8 @@ export default function ContactSelectPage() {
 
   const handleCreatePersona = () => {
     if (!selectedContactId) return;
-    router.push(`/personas/from-contact?contactId=${selectedContactId}`);
+    router.push(`/personas/from-contact?contactId=${selectedContactId}${companyHQId ? `&companyHQId=${companyHQId}` : ''}`);
   };
-
-  // Show loading while fetching companyHQId
-  if (companyLoading || (!companyHQId && !error)) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-red-600 border-r-transparent"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error if companyHQId still not available after loading
-  if (!companyHQId) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            Unable to load company context. Please ensure you are logged in and try refreshing the page.
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -105,7 +99,7 @@ export default function ContactSelectPage() {
         {/* Header */}
         <div className="mb-6">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push(companyHQId ? `/personas?companyHQId=${companyHQId}` : '/personas')}
             className="mb-4 text-sm text-gray-600 hover:text-gray-900"
           >
             ← Back to Personas
@@ -227,6 +221,23 @@ export default function ContactSelectPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ContactSelectPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-red-600 border-r-transparent"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ContactSelectPageContent />
+    </Suspense>
   );
 }
 

@@ -2,9 +2,10 @@
  * Global Owner Store - Single Source of Truth
  * 
  * This store holds the authenticated owner data.
- * It is populated ONLY by initAuthFlow().
+ * It is populated by the /welcome page during owner hydration.
  * 
  * Components should read from this store, never call hydrate API directly.
+ * The /welcome page is the single source of truth for setting companyHQId.
  */
 
 'use client';

@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Upload,
   List,
@@ -11,15 +11,15 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 
-// ACTION_CARDS will be generated with companyHQId in the component
-
-export default function PeopleHubPage() {
+function PeopleHubPageContent() {
   const router = useRouter();
-  const [companyHQId, setCompanyHQId] = useState('');
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  const hasRedirectedRef = useRef(false);
+  
   const [contactCount, setContactCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [initialSyncComplete, setInitialSyncComplete] = useState(false);
-  const hasRedirectedRef = useRef(false);
 
   // Sync contacts from API (non-blocking, background)
   const syncContacts = useCallback(async (tenantId, showLoading = false) => {
@@ -54,21 +54,22 @@ export default function PeopleHubPage() {
     }
   }, []);
 
-  // Load from localStorage immediately (local-first)
+  // Redirect if no companyHQId in URL
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Prevent multiple redirects
     if (hasRedirectedRef.current) return;
     
-    const storedCompanyHQId =
-      window.localStorage.getItem('companyHQId') ||
-      window.localStorage.getItem('companyId') ||
-      '';
-    setCompanyHQId(storedCompanyHQId);
+    if (!companyHQId && typeof window !== 'undefined') {
+      hasRedirectedRef.current = true;
+      router.push('/welcome');
+    }
+  }, [companyHQId, router]);
 
+  // Load from cache and sync when companyHQId is available
+  useEffect(() => {
+    if (!companyHQId) return;
+    
     // Load from cache immediately - no API call
-    const cachedContacts = window.localStorage.getItem('contacts');
+    const cachedContacts = typeof window !== 'undefined' ? window.localStorage.getItem('contacts') : null;
     if (cachedContacts) {
       try {
         const contacts = JSON.parse(cachedContacts);
@@ -85,14 +86,8 @@ export default function PeopleHubPage() {
     }
 
     // Always do an initial sync to verify data is up to date
-    // This prevents race conditions where cache is stale
-    if (storedCompanyHQId) {
-      syncContacts(storedCompanyHQId, false);
-    } else {
-      // No companyHQId, so sync is complete (nothing to sync)
-      setInitialSyncComplete(true);
-    }
-  }, [syncContacts]);
+    syncContacts(companyHQId, false);
+  }, [companyHQId, syncContacts]);
 
   // Handle redirect after initial sync completes
   useEffect(() => {
@@ -111,7 +106,7 @@ export default function PeopleHubPage() {
       id: 'load',
       title: 'Load Up',
       description: 'Get people into Ignite BD.',
-      route: '/people/load',
+      route: companyHQId ? `/people/load?companyHQId=${companyHQId}` : '/people/load',
       icon: Upload,
       containerClasses:
         'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
@@ -131,7 +126,7 @@ export default function PeopleHubPage() {
       id: 'outreach-prep',
       title: 'Outreach Prep',
       description: 'Build or select contact lists for outreach.',
-      route: '/people/outreach-prep',
+      route: companyHQId ? `/people/outreach-prep?companyHQId=${companyHQId}` : '/people/outreach-prep',
       icon: List,
       containerClasses:
         'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
@@ -210,5 +205,22 @@ export default function PeopleHubPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PeopleHubPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-8">
+            <RefreshCw className="animate-spin h-6 w-6 mx-auto mb-2 text-gray-400" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <PeopleHubPageContent />
+    </Suspense>
   );
 }

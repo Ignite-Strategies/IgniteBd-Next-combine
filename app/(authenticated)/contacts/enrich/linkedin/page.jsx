@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Search, RefreshCw, Linkedin, X, Save, CheckCircle, User, ArrowRight, Mail } from 'lucide-react';
@@ -9,7 +9,9 @@ function LinkedInEnrichContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get('returnTo');
-  const companyHQId = searchParams?.get('companyHQId');
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  const hasRedirectedRef = useRef(false);
+  const urlCheckDoneRef = useRef(false);
   
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,22 +23,40 @@ function LinkedInEnrichContent() {
   // Log CompanyHQ from URL params
   useEffect(() => {
     if (companyHQId) {
-      console.log('🏢 CompanyHQ from URL params:', {
+      console.log('🏢 LinkedIn Enrich: CompanyHQ from URL params:', {
         companyHQId,
         timestamp: new Date().toISOString(),
       });
-    } else {
-      console.warn('⚠️ No companyHQId in URL params - redirecting to get it');
-      // Redirect to get companyHQId if not in URL
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('companyHQId');
-        if (stored) {
-          router.replace(`/contacts/enrich/linkedin?companyHQId=${stored}`);
-        } else {
-          router.push('/people');
-        }
-      }
     }
+  }, [companyHQId]);
+
+  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
+  // NO localStorage fallback - if missing, go to welcome where it gets set
+  // Add small delay to let searchParams load
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    
+    const checkAndRedirect = () => {
+      if (typeof window === 'undefined') return;
+      
+      // Check if URL actually has companyHQId
+      const currentUrl = window.location.href;
+      const urlHasCompanyHQId = currentUrl.includes('companyHQId=');
+      
+      // If URL has companyHQId or searchParams has it, we're good
+      if (urlHasCompanyHQId || companyHQId) {
+        return; // No redirect needed
+      }
+      
+      // URL truly doesn't have companyHQId - redirect to welcome
+      hasRedirectedRef.current = true;
+      console.warn('⚠️ LinkedIn Enrich: No companyHQId in URL - redirecting to welcome');
+      router.push('/welcome');
+    };
+    
+    // Small delay to let searchParams load
+    const timeoutId = setTimeout(checkAndRedirect, 100);
+    return () => clearTimeout(timeoutId);
   }, [companyHQId, router]);
 
   // Apollo enrich call

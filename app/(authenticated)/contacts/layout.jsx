@@ -6,16 +6,28 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
 import { ContactsContext } from './ContactsContext';
 import { ContactListsContext } from './ContactListsContext';
 
 export default function ContactsLayout({ children }) {
+  const pathname = usePathname();
   const { companyHQId } = useCompanyHQ(); // Get companyHQId from hook
   const [contacts, setContacts] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
+  
+  // Skip fetching contacts for enrich routes - they don't need the contacts list
+  // Use safe pathname check with fallback to window.location
+  const isEnrichRoute = useMemo(() => {
+    if (typeof window !== 'undefined' && !pathname) {
+      // Fallback to window.location if pathname not available yet
+      return window.location.pathname?.includes('/contacts/enrich') || false;
+    }
+    return pathname?.includes('/contacts/enrich') || false;
+  }, [pathname]);
   
   // Contact Lists state (local-first)
   const [lists, setLists] = useState([]);
@@ -25,6 +37,13 @@ export default function ContactsLayout({ children }) {
   // Step 2: Fetch from API when companyHQId is available
   // Define refreshContacts as a stable callback for use in context and other components
   const refreshContacts = useCallback(async () => {
+    // Skip fetching for enrich routes
+    if (isEnrichRoute) {
+      setHydrated(true);
+      setHydrating(false);
+      return;
+    }
+    
     if (!companyHQId) {
       console.warn('⚠️ refreshContacts called without companyHQId');
       return;
@@ -51,13 +70,23 @@ export default function ContactsLayout({ children }) {
       console.error('❌ Error fetching contacts:', error);
       console.error('❌ Error response:', error.response?.data);
       // Don't clear contacts on error - keep cached data
+      // Set hydrated to true even on error so components can render
+      setHydrated(true);
     } finally {
       setHydrating(false);
     }
-  }, [companyHQId]);
+  }, [companyHQId, isEnrichRoute]);
 
   // NO localStorage - always fetch from API when companyHQId is available
+  // Skip fetching for enrich routes - they don't need the contacts list
   useEffect(() => {
+    // Skip fetching for enrich routes
+    if (isEnrichRoute) {
+      setHydrated(true);
+      setHydrating(false);
+      return;
+    }
+    
     if (!companyHQId) {
       setContacts([]);
       setHydrated(false);
@@ -92,6 +121,8 @@ export default function ContactsLayout({ children }) {
         console.error('❌ Error fetching contacts:', error);
         console.error('❌ Error response:', error.response?.data);
         // Don't clear contacts on error - keep cached data
+        // Set hydrated to true even on error so components can render
+        setHydrated(true);
       } finally {
         if (isMounted) {
           setHydrating(false);
@@ -104,7 +135,7 @@ export default function ContactsLayout({ children }) {
     return () => {
       isMounted = false;
     };
-  }, [companyHQId]);
+  }, [companyHQId, isEnrichRoute]);
 
   // Step 1: Check localStorage cache on mount for contact lists
   useEffect(() => {
