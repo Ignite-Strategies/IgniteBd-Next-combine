@@ -36,11 +36,8 @@ export async function GET(
     console.log(`🔄 Pick Events API: Calling pickEventsByPreferences...`);
     const pickerResult = await pickEventsByPreferences(tunerId);
     
-    const eventCount = Object.values(pickerResult.eventsByTimeFrame || {}).reduce(
-      (sum, events) => sum + (Array.isArray(events) ? events.length : 0),
-      0
-    );
-    console.log(`✅ Pick Events API: Successfully picked ${eventCount} events across ${Object.keys(pickerResult.eventsByTimeFrame || {}).length} time frames`);
+    const eventCount = pickerResult.eventPickerModel?.length || 0;
+    console.log(`✅ Pick Events API: Successfully received ${eventCount} events from OpenAI`);
 
     return NextResponse.json({
       success: true,

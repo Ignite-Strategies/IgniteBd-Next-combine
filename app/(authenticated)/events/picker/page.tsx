@@ -200,13 +200,12 @@ function EventPickerPageContent() {
       const response = await api.get(`/api/event-tuners/${tunerId}/pick-events`);
 
       if (response.data?.success) {
-        // Store generated events in localStorage (temporary state)
-        const eventsData = {
-          eventsByTimeFrame: response.data.eventsByTimeFrame || {},
-          summary: response.data.summary || '',
-          tunerId: tunerId,
-        };
-        localStorage.setItem('tempPickedEvents', JSON.stringify(eventsData));
+      // Store generated events in localStorage (temporary state)
+      const eventsData = {
+        eventPickerModel: response.data.eventPickerModel || [],
+        tunerId: tunerId,
+      };
+      localStorage.setItem('tempPickedEvents', JSON.stringify(eventsData));
 
         // Navigate AFTER successful generation
         const url = companyHQId 
