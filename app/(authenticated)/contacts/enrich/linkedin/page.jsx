@@ -525,23 +525,23 @@ function LinkedInEnrichContent() {
                 
                 <div className="space-y-3">
                   {savedWithIntelligence ? (
-                    // Enriched save options
+                    // Enriched save options - Persona creation is the primary goal
                     <>
                       <button
                         onClick={() => {
                           setShowSuccessModal(false);
-                          router.push(`/contacts/${savedContactId}?companyHQId=${companyHQId}`);
+                          router.push(`/personas/from-contact?contactId=${savedContactId}&companyHQId=${companyHQId}`);
                         }}
-                        className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
+                        className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
                       >
                         <div className="flex items-center gap-3">
-                          <User className="h-5 w-5 text-blue-600" />
+                          <Sparkles className="h-5 w-5 text-purple-600" />
                           <div>
-                            <div className="font-semibold text-gray-900">View Contact</div>
-                            <div className="text-sm text-gray-600">See full contact details and intelligence</div>
+                            <div className="font-semibold text-gray-900">Develop a Persona</div>
+                            <div className="text-sm text-gray-600">Create a persona from this enriched contact</div>
                           </div>
                         </div>
-                        <ArrowRight className="h-5 w-5 text-blue-600" />
+                        <ArrowRight className="h-5 w-5 text-purple-600" />
                       </button>
 
                       <button
@@ -564,18 +564,18 @@ function LinkedInEnrichContent() {
                       <button
                         onClick={() => {
                           setShowSuccessModal(false);
-                          router.push(`/personas/from-contact?contactId=${savedContactId}&companyHQId=${companyHQId}`);
+                          router.push(`/contacts/${savedContactId}?companyHQId=${companyHQId}`);
                         }}
-                        className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
+                        className="w-full flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-50 px-6 py-4 text-left transition hover:bg-blue-100"
                       >
                         <div className="flex items-center gap-3">
-                          <Sparkles className="h-5 w-5 text-purple-600" />
+                          <User className="h-5 w-5 text-blue-600" />
                           <div>
-                            <div className="font-semibold text-gray-900">Start Persona Flow</div>
-                            <div className="text-sm text-gray-600">Create a persona from this enriched contact</div>
+                            <div className="font-semibold text-gray-900">View Contact</div>
+                            <div className="text-sm text-gray-600">See full contact details and intelligence</div>
                           </div>
                         </div>
-                        <ArrowRight className="h-5 w-5 text-purple-600" />
+                        <ArrowRight className="h-5 w-5 text-blue-600" />
                       </button>
                     </>
                   ) : (
