@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -19,12 +20,32 @@ import {
 function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Get companyHQId from URL params first, then localStorage fallback
+  const [companyHQId, setCompanyHQId] = useState<string>('');
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Try URL params first
+    const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+    if (urlCompanyHQId) {
+      setCompanyHQId(urlCompanyHQId);
+      return;
+    }
+    
+    // Fallback to localStorage
+    const stored = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    if (stored) {
+      setCompanyHQId(stored);
+    }
+  }, [searchParams]);
   
   // Helper to add companyHQId to href if available
   const getHref = (href) => {
     if (companyHQId && !href.includes('companyHQId=')) {
-      return `${href}?companyHQId=${companyHQId}`;
+      const separator = href.includes('?') ? '&' : '?';
+      return `${href}${separator}companyHQId=${companyHQId}`;
     }
     return href;
   };
