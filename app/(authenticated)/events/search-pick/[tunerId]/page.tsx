@@ -151,18 +151,24 @@ function SearchPickPageContent() {
     try {
       setLiking(prev => ({ ...prev, [event.eventTitle]: true }));
 
-      // For now, just mark as liked locally since we don't have eventMetaId
-      // TODO: Update API to handle eventTitle-based likes or create event records
-      setLikedEventTitles(prev => new Set(prev).add(event.eventTitle));
-      
-      // TODO: Call API when backend supports this shape
-      // const response = await api.post('/api/events/ops/like', {
-      //   eventTitle: event.eventTitle,
-      //   companyHQId,
-      //   ownerId,
-      //   eventTunerId: tunerId,
-      //   whyGo: event.whyGo,
-      // });
+      const response = await api.post('/api/events/ops/like', {
+        eventTitle: event.eventTitle,
+        description: event.description,
+        location: event.location,
+        timeFrame: event.timeFrame,
+        sponsor: event.sponsor,
+        costEstimate: event.costEstimate,
+        companyHQId,
+        ownerId,
+        eventTunerId: tunerId,
+        whyGo: event.whyGo,
+      });
+
+      if (response.data?.success) {
+        setLikedEventTitles(prev => new Set(prev).add(event.eventTitle));
+      } else {
+        throw new Error('Failed to save event');
+      }
     } catch (err: any) {
       console.error('Error liking event:', err);
       alert(err.response?.data?.error || 'Failed to save event. Please try again.');

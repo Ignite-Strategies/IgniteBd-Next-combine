@@ -42,7 +42,7 @@ model assessments {
   growthNeeds          String?
   rawGptResponse       String?
   createdAt            DateTime     @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt            DateTime     @updatedAt
   company_hqs          company_hqs? @relation(fields: [companyHQId], references: [id])
   owners               owners       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
@@ -64,11 +64,15 @@ model bd_event_ops {
   city            String?
   state           String?
   country         String?
+  location        String? // Combined location string (e.g., "San Francisco, CA")
+  timeFrame       String? // General timeframe (e.g., "Q1 2025", "Spring 2025", "Early 2025")
+  sponsor         String? // Main sponsor or organizer name
+  costEstimate    String? // Cost estimate (e.g., "$500-$2,000", "Free", "$5,000+")
   costBand        String?
   source          EventSource       @default(MANUAL)
   status          EventOppStatus    @default(CONSIDERING)
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime          @updatedAt
   eventTunerId    String?
   prioritySource  String?
   event_tuners    event_tuners?     @relation(fields: [eventTunerId], references: [id])
@@ -97,7 +101,7 @@ model bd_eventop_intel {
   notes            String?
   status           EventOppStatus @default(CONSIDERING)
   createdAt        DateTime       @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime       @updatedAt
   event_metas      event_metas    @relation(fields: [eventMetaId], references: [id])
 
   @@index([companyHQId])
@@ -176,7 +180,7 @@ model blogs {
   companyHQId  String
   title        String
   createdAt    DateTime    @default(now())
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime    @updatedAt
   blogText     String?
   description  String?
   presenter    String?
@@ -260,7 +264,7 @@ model companies {
   contractId            String?
   invoiceId             String?
   createdAt             DateTime        @default(now())
-  updatedAt             DateTime @updatedAt
+  updatedAt             DateTime        @updatedAt
   category              String?
   companyHealthScore    Int?
   competitors           String[]        @default([])
@@ -299,7 +303,7 @@ model company_hqs {
   companyIndustry                               String?
   teamSize                                      String?
   createdAt                                     DateTime                        @default(now())
-  updatedAt                                     DateTime @updatedAt
+  updatedAt                                     DateTime                        @updatedAt
   ownerId                                       String?
   contactOwnerId                                String?
   managerId                                     String?
@@ -367,7 +371,7 @@ model consultant_deliverables {
   companyHQId      String
   contactCompanyId String?
   createdAt        DateTime    @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime    @updatedAt
   company_hqs      company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   contacts         Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   proposals        proposals?  @relation(fields: [proposalId], references: [id])
@@ -384,7 +388,7 @@ model contact_lists {
   description   String?
   type          String      @default("static")
   createdAt     DateTime    @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime    @updatedAt
   filters       Json?
   totalContacts Int         @default(0)
   lastUpdated   DateTime    @default(now())
@@ -432,7 +436,7 @@ model Contact {
   ownerId                                                   String?
   role                                                      String                    @default("contact")
   createdAt                                                 DateTime                  @default(now())
-  updatedAt                                                 DateTime @updatedAt
+  updatedAt                                                 DateTime                  @updatedAt
   averageTenureMonths                                       Float?
   avgTenureYears                                            Float?
   budgetAuthority                                           Boolean?
@@ -557,7 +561,7 @@ model email_activities {
   event               String?
   messageId           String           @unique
   createdAt           DateTime         @default(now())
-  updatedAt           DateTime @updatedAt
+  updatedAt           DateTime         @updatedAt
   campaign_id         String?
   sequence_id         String?
   sequence_step_id    String?
@@ -711,7 +715,7 @@ model event_tuners {
   travelDistance        TravelDistance?
   isActive              Boolean                @default(true)
   createdAt             DateTime               @default(now())
-  updatedAt             DateTime @updatedAt
+  updatedAt             DateTime               @updatedAt
   bd_event_ops          bd_event_ops[]
   event_tuner_personas  event_tuner_personas[]
   event_tuner_states    event_tuner_states[]
@@ -745,7 +749,7 @@ model invoice_milestones {
   description    String?
   status         String     @default("pending")
   createdAt      DateTime   @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime   @updatedAt
   invoices       invoices   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   payments       payments[]
 
@@ -761,7 +765,7 @@ model invoice_template_milestones {
   expectedDate      DateTime?
   description       String?
   createdAt         DateTime          @default(now())
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime          @updatedAt
   invoice_templates invoice_templates @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@index([templateId])
@@ -772,7 +776,7 @@ model invoice_templates {
   name                        String
   notes                       String?
   createdAt                   DateTime                      @default(now())
-  updatedAt                   DateTime @updatedAt
+  updatedAt                   DateTime                      @updatedAt
   invoice_template_milestones invoice_template_milestones[]
 }
 
@@ -785,7 +789,7 @@ model invoices {
   totalReceived           Int                  @default(0)
   status                  String               @default("pending")
   createdAt               DateTime             @default(now())
-  updatedAt               DateTime @updatedAt
+  updatedAt               DateTime             @updatedAt
   invoiceNumber           String?
   amount                  Float?
   currency                String               @default("USD")
@@ -813,7 +817,7 @@ model landing_pages {
   published   Boolean     @default(false)
   publishedAt DateTime?
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime    @updatedAt
   presenter   String?
   company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
@@ -835,7 +839,7 @@ model owners {
   microsoftDisplayName                      String?
   microsoftTenantId                         String?
   createdAt                                 DateTime              @default(now())
-  updatedAt                                 DateTime @updatedAt
+  updatedAt                                 DateTime              @updatedAt
   firstName                                 String?
   lastName                                  String?
   sendgridVerifiedEmail                     String?
@@ -898,7 +902,7 @@ model personas {
   decisionDrivers      String[]
   buyerTriggers        String[]
   createdAt            DateTime               @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt            DateTime               @updatedAt
   productId            String?
   bd_intels            bd_intels? // Legacy - will be removed after migration
   event_tuner_personas event_tuner_personas[]
@@ -948,7 +952,7 @@ model platform {
   id           String         @id @default(cuid())
   name         String
   createdAt    DateTime       @default(now())
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime       @updatedAt
   company_hqs  company_hqs[]
   super_admins super_admins[]
 }
@@ -962,7 +966,7 @@ model presentations {
   published         Boolean     @default(false)
   publishedAt       DateTime?
   createdAt         DateTime    @default(now())
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime    @updatedAt
   feedback          Json?
   gammaBlob         String?
   gammaDeckUrl      String?
@@ -1006,7 +1010,7 @@ model products {
   competitiveAdvantages String?
   targetedTo            String?
   createdAt             DateTime       @default(now())
-  updatedAt             DateTime @updatedAt
+  updatedAt             DateTime       @updatedAt
   personas              personas[]
   product_fits          product_fits[]
   company_hqs           company_hqs    @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
@@ -1022,7 +1026,7 @@ model proposal_deliverables {
   totalPrice  Float?
   notes       String?
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
   proposals   proposals @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
   @@index([proposalId])
@@ -1037,7 +1041,7 @@ model proposal_phases {
   durationWeeks   Int
   order           Int
   createdAt       DateTime         @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime         @updatedAt
   phase_templates phase_templates? @relation(fields: [phaseTemplateId], references: [id])
   proposals       proposals        @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
@@ -1060,7 +1064,7 @@ model proposals {
   dateIssued              DateTime?
   preparedBy              String?
   createdAt               DateTime                  @default(now())
-  updatedAt               DateTime @updatedAt
+  updatedAt               DateTime                  @updatedAt
   consultant_deliverables consultant_deliverables[]
   proposal_deliverables   proposal_deliverables[]
   proposal_phases         proposal_phases[]
@@ -1191,7 +1195,7 @@ model work_collateral {
   reviewRequestedAt DateTime?
   reviewCompletedAt DateTime?
   createdAt         DateTime             @default(now())
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime             @updatedAt
 
   @@index([presentationId])
   @@index([status])
@@ -1240,7 +1244,7 @@ model work_package_phases {
   estimatedEndDate    DateTime?
   estimatedStartDate  DateTime?
   status              String?
-  updatedAt           DateTime @updatedAt             @default(now())
+  updatedAt           DateTime             @default(now()) @updatedAt
   work_package_items  work_package_items[]
   work_packages       work_packages        @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
 
@@ -1258,7 +1262,7 @@ model work_packages {
   totalCost                                            Float?
   effectiveStartDate                                   DateTime?
   createdAt                                            DateTime              @default(now())
-  updatedAt                                            DateTime @updatedAt
+  updatedAt                                            DateTime              @updatedAt
   workPackageOwnerId                                   String
   workPackageClientId                                  String
   workPackageMemberId                                  String?
