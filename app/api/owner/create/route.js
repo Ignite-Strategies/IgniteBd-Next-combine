@@ -19,9 +19,33 @@ export async function POST(request) {
       );
     }
 
+    // FIRST: Try to find by firebaseId (primary lookup)
     let owner = await prisma.owners.findUnique({
       where: { firebaseId },
     });
+
+    // SECOND: If not found by firebaseId, try to find by email (fallback for account linking)
+    if (!owner && email) {
+      console.log('🔍 OwnerCreate: Not found by firebaseId, trying email lookup:', email);
+      owner = await prisma.owners.findFirst({
+        where: { 
+          email: email,
+        },
+      });
+      
+      // If found by email but firebaseId is different, update it (account linking)
+      if (owner && owner.firebaseId !== firebaseId) {
+        console.log('🔗 OwnerCreate: Linking account - updating firebaseId for existing owner:', owner.id);
+        owner = await prisma.owners.update({
+          where: { id: owner.id },
+          data: {
+            firebaseId: firebaseId, // Link the new firebaseId to existing account
+            updatedAt: new Date(),
+          },
+        });
+        console.log('✅ OwnerCreate: Account linked successfully');
+      }
+    }
 
     if (!owner) {
       // Create with firstName and lastName (and legacy name for backward compatibility)
@@ -39,7 +63,7 @@ export async function POST(request) {
           photoURL: photoURL || null,
         },
       });
-      console.log('✅ Created new owner:', owner.id, { firebaseId, email });
+      console.log('✅ Created new owner:', owner.id, { firebaseId, email, firstName, lastName });
     } else {
       // Update existing owner with latest info from sign-in (but preserve existing data)
       const updateData = {};
