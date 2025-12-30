@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import { Search, RefreshCw, Linkedin, X, Save, CheckCircle, User, ArrowRight, Mail, Sparkles } from 'lucide-react';
+import IntelligencePreview from '@/components/enrichment/IntelligencePreview';
 
 function LinkedInEnrichContent() {
   const router = useRouter();
@@ -199,13 +200,24 @@ function LinkedInEnrichContent() {
         matches: createdContact.crmId === companyHQId,
       });
 
-      // Step 2: Save enrichment
+      // Step 2: Save enrichment with intelligence if available
       console.log('📤 Saving enrichment for contact:', { contactId, companyHQId });
+      const hasIntelligence = !!(enrichmentData.intelligenceScores && enrichmentData.companyIntelligence);
       const saveResponse = await api.post('/api/contacts/enrich/save', {
         contactId,
         rawEnrichmentPayload: enrichmentData.rawEnrichmentPayload,
         companyHQId,
-        skipIntelligence: true, // Skip intelligence for now
+        skipIntelligence: !hasIntelligence,
+        // Send intelligence data directly if available
+        ...(hasIntelligence ? {
+          profileSummary: enrichmentData.profileSummary,
+          tenureYears: enrichmentData.tenureYears,
+          currentTenureYears: enrichmentData.currentTenureYears,
+          totalExperienceYears: enrichmentData.totalExperienceYears,
+          avgTenureYears: enrichmentData.avgTenureYears,
+          careerTimeline: enrichmentData.careerTimeline,
+          companyPositioning: enrichmentData.companyPositioning,
+        } : {}),
       });
 
       console.log('✅ Enrichment saved:', {
@@ -227,10 +239,10 @@ function LinkedInEnrichContent() {
     }
   }
 
-  // Enrich Full Profile - generates intelligence and goes to intelligence preview page
+  // Enrich Full Profile - generates intelligence and displays inline (no navigation)
   async function handleEnrichFullProfile() {
-    if (!enrichmentData || !url) {
-      alert('Please enrich the contact first');
+    if (!url) {
+      alert('Please enter a LinkedIn URL first');
       return;
     }
 
@@ -244,23 +256,36 @@ function LinkedInEnrichContent() {
     try {
       console.log('🧠 Generating full intelligence profile for:', url);
 
-      // Call generate-intel API to create intelligence scores and get previewId
+      // Call generate-intel API - returns all data in response (no Redis needed)
       const intelResponse = await api.post('/api/contacts/enrich/generate-intel', {
         linkedinUrl: url,
       });
 
-      if (!intelResponse.data?.success || !intelResponse.data?.previewId) {
+      if (!intelResponse.data?.success) {
         throw new Error(intelResponse.data?.error || 'Failed to generate intelligence');
       }
 
-      const previewId = intelResponse.data.previewId;
-      console.log('✅ Intelligence generated, previewId:', previewId);
+      console.log('✅ Intelligence generated, storing in state');
 
-      // Navigate to intelligence preview page
-      router.push(`/contacts/enrich/intelligence?previewId=${previewId}&companyHQId=${companyHQId}`);
+      // Store all intelligence data in component state (stays on same page)
+      setEnrichmentData({
+        rawEnrichmentPayload: intelResponse.data.rawEnrichmentPayload,
+        normalizedContact: intelResponse.data.normalizedContact,
+        normalizedCompany: intelResponse.data.normalizedCompany,
+        intelligenceScores: intelResponse.data.intelligenceScores,
+        companyIntelligence: intelResponse.data.companyIntelligence,
+        profileSummary: intelResponse.data.profileSummary,
+        tenureYears: intelResponse.data.tenureYears,
+        currentTenureYears: intelResponse.data.currentTenureYears,
+        totalExperienceYears: intelResponse.data.totalExperienceYears,
+        avgTenureYears: intelResponse.data.avgTenureYears,
+        careerTimeline: intelResponse.data.careerTimeline,
+        companyPositioning: intelResponse.data.companyPositioning,
+      });
     } catch (err) {
       console.error('❌ Full profile enrichment error:', err);
       alert(err.response?.data?.error || err.message || 'Failed to generate full profile');
+    } finally {
       setEnrichingFullProfile(false);
     }
   }
@@ -407,6 +432,57 @@ function LinkedInEnrichContent() {
                   <>
                     <Save className="h-5 w-5" />
                     <span>Save Contact</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Intelligence Preview - Show when intelligence data is available */}
+        {enrichmentData && enrichmentData.intelligenceScores && enrichmentData.companyIntelligence && (
+          <div className="space-y-6 mb-6">
+            <IntelligencePreview
+              normalizedContact={enrichmentData.normalizedContact}
+              normalizedCompany={enrichmentData.normalizedCompany}
+              intelligenceScores={enrichmentData.intelligenceScores}
+              companyIntelligence={enrichmentData.companyIntelligence}
+              linkedinUrl={url}
+              profileSummary={enrichmentData.profileSummary}
+              tenureYears={enrichmentData.tenureYears}
+              currentTenureYears={enrichmentData.currentTenureYears}
+              totalExperienceYears={enrichmentData.totalExperienceYears}
+              avgTenureYears={enrichmentData.avgTenureYears}
+              careerTimeline={enrichmentData.careerTimeline}
+              companyPositioning={enrichmentData.companyPositioning}
+            />
+
+            {/* Save Button for Intelligence-Enriched Contact */}
+            <div className="flex justify-end gap-3 bg-white rounded-lg p-4 shadow">
+              <button
+                onClick={() => {
+                  setEnrichmentData(null);
+                  setUrl('');
+                }}
+                className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                disabled={saving}
+              >
+                Start Over
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Saving Enriched Contact...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Save Enriched Contact
                   </>
                 )}
               </button>
