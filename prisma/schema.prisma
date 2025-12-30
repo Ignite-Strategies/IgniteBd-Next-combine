@@ -9,7 +9,7 @@ datasource db {
 }
 
 model GoogleOAuthToken {
-  id           String   @id
+  id           String   @id @default(cuid())
   ownerId      String
   provider     String   @default("google")
   refreshToken String
@@ -24,7 +24,7 @@ model GoogleOAuthToken {
 }
 
 model assessments {
-  id                   String       @id
+  id                   String       @id @default(cuid())
   ownerId              String
   companyHQId          String?
   name                 String
@@ -51,7 +51,7 @@ model assessments {
 }
 
 model bd_event_ops {
-  id              String            @id
+  id              String            @id @default(cuid())
   companyHQId     String
   ownerId         String
   eventPlanId     String?
@@ -84,7 +84,7 @@ model bd_event_ops {
 }
 
 model bd_eventop_intel {
-  id               String         @id
+  id               String         @id @default(cuid())
   companyHQId      String
   ownerId          String
   eventMetaId      String
@@ -109,7 +109,7 @@ model bd_eventop_intel {
 
 // Legacy model - will be removed after migration to contact_analyses
 model bd_intels {
-  id                    String   @id
+  id                    String   @id @default(cuid())
   personaId             String   @unique
   fitScore              Int
   painAlignmentScore    Int
@@ -129,7 +129,7 @@ model bd_intels {
 
 // Contact Analysis - for REAL contacts (meeting prep), not hypothetical personas
 model contact_analyses {
-  id                    String   @id @default(cuid())
+  id                    String   @id @default(cuid()) @default(cuid())
   contactId             String   @unique
   fitScore              Int?
   painAlignmentScore    Int?
@@ -150,7 +150,7 @@ model contact_analyses {
 }
 
 model bdos_scores {
-  id               String   @id
+  id               String   @id @default(cuid())
   contactId        String
   productId        String
   personaId        String?
@@ -172,7 +172,7 @@ model bdos_scores {
 }
 
 model blogs {
-  id           String      @id
+  id           String      @id @default(cuid())
   companyHQId  String
   title        String
   createdAt    DateTime    @default(now())
@@ -189,7 +189,7 @@ model blogs {
 }
 
 model campaigns {
-  id               String             @id
+  id               String             @id @default(cuid())
   owner_id         String
   company_hq_id    String?
   name             String
@@ -235,7 +235,7 @@ model campaigns {
 }
 
 model client_uploads {
-  id           String   @id
+  id           String   @id @default(cuid())
   ownerId      String
   fileUrl      String
   originalName String
@@ -248,7 +248,7 @@ model client_uploads {
 }
 
 model companies {
-  id                    String          @id
+  id                    String          @id @default(cuid())
   companyHQId           String
   companyName           String
   address               String?
@@ -289,7 +289,7 @@ model companies {
 }
 
 model company_hqs {
-  id                                            String                          @id
+  id                                            String                          @id @default(cuid())
   companyName                                   String
   companyStreet                                 String?
   companyCity                                   String?
@@ -336,7 +336,7 @@ model company_hqs {
 }
 
 model company_memberships {
-  id          String      @id
+  id          String      @id @default(cuid())
   userId      String
   companyHqId String
   role        String
@@ -351,7 +351,7 @@ model company_memberships {
 }
 
 model consultant_deliverables {
-  id               String      @id
+  id               String      @id @default(cuid())
   contactId        String
   title            String
   description      String?
@@ -378,7 +378,7 @@ model consultant_deliverables {
 }
 
 model contact_lists {
-  id            String      @id
+  id            String      @id @default(cuid())
   companyId     String
   name          String
   description   String?
@@ -399,7 +399,7 @@ model contact_lists {
 }
 
 model Contact {
-  id                                                        String                    @id @default(cuid())
+  id                                                        String                    @id @default(cuid()) @default(cuid())
   crmId                                                     String
   firstName                                                 String?
   lastName                                                  String?
@@ -493,7 +493,7 @@ model Contact {
 }
 
 model deliverable_templates {
-  id                          String                        @id
+  id                          String                        @id @default(cuid())
   companyHQId                 String
   deliverableType             String
   deliverableLabel            String
@@ -508,7 +508,7 @@ model deliverable_templates {
 }
 
 model domain_registry {
-  id              String      @id
+  id              String      @id @default(cuid())
   domain          String      @unique
   normalizedName  String?
   companyHqId     String      @unique
@@ -522,7 +522,7 @@ model domain_registry {
 }
 
 model ecosystem_orgs {
-  id                          String                @id
+  id                          String                @id @default(cuid())
   name                        String
   website                     String?
   city                        String?
@@ -547,7 +547,7 @@ model ecosystem_orgs {
 }
 
 model email_activities {
-  id                  String           @id
+  id                  String           @id @default(cuid())
   owner_id            String
   contact_id          String?
   tenant_id           String?
@@ -576,7 +576,7 @@ model email_activities {
 }
 
 model email_sequences {
-  id                  String             @id
+  id                  String             @id @default(cuid())
   campaign_id         String?
   owner_id            String
   company_hq_id       String?
@@ -606,7 +606,7 @@ model email_sequences {
 }
 
 model email_signatures {
-  id         String   @id
+  id         String   @id @default(cuid())
   owner_id   String
   name       String
   content    String
@@ -620,7 +620,7 @@ model email_signatures {
 }
 
 model event_metas {
-  id               String             @id
+  id               String             @id @default(cuid())
   name             String
   seriesName       String?
   eventType        EventType
@@ -645,7 +645,7 @@ model event_metas {
 }
 
 model event_plan_opps {
-  id           String       @id
+  id           String       @id @default(cuid())
   eventPlanId  String
   bdEventOppId String
   order        Int?
@@ -658,7 +658,7 @@ model event_plan_opps {
 }
 
 model event_plans {
-  id           String   @id
+  id           String   @id @default(cuid())
   companyHQId  String
   description  String?
   createdAt    DateTime @default(now())
@@ -676,7 +676,7 @@ model event_plans {
 }
 
 model event_tuner_personas {
-  id           String       @id
+  id           String       @id @default(cuid())
   eventTunerId String
   personaId    String
   createdAt    DateTime     @default(now())
@@ -689,7 +689,7 @@ model event_tuner_personas {
 }
 
 model event_tuner_states {
-  id           String       @id
+  id           String       @id @default(cuid())
   eventTunerId String
   state        String
   createdAt    DateTime     @default(now())
@@ -701,7 +701,7 @@ model event_tuner_states {
 }
 
 model event_tuners {
-  id                    String                 @id
+  id                    String                 @id @default(cuid())
   companyHQId           String
   ownerId               String
   name                  String
@@ -722,7 +722,7 @@ model event_tuners {
 }
 
 model invite_tokens {
-  id        String   @id
+  id        String   @id @default(cuid())
   contactId String
   email     String
   token     String   @unique
@@ -737,7 +737,7 @@ model invite_tokens {
 }
 
 model invoice_milestones {
-  id             String     @id
+  id             String     @id @default(cuid())
   invoiceId      String
   label          String
   expectedAmount Int
@@ -754,7 +754,7 @@ model invoice_milestones {
 }
 
 model invoice_template_milestones {
-  id                String            @id
+  id                String            @id @default(cuid())
   templateId        String
   label             String
   expectedAmount    Float
@@ -768,7 +768,7 @@ model invoice_template_milestones {
 }
 
 model invoice_templates {
-  id                          String                        @id
+  id                          String                        @id @default(cuid())
   name                        String
   notes                       String?
   createdAt                   DateTime                      @default(now())
@@ -777,7 +777,7 @@ model invoice_templates {
 }
 
 model invoices {
-  id                      String               @id
+  id                      String               @id @default(cuid())
   workPackageId           String
   invoiceName             String
   invoiceDescription      String?
@@ -804,7 +804,7 @@ model invoices {
 }
 
 model landing_pages {
-  id          String      @id
+  id          String      @id @default(cuid())
   companyHQId String
   title       String
   url         String?
@@ -822,7 +822,7 @@ model landing_pages {
 }
 
 model owners {
-  id                                        String                @id
+  id                                        String                @id @default(cuid())
   firebaseId                                String                @unique
   name                                      String?
   email                                     String?
@@ -855,7 +855,7 @@ model owners {
 }
 
 model payments {
-  id                    String              @id
+  id                    String              @id @default(cuid())
   invoiceId             String
   milestoneId           String?
   amountReceived        Int
@@ -875,7 +875,7 @@ model payments {
 }
 
 model personas {
-  id                   String                 @id
+  id                   String                 @id @default(cuid())
   companyHQId          String
   personName           String                 @default("")
   title                String
@@ -908,7 +908,7 @@ model personas {
 }
 
 model phase_deliverable_templates {
-  id                    String                @id
+  id                    String                @id @default(cuid())
   phaseTemplateId       String
   deliverableTemplateId String
   defaultQuantity       Int?                  @default(1)
@@ -921,7 +921,7 @@ model phase_deliverable_templates {
 }
 
 model phase_templates {
-  id                          String                        @id
+  id                          String                        @id @default(cuid())
   companyHQId                 String
   name                        String
   description                 String?
@@ -935,7 +935,7 @@ model phase_templates {
 }
 
 model pipelines {
-  id        String   @id
+  id        String   @id @default(cuid())
   contactId String   @unique
   pipeline  String
   stage     String
@@ -945,7 +945,7 @@ model pipelines {
 }
 
 model platform {
-  id           String         @id
+  id           String         @id @default(cuid())
   name         String
   createdAt    DateTime       @default(now())
   updatedAt    DateTime
@@ -954,7 +954,7 @@ model platform {
 }
 
 model presentations {
-  id                String      @id
+  id                String      @id @default(cuid())
   companyHQId       String
   title             String
   description       String?
@@ -978,7 +978,7 @@ model presentations {
 }
 
 model product_fits {
-  id                 String   @id
+  id                 String   @id @default(cuid())
   personaId          String   @unique
   productId          String
   valuePropToThem    String
@@ -990,7 +990,7 @@ model product_fits {
 }
 
 model products {
-  id                    String         @id @default(cuid())
+  id                    String         @id @default(cuid()) @default(cuid())
   companyHQId           String
   name                  String
   description           String?
@@ -1013,7 +1013,7 @@ model products {
 }
 
 model proposal_deliverables {
-  id          String    @id
+  id          String    @id @default(cuid())
   proposalId  String
   name        String
   description String?
@@ -1029,7 +1029,7 @@ model proposal_deliverables {
 }
 
 model proposal_phases {
-  id              String           @id
+  id              String           @id @default(cuid())
   proposalId      String
   phaseTemplateId String?
   name            String
@@ -1045,7 +1045,7 @@ model proposal_phases {
 }
 
 model proposals {
-  id                      String                    @id
+  id                      String                    @id @default(cuid())
   title                   String
   companyHQId             String
   contactId               String
@@ -1070,7 +1070,7 @@ model proposals {
 }
 
 model prospect_candidates {
-  id          String   @id
+  id          String   @id @default(cuid())
   userId      String
   firstName   String?
   lastName    String?
@@ -1084,7 +1084,7 @@ model prospect_candidates {
 }
 
 model saved_events {
-  id               String   @id
+  id               String   @id @default(cuid())
   userId           String
   eventName        String
   eventSeriesName  String?
@@ -1107,7 +1107,7 @@ model saved_events {
 }
 
 model sequence_steps {
-  id               String             @id
+  id               String             @id @default(cuid())
   sequence_id      String
   step_number      Int
   name             String?
@@ -1136,7 +1136,7 @@ model sequence_steps {
 }
 
 model super_admins {
-  id         String   @id
+  id         String   @id @default(cuid())
   ownerId    String   @unique
   createdAt  DateTime @default(now())
   updatedAt  DateTime
@@ -1148,7 +1148,7 @@ model super_admins {
 }
 
 model template_relationship_helpers {
-  id               String      @id
+  id               String      @id @default(cuid())
   ownerId          String
   relationshipType String
   familiarityLevel String
@@ -1164,7 +1164,7 @@ model template_relationship_helpers {
 }
 
 model templates {
-  id          String      @id @default(cuid())
+  id          String      @id @default(cuid()) @default(cuid())
   subject     String
   body        String
   createdAt   DateTime    @default(now())
@@ -1180,7 +1180,7 @@ model templates {
 }
 
 model work_collateral {
-  id                String               @id
+  id                String               @id @default(cuid())
   workPackageId     String?
   workPackageItemId String?
   presentationId    String?
@@ -1201,7 +1201,7 @@ model work_collateral {
 }
 
 model work_package_items {
-  id                     String                @id
+  id                     String                @id @default(cuid())
   workPackageId          String
   workPackagePhaseId     String
   deliverableType        String
@@ -1227,7 +1227,7 @@ model work_package_items {
 }
 
 model work_package_phases {
-  id                  String               @id
+  id                  String               @id @default(cuid())
   workPackageId       String
   name                String
   position            Int
@@ -1250,7 +1250,7 @@ model work_package_phases {
 }
 
 model work_packages {
-  id                                                   String                @id
+  id                                                   String                @id @default(cuid())
   companyId                                            String
   title                                                String
   description                                          String?
