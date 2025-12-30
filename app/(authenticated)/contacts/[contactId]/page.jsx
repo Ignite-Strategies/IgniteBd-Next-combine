@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -11,6 +11,8 @@ import CompanySelector from '@/components/CompanySelector';
 
 export default function ContactDetailPage({ params }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : '') || '';
   const { contacts, refreshContacts } = useContactsContext();
   const [lists, setLists] = useState([]);
   const [loadingLists, setLoadingLists] = useState(false);
@@ -499,7 +501,12 @@ export default function ContactDetailPage({ params }) {
                     </button>
                     {contact?.email && (
                       <button
-                        onClick={() => router.push(`/outreach/compose?contactId=${contactId}`)}
+                        onClick={() => {
+                          const url = companyHQId 
+                            ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
+                            : `/outreach/compose?contactId=${contactId}`;
+                          router.push(url);
+                        }}
                         className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                         title="Send Email"
                       >
@@ -548,7 +555,12 @@ export default function ContactDetailPage({ params }) {
                     </button>
                     {contact?.email && (
                       <button
-                        onClick={() => router.push(`/outreach/compose?contactId=${contactId}`)}
+                        onClick={() => {
+                          const url = companyHQId 
+                            ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
+                            : `/outreach/compose?contactId=${contactId}`;
+                          router.push(url);
+                        }}
                         className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                         title="Send Email"
                       >

@@ -16,6 +16,7 @@ function PreviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestId = searchParams.get('requestId');
+  const companyHQId = searchParams.get('companyHQId') || (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : '') || '';
 
   const [previewPayload, setPreviewPayload] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +85,8 @@ function PreviewContent() {
         
         // Redirect back to compose after 3 seconds
         setTimeout(() => {
-          router.push('/outreach/compose');
+          const url = companyHQId ? `/outreach/compose?companyHQId=${companyHQId}` : '/outreach/compose';
+          router.push(url);
         }, 3000);
       } else {
         setError(response.data?.error || 'Failed to send email');

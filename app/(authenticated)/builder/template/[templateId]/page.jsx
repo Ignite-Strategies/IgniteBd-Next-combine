@@ -275,10 +275,11 @@ export default function TemplateBuilderPage() {
               <div className="mt-3 flex flex-wrap gap-3">
                 <button
                   onClick={() => {
+                    const baseUrl = companyHQId ? `/outreach/compose?companyHQId=${companyHQId}` : '/outreach/compose';
                     if (currentTemplateId && currentTemplateId !== 'new') {
-                      router.push(`/outreach/compose?templateId=${currentTemplateId}`);
+                      router.push(`${baseUrl}&templateId=${currentTemplateId}`);
                     } else {
-                      router.push('/outreach/compose');
+                      router.push(baseUrl);
                     }
                   }}
                   className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition"

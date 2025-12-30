@@ -12,6 +12,7 @@ function ContactListSuccessContent() {
   const listName = searchParams.get('listName');
   const contactCount = searchParams.get('contactCount');
   const returnTo = searchParams.get('returnTo');
+  const companyHQId = searchParams.get('companyHQId') || (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : '') || '';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

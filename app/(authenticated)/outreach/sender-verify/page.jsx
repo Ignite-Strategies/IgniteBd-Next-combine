@@ -9,7 +9,7 @@ import { useOwner } from '@/hooks/useOwner';
 
 export default function SenderVerifyPage() {
   const router = useRouter();
-  const { ownerId } = useOwner();
+  const { ownerId, companyHQId } = useOwner();
   
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -142,7 +142,8 @@ export default function SenderVerifyPage() {
         await loadCurrentSender();
         // Redirect back after a moment
         setTimeout(() => {
-          router.push('/outreach/compose');
+          const url = companyHQId ? `/outreach/compose?companyHQId=${companyHQId}` : '/outreach/compose';
+          router.push(url);
         }, 1500);
       } else {
         setError(response.data?.error || 'Failed to assign sender');
