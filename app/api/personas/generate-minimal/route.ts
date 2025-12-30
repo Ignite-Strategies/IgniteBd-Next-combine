@@ -2,12 +2,22 @@
  * POST /api/personas/generate-minimal
  * 
  * MVP1: Generate minimal persona (who they are, what company, core goal)
- * No product complexity - just the essentials
+ * 
+ * Flow:
+ * 1. Fetch contact and companyHQ from DB
+ * 2. Prepare data for prompt
+ * 3. Build AI prompts
+ * 4. Call OpenAI
+ * 5. Parse response
+ * 6. Return persona
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PersonaMinimalService } from '@/lib/services/PersonaMinimalService';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { PersonaPromptPrepService } from '@/lib/services/PersonaPromptPrepService';
+import { PersonaMinimalPromptService } from '@/lib/services/PersonaMinimalPromptService';
+import { PersonaParsingService } from '@/lib/services/PersonaParsingService';
+import { OpenAI } from 'openai';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +31,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { contactId, contactData, companyHQId, description } = body;
+    const { contactId, companyHQId, description } = body;
+
+    if (!contactId) {
+      return NextResponse.json(
+        { success: false, error: 'contactId is required' },
+        { status: 400 }
+      );
+    }
 
     if (!companyHQId) {
       return NextResponse.json(
@@ -30,27 +47,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate minimal persona - pass contactData if provided to avoid fetching
-    const result = await PersonaMinimalService.generate({
+    // Step 1: Prepare data (fetch contact and companyHQ from DB)
+    const prepResult = await PersonaPromptPrepService.prepare({
       contactId,
-      contactData, // Pass contact data directly if available
       companyHQId,
-      description,
     });
 
-    if (!result.success) {
+    if (!prepResult.success || !prepResult.data) {
       return NextResponse.json(
         {
           success: false,
-          error: result.error || 'Failed to generate minimal persona',
+          error: prepResult.error || 'Failed to prepare persona data',
         },
         { status: 400 }
       );
     }
 
+    // Step 2: Build prompts
+    const { systemPrompt, userPrompt } = PersonaMinimalPromptService.buildPrompts(
+      prepResult.data,
+      description
+    );
+
+    // Step 3: Call OpenAI
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const model = process.env.OPENAI_MODEL || 'gpt-4o';
+
+    console.log(`🤖 Generating minimal persona (${model})...`);
+
+    const completion = await openai.chat.completions.create({
+      model,
+      temperature: 0.7,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const content = completion.choices?.[0]?.message?.content;
+    if (!content) {
+      return NextResponse.json(
+        { success: false, error: 'No response from OpenAI' },
+        { status: 500 }
+      );
+    }
+
+    // Step 4: Parse response
+    const persona = PersonaParsingService.parse(content);
+
     return NextResponse.json({
       success: true,
-      persona: result.persona,
+      persona,
     });
   } catch (error: any) {
     console.error('❌ Persona generate-minimal error:', error);

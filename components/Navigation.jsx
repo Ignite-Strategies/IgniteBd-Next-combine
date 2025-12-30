@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TrendingUp, Settings, Menu, X } from 'lucide-react';
+import { TrendingUp, Settings, Menu, X, Package } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/growth-dashboard', label: 'Growth Dashboard', icon: TrendingUp },
+  { path: '/products', label: 'Products', icon: Package },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 

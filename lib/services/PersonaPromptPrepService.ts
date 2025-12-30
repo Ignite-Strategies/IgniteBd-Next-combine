@@ -1,0 +1,88 @@
+/**
+ * PersonaPromptPrepService
+ * 
+ * Prepares data needed for persona generation:
+ * - Fetches contact from DB
+ * - Fetches companyHQ from DB
+ * - Returns structured data for prompt building
+ */
+
+import { prisma } from '@/lib/prisma';
+
+export interface PreparedData {
+  contact: {
+    firstName?: string;
+    lastName?: string;
+    title?: string;
+    companyName?: string;
+    companyIndustry?: string;
+  } | null;
+  companyHQ: {
+    companyName: string;
+    companyIndustry?: string;
+    whatYouDo?: string;
+  };
+}
+
+export class PersonaPromptPrepService {
+  /**
+   * Prepare data for persona generation
+   */
+  static async prepare(params: {
+    contactId: string;
+    companyHQId: string;
+  }): Promise<{
+    success: boolean;
+    data?: PreparedData;
+    error?: string;
+  }> {
+    try {
+      const { contactId, companyHQId } = params;
+
+      if (!prisma) {
+        return { success: false, error: 'Database connection not available' };
+      }
+
+      // Fetch contact and companyHQ in parallel
+      const [contact, companyHQ] = await Promise.all([
+        prisma.contact.findUnique({
+          where: { id: contactId },
+          select: {
+            firstName: true,
+            lastName: true,
+            title: true,
+            companyName: true,
+            companyIndustry: true,
+          },
+        }),
+        prisma.companyHQ.findUnique({
+          where: { id: companyHQId },
+          select: {
+            companyName: true,
+            companyIndustry: true,
+            whatYouDo: true,
+          },
+        }),
+      ]);
+
+      if (!companyHQ) {
+        return { success: false, error: 'Company not found' };
+      }
+
+      return {
+        success: true,
+        data: {
+          contact,
+          companyHQ,
+        },
+      };
+    } catch (error: any) {
+      console.error('❌ PersonaPromptPrepService error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to prepare persona data',
+      };
+    }
+  }
+}
+

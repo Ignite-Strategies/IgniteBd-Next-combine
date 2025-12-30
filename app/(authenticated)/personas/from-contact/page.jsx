@@ -33,19 +33,11 @@ function FromContactContent() {
           setContact(fetchedContact);
 
           // Generate minimal persona (MVP1 - just basics)
-          // Pass contact data directly to avoid service fetching it again
+          // API will fetch contact from DB - we just pass contactId
           try {
             const personaResponse = await api.post('/api/personas/generate-minimal', {
               companyHQId,
               contactId,
-              contactData: {
-                firstName: fetchedContact.firstName,
-                lastName: fetchedContact.lastName,
-                title: fetchedContact.title,
-                companyName: fetchedContact.companyName,
-                companyIndustry: fetchedContact.companyIndustry,
-                fullName: fetchedContact.fullName,
-              },
             });
 
             if (personaResponse.data?.success && personaResponse.data?.persona) {
