@@ -405,8 +405,8 @@ function LinkedInEnrichContent() {
               </a>
             </div>
 
-            {/* Action Buttons - Fork: Save basic OR Enrich full */}
-            {!enrichmentData.intelligenceScores && (
+            {/* Action Buttons - Fork: Save basic OR Enrich full - Only show BEFORE intelligence is loaded */}
+            {!enrichmentData.intelligenceScores && !enrichmentData.companyIntelligence && (
               <div className="mt-6 border-t pt-6 space-y-3">
                 {/* Save Contact Button - Saves basic contact details only */}
                 <button
