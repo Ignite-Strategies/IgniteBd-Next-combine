@@ -19,7 +19,7 @@ export default function ContactSelector({
   showLabel = true,
   className = '',
   companyId, // Optional: filter contacts by company
-  companyHQId: propCompanyHQId, // Optional: pass companyHQId from URL params (preferred)
+  companyHQId: propCompanyHQId = undefined, // Optional: pass companyHQId from URL params (preferred)
 }) {
   // Use prop companyHQId if provided, otherwise fall back to hook (for backward compatibility)
   const { companyHQId: hookCompanyHQId, hydrated: companyHydrated } = useCompanyHQ();

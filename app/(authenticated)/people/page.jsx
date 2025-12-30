@@ -54,8 +54,9 @@ function PeopleHubPageContent() {
     }
   }, []);
 
-  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
-  // Add delay to let searchParams load before redirecting
+  // Option B: URL params primary, localStorage fallback
+  // If missing from URL, check localStorage and add to URL
+  // If neither exists, redirect to welcome
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     
@@ -71,9 +72,19 @@ function PeopleHubPageContent() {
         return; // No redirect needed
       }
       
-      // URL truly doesn't have companyHQId - redirect to welcome
+      // URL doesn't have companyHQId - check localStorage (Option B fallback)
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        // Add companyHQId to URL from localStorage
+        hasRedirectedRef.current = true;
+        console.log(`🔄 People: Adding companyHQId from localStorage to URL: ${stored}`);
+        router.replace(`/people?companyHQId=${stored}`);
+        return;
+      }
+      
+      // Neither URL nor localStorage has companyHQId - redirect to welcome
       hasRedirectedRef.current = true;
-      console.warn('⚠️ People: No companyHQId in URL - redirecting to welcome');
+      console.warn('⚠️ People: No companyHQId in URL or localStorage - redirecting to welcome');
       router.push('/welcome');
     };
     

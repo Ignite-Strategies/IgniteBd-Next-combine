@@ -64,15 +64,33 @@ function ComposeContent() {
   const [savingQuickContact, setSavingQuickContact] = useState(false);
   const [quickContactError, setQuickContactError] = useState(null);
   
-  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
-  // NO localStorage fallback - if missing, go to welcome where it gets set
+  // Option B: URL params primary, localStorage fallback
+  // If missing from URL, check localStorage and add to URL
+  // If neither exists, redirect to welcome
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     
-    if (!companyHQId && typeof window !== 'undefined') {
-      hasRedirectedRef.current = true;
-      router.push('/welcome');
+    if (typeof window === 'undefined') return;
+    
+    // If URL has companyHQId, we're good
+    if (companyHQId) {
+      return;
     }
+    
+    // URL doesn't have companyHQId - check localStorage (Option B fallback)
+    const stored = localStorage.getItem('companyHQId');
+    if (stored) {
+      // Add companyHQId to URL from localStorage
+      hasRedirectedRef.current = true;
+      console.log(`🔄 Outreach Compose: Adding companyHQId from localStorage to URL: ${stored}`);
+      router.replace(`/outreach/compose?companyHQId=${stored}`);
+      return;
+    }
+    
+    // Neither URL nor localStorage has companyHQId - redirect to welcome
+    hasRedirectedRef.current = true;
+    console.warn('⚠️ Outreach Compose: No companyHQId in URL or localStorage - redirecting to welcome');
+    router.push('/welcome');
   }, [companyHQId, router]);
 
   // Log CompanyHQ from URL params

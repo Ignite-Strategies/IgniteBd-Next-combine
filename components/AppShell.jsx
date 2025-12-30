@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Navigation from './Navigation';
@@ -100,7 +100,11 @@ export default function AppShell({ children }) {
         {!shouldHideContext && <CompanyHQContextHeader />}
         
         {/* Sidebar - Only render when showSidebar is true */}
-        {showSidebar && <Sidebar />}
+        {showSidebar && (
+          <Suspense fallback={<div className="w-64" />}>
+            <Sidebar />
+          </Suspense>
+        )}
         {/* Main Content Area */}
         <main className={showSidebar ? 'flex-1 ml-64 min-h-[calc(100vh-3.5rem)]' : 'min-h-[calc(100vh-3.5rem)]'}>
           {children}
