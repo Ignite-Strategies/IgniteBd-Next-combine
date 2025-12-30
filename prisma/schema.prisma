@@ -990,7 +990,7 @@ model product_fits {
 }
 
 model products {
-  id                    String         @id
+  id                    String         @id @default(cuid())
   companyHQId           String
   name                  String
   description           String?
