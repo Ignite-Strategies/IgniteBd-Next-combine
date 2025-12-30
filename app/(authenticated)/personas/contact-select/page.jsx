@@ -17,19 +17,14 @@ function ContactSelectPageContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(null);
 
-  // Redirect if no companyHQId in URL
+  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
+  // NO localStorage fallback - if missing, go to welcome where it gets set
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     
     if (!companyHQId && typeof window !== 'undefined') {
-      const stored = localStorage.getItem('companyHQId');
-      if (stored) {
-        hasRedirectedRef.current = true;
-        router.replace(`/personas/contact-select?companyHQId=${stored}`);
-      } else {
-        hasRedirectedRef.current = true;
-        router.push('/welcome');
-      }
+      hasRedirectedRef.current = true;
+      router.push('/welcome');
     }
   }, [companyHQId, router]);
 

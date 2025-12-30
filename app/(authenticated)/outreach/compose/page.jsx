@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, Mail, Loader2, CheckCircle2, Plus, X, Info, ChevronDown, ChevronUp, Eye, Code, Users, TrendingUp } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -8,15 +8,15 @@ import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
 import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
 function ComposeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  const hasRedirectedRef = useRef(false);
   const { ownerId, owner } = useOwner();
-  const { companyHQId } = useCompanyHQ();
   
   // Form state
   const [selectedContact, setSelectedContact] = useState(null);
@@ -64,6 +64,27 @@ function ComposeContent() {
   const [savingQuickContact, setSavingQuickContact] = useState(false);
   const [quickContactError, setQuickContactError] = useState(null);
   
+  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
+  // NO localStorage fallback - if missing, go to welcome where it gets set
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    
+    if (!companyHQId && typeof window !== 'undefined') {
+      hasRedirectedRef.current = true;
+      router.push('/welcome');
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 Outreach Compose: CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
+
   // Handle auth state changes - reset form if ownerId changes
   useEffect(() => {
     if (!ownerId) {
@@ -400,7 +421,7 @@ function ComposeContent() {
         <PageHeader
           title="1-to-1 Outreach"
           subtitle="Send personalized emails via SendGrid"
-          backTo="/outreach"
+          backTo={companyHQId ? `/outreach?companyHQId=${companyHQId}` : '/outreach'}
           backLabel="Back to Outreach"
         />
 
@@ -466,6 +487,7 @@ function ComposeContent() {
                   onContactSelect={handleContactSelect}
                   selectedContact={selectedContact}
                   showLabel={false}
+                  companyHQId={companyHQId}
                 />
               </div>
 

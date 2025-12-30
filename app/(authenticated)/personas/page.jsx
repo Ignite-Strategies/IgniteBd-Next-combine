@@ -12,9 +12,9 @@ function PersonasPageContent() {
   // All persona queries must include companyHQId parameter
   const router = useRouter();
   const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const { ownerId, hydrated: ownerHydrated } = useOwner();
   const [personas, setPersonas] = useState([]);
-  const [companyHQId, setCompanyHQId] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -31,11 +31,10 @@ function PersonasPageContent() {
       return;
     }
 
-    const storedCompanyHQId =
-      window.localStorage.getItem('companyHQId') ||
-      window.localStorage.getItem('companyId') ||
-      '';
-    setCompanyHQId(storedCompanyHQId);
+    if (!companyHQId) {
+      setError('Company context is required');
+      return;
+    }
 
     if (!storedCompanyHQId) {
       setError('Company context is required');
@@ -231,7 +230,7 @@ function PersonasPageContent() {
 
               {/* Build from Contacts */}
               <div
-                onClick={() => router.push('/personas/contact-select')}
+                onClick={() => router.push(companyHQId ? `/personas/contact-select?companyHQId=${companyHQId}` : '/personas/contact-select')}
                 className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-green-300"
               >
                 <div className="mb-4 flex items-center gap-3">

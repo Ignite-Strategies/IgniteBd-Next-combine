@@ -54,14 +54,32 @@ function PeopleHubPageContent() {
     }
   }, []);
 
-  // Redirect if no companyHQId in URL
+  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
+  // Add delay to let searchParams load before redirecting
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     
-    if (!companyHQId && typeof window !== 'undefined') {
+    const checkAndRedirect = () => {
+      if (typeof window === 'undefined') return;
+      
+      // Check if URL actually has companyHQId
+      const currentUrl = window.location.href;
+      const urlHasCompanyHQId = currentUrl.includes('companyHQId=');
+      
+      // If URL has companyHQId or searchParams has it, we're good
+      if (urlHasCompanyHQId || companyHQId) {
+        return; // No redirect needed
+      }
+      
+      // URL truly doesn't have companyHQId - redirect to welcome
       hasRedirectedRef.current = true;
+      console.warn('⚠️ People: No companyHQId in URL - redirecting to welcome');
       router.push('/welcome');
-    }
+    };
+    
+    // Small delay to let searchParams load
+    const timeoutId = setTimeout(checkAndRedirect, 100);
+    return () => clearTimeout(timeoutId);
   }, [companyHQId, router]);
 
   // Load from cache and sync when companyHQId is available

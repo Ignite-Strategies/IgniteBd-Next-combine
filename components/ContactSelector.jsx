@@ -19,18 +19,25 @@ export default function ContactSelector({
   showLabel = true,
   className = '',
   companyId, // Optional: filter contacts by company
+  companyHQId: propCompanyHQId, // Optional: pass companyHQId from URL params (preferred)
 }) {
-  const { companyHQId, hydrated: companyHydrated, refresh: refreshCompanyHQ } = useCompanyHQ();
+  // Use prop companyHQId if provided, otherwise fall back to hook (for backward compatibility)
+  const { companyHQId: hookCompanyHQId, hydrated: companyHydrated } = useCompanyHQ();
+  const companyHQId = propCompanyHQId || hookCompanyHQId;
   const { ownerId, hydrated: ownerHydrated } = useOwner();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(contactId || null);
 
-  // Debug: Log companyId prop
+  // Debug: Log companyId and companyHQId props
   useEffect(() => {
-    console.log('🔍 ContactSelector companyId prop:', companyId);
-  }, [companyId]);
+    console.log('🔍 ContactSelector props:', {
+      companyId,
+      companyHQId: propCompanyHQId,
+      usingHook: !propCompanyHQId,
+    });
+  }, [companyId, propCompanyHQId]);
 
   // Fetch contacts from API - WAIT FOR AUTH
   useEffect(() => {
@@ -43,37 +50,13 @@ export default function ContactSelector({
         return;
       }
       
-      // If companyHQId is not available yet, try to refresh it
-      if (!companyHQId && companyHydrated) {
-        // Company is hydrated but no ID - try refreshing
-        await refreshCompanyHQ();
-        // After refresh, check localStorage again (refreshCompanyHQ updates localStorage)
-        const refreshedId = 
-          window.localStorage.getItem('companyHQId') ||
-          window.localStorage.getItem('companyId') ||
-          '';
-        if (!refreshedId) {
-          console.warn('ContactSelector: No companyHQId available after refresh');
-          setLoading(false);
-          return;
-        }
-        // Continue with refreshedId - the effect will run again when companyHQId updates
-        // But we can proceed with the localStorage value
-      }
-      
-      // Get companyHQId from hook or localStorage
-      let finalCompanyHQId = companyHQId;
-      if (!finalCompanyHQId) {
-        finalCompanyHQId = 
-          window.localStorage.getItem('companyHQId') ||
-          window.localStorage.getItem('companyId') ||
-          '';
-      }
+      // Use prop companyHQId if provided (from URL params), otherwise use hook
+      const finalCompanyHQId = companyHQId;
       
       if (!finalCompanyHQId) {
         // Still no companyHQId - if not hydrated yet, wait; otherwise show error
-        if (!companyHydrated) {
-          // Still loading company data, keep loading state
+        if (!companyHydrated && !propCompanyHQId) {
+          // Still loading company data, keep loading state (only if using hook)
           return;
         }
         console.warn('ContactSelector: No companyHQId available');
