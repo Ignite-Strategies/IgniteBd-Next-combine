@@ -212,81 +212,158 @@ export class PersonaGeneratorService {
   }): { systemPrompt: string; userPrompt: string } {
     const { product, productDescription, companyHQ, contactData, apolloData, description, notes } = context;
 
-    const systemPrompt = `You are an expert in executive psychology and business persona modeling.
+    const systemPrompt = `You are a business persona inference engine. Your task is to infer a REUSABLE PERSONA MODEL from input signals. You are NOT preserving CRM data or mapping fields. You are creating an archetypal model that represents "who we are selling to" - not "who is in our database". Return only valid JSON. Never include markdown code blocks, explanations, or any text outside the JSON object.`;
 
-You help clients think through who they're targeting. This is a THINKING TOOL, not a complex system.
+    // Build input signals section (these are WEAK SIGNALS for inference, not outputs)
+    let inputSignals = '';
+    if (apolloData) {
+      inputSignals = `=== INPUT SIGNALS (for inference only) ===
+Enriched Contact Data: ${JSON.stringify(apolloData, null, 2)}`;
+    } else if (contactData) {
+      const fullName = `${contactData.firstName || ''} ${contactData.lastName || ''}`.trim();
+      inputSignals = `=== INPUT SIGNALS (for inference only) ===
+Contact Name: ${fullName || 'Not specified'}
+Contact Title: ${contactData.title || 'Not specified'}
+Contact Company: ${contactData.companyName || contactData.companies?.companyName || 'Not specified'}
+Contact Industry: ${contactData.companyIndustry || contactData.companies?.industry || 'Not specified'}`;
+    } else if (description) {
+      inputSignals = `=== INPUT SIGNAL (for inference only) ===
+Description: ${description}`;
+    }
 
-Generate a simple persona that answers:
-1. Who is this person? (name, title, role, seniority)
-2. What do they want? (core goal, pain points, need for product, potential pitch)
-3. What company are they at? (industry, size, type)
+    // Company context (also a signal, not output)
+    const companyHQName = companyHQ.companyName || 'Not specified';
+    const companyHQIndustry = companyHQ.companyIndustry || 'Not specified';
+    const companyHQWhatYouDo = companyHQ.whatYouDo || 'Not specified';
 
-Return EXACTLY this JSON structure:
-{
-  "personName": "",           // Name/archetype (e.g., "Enterprise CMO")
-  "title": "",                // Required - Role/Title (e.g., "Chief Marketing Officer")
-  "role": "",                 // Additional role context (more than just title) - can be null
-  "seniority": "",            // Optional - Seniority level (e.g., "C-Level", "Director") - can be null
-  "coreGoal": "",             // Required - Their north star (regardless of our product) - what they want in general
-  "painPoints": [],           // Array - What problems do they have?
-  "needForOurProduct": "",    // Required - Need for OUR PRODUCT assessment (inferred - this is key!)
-  "potentialPitch": "",       // Optional - How we would pitch (inferred from pain + needs) - can be null
-  "industry": "",             // Optional - Industry type - can be null
-  "companySize": "",          // Optional - Company size (e.g., "51-200", "200-1000") - can be null
-  "company": ""               // Optional - Company type/archetype (e.g., "mid-market SaaS") - can be null
-}`;
-
-    // Build product context - if no product, generate basic persona info only
+    // Product context (for product-specific inference)
     const productContext = product
-      ? `Our Product:
-Name: ${product.name}
+      ? `=== PRODUCT CONTEXT ===
+Product Name: ${product.name}
 Description: ${product.description || 'Not specified'}
 Value Prop: ${product.valueProp || 'Not specified'}`
       : productDescription
-      ? `Our Product Description: ${productDescription}
+      ? `=== PRODUCT CONTEXT ===
+Product Description: ${productDescription}`
+      : '';
 
-IMPORTANT: This is a DEEP DIVE phase. The persona already has basic info (title, company, industry). 
-Focus on product-specific analysis: coreGoal, needForOurProduct, painPoints that our product solves, potentialPitch.`
-      : `Phase 1: Generate basic persona information only (title, company, industry, companySize, company type).
-Do NOT generate product-specific fields like needForOurProduct, potentialPitch, or detailed painPoints yet.
-Those will come in Phase 2 when product context is provided.`;
+    const userPrompt = `You are inferring a REUSABLE PERSONA MODEL. This is NOT CRM hydration and NOT data preservation.
 
-    const companyContext = `Our Company:
-Name: ${companyHQ.companyName}
-Industry: ${companyHQ.companyIndustry || 'Not specified'}
-What We Do: ${companyHQ.whatYouDo || 'Not specified'}
-Team Size: ${companyHQ.teamSize || 'Not specified'}`;
+=== AUTHORITATIVE CONCEPT ===
 
-    let contactContext = '';
-    if (apolloData) {
-      contactContext = `Enriched Contact Data:\n${JSON.stringify(apolloData, null, 2)}`;
-    } else if (contactData) {
-      contactContext = `Contact Data:\n${JSON.stringify({
-        firstName: contactData.firstName,
-        lastName: contactData.lastName,
-        title: contactData.title,
-        companyName: contactData.companyName,
-        companyIndustry: contactData.companyIndustry,
-      }, null, 2)}`;
-    } else if (description) {
-      contactContext = `Description: ${description}`;
-    }
+We are inferring a REUSABLE PERSONA MODEL.
 
-    const userPrompt = `Generate a persona for this targeting scenario.
+The persona should still make sense if:
+- the person changes jobs
+- the company name changes  
+- the specific contact disappears
 
-${productContext}
+If the output resembles a real individual or exact employer, the persona is WRONG.
 
-${companyContext}
+=== INPUT SIGNALS (for inference only) ===
 
-${contactContext ? `${contactContext}\n` : ''}${notes ? `Additional Notes: ${notes}\n` : ''}
+CRM Context:
+Company: ${companyHQName}
+Industry: ${companyHQIndustry}
+What We Do: ${companyHQWhatYouDo}
 
-Remember:
-- coreGoal = What they want in general (their north star, regardless of our product)
-- needForOurProduct = What they need from OUR PRODUCT specifically (inferred - this is the key field!)
-- potentialPitch = How we'd pitch to them (inferred from pain points + needs)
-- Keep it simple - this is a thinking tool to help plan targeting
+${productContext ? `${productContext}\n` : ''}
 
-Return the complete persona JSON structure.`;
+${inputSignals ? `${inputSignals}\n` : ''}
+
+${notes ? `Additional Notes: ${notes}\n` : ''}
+
+=== RULES (NON-NEGOTIABLE) ===
+
+1. Contact name, exact title, and exact company name are NEVER the goal.
+   These fields exist ONLY to infer:
+   - role archetype
+   - company TYPE
+   - industry
+   - goals
+   - pain points
+   - product needs
+
+2. Literal reuse is allowed ONLY if it is already archetypal. Otherwise, GENERALIZE.
+
+   Examples of generalization:
+   - "Group Chief Compliance Officer" → "Chief Compliance Officer"
+   - "Gemcorp Capital" → "Global Asset Management Firm"
+   - "VP, Legal & Compliance" → "Compliance Leader"
+   - "John Smith" → NEVER use real names
+   - "Acme Corp" → "Mid-size B2B SaaS Company"
+
+3. OUTPUT IS A MODEL, NOT A RECORD
+
+   This output should feel like:
+   "Who we are selling to"
+   
+   NOT
+   "Who is in our database"
+
+4. THINKING MODE
+
+   Treat LinkedIn titles, company info, and CRM fields as WEAK SIGNALS.
+   Infer intent, responsibility, pressure, and incentives.
+   
+   If the output looks like it belongs on LinkedIn or in Salesforce, you FAILED.
+   If it looks like a slide titled "Target Persona: Compliance Leader at Asset Managers", you SUCCEEDED.
+
+=== OUTPUT FORMAT ===
+
+CRITICAL: Return ONLY valid JSON in this exact format:
+{
+  "personName": "string",          // role archetype (never a real title string, never a person's name)
+  "title": "string",               // simplified / generalized role (NOT literal title)
+  "companyType": "string",         // abstracted company description (NOT literal company name)
+  "companySize": "string",         // company size range (e.g., "1-10", "11-50", "51-200", "200-1000", "1000+")
+  "industry": "string",            // broad industry classification
+  "coreGoal": "string",            // one sentence, maximum ~25 words
+  "painPoints": ["string"],        // 3–5 inferred pains (array of strings)
+  "whatProductNeeds": "string",   // one sentence describing what product/service they need
+  "role": "string",                // Optional - Additional role context - can be null
+  "seniority": "string",           // Optional - Seniority level - can be null
+  "potentialPitch": "string"       // Optional - How we would pitch - can be null
+}
+
+=== FIELD REQUIREMENTS ===
+
+1. **personName**: Role archetype label. NEVER a real person's name. NEVER a literal job title. 
+   Examples: "Compliance Leader", "Operations Director", "Sales Executive", "Legal Counsel"
+   BAD: "John Smith", "Deputy Counsel", "VP of Sales at Acme"
+
+2. **title**: Simplified/generalized role. Generalize from input signals. Remove company-specific details.
+   Examples: "Chief Compliance Officer", "Operations Director", "Sales Leader"
+   BAD: "Group Chief Compliance Officer at Gemcorp Capital", "VP of Sales at Acme Corp"
+
+3. **companyType**: Abstracted company description. NEVER use literal company names.
+   Examples: "Global Asset Management Firm", "Mid-size B2B SaaS Company", "Enterprise Software Provider"
+   BAD: "Gemcorp Capital", "Acme Corp", "TechCorp"
+
+4. **companySize**: Company size range. Infer from input signals or use standard ranges.
+   Examples: "1-10", "11-50", "51-200", "200-1000", "1000+", "Enterprise (1000+)"
+   Use ranges, not specific numbers. Infer from company type and industry context.
+
+5. **industry**: Broad industry classification. Use standard industry categories.
+   Examples: "Asset Management", "Enterprise Software", "Financial Services", "Healthcare Technology"
+
+6. **coreGoal**: One sentence describing their primary objective. Maximum ~25 words. NO bullet points, NO semicolons.
+
+7. **painPoints**: Array of 3–5 inferred pain points. Each should be a complete sentence or phrase.
+   Infer from role, industry, and company type - not from literal contact data.
+   ${product ? 'Focus on pain points that our product can solve.' : ''}
+
+8. **whatProductNeeds**: One sentence describing what product/service they need based on their role and pain points.
+   ${product ? `Infer what they need from OUR PRODUCT specifically: ${product.name}` : 'Infer general product needs from their role and pain points.'}
+
+9. **role**: Optional - Additional role context beyond title. Can be null.
+
+10. **seniority**: Optional - Seniority level (e.g., "C-Level", "Director", "VP"). Can be null.
+
+11. **potentialPitch**: Optional - How we would pitch to them (inferred from pain points + needs). Can be null.
+    ${product ? `Infer how we would pitch OUR PRODUCT: ${product.name}` : ''}
+
+CRITICAL: Return ONLY the JSON object. Do not include markdown code blocks, explanations, or any text outside the JSON object.`;
 
     return { systemPrompt, userPrompt };
   }
@@ -325,6 +402,8 @@ Return the complete persona JSON structure.`;
 
     const personaData = parsed.persona || parsed;
 
+    // Map new format fields to PersonaJSON format
+    // companyType -> company, whatProductNeeds -> needForOurProduct
     return {
       personName: personaData.personName || '',
       title: personaData.title || '',
@@ -332,11 +411,11 @@ Return the complete persona JSON structure.`;
       seniority: personaData.seniority || null,
       coreGoal: personaData.coreGoal || '',
       painPoints: normalizeArray(personaData.painPoints),
-      needForOurProduct: personaData.needForOurProduct || '',
+      needForOurProduct: personaData.whatProductNeeds || personaData.needForOurProduct || '', // Support both formats
       potentialPitch: personaData.potentialPitch || null,
       industry: personaData.industry || null,
       companySize: personaData.companySize || null,
-      company: personaData.company || null,
+      company: personaData.companyType || personaData.company || null, // Support both formats (companyType is new)
     };
   }
 

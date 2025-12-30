@@ -144,11 +144,11 @@ function PersonaBuilderContent({ searchParams }) {
           painPoints: Array.isArray(persona.painPoints)
             ? persona.painPoints.join('\n')
             : persona.painPoints || '',
-          needForOurProduct: persona.needForOurProduct || '',
+          needForOurProduct: persona.needForOurProduct || persona.whatProductNeeds || '',
           potentialPitch: persona.potentialPitch || '',
           industry: persona.industry || '',
           companySize: persona.companySize || '',
-          company: persona.company || '',
+          company: persona.companyType || persona.company || '', // Support both formats
         });
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
