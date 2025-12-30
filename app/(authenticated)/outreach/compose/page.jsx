@@ -831,9 +831,10 @@ function ComposeContent() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Live Preview Section - Full Width Below */}
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+      {/* Live Preview Section - Full Width Below */}
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-6">Preview</h2>
               
