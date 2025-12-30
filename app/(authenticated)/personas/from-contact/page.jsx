@@ -35,9 +35,17 @@ function FromContactContent() {
       setError('');
 
       try {
+        // Get ownerId from localStorage (required for auth)
+        const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
+        if (!ownerId) {
+          setError('Owner ID not found. Please sign in again.');
+          return;
+        }
+
         const response = await api.post('/api/personas/generate-minimal', {
           companyHQId,
           contactId,
+          ownerId,
         });
 
         if (response.data?.success && response.data?.persona) {

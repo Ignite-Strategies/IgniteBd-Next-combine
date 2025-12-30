@@ -20,20 +20,46 @@ import { PersonaParsingService } from '@/lib/services/PersonaParsingService';
 import { OpenAI } from 'openai';
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 POST /api/personas/generate-minimal - Request received');
+  
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
-  } catch (error) {
+    firebaseUser = await verifyFirebaseToken(request);
+    console.log('✅ Firebase token verified:', firebaseUser.uid);
+  } catch (error: any) {
+    console.error('❌ Firebase authentication failed:', {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      stack: error.stack,
+    });
     return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
+      { success: false, error: 'Unauthorized', details: error.message },
       { status: 401 }
     );
   }
 
   try {
+    // Get owner from Firebase token (like template route)
+    const { prisma } = await import('@/lib/prisma');
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+    });
+
+    if (!owner) {
+      console.error('❌ Owner not found for firebaseId:', firebaseUser.uid);
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 }
+      );
+    }
+
     const body = await request.json();
-    const { contactId, companyHQId, description } = body;
+    const { contactId, companyHQId, ownerId, description } = body;
+    console.log('📦 Request body:', { contactId, companyHQId, ownerId, hasDescription: !!description });
 
     if (!contactId) {
+      console.error('❌ Missing contactId');
       return NextResponse.json(
         { success: false, error: 'contactId is required' },
         { status: 400 }
@@ -41,12 +67,25 @@ export async function POST(request: NextRequest) {
     }
 
     if (!companyHQId) {
+      console.error('❌ Missing companyHQId');
       return NextResponse.json(
         { success: false, error: 'companyHQId is required' },
         { status: 400 }
       );
     }
 
+    // Validate membership - owner must have access to this companyHQ (like template route)
+    const { resolveMembership } = await import('@/lib/membership');
+    const { membership } = await resolveMembership(owner.id, companyHQId);
+    if (!membership) {
+      console.error('❌ Access denied to companyHQ:', companyHQId);
+      return NextResponse.json(
+        { success: false, error: 'Access denied to this company' },
+        { status: 403 }
+      );
+    }
+
+    console.log('📊 Step 1: Preparing data...');
     // Step 1: Prepare data (fetch contact and companyHQ from DB)
     const prepResult = await PersonaPromptPrepService.prepare({
       contactId,
@@ -63,12 +102,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('📝 Step 2: Building prompts...');
     // Step 2: Build prompts
     const { systemPrompt, userPrompt } = PersonaMinimalPromptService.buildPrompts(
       prepResult.data,
       description
     );
 
+    console.log('🤖 Step 3: Calling OpenAI...');
     // Step 3: Call OpenAI
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const model = process.env.OPENAI_MODEL || 'gpt-4o';
