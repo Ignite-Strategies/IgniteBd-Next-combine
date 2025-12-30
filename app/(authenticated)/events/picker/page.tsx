@@ -3,8 +3,25 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Plus, Edit2, Trash2, DollarSign, MapPin, Calendar, Loader2, Sparkles, List, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, DollarSign, MapPin, Calendar, Loader2, Sparkles, X, FileText } from 'lucide-react';
 import api from '@/lib/api';
+import PersonaSearch from '../build-from-persona/PersonaSearch';
+
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+];
+
+interface Persona {
+  id: string;
+  personName?: string;
+  title?: string;
+  industry?: string;
+  location?: string;
+}
 
 interface EventTuner {
   id: string;
@@ -15,7 +32,7 @@ interface EventTuner {
   eventSearchRawText?: string | null;
   createdAt: string;
   event_tuner_states?: { state: string }[];
-  event_tuner_personas?: { personas: { personName?: string; title?: string } }[];
+  event_tuner_personas?: { personas: Persona }[];
 }
 
 function EventPickerPageContent() {
@@ -27,6 +44,19 @@ function EventPickerPageContent() {
   const [tuners, setTuners] = useState<EventTuner[]>([]);
   const [loadingTuners, setLoadingTuners] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedTunerId, setSelectedTunerId] = useState<string | null>(null);
+
+  // Form state
+  const [name, setName] = useState('');
+  const [costRange, setCostRange] = useState<string>('');
+  const [travelDistance, setTravelDistance] = useState<string>('');
+  const [preferredStates, setPreferredStates] = useState<string[]>([]);
+  const [eventSearchRawText, setEventSearchRawText] = useState('');
+  const [conferencesPerQuarter, setConferencesPerQuarter] = useState<number | ''>('');
+  const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
+  const [additionalContext, setAdditionalContext] = useState(''); // NEW: Additional context for AI
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -59,20 +89,114 @@ function EventPickerPageContent() {
     }
   };
 
-  const [generatingTunerId, setGeneratingTunerId] = useState<string | null>(null);
-  const [generationError, setGenerationError] = useState<string | null>(null);
+  // Load preference into form when selected
+  const handleSelectPreference = (tuner: EventTuner) => {
+    setSelectedTunerId(tuner.id);
+    setName(tuner.name || '');
+    setCostRange(tuner.costRange || '');
+    setTravelDistance(tuner.travelDistance || '');
+    setEventSearchRawText(tuner.eventSearchRawText || '');
+    setConferencesPerQuarter(tuner.conferencesPerQuarter || '');
+    setPreferredStates(tuner.event_tuner_states?.map((ps: any) => ps.state) || []);
+    
+    if (tuner.event_tuner_personas && tuner.event_tuner_personas.length > 0) {
+      setSelectedPersona(tuner.event_tuner_personas[0].personas);
+    } else {
+      setSelectedPersona(null);
+    }
+    
+    // Clear additional context when selecting a preference
+    setAdditionalContext('');
+  };
 
-  const handleSelectTuner = async (tunerId: string) => {
-    if (!tunerId || !companyHQId) {
-      alert('Missing required information. Please try again.');
+  const clearForm = () => {
+    setSelectedTunerId(null);
+    setName('');
+    setCostRange('');
+    setTravelDistance('');
+    setPreferredStates([]);
+    setEventSearchRawText('');
+    setConferencesPerQuarter('');
+    setSelectedPersona(null);
+    setAdditionalContext('');
+  };
+
+  const toggleState = (state: string) => {
+    setPreferredStates(prev =>
+      prev.includes(state)
+        ? prev.filter(s => s !== state)
+        : [...prev, state]
+    );
+  };
+
+  const handleGenerateEvents = async () => {
+    if (!name.trim()) {
+      alert('Please enter a title for your event preferences');
+      return;
+    }
+
+    if (!ownerId || !companyHQId) {
+      alert('Please ensure you are logged in and have a company selected.');
       return;
     }
 
     try {
-      setGeneratingTunerId(tunerId);
+      setGenerating(true);
       setGenerationError(null);
 
-      // Call API - WAIT for response (following OpenAI pattern)
+      // First, save/create the tuner
+      let tunerId: string;
+      
+      if (selectedTunerId) {
+        // Update existing tuner
+        const response = await api.patch(`/api/event-tuners/${selectedTunerId}`, {
+          name: name.trim(),
+          costRange: costRange || null,
+          travelDistance: travelDistance || null,
+          preferredStates: preferredStates.length > 0 ? preferredStates : undefined,
+          eventSearchRawText: eventSearchRawText.trim() || null,
+          conferencesPerQuarter: conferencesPerQuarter ? Number(conferencesPerQuarter) : null,
+          personaIds: selectedPersona ? [selectedPersona.id] : undefined,
+        });
+
+        if (!response.data?.success) {
+          throw new Error('Failed to update preferences');
+        }
+        tunerId = response.data.tuner.id;
+      } else {
+        // Create new tuner
+        const response = await api.post('/api/event-tuners/create', {
+          companyHQId,
+          ownerId,
+          name: name.trim(),
+          costRange: costRange || null,
+          travelDistance: travelDistance || null,
+          preferredStates: preferredStates.length > 0 ? preferredStates : undefined,
+          eventSearchRawText: eventSearchRawText.trim() || null,
+          conferencesPerQuarter: conferencesPerQuarter ? Number(conferencesPerQuarter) : null,
+          personaIds: selectedPersona ? [selectedPersona.id] : undefined,
+        });
+
+        if (!response.data?.success) {
+          throw new Error('Failed to save preferences');
+        }
+        tunerId = response.data.tuner.id;
+      }
+
+      // If additional context is provided, append it to eventSearchRawText for OpenAI
+      let finalSearchText = eventSearchRawText.trim();
+      if (additionalContext.trim()) {
+        finalSearchText = finalSearchText 
+          ? `${finalSearchText}. Additional context: ${additionalContext.trim()}`
+          : `Additional context: ${additionalContext.trim()}`;
+        
+        // Update the tuner with combined search text
+        await api.patch(`/api/event-tuners/${tunerId}`, {
+          eventSearchRawText: finalSearchText,
+        });
+      }
+
+      // Now call OpenAI to generate events
       const response = await api.get(`/api/event-tuners/${tunerId}/pick-events`);
 
       if (response.data?.success) {
@@ -96,16 +220,9 @@ function EventPickerPageContent() {
       console.error('Failed to generate events:', err);
       const errorMessage = err.response?.data?.error || err.message || 'Failed to generate events. Please try again.';
       setGenerationError(errorMessage);
-      setGeneratingTunerId(null);
+    } finally {
+      setGenerating(false);
     }
-  };
-
-  const handleEditTuner = (tunerId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const url = companyHQId 
-      ? `/events/preferences?tunerId=${tunerId}&companyHQId=${companyHQId}`
-      : `/events/preferences?tunerId=${tunerId}`;
-    router.push(url);
   };
 
   const handleDeleteTuner = async (tunerId: string, e: React.MouseEvent) => {
@@ -118,36 +235,18 @@ function EventPickerPageContent() {
     try {
       setDeletingId(tunerId);
       await api.delete(`/api/event-tuners/${tunerId}`);
+      
+      // If deleted tuner was selected, clear form
+      if (selectedTunerId === tunerId) {
+        clearForm();
+      }
+      
       await loadTuners();
     } catch (err: any) {
       console.error('Error deleting tuner:', err);
       alert(err.response?.data?.error || 'Failed to delete preferences. Please try again.');
     } finally {
       setDeletingId(null);
-    }
-  };
-
-  const navigateToCreatePreferences = () => {
-    if (companyHQId) {
-      router.push(`/events/preferences?companyHQId=${companyHQId}`);
-    } else {
-      router.push('/events/preferences');
-    }
-  };
-
-  const navigateToBuildFromPersona = () => {
-    if (companyHQId) {
-      router.push(`/events/build-from-persona?companyHQId=${companyHQId}`);
-    } else {
-      router.push('/events/build-from-persona');
-    }
-  };
-
-  const navigateToList = () => {
-    if (companyHQId) {
-      router.push(`/events/list?companyHQId=${companyHQId}`);
-    } else {
-      router.push('/events/list');
     }
   };
 
@@ -177,7 +276,7 @@ function EventPickerPageContent() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       {/* Loading Overlay - Following OpenAI Pattern */}
-      {generatingTunerId && (
+      {generating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-xl max-w-md mx-4">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-red-600" />
@@ -213,168 +312,296 @@ function EventPickerPageContent() {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Let's Pick Your Events"
-          subtitle="Select events that match your goals. Create preferences to get started."
+          title="Pick Your Events"
+          subtitle="Fill out your preferences below or select from saved preferences on the right"
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
         />
 
-        {/* Create New Preference Card */}
-        <div className="mt-8 mb-8">
-          <div
-            onClick={navigateToCreatePreferences}
-            className="cursor-pointer rounded-2xl border-2 border-dashed border-gray-300 bg-white p-8 shadow-sm hover:shadow-md hover:border-red-400 transition-all text-center"
-          >
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 flex items-center justify-center">
-                <Plus className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Need to Set Up Preferences?</h3>
-                <p className="text-sm text-gray-600">Create preferences to find events that match your criteria</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Form - Left/Center (2/3 width) */}
+          <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Event Preferences</h2>
 
-        {/* Existing Preferences Grid */}
-        {loadingTuners ? (
-          <div className="text-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-red-600 mx-auto mb-4" />
-            <p className="text-gray-600">Loading your preferences...</p>
-          </div>
-        ) : tuners.length === 0 ? (
-          <div className="text-center py-12 rounded-xl border border-gray-200 bg-white">
-            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-lg font-semibold text-gray-800 mb-2">Ready to Pick Your Events</p>
-            <p className="text-sm text-gray-500 mb-6">
-              Create preferences first to find events that match your goals
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Pick Your Events</h2>
-              <p className="text-sm text-gray-600 mt-1">Select a preference set to generate your event recommendations</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tuners.map((tuner) => (
-                <div
-                  key={tuner.id}
-                  className="group cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg hover:border-red-400 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex-1">{tuner.name}</h3>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => handleEditTuner(tuner.id, e)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteTuner(tuner.id, e)}
-                        disabled={deletingId === tuner.id}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                        title="Delete"
-                      >
-                        {deletingId === tuner.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
+              {generationError && (
+                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                  <p className="text-sm font-medium text-red-900">{generationError}</p>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                {/* Title */}
+                <div>
+                  <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                    Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="title"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g., Q1 2025 Events, West Coast Conferences"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Body (from template) - This is the preferences form */}
+                <div className="space-y-4">
+                  {/* Cost Range */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Cost Range
+                    </label>
+                    <select
+                      value={costRange}
+                      onChange={(e) => setCostRange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                    >
+                      <option value="">No limit</option>
+                      <option value="FREE">Free</option>
+                      <option value="LOW_0_500">Low ($0-$500)</option>
+                      <option value="MEDIUM_500_2000">Medium ($500-$2,000)</option>
+                      <option value="HIGH_2000_5000">High ($2,000-$5,000)</option>
+                      <option value="PREMIUM_5000_PLUS">Premium ($5,000+)</option>
+                    </select>
+                  </div>
+
+                  {/* Travel Distance */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Travel Distance
+                    </label>
+                    <select
+                      value={travelDistance}
+                      onChange={(e) => setTravelDistance(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                    >
+                      <option value="">No limit</option>
+                      <option value="LOCAL">Local</option>
+                      <option value="REGIONAL">Regional</option>
+                      <option value="DOMESTIC">Domestic</option>
+                      <option value="INTERNATIONAL">International</option>
+                    </select>
+                  </div>
+
+                  {/* Preferred States */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Preferred States (Optional)
+                    </label>
+                    <div className="grid grid-cols-5 md:grid-cols-10 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-lg">
+                      {US_STATES.map((state) => (
+                        <label
+                          key={state}
+                          className={`cursor-pointer px-2 py-1 text-center text-xs font-medium rounded border-2 transition-colors ${
+                            preferredStates.includes(state)
+                              ? 'bg-red-600 text-white border-red-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={preferredStates.includes(state)}
+                            onChange={() => toggleState(state)}
+                            className="sr-only"
+                          />
+                          {state}
+                        </label>
+                      ))}
                     </div>
                   </div>
-                  
-                  <div className="space-y-2 text-sm text-gray-600 mb-4">
-                    {tuner.costRange && (
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-gray-400" />
-                        <span>{formatCostRange(tuner.costRange)}</span>
-                      </div>
-                    )}
-                    {tuner.travelDistance && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <span>{formatTravelDistance(tuner.travelDistance)}</span>
-                      </div>
-                    )}
-                    {tuner.conferencesPerQuarter && (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <span>{tuner.conferencesPerQuarter} per quarter</span>
-                      </div>
-                    )}
+
+                  {/* Search Keywords */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search Keywords (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={eventSearchRawText}
+                      onChange={(e) => setEventSearchRawText(e.target.value)}
+                      placeholder="e.g., fintech, healthcare, startup"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                    />
                   </div>
 
+                  {/* Conferences Per Quarter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Conferences Per Quarter (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={conferencesPerQuarter}
+                      onChange={(e) => setConferencesPerQuarter(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="e.g., 4"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Persona Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Persona (Optional)
+                    </label>
+                    <PersonaSearch
+                      selectedPersona={selectedPersona}
+                      onSelectPersona={setSelectedPersona}
+                    />
+                  </div>
+                </div>
+
+                {/* Add additional context for AI (NEW) */}
+                <div>
+                  <label htmlFor="additionalContext" className="block text-sm font-medium text-gray-700 mb-2">
+                    Add Additional Context for AI (Optional)
+                  </label>
+                  <textarea
+                    id="additionalContext"
+                    value={additionalContext}
+                    onChange={(e) => setAdditionalContext(e.target.value)}
+                    placeholder="e.g., Focus on events with strong networking opportunities, prefer events in tech hubs, looking for speaking opportunities..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Provide any additional context that will help AI find better events for you.
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                   <button
-                    onClick={() => handleSelectTuner(tuner.id)}
-                    disabled={generatingTunerId === tuner.id}
-                    className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    type="button"
+                    onClick={clearForm}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                   >
-                    {generatingTunerId === tuner.id ? (
+                    Clear
+                  </button>
+                  <button
+                    onClick={handleGenerateEvents}
+                    disabled={generating || !name.trim()}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {generating ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Generating Events...</span>
+                        Generating...
                       </>
                     ) : (
-                      'Generate My Events'
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Get Events
+                      </>
                     )}
                   </button>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Other Actions */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Research Best Events by Persona */}
-          <div
-            onClick={navigateToBuildFromPersona}
-            className="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md hover:shadow-lg transition-all hover:border-blue-300"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Research Best Events by Persona</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  Get scores and see optimal BD alignment for your goals. Research events with persona-based intelligence.
-                </p>
-                <div className="flex items-center gap-1 text-blue-600 font-medium text-sm">
-                  <span>Research Events</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* See Events */}
-          <div
-            onClick={navigateToList}
-            className="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md hover:shadow-lg transition-all hover:border-orange-300"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                <List className="h-6 w-6 text-orange-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">See Events</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  View all your selected events
-                </p>
-                <div className="flex items-center gap-1 text-orange-600 font-medium text-sm">
-                  <span>View Events</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+          {/* Preferences Sidebar - Right (1/3 width) */}
+          <div className="lg:col-span-1">
+            <div className="rounded-lg border border-gray-200 bg-white shadow-sm sticky top-8">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Saved Preferences
+                  </h3>
+                  <button
+                    onClick={clearForm}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    New
+                  </button>
                 </div>
+              </div>
+              <div className="p-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
+                {loadingTuners ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                    <span className="ml-2 text-xs text-gray-600">Loading...</span>
+                  </div>
+                ) : tuners.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-xs text-gray-500">No saved preferences</p>
+                    <p className="text-xs text-gray-400 mt-1">Create one to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {tuners.map((tuner) => (
+                      <div
+                        key={tuner.id}
+                        className={`group cursor-pointer rounded-lg border-2 p-3 transition-all ${
+                          selectedTunerId === tuner.id
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleSelectPreference(tuner)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium text-gray-900 flex-1">{tuner.name}</h4>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Navigate to edit page
+                                const url = companyHQId 
+                                  ? `/events/preferences?tunerId=${tuner.id}&companyHQId=${companyHQId}`
+                                  : `/events/preferences?tunerId=${tuner.id}`;
+                                router.push(url);
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteTuner(tuner.id, e)}
+                              disabled={deletingId === tuner.id}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                              title="Delete"
+                            >
+                              {deletingId === tuner.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-xs text-gray-600">
+                          {tuner.costRange && (
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3" />
+                              <span>{formatCostRange(tuner.costRange)}</span>
+                            </div>
+                          )}
+                          {tuner.travelDistance && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              <span>{formatTravelDistance(tuner.travelDistance)}</span>
+                            </div>
+                          )}
+                          {tuner.conferencesPerQuarter && (
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>{tuner.conferencesPerQuarter} per quarter</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -400,4 +627,3 @@ export default function EventPickerPage() {
     </Suspense>
   );
 }
-
