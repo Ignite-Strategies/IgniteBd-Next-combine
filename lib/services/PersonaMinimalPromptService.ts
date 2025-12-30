@@ -120,6 +120,7 @@ CRITICAL: Return ONLY valid JSON in this exact format:
   "personName": "string",          // role archetype (never a real title string, never a person's name)
   "title": "string",               // simplified / generalized role (NOT literal title)
   "companyType": "string",         // abstracted company description (NOT literal company name)
+  "companySize": "string",        // company size range (e.g., "1-10", "11-50", "51-200", "200-1000", "1000+")
   "industry": "string",            // broad industry classification
   "coreGoal": "string",            // one sentence, maximum ~25 words
   "painPoints": ["string"],        // 3–5 inferred pains (array of strings)
@@ -140,15 +141,19 @@ CRITICAL: Return ONLY valid JSON in this exact format:
    Examples: "Global Asset Management Firm", "Mid-size B2B SaaS Company", "Enterprise Software Provider"
    BAD: "Gemcorp Capital", "Acme Corp", "TechCorp"
 
-4. **industry**: Broad industry classification. Use standard industry categories.
+4. **companySize**: Company size range. Infer from input signals or use standard ranges.
+   Examples: "1-10", "11-50", "51-200", "200-1000", "1000+", "Enterprise (1000+)"
+   Use ranges, not specific numbers. Infer from company type and industry context.
+
+5. **industry**: Broad industry classification. Use standard industry categories.
    Examples: "Asset Management", "Enterprise Software", "Financial Services", "Healthcare Technology"
 
-5. **coreGoal**: One sentence describing their primary objective. Maximum ~25 words. NO bullet points, NO semicolons.
+6. **coreGoal**: One sentence describing their primary objective. Maximum ~25 words. NO bullet points, NO semicolons.
 
-6. **painPoints**: Array of 3–5 inferred pain points. Each should be a complete sentence or phrase.
+7. **painPoints**: Array of 3–5 inferred pain points. Each should be a complete sentence or phrase.
    Infer from role, industry, and company type - not from literal contact data.
 
-7. **whatProductNeeds**: One sentence describing what product/service they need based on their role and pain points.
+8. **whatProductNeeds**: One sentence describing what product/service they need based on their role and pain points.
 
 === EXAMPLES ===
 
@@ -157,6 +162,7 @@ Example 1: Input signal is "John Smith, Group Chief Compliance Officer at Gemcor
   "personName": "Compliance Leader",
   "title": "Chief Compliance Officer",
   "companyType": "Global Asset Management Firm",
+  "companySize": "200-1000",
   "industry": "Asset Management",
   "coreGoal": "Ensure regulatory compliance across all investment activities while minimizing operational risk and maintaining investor trust.",
   "painPoints": [
@@ -173,6 +179,7 @@ Example 2: Input signal is "Jane Doe, VP of Sales at Acme Corp (B2B SaaS)"
   "personName": "Sales Leader",
   "title": "Sales Executive",
   "companyType": "Mid-size B2B SaaS Company",
+  "companySize": "51-200",
   "industry": "Enterprise Software",
   "coreGoal": "Drive predictable revenue growth through strategic account management and sales team enablement.",
   "painPoints": [
@@ -189,6 +196,7 @@ Example 3: Input signal is "Sarah Johnson, Operations Director at TechCorp"
   "personName": "Operations Director",
   "title": "Operations Leader",
   "companyType": "Technology Services Company",
+  "companySize": "11-50",
   "industry": "Technology Services",
   "coreGoal": "Optimize operational efficiency while scaling business processes to support growth.",
   "painPoints": [

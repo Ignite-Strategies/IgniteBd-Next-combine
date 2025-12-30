@@ -56,16 +56,13 @@ export async function POST(request: NextRequest) {
           data: {
             personName: persona.personName,
             title: persona.title,
-            // Map new fields to schema (will need migration for new fields)
             seniority: persona.seniority || null,
             industry: persona.industry || null,
             companySize: persona.companySize || null,
             company: persona.company || null,
             painPoints: persona.painPoints || [],
-            // TODO: After migration, add: coreGoal, needForOurProduct, potentialPitch, role
-            // For now, map to existing fields:
-            whatTheyWant: persona.needForOurProduct, // Temporary mapping
-            description: persona.coreGoal, // Temporary mapping
+            coreGoal: persona.coreGoal || null,
+            needForOurProduct: persona.needForOurProduct || null,
             updatedAt: new Date(),
           },
         })
@@ -79,9 +76,8 @@ export async function POST(request: NextRequest) {
             companySize: persona.companySize || null,
             company: persona.company || null,
             painPoints: persona.painPoints || [],
-            // TODO: After migration, add: coreGoal, needForOurProduct, potentialPitch, role
-            whatTheyWant: persona.needForOurProduct, // Temporary mapping
-            description: persona.coreGoal, // Temporary mapping
+            coreGoal: persona.coreGoal || null,
+            needForOurProduct: persona.needForOurProduct || null,
             createdAt: new Date(),
             updatedAt: new Date(),
           },

@@ -8,8 +8,12 @@
 export interface MinimalPersonaJSON {
   personName: string;
   title: string;
-  company: string;
+  companyType: string;
+  companySize: string;
+  industry: string;
   coreGoal: string;
+  painPoints: string[];
+  whatProductNeeds: string;
 }
 
 export class PersonaParsingService {
@@ -37,19 +41,44 @@ export class PersonaParsingService {
     if (!personaData.title || typeof personaData.title !== 'string') {
       throw new Error('AI response missing title field or invalid type');
     }
-    if (!personaData.company || typeof personaData.company !== 'string') {
-      throw new Error('AI response missing company field or invalid type');
+    if (!personaData.companyType || typeof personaData.companyType !== 'string') {
+      throw new Error('AI response missing companyType field or invalid type');
+    }
+    if (!personaData.companySize || typeof personaData.companySize !== 'string') {
+      throw new Error('AI response missing companySize field or invalid type');
+    }
+    if (!personaData.industry || typeof personaData.industry !== 'string') {
+      throw new Error('AI response missing industry field or invalid type');
     }
     if (!personaData.coreGoal || typeof personaData.coreGoal !== 'string') {
       throw new Error('AI response missing coreGoal field or invalid type');
     }
+    if (!Array.isArray(personaData.painPoints)) {
+      throw new Error('AI response missing painPoints field or invalid type (must be array)');
+    }
+    if (!personaData.whatProductNeeds || typeof personaData.whatProductNeeds !== 'string') {
+      throw new Error('AI response missing whatProductNeeds field or invalid type');
+    }
+
+    // Normalize painPoints array
+    const normalizePainPoints = (value: any): string[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value.filter(p => typeof p === 'string' && p.trim()).map(p => p.trim());
+      }
+      return [];
+    };
 
     // Return validated response (trimmed like template service)
     return {
       personName: personaData.personName.trim(),
       title: personaData.title.trim(),
-      company: personaData.company.trim(),
+      companyType: personaData.companyType.trim(),
+      companySize: personaData.companySize.trim(),
+      industry: personaData.industry.trim(),
       coreGoal: personaData.coreGoal.trim(),
+      painPoints: normalizePainPoints(personaData.painPoints),
+      whatProductNeeds: personaData.whatProductNeeds.trim(),
     };
   }
 }

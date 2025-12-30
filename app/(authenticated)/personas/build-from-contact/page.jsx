@@ -30,8 +30,12 @@ function BuildFromContactContent() {
   // Form fields (hydrated from API response)
   const [personName, setPersonName] = useState('');
   const [title, setTitle] = useState('');
-  const [company, setCompany] = useState('');
+  const [companyType, setCompanyType] = useState('');
+  const [companySize, setCompanySize] = useState('');
+  const [industry, setIndustry] = useState('');
   const [coreGoal, setCoreGoal] = useState('');
+  const [painPoints, setPainPoints] = useState('');
+  const [whatProductNeeds, setWhatProductNeeds] = useState('');
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -98,8 +102,12 @@ function BuildFromContactContent() {
     // Clear previous form data
     setPersonName('');
     setTitle('');
-    setCompany('');
+    setCompanyType('');
+    setCompanySize('');
+    setIndustry('');
     setCoreGoal('');
+    setPainPoints('');
+    setWhatProductNeeds('');
     setRawResponse(null);
 
     try {
@@ -123,8 +131,12 @@ function BuildFromContactContent() {
         const persona = response.data.persona;
         setPersonName(persona.personName || '');
         setTitle(persona.title || '');
-        setCompany(persona.company || '');
+        setCompanyType(persona.companyType || '');
+        setCompanySize(persona.companySize || '');
+        setIndustry(persona.industry || '');
         setCoreGoal(persona.coreGoal || '');
+        setPainPoints(Array.isArray(persona.painPoints) ? persona.painPoints.join('\n') : (persona.painPoints || ''));
+        setWhatProductNeeds(persona.whatProductNeeds || '');
       } else {
         console.error('❌ API returned success=false:', response.data);
         setError(response.data?.error || 'Failed to generate persona');
@@ -146,8 +158,8 @@ function BuildFromContactContent() {
       return;
     }
 
-    if (!personName.trim() || !title.trim() || !company.trim() || !coreGoal.trim()) {
-      setError('All fields are required');
+    if (!personName.trim() || !title.trim() || !companyType.trim() || !companySize.trim() || !industry.trim() || !coreGoal.trim() || !whatProductNeeds.trim()) {
+      setError('All required fields must be filled');
       return;
     }
 
@@ -161,18 +173,23 @@ function BuildFromContactContent() {
         throw new Error('Owner ID not found. Please sign in again.');
       }
 
+      // Parse painPoints from textarea (one per line)
+      const painPointsArray = painPoints.trim()
+        ? painPoints.split('\n').map(p => p.trim()).filter(p => p.length > 0)
+        : [];
+
       const payload = {
         personName: personName.trim(),
         title: title.trim(),
-        company: company.trim(),
+        company: companyType.trim(), // companyType maps to company field
+        companySize: companySize.trim(),
+        industry: industry.trim(),
         coreGoal: coreGoal.trim(),
+        needForOurProduct: whatProductNeeds.trim(),
+        painPoints: painPointsArray,
         role: null,
         seniority: null,
-        needForOurProduct: null,
         potentialPitch: null,
-        painPoints: [],
-        industry: null,
-        companySize: null,
       };
 
       const response = await api.post('/api/personas/save', {
@@ -357,16 +374,46 @@ function BuildFromContactContent() {
                 />
               </div>
 
-              {/* Company */}
+              {/* Company Type */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Company *
+                  Company Type *
                 </label>
                 <input
                   type="text"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="e.g., X Firm"
+                  value={companyType}
+                  onChange={(e) => setCompanyType(e.target.value)}
+                  placeholder="e.g., Global Asset Management Firm"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  disabled={generating}
+                />
+              </div>
+
+              {/* Company Size */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Company Size *
+                </label>
+                <input
+                  type="text"
+                  value={companySize}
+                  onChange={(e) => setCompanySize(e.target.value)}
+                  placeholder="e.g., 51-200, 200-1000, 1000+"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  disabled={generating}
+                />
+              </div>
+
+              {/* Industry */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Industry *
+                </label>
+                <input
+                  type="text"
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
+                  placeholder="e.g., Asset Management, Enterprise Software"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                   disabled={generating}
                 />
@@ -380,8 +427,39 @@ function BuildFromContactContent() {
                 <textarea
                   value={coreGoal}
                   onChange={(e) => setCoreGoal(e.target.value)}
-                  placeholder="e.g., Ensure compliance with industry regulations while minimizing operational overhead"
+                  placeholder="e.g., Ensure regulatory compliance across all investment activities while minimizing operational risk"
                   rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  disabled={generating}
+                />
+              </div>
+
+              {/* Pain Points */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Pain Points *
+                </label>
+                <textarea
+                  value={painPoints}
+                  onChange={(e) => setPainPoints(e.target.value)}
+                  placeholder="Enter one pain point per line&#10;e.g., Managing complex regulatory requirements&#10;Balancing compliance costs with efficiency"
+                  rows={4}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                  disabled={generating}
+                />
+                <p className="mt-1 text-xs text-gray-500">Enter one pain point per line</p>
+              </div>
+
+              {/* What Product Needs */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  What Product Needs *
+                </label>
+                <textarea
+                  value={whatProductNeeds}
+                  onChange={(e) => setWhatProductNeeds(e.target.value)}
+                  placeholder="e.g., Compliance management platform that automates regulatory reporting and provides real-time risk monitoring"
+                  rows={2}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                   disabled={generating}
                 />
@@ -391,7 +469,7 @@ function BuildFromContactContent() {
               <div className="pt-4">
                 <button
                   onClick={handleSave}
-                  disabled={saving || generating || !personName.trim() || !title.trim() || !company.trim() || !coreGoal.trim()}
+                  disabled={saving || generating || !personName.trim() || !title.trim() || !companyType.trim() || !companySize.trim() || !industry.trim() || !coreGoal.trim() || !whatProductNeeds.trim()}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? (
