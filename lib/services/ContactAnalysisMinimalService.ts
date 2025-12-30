@@ -1,23 +1,24 @@
 /**
  * ContactAnalysisMinimalService
  * 
- * MVP1: Simple meeting prep for real contacts
- * No product dependency - just "how do you talk to this person?"
- * Based on their persona/profile - what they might want, how to pitch
+ * MVP1: Basic contact info extraction (who they are, what company, core goal)
+ * Same minimal structure as PersonaMinimalService but for real contacts
  * 
  * MVP1 Fields:
- * - recommendedTalkTrack (how to speak with THIS person)
- * - whatTheyMightWant (what they might want - basic)
- * - meetingPrepSummary (prep summary)
+ * - personName (who they are)
+ * - title
+ * - company
+ * - coreGoal (what they might want)
  */
 
 import { prisma } from '@/lib/prisma';
 import { OpenAI } from 'openai';
 
 interface MinimalContactAnalysisJSON {
-  recommendedTalkTrack: string;  // How to speak with THIS person (key output)
-  whatTheyMightWant: string;     // What they might want (basic)
-  meetingPrepSummary: string;    // Prep summary for meeting (maps to finalSummary in DB)
+  personName: string;  // e.g., "Compliance Manager"
+  title: string;       // e.g., "Deputy Counsel"
+  company: string;     // e.g., "X Firm"
+  coreGoal: string;    // What they might want / their north star
 }
 
 interface GenerateParams {
@@ -72,7 +73,7 @@ export class ContactAnalysisMinimalService {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const model = process.env.OPENAI_MODEL || 'gpt-4o';
 
-      console.log(`🤖 ContactAnalysisMinimalService: Generating meeting prep for ${contact.fullName || contact.email}...`);
+      console.log(`🤖 ContactAnalysisMinimalService: Generating basic contact info for ${contact.fullName || contact.email}...`);
 
       const completion = await openai.chat.completions.create({
         model,
@@ -111,21 +112,22 @@ export class ContactAnalysisMinimalService {
   }): { systemPrompt: string; userPrompt: string } {
     const { contact, companyHQ } = context;
 
-    const systemPrompt = `You are a senior BD strategist preparing for a meeting with a real contact.
+    const systemPrompt = `You are an expert in business contact analysis.
 
-Generate simple meeting prep - just the essentials:
-1. How to talk to this person (recommendedTalkTrack)
-2. What they might want (whatTheyMightWant)
-3. Meeting prep summary (meetingPrepSummary)
+Generate basic contact info - just the essentials:
+1. Who they are (personName + title)
+2. What company (company)
+3. Core goal (what they might want / their north star)
 
 Return EXACTLY this JSON structure:
 {
-  "recommendedTalkTrack": "",    // How to speak with THIS person (key output)
-  "whatTheyMightWant": "",       // What they might want (basic - one sentence or short paragraph)
-  "meetingPrepSummary": ""       // Prep summary for meeting (concise)
+  "personName": "",      // e.g., "Compliance Manager" or contact's name/archetype
+  "title": "",           // e.g., "Deputy Counsel" or their job title
+  "company": "",         // e.g., "X Firm" or company name
+  "coreGoal": ""         // What they might want / their north star (one sentence)
 }
 
-Keep it simple. This is MVP1 - just the basics for meeting prep.`;
+Keep it simple. This is MVP1 - just the basics.`;
 
     const contactContext = `Contact Info:
 - Name: ${contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown'}
@@ -141,18 +143,17 @@ Keep it simple. This is MVP1 - just the basics for meeting prep.`;
 - What You Do: ${companyHQ.whatYouDo || 'Not specified'}`
       : '';
 
-    const userPrompt = `Generate meeting prep analysis for this contact.
+    const userPrompt = `Generate basic contact info for this real contact.
 
 ${contactContext}
 
 ${companyContext ? `${companyContext}\n` : ''}
 
-Focus on:
-- How to speak with THIS specific person (recommendedTalkTrack is key)
-- What they might want (basic - infer from their role, title, company)
-- Concise meeting prep summary
-
-Return the JSON structure with practical, actionable meeting prep.`;
+Return the JSON structure with:
+- personName: A clear identifier (e.g., their name or role like "Compliance Manager")
+- title: Their job title/role
+- company: Company name
+- coreGoal: What they might want / their north star (one sentence)`;
 
     return { systemPrompt, userPrompt };
   }
@@ -178,10 +179,10 @@ Return the JSON structure with practical, actionable meeting prep.`;
     const analysisData = parsed.analysis || parsed;
 
     return {
-      recommendedTalkTrack: analysisData.recommendedTalkTrack || '',
-      whatTheyMightWant: analysisData.whatTheyMightWant || '',
-      meetingPrepSummary: analysisData.meetingPrepSummary || '',
+      personName: analysisData.personName || '',
+      title: analysisData.title || '',
+      company: analysisData.company || '',
+      coreGoal: analysisData.coreGoal || '',
     };
   }
 }
-

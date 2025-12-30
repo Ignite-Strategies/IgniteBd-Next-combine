@@ -61,28 +61,36 @@ export async function POST(
       );
     }
 
-    // Save to database (using existing schema fields)
+    // Save to database (using finalSummary field to store the basic info as JSON)
+    // For MVP1, we're storing basic persona-like fields (who, company, coreGoal)
+    const analysisData = {
+      personName: result.analysis!.personName,
+      title: result.analysis!.title,
+      company: result.analysis!.company,
+      coreGoal: result.analysis!.coreGoal,
+    };
+
     const savedAnalysis = await prisma.contact_analyses.upsert({
       where: { contactId },
       create: {
         contactId,
-        recommendedTalkTrack: result.analysis!.recommendedTalkTrack || null,
-        finalSummary: result.analysis!.meetingPrepSummary || null, // Map meetingPrepSummary to finalSummary
+        finalSummary: JSON.stringify(analysisData), // Store basic info in finalSummary for MVP1
         // MVP2 fields left null for now
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       update: {
-        recommendedTalkTrack: result.analysis!.recommendedTalkTrack || null,
-        finalSummary: result.analysis!.meetingPrepSummary || null,
+        finalSummary: JSON.stringify(analysisData),
         updatedAt: new Date(),
       },
     });
 
+    // Return the analysis data (not the DB record)
     return NextResponse.json({
       success: true,
-      analysis: savedAnalysis,
+      analysis: analysisData,
     });
+
   } catch (error: any) {
     console.error('❌ Contact analysis error:', error);
     return NextResponse.json(
