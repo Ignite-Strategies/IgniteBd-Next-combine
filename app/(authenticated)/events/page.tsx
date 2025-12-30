@@ -174,6 +174,7 @@ function EventsPageContent() {
                 </div>
               </div>
             </div>
+          </div>
 
           {/* Sidebar - Existing Preferences (1 column) */}
           <div className="lg:col-span-1 space-y-6">
