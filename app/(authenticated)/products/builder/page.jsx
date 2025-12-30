@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { Package } from 'lucide-react';
 import api from '@/lib/api';
@@ -9,7 +9,6 @@ import { PRODUCT_CONFIG } from '@/lib/config/productConfig';
 import { mapDatabaseToForm } from '@/lib/services/ProductServiceMapper';
 import { ProductFormFields } from '@/components/forms/ProductFormFields';
 import UniversalParserModal from '@/components/parsers/UniversalParserModal';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 // Default values from config
 const DEFAULT_VALUES = {
@@ -30,10 +29,14 @@ const DEFAULT_VALUES = {
 };
 
 
-export default function ProductBuilderPage({ searchParams }) {
+function ProductBuilderPageContent({ searchParams }) {
   const router = useRouter();
-  const productId = searchParams?.productId || null;
-  const buildWithAI = searchParams?.buildWithAI === 'true';
+  const urlSearchParams = useSearchParams();
+  const productId = searchParams?.productId || urlSearchParams?.get('productId') || null;
+  const buildWithAI = searchParams?.buildWithAI === 'true' || urlSearchParams?.get('buildWithAI') === 'true';
+  
+  // Get companyHQId from URL params - NO HOOKS
+  const companyHQId = urlSearchParams?.get('companyHQId') || '';
 
   // Redirect to fork page if creating new product without going through fork
   useEffect(() => {
@@ -50,16 +53,6 @@ export default function ProductBuilderPage({ searchParams }) {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [personas, setPersonas] = useState([]);
   const [isParserModalOpen, setIsParserModalOpen] = useState(false);
-
-  // Use hook to get companyHQId (handles refresh if localStorage is empty)
-  const { companyHQId: derivedCompanyId, loading: companyLoading, refresh: refreshCompanyHQ } = useCompanyHQ();
-
-  // Auto-refresh companyHQ if not in localStorage
-  useEffect(() => {
-    if (!derivedCompanyId && !companyLoading && typeof window !== 'undefined') {
-      refreshCompanyHQ();
-    }
-  }, [derivedCompanyId, companyLoading, refreshCompanyHQ]);
 
   const {
     register,
@@ -86,12 +79,12 @@ export default function ProductBuilderPage({ searchParams }) {
   // DISABLED: Auto-fetch personas - fail silently
   // Also fetch personas for dropdown
   // useEffect(() => {
-  //   if (!derivedCompanyId) return;
+  //   if (!companyHQId) return;
   //   
   //   // Fetch personas for "Targeted To" dropdown
   //   const fetchPersonas = async () => {
   //     try {
-  //       const response = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
+  //       const response = await api.get(`/api/personas?companyHQId=${companyHQId}`);
   //       const personasData = Array.isArray(response.data) ? response.data : [];
   //       setPersonas(personasData);
   //     } catch (err) {
@@ -99,19 +92,19 @@ export default function ProductBuilderPage({ searchParams }) {
   //     }
   //   };
   //   
-  //   if (derivedCompanyId && !hasInitialized) {
-  //     setValue('companyId', derivedCompanyId);
+  //   if (companyHQId && !hasInitialized) {
+  //     setValue('companyId', companyHQId);
   //     setHasInitialized(true);
   //     fetchPersonas();
   //   }
-  // }, [derivedCompanyId, productId, setValue, reset, hasInitialized]);
+  // }, [companyHQId, productId, setValue, reset, hasInitialized]);
 
   // Open AI modal if coming from "Build with AI" fork
   useEffect(() => {
-    if (buildWithAI && derivedCompanyId && !productId) {
+    if (buildWithAI && companyHQId && !productId) {
       setIsParserModalOpen(true);
     }
-  }, [buildWithAI, derivedCompanyId, productId]);
+  }, [buildWithAI, companyHQId, productId]);
 
   // Fetch product data if editing
   useEffect(() => {
@@ -127,7 +120,7 @@ export default function ProductBuilderPage({ searchParams }) {
     (async () => {
       try {
         // Fetch single product by ID
-        const response = await api.get(`/api/products/${productId}?companyHQId=${derivedCompanyId}`);
+        const response = await api.get(`/api/products/${productId}?companyHQId=${companyHQId}`);
         const product = response.data?.product;
 
         if (!isMounted) return;
@@ -139,14 +132,14 @@ export default function ProductBuilderPage({ searchParams }) {
 
         // Use mapper to convert database record to form data
         const formData = mapDatabaseToForm(product);
-        formData.companyId = product.companyHQId ?? derivedCompanyId ?? '';
+        formData.companyId = product.companyHQId ?? companyHQId ?? '';
         reset(formData);
         setHasInitialized(true);
         
         // DISABLED: Auto-fetch personas - fail silently
         // Also fetch personas for dropdown
         // try {
-        //   const personasResponse = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
+          //   const personasResponse = await api.get(`/api/personas?companyHQId=${companyHQId}`);
         //   const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
         //   setPersonas(personasData);
         // } catch (err) {
@@ -169,7 +162,7 @@ export default function ProductBuilderPage({ searchParams }) {
     return () => {
       isMounted = false;
     };
-  }, [productId, reset, derivedCompanyId]);
+  }, [productId, reset, companyHQId]);
 
   const handleShowToast = (message, callback) => {
     setToastMessage(message);
@@ -306,7 +299,7 @@ export default function ProductBuilderPage({ searchParams }) {
           <form onSubmit={onSubmit} className="space-y-6">
             <input
               type="hidden"
-              value={derivedCompanyId || ''}
+              value={companyHQId || ''}
               {...register('companyId', { required: true })}
             />
 
@@ -340,16 +333,33 @@ export default function ProductBuilderPage({ searchParams }) {
       </div>
 
       {/* AI Parser Modal */}
-      {derivedCompanyId && (
+      {companyHQId && (
         <UniversalParserModal
           isOpen={isParserModalOpen}
           onClose={() => setIsParserModalOpen(false)}
           onApply={handleParserApply}
           defaultType="product_definition"
-          companyHqId={derivedCompanyId}
+          companyHqId={companyHQId}
         />
       )}
     </div>
+  );
+}
+
+export default function ProductBuilderPage({ searchParams }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ProductBuilderPageContent searchParams={searchParams} />
+    </Suspense>
   );
 }
 
