@@ -129,7 +129,7 @@ model bd_intels {
 
 // Contact Analysis - for REAL contacts (meeting prep), not hypothetical personas
 model contact_analyses {
-  id                    String   @id @default(cuid()) @default(cuid())
+  id                    String   @id @default(cuid())
   contactId             String   @unique
   fitScore              Int?
   painAlignmentScore    Int?
@@ -399,7 +399,7 @@ model contact_lists {
 }
 
 model Contact {
-  id                                                        String                    @id @default(cuid()) @default(cuid())
+  id                                                        String                    @id @default(cuid())
   crmId                                                     String
   firstName                                                 String?
   lastName                                                  String?
@@ -990,7 +990,7 @@ model product_fits {
 }
 
 model products {
-  id                    String         @id @default(cuid()) @default(cuid())
+  id                    String         @id @default(cuid())
   companyHQId           String
   name                  String
   description           String?
@@ -1164,7 +1164,7 @@ model template_relationship_helpers {
 }
 
 model templates {
-  id          String      @id @default(cuid()) @default(cuid())
+  id          String      @id @default(cuid())
   subject     String
   body        String
   createdAt   DateTime    @default(now())
