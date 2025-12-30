@@ -5,11 +5,17 @@ import { useRouter } from 'next/navigation';
 import { Loader2, CheckCircle2, TrendingUp, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOwner } from '@/hooks/useOwner';
 
 export default function AssessmentPage() {
   const router = useRouter();
-  const { ownerId, hydrated: ownerHydrated } = useOwner();
+  
+  // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) setOwnerId(stored);
+  }, []);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [companyHQId, setCompanyHQId] = useState('');

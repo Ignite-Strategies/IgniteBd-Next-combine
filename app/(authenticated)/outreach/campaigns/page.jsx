@@ -4,12 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Mail, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOwner } from '@/hooks/useOwner';
 import api from '@/lib/api';
 
 export default function CampaignsPage() {
   const router = useRouter();
-  const { ownerId, hydrated: ownerHydrated } = useOwner();
+  
+  // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) setOwnerId(stored);
+  }, []);
   const [campaigns, setCampaigns] = useState([]);
   const [hydrating, setHydrating] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -55,12 +61,12 @@ export default function CampaignsPage() {
     }
   };
 
-  // Auto-sync when owner is hydrated (only once)
+  // Auto-sync when ownerId is available (only once)
   useEffect(() => {
-    if (ownerHydrated && ownerId && !hydrated && !hydrating) {
+    if (ownerId && !hydrated && !hydrating) {
       syncCampaigns();
     }
-  }, [ownerHydrated, ownerId, hydrated, hydrating]);
+  }, [ownerId, hydrated, hydrating]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

@@ -4,30 +4,22 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
 function FromContactContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contactId = searchParams?.get('contactId');
+  const companyHQId = searchParams?.get('companyHQId') || '';
 
   const [contact, setContact] = useState(null);
   const [personaData, setPersonaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  
-  const { companyHQId, loading: companyLoading, refresh } = useCompanyHQ();
-
-  useEffect(() => {
-    if (!companyHQId && !companyLoading) {
-      refresh();
-    }
-  }, [companyHQId, companyLoading, refresh]);
 
   // Fetch contact and generate minimal persona
   useEffect(() => {
-    if (!contactId || !companyHQId || companyLoading) return;
+    if (!contactId || !companyHQId) return;
 
     const fetchContactAndGenerate = async () => {
       setLoading(true);
