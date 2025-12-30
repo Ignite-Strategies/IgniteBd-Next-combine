@@ -6,15 +6,16 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
+import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { ProposalsContext } from './ProposalsContext';
 
-// Note: Proposals are hydrated by Growth Dashboard via useCompanyHydration hook
+// Note: Proposals are hydrated by Growth Dashboard
 // This layout just reads from localStorage - no separate API calls
 
 export default function ProposalsLayout({ children }) {
-  const { companyHQId } = useCompanyHQ();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [proposals, setProposals] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
