@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Heart, Loader2, MapPin, Calendar, DollarSign, Sparkles } from 'lucide-react';
+import { Heart, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 
 interface EventPickerModel {
