@@ -89,6 +89,9 @@ function FromContactContent() {
               potentialPitch: null,
             });
           }
+          
+          // Move to review phase after Phase 1 completes
+          setPhase(3);
         }
       } catch (err) {
         console.error('Failed to fetch contact:', err);
@@ -341,8 +344,8 @@ function FromContactContent() {
           </p>
         </div>
 
-        {/* Phase 2 CTA if not done yet */}
-        {phase === 1 && (
+        {/* Phase 2 CTA if not done deep dive yet */}
+        {phase === 3 && (!personaData?.needForOurProduct || !personaData?.coreGoal) && (
           <div className="mb-6 rounded-xl border-2 border-purple-200 bg-purple-50 p-6">
             <div className="flex items-center justify-between">
               <div>
