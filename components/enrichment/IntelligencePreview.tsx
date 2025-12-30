@@ -24,6 +24,125 @@ const formatRevenue = (revenue: number | null | undefined): string => {
   }
 };
 
+// Normalize text capitalization - sentence case
+const normalizeText = (text: string | null | undefined): string => {
+  if (!text) return '';
+  // Convert to lowercase first, then capitalize first letter of each word
+  return text
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Normalize industry name - proper capitalization
+const normalizeIndustry = (industry: string | null | undefined): string => {
+  if (!industry) return '';
+  // Common industry names that should be capitalized properly
+  const industries: Record<string, string> = {
+    'finance': 'Finance',
+    'healthcare': 'Healthcare',
+    'technology': 'Technology',
+    'consulting': 'Consulting',
+    'retail': 'Retail',
+    'manufacturing': 'Manufacturing',
+    'government': 'Government',
+    'education': 'Education',
+    'energy': 'Energy',
+    'real estate': 'Real Estate',
+    'media': 'Media',
+    'transportation': 'Transportation',
+    'hospitality': 'Hospitality',
+    'legal': 'Legal',
+    'construction': 'Construction',
+    'investment management': 'Investment Management',
+  };
+  
+  const lower = industry.toLowerCase().trim();
+  return industries[lower] || normalizeText(industry);
+};
+
+// Normalize category - proper capitalization
+const normalizeCategory = (category: string | null | undefined): string => {
+  if (!category) return '';
+  // Common categories that should be capitalized properly
+  const categories: Record<string, string> = {
+    'asset manager': 'Asset Manager',
+    'capital allocator': 'Capital Allocator',
+    'bank': 'Bank',
+    'saas vendor': 'SaaS Vendor',
+    'consultancy': 'Consultancy',
+    'healthcare system': 'Healthcare System',
+    'pe firm': 'PE Firm',
+    'manufacturer': 'Manufacturer',
+    'government contractor': 'Government Contractor',
+    'retailer': 'Retailer',
+    'media company': 'Media Company',
+    'energy company': 'Energy Company',
+    'real estate firm': 'Real Estate Firm',
+    'law firm': 'Law Firm',
+    'construction company': 'Construction Company',
+    'education institution': 'Education Institution',
+    'technology company': 'Technology Company',
+  };
+  
+  const lower = category.toLowerCase().trim();
+  return categories[lower] || normalizeText(category);
+};
+
+// Normalize tier - capitalize first letter only
+const normalizeTier = (tier: string | null | undefined): string => {
+  if (!tier) return '';
+  const lower = tier.toLowerCase().trim();
+  // Common tier values
+  if (['micro', 'small', 'medium', 'large', 'enterprise'].includes(lower)) {
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }
+  return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+};
+
+// Normalize positioning label - sentence case
+const normalizePositioning = (label: string | null | undefined): string => {
+  if (!label) return '';
+  // Convert to sentence case (first letter capitalized, rest lowercase unless proper nouns)
+  return label
+    .toLowerCase()
+    .split(' ')
+    .map((word, index) => {
+      // Capitalize first word, keep common words lowercase unless they're first
+      if (index === 0) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+      // Keep small words lowercase unless they're important
+      const smallWords = ['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'if', 'in', 'of', 'on', 'or', 'the', 'to'];
+      if (smallWords.includes(word)) {
+        return word;
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+};
+
+// Normalize job title - title case
+const normalizeTitle = (title: string | null | undefined): string => {
+  if (!title) return '';
+  // Common title words that should be lowercase unless first word
+  const smallWords = ['of', 'and', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'by'];
+  return title
+    .toLowerCase()
+    .split(' ')
+    .map((word, index) => {
+      if (index === 0) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+      if (smallWords.includes(word)) {
+        return word;
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+};
+
 interface IntelligencePreviewProps {
   normalizedContact: any;
   normalizedCompany: any;
@@ -112,7 +231,7 @@ export default function IntelligencePreview({
           {normalizedContact.title && (
             <div>
               <dt className="text-xs font-semibold text-gray-500 uppercase">Title</dt>
-              <dd className="mt-1 text-sm text-gray-900">{normalizedContact.title}</dd>
+              <dd className="mt-1 text-sm text-gray-900">{normalizeTitle(normalizedContact.title)}</dd>
             </div>
           )}
           {normalizedContact.email && (
@@ -167,13 +286,13 @@ export default function IntelligencePreview({
           {normalizedContact.seniority && (
             <div>
               <dt className="text-xs font-semibold text-gray-500 uppercase">Seniority</dt>
-              <dd className="mt-1 text-sm text-gray-900 capitalize">{normalizedContact.seniority}</dd>
+              <dd className="mt-1 text-sm text-gray-900">{normalizeText(normalizedContact.seniority)}</dd>
             </div>
           )}
           {normalizedContact.department && (
             <div>
               <dt className="text-xs font-semibold text-gray-500 uppercase">Department</dt>
-              <dd className="mt-1 text-sm text-gray-900">{normalizedContact.department}</dd>
+              <dd className="mt-1 text-sm text-gray-900">{normalizeText(normalizedContact.department)}</dd>
             </div>
           )}
         </div>
@@ -273,26 +392,26 @@ export default function IntelligencePreview({
             {companyPositioning.positioningLabel && (
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Positioning</dt>
-                <dd className="mt-1 text-gray-900">{companyPositioning.positioningLabel}</dd>
+                <dd className="mt-1 text-gray-900">{normalizePositioning(companyPositioning.positioningLabel)}</dd>
               </div>
             )}
             {companyPositioning.category && (
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Category</dt>
-                <dd className="mt-1 text-gray-900">{companyPositioning.category}</dd>
+                <dd className="mt-1 text-gray-900">{normalizeCategory(companyPositioning.category)}</dd>
               </div>
             )}
             {companyPositioning.normalizedIndustry && (
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Normalized Industry</dt>
-                <dd className="mt-1 text-gray-900">{companyPositioning.normalizedIndustry}</dd>
+                <dd className="mt-1 text-gray-900">{normalizeIndustry(companyPositioning.normalizedIndustry)}</dd>
               </div>
             )}
             {companyPositioning.revenueTier && normalizedCompany.revenue && (
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Revenue Tier</dt>
                 <dd className="mt-1 text-gray-900">
-                  {companyPositioning.revenueTier} ({formatRevenue(normalizedCompany.revenue)})
+                  {normalizeTier(companyPositioning.revenueTier)} ({formatRevenue(normalizedCompany.revenue)})
                 </dd>
               </div>
             )}
@@ -300,7 +419,7 @@ export default function IntelligencePreview({
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Headcount Tier</dt>
                 <dd className="mt-1 text-gray-900">
-                  {companyPositioning.headcountTier} ({normalizedCompany.headcount.toLocaleString()} employees)
+                  {normalizeTier(companyPositioning.headcountTier)} ({normalizedCompany.headcount.toLocaleString()} employees)
                 </dd>
               </div>
             )}
@@ -337,7 +456,7 @@ export default function IntelligencePreview({
             {normalizedCompany.industry && (
               <div>
                 <dt className="text-xs font-semibold text-gray-500 uppercase">Industry</dt>
-                <dd className="mt-1 text-sm text-gray-900">{normalizedCompany.industry}</dd>
+                <dd className="mt-1 text-sm text-gray-900">{normalizeIndustry(normalizedCompany.industry)}</dd>
               </div>
             )}
             {normalizedCompany.headcount && (
@@ -417,7 +536,7 @@ export default function IntelligencePreview({
                       {role.company}
                     </p>
                     <p className="text-sm text-gray-700 mt-0.5">
-                      {yearRange} {role.title}
+                      {yearRange} {normalizeTitle(role.title)}
                     </p>
                   </div>
                 </div>
