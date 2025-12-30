@@ -266,7 +266,7 @@ function EventPickerPageContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       {/* Loading Overlay - Following OpenAI Pattern */}
       {generating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-30 backdrop-blur-sm">
           <div className="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-xl max-w-md mx-4">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-red-600" />
             <p className="mt-4 text-lg font-semibold text-gray-900">Generating Your Events...</p>
