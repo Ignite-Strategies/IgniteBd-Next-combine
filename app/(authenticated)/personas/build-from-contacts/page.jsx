@@ -135,8 +135,8 @@ export default function BuildFromContactsPage() {
         };
         localStorage.setItem('tempPersonaData', JSON.stringify(tempPersonaData));
         
-        // Navigate with just contactId and companyHQId
-        router.push(`/personas/from-contact?contactId=${contactId}&companyHQId=${companyHQId}`);
+        // Navigate to new build-from-contact page with contactId
+        router.push(`/personas/build-from-contact?contactId=${contactId}&companyHQId=${companyHQId}`);
       } else {
         setError(response.data?.error || 'Failed to generate persona');
         setGeneratingContactId(null);

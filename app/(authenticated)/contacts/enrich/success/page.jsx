@@ -42,7 +42,8 @@ export default function EnrichSuccessPage() {
   const handleAddToPersonaBuilder = async (contact) => {
     try {
       // Navigate to persona from-contact route for enriched contacts
-      router.push(`/personas/from-contact?contactId=${contact.id}`);
+      const companyHQId = typeof window !== 'undefined' ? localStorage.getItem('companyHQId') || localStorage.getItem('companyId') : '';
+      router.push(`/personas/build-from-contact?contactId=${contact.id}&companyHQId=${companyHQId}`);
     } catch (error) {
       console.error('Error navigating to persona builder:', error);
       alert('Failed to navigate to persona builder');

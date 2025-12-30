@@ -9,6 +9,7 @@ function BuildFromContactContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
+  const urlContactId = searchParams?.get('contactId') || '';
 
   // Contacts list state
   const [contacts, setContacts] = useState([]);
@@ -57,6 +58,18 @@ function BuildFromContactContent() {
 
     fetchContacts();
   }, [companyHQId]);
+
+  // Auto-select contact from URL if provided
+  useEffect(() => {
+    if (urlContactId && contacts.length > 0 && !generating && !selectedContactId && companyHQId) {
+      const contactExists = contacts.some(c => c.id === urlContactId);
+      if (contactExists) {
+        // Auto-select and generate for this contact
+        handleContactSelect(urlContactId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlContactId, contacts.length, companyHQId]);
 
   // Filter contacts
   const filteredContacts = contacts.filter((contact) => {

@@ -247,7 +247,7 @@ function PersonasPageContent() {
 
               {/* Build from Contacts */}
               <div
-                onClick={() => router.push(companyHQId ? `/personas/contact-select?companyHQId=${companyHQId}` : '/personas/contact-select')}
+                onClick={() => router.push(companyHQId ? `/personas/build-from-contact?companyHQId=${companyHQId}` : '/personas/build-from-contact')}
                 className="cursor-pointer rounded-xl border border-gray-200 bg-white p-6 shadow-md transition hover:shadow-lg hover:border-green-300"
               >
                 <div className="mb-4 flex items-center gap-3">

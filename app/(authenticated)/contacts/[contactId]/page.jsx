@@ -493,7 +493,10 @@ export default function ContactDetailPage({ params }) {
                   // Show "Build Persona" as primary, other actions as secondary if enriched
                   <>
                     <button
-                      onClick={() => router.push(`/personas/from-contact?contactId=${contactId}`)}
+                      onClick={() => {
+                        const companyHQId = typeof window !== 'undefined' ? localStorage.getItem('companyHQId') || localStorage.getItem('companyId') : '';
+                        router.push(`/personas/build-from-contact?companyHQId=${companyHQId}&contactId=${contactId}`);
+                      }}
                       className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
                     >
                       <UserCircle className="h-4 w-4" />
@@ -851,7 +854,8 @@ export default function ContactDetailPage({ params }) {
                   <button
                     onClick={() => {
                       setShowEnrichSuccessModal(false);
-                      router.push(`/personas/from-contact?contactId=${contactId}`);
+                      const companyHQId = typeof window !== 'undefined' ? localStorage.getItem('companyHQId') || localStorage.getItem('companyId') : '';
+                      router.push(`/personas/build-from-contact?companyHQId=${companyHQId}&contactId=${contactId}`);
                     }}
                     className="w-full flex items-center justify-between rounded-lg border-2 border-purple-600 bg-purple-50 px-6 py-4 text-left transition hover:bg-purple-100"
                   >
