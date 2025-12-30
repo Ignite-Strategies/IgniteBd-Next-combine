@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send, Lock, Copy, Check } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
@@ -19,6 +19,11 @@ export default function SettingsPage() {
   const [becomingSuperAdmin, setBecomingSuperAdmin] = useState(false);
   const [activeSection, setActiveSection] = useState(null); // 'profile' | 'company' | 'integrations' | null
   const [authInitialized, setAuthInitialized] = useState(false);
+  
+  // Password reset state
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const [passwordResetLink, setPasswordResetLink] = useState(null);
+  const [passwordResetCopied, setPasswordResetCopied] = useState(false);
   
   // Profile form state
   const [profileLoading, setProfileLoading] = useState(false);
@@ -239,6 +244,43 @@ export default function SettingsPage() {
       setError(err.response?.data?.error || 'Failed to update profile');
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  // Handle password reset
+  const handlePasswordReset = async () => {
+    if (!authInitialized || passwordResetLoading) return;
+
+    try {
+      setPasswordResetLoading(true);
+      setError(null);
+      setPasswordResetLink(null);
+      setPasswordResetCopied(false);
+
+      const response = await api.post('/api/owner/password/reset');
+
+      if (response.data.success) {
+        setPasswordResetLink(response.data.passwordResetLink);
+      } else {
+        setError(response.data.error || 'Failed to generate password reset link');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to generate password reset link');
+    } finally {
+      setPasswordResetLoading(false);
+    }
+  };
+
+  // Copy password reset link to clipboard
+  const copyPasswordResetLink = async () => {
+    if (!passwordResetLink) return;
+    
+    try {
+      await navigator.clipboard.writeText(passwordResetLink);
+      setPasswordResetCopied(true);
+      setTimeout(() => setPasswordResetCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
     }
   };
 
@@ -484,6 +526,82 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   */}
+                  
+                  {/* Password Reset Section */}
+                  <div className="pt-6 border-t border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                      <Lock className="h-5 w-5 mr-2 text-gray-600" />
+                      Password
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Reset your password by generating a secure reset link. Click the link to set a new password.
+                    </p>
+                    
+                    {!passwordResetLink ? (
+                      <button
+                        type="button"
+                        onClick={handlePasswordReset}
+                        disabled={passwordResetLoading || !authInitialized}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {passwordResetLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="h-4 w-4 mr-2" />
+                            Generate Password Reset Link
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                          <p className="text-sm font-medium text-green-900 mb-1">
+                            Password reset link generated successfully!
+                          </p>
+                          <p className="text-xs text-green-700 mb-2">
+                            Click the link below or copy it to reset your password. The link will expire after a set time.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={passwordResetLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 underline break-all"
+                            >
+                              {passwordResetLink}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={copyPasswordResetLink}
+                              className="flex-shrink-0 p-1 text-gray-600 hover:text-gray-900 rounded"
+                              title="Copy link"
+                            >
+                              {passwordResetCopied ? (
+                                <Check className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPasswordResetLink(null);
+                            setPasswordResetCopied(false);
+                          }}
+                          className="text-sm text-gray-600 hover:text-gray-900"
+                        >
+                          Generate new link
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="flex justify-end">
                     <button
                       type="submit"
