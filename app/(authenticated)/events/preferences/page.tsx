@@ -254,19 +254,19 @@ function PreferencesPageContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title={isEditing ? "Edit Preferences" : "Set Preferences"}
+          title={isEditing ? "Edit Preferences" : "Set Your Event Preferences"}
           subtitle={isEditing 
             ? "Update your preferences below. Changes will be saved when you continue."
-            : "Name your preference based on something you can remember. You can have more preferences later or edit this same version."
+            : "We're here to set your event plan. Configure your preferences to find events that match your criteria."
           }
           backTo={companyHQId ? `/events?companyHQId=${companyHQId}` : "/events"}
-          backLabel="Back to Events"
+          backLabel="Back to Event Picker"
         />
 
         {isEditing && (
           <div className="mt-4 mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4">
             <p className="text-sm text-blue-800">
-              <strong>Editing existing preferences.</strong> Make your changes below and save to continue.
+              <strong>Editing existing preferences.</strong> Update your settings below and continue to generate your events.
             </p>
           </div>
         )}
@@ -418,7 +418,7 @@ function PreferencesPageContent() {
               disabled={saving || !name.trim()}
               className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Saving...' : isEditing ? 'Update Preferences & Continue' : 'Save Preferences & Ready to Plan'}
+              {saving ? 'Saving...' : isEditing ? 'Update & Generate Events' : 'Save & Generate Events'}
             </button>
           </div>
         </div>
