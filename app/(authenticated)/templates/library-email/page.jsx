@@ -1,48 +1,68 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Edit, Trash2, FileCode, Plus } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 import PageHeader from '@/components/PageHeader.jsx';
 
 /**
  * Email Template Library Page
- * View and manage email templates created by ownerId
+ * View and manage email templates for companyHQId
  */
 function EmailTemplateLibraryContent() {
   const router = useRouter();
-  const { companyHQId } = useOwner();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 🎯 LOCAL-FIRST: Load from localStorage on mount - NO API CALLS unless cache miss
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/templates/library-email?companyHQId=${stored}`);
+      } else {
+        router.push('/templates');
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
+
+  // Load templates on mount - use cache for instant display, then refresh from API
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!ownerId) {
+    if (!companyHQId) {
       setLoading(false);
       return;
     }
 
-    // Try to load from localStorage first
+    // Try to load from localStorage first for instant display
     try {
       const cached = localStorage.getItem(`templates_${companyHQId}`);
       if (cached) {
         const templates = JSON.parse(cached);
-        if (Array.isArray(templates)) {
+        if (Array.isArray(templates) && templates.length > 0) {
           setTemplates(templates);
-          setLoading(false);
-          console.log(`✅ [LOCAL-FIRST] Loaded ${templates.length} templates from localStorage`);
-          return;
+          console.log(`✅ [CACHE] Loaded ${templates.length} templates from localStorage (will refresh from API)`);
         }
       }
     } catch (e) {
-      console.warn('[LOCAL-FIRST] Failed to parse cached templates:', e);
+      console.warn('[CACHE] Failed to parse cached templates:', e);
     }
 
-    // Fallback: Load from API if not cached
+    // Always load from API to get fresh data
     loadTemplates();
   }, [companyHQId]);
 
@@ -52,18 +72,36 @@ function EmailTemplateLibraryContent() {
     try {
       setLoading(true);
       setError('');
+      console.log(`🔄 Loading templates for companyHQId: ${companyHQId}`);
       const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
+      console.log('📦 API Response:', response);
+      console.log('📦 Response data:', response.data);
+      console.log('📦 Response status:', response.status);
+      
       if (response.data?.success) {
         const templates = response.data.templates || [];
+        console.log(`✅ Loaded ${templates.length} templates from API`);
+        console.log('📋 Templates array:', templates);
+        
+        // Ensure templates is an array
+        if (!Array.isArray(templates)) {
+          console.error('❌ Templates is not an array:', typeof templates, templates);
+          setError('Invalid response format: templates is not an array');
+          return;
+        }
+        
         setTemplates(templates);
         // Cache in localStorage
         localStorage.setItem(`templates_${companyHQId}`, JSON.stringify(templates));
-        console.log(`✅ Loaded ${templates.length} templates from API and cached`);
+        console.log(`✅ Cached ${templates.length} templates in localStorage`);
       } else {
+        console.warn('⚠️ API response missing success flag:', response.data);
         setError('Failed to load templates');
       }
     } catch (err) {
-      console.error('Error loading templates:', err);
+      console.error('❌ Error loading templates:', err);
+      console.error('❌ Error response:', err.response?.data);
+      console.error('❌ Error status:', err.response?.status);
       setError('Failed to load templates');
     } finally {
       setLoading(false);
@@ -136,7 +174,7 @@ function EmailTemplateLibraryContent() {
             </h2>
           </div>
           <button
-            onClick={() => router.push('/templates/create')}
+            onClick={() => router.push(companyHQId ? `/templates/create?companyHQId=${companyHQId}` : '/templates/create')}
             className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition"
           >
             <Plus className="h-4 w-4" />
@@ -152,7 +190,7 @@ function EmailTemplateLibraryContent() {
               Create your first email template to get started
             </p>
             <button
-              onClick={() => router.push('/templates/create')}
+              onClick={() => router.push(companyHQId ? `/templates/create?companyHQId=${companyHQId}` : '/templates/create')}
               className="rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700 transition"
             >
               Create Your First Template
@@ -163,7 +201,7 @@ function EmailTemplateLibraryContent() {
             {templates.map((template) => (
               <div
                 key={template.id}
-                onClick={() => router.push(`/builder/template/${template.id}`)}
+                onClick={() => router.push(companyHQId ? `/builder/template/${template.id}?companyHQId=${companyHQId}` : `/builder/template/${template.id}`)}
                 className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -175,7 +213,13 @@ function EmailTemplateLibraryContent() {
                       <strong>Subject:</strong> {template.subject || 'No subject'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Created {new Date(template.createdAt).toLocaleDateString()}
+                      Created {template.createdAt ? (() => {
+                        try {
+                          return new Date(template.createdAt).toLocaleDateString();
+                        } catch (e) {
+                          return 'Unknown date';
+                        }
+                      })() : 'Unknown date'}
                     </p>
                   </div>
                   <button
@@ -190,7 +234,7 @@ function EmailTemplateLibraryContent() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/builder/template/${template.id}`);
+                      router.push(companyHQId ? `/builder/template/${template.id}?companyHQId=${companyHQId}` : `/builder/template/${template.id}`);
                     }}
                     className="flex items-center gap-2 w-full justify-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition"
                   >

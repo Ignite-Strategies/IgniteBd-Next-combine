@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
@@ -12,10 +12,34 @@ import { useOwner } from '@/hooks/useOwner';
  */
 export default function QuickIdeaTemplatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const { ownerId } = useOwner();
   const [idea, setIdea] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/templates/create/ai/quick?companyHQId=${stored}`);
+      } else {
+        router.push('/templates');
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -53,6 +77,9 @@ export default function QuickIdeaTemplatePage() {
           subject: subject,
           body: templateBody,
         });
+        if (companyHQId) {
+          params.append('companyHQId', companyHQId);
+        }
         
         // Navigate to template builder - use full path
         const url = `/builder/template/new?${params.toString()}`;

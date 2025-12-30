@@ -22,37 +22,8 @@ export default function ContactsLayout({ children }) {
   const [listsHydrated, setListsHydrated] = useState(false);
   const [listsHydrating, setListsHydrating] = useState(false);
 
-  // NO localStorage - always fetch from API when companyHQId is available
-  useEffect(() => {
-    if (!companyHQId) {
-      setContacts([]);
-      setHydrated(false);
-      return;
-    }
-    
-    // Always fetch from API - no localStorage cache
-    refreshContacts();
-  }, [companyHQId, refreshContacts]);
-
-  // Step 1: Check localStorage cache on mount for contact lists
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const cached = window.localStorage.getItem('contactLists');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          setLists(parsed);
-          setListsHydrated(true);
-        }
-      } catch (error) {
-        console.warn('Failed to parse cached contact lists', error);
-      }
-    }
-  }, []);
-
   // Step 2: Fetch from API when companyHQId is available
+  // Define refreshContacts BEFORE using it in useEffect
   const refreshContacts = useCallback(async () => {
     if (!companyHQId) {
       console.warn('⚠️ refreshContacts called without companyHQId');
@@ -84,6 +55,36 @@ export default function ContactsLayout({ children }) {
       setHydrating(false);
     }
   }, [companyHQId]);
+
+  // NO localStorage - always fetch from API when companyHQId is available
+  useEffect(() => {
+    if (!companyHQId) {
+      setContacts([]);
+      setHydrated(false);
+      return;
+    }
+    
+    // Always fetch from API - no localStorage cache
+    refreshContacts();
+  }, [companyHQId, refreshContacts]);
+
+  // Step 1: Check localStorage cache on mount for contact lists
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const cached = window.localStorage.getItem('contactLists');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setLists(parsed);
+          setListsHydrated(true);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached contact lists', error);
+      }
+    }
+  }, []);
 
   // Contacts are always fetched from API when companyHQId changes (handled above)
 

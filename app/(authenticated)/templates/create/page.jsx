@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Sparkles, FileEdit, Copy, ArrowLeft } from 'lucide-react';
 
@@ -11,22 +11,47 @@ import { Sparkles, FileEdit, Copy, ArrowLeft } from 'lucide-react';
  */
 function TemplateCreateContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/templates/create?companyHQId=${stored}`);
+      } else {
+        router.push('/templates');
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
 
   const handleOptionSelect = (option) => {
+    const baseParams = companyHQId ? `?companyHQId=${companyHQId}` : '';
     switch (option) {
       case 'manual': {
         // Route to manual template builder
-        router.push('/builder/template/new');
+        router.push(`/builder/template/new${baseParams}`);
         break;
       }
       case 'ai': {
         // Route to AI fork page (Quick Idea or Relationship Helper)
-        router.push('/templates/create/ai');
+        router.push(`/templates/create/ai${baseParams}`);
         break;
       }
       case 'previous': {
         // Route to clone from previous template
-        router.push('/templates/create/clone');
+        router.push(`/templates/create/clone${baseParams}`);
         break;
       }
     }

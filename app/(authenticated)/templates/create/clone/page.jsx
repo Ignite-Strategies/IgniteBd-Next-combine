@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 /**
  * Clone Template Page
@@ -12,10 +11,33 @@ import { useOwner } from '@/hooks/useOwner';
  */
 export default function CloneTemplatePage() {
   const router = useRouter();
-  const { companyHQId } = useOwner();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/templates/create/clone?companyHQId=${stored}`);
+      } else {
+        router.push('/templates');
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
 
   useEffect(() => {
     if (companyHQId) {
@@ -24,14 +46,19 @@ export default function CloneTemplatePage() {
   }, [companyHQId]);
 
   const loadTemplates = async () => {
+    if (!companyHQId) return;
+    
     try {
       setLoading(true);
+      console.log('🔄 Loading templates for clone:', { companyHQId });
       const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
       if (response.data?.success) {
-        setTemplates(response.data.templates || []);
+        const templates = response.data.templates || [];
+        console.log(`✅ Loaded ${templates.length} templates for clone`);
+        setTemplates(templates);
       }
     } catch (err) {
-      console.error('Error loading templates:', err);
+      console.error('❌ Error loading templates:', err);
       setError('Failed to load templates');
     } finally {
       setLoading(false);
@@ -39,7 +66,11 @@ export default function CloneTemplatePage() {
   };
 
   const handleClone = (templateId) => {
-    router.push(`/builder/template/new?cloneFrom=${templateId}`);
+    const params = new URLSearchParams({ cloneFrom: templateId });
+    if (companyHQId) {
+      params.append('companyHQId', companyHQId);
+    }
+    router.push(`/builder/template/new?${params.toString()}`);
   };
 
   return (
@@ -72,7 +103,7 @@ export default function CloneTemplatePage() {
           <div className="rounded-xl bg-white p-8 text-center shadow">
             <p className="text-gray-600">No templates found. Create your first template manually.</p>
             <button
-              onClick={() => router.push('/builder/template/new')}
+              onClick={() => router.push(companyHQId ? `/builder/template/new?companyHQId=${companyHQId}` : '/builder/template/new')}
               className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
             >
               Create Template

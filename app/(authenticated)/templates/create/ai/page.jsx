@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Zap, Heart } from 'lucide-react';
 
 /**
@@ -9,15 +10,40 @@ import { ArrowLeft, Zap, Heart } from 'lucide-react';
  */
 export default function AITemplateCreatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/templates/create/ai?companyHQId=${stored}`);
+      } else {
+        router.push('/templates');
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
 
   const handleOptionSelect = (option) => {
+    const baseParams = companyHQId ? `?companyHQId=${companyHQId}` : '';
     switch (option) {
       case 'quick': {
-        router.push('/templates/create/ai/quick');
+        router.push(`/templates/create/ai/quick${baseParams}`);
         break;
       }
       case 'relationship': {
-        router.push('/templates/create/ai/relationship');
+        router.push(`/templates/create/ai/relationship${baseParams}`);
         break;
       }
     }

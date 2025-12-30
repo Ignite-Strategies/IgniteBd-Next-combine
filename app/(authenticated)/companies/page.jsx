@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Plus, Check, X, Sparkles, Search } from 'lucide-react';
+import { Building2, Check, Sparkles, Search, ExternalLink, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import { useOwner } from '@/hooks/useOwner';
@@ -14,213 +14,90 @@ export default function CompanyHubPage() {
   
   // Search state
   const [companySearch, setCompanySearch] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  
-  // Create state (only shown if not found)
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [companyName, setCompanyName] = useState('');
-  const [website, setWebsite] = useState('');
+  const [lookingUp, setLookingUp] = useState(false);
+  const [company, setCompany] = useState(null);
+  const [source, setSource] = useState(null); // 'database' | 'apollo'
   
   // Association state
   const [selectedContactId, setSelectedContactId] = useState(null);
   const [selectedContact, setSelectedContact] = useState(null);
   
   // Action state
-  const [creating, setCreating] = useState(false);
-  const [enriching, setEnriching] = useState(false);
+  const [associating, setAssociating] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [createdCompany, setCreatedCompany] = useState(null);
   const [error, setError] = useState(null);
 
-  // Search companies as user types
+  // Lookup company when user stops typing
   useEffect(() => {
     if (!companyHQId || !ownerHydrated) return;
     
     if (companySearch.length < 2) {
-      setSearchResults([]);
-      setShowCreateForm(false);
+      setCompany(null);
+      setSource(null);
       return;
     }
 
     const timeoutId = setTimeout(async () => {
-      setSearching(true);
+      setLookingUp(true);
+      setError(null);
+      
       try {
-        const response = await api.get(
-          `/api/companies?companyHQId=${companyHQId}&query=${encodeURIComponent(companySearch)}`
-        );
-        if (response.data?.success) {
-          const results = response.data.companies || [];
-          setSearchResults(results);
-          // Show create form if no results found
-          setShowCreateForm(results.length === 0);
+        const response = await api.post('/api/companies/lookup', {
+          companyHQId,
+          query: companySearch.trim(),
+        });
+
+        if (response.data?.success && response.data.company) {
+          setCompany(response.data.company);
+          setSource(response.data.source); // 'database' or 'apollo'
+        } else {
+          setCompany(null);
+          setError(response.data?.error || 'Company not found');
         }
       } catch (err) {
-        console.error('Failed to search companies:', err);
-        setSearchResults([]);
+        console.error('Failed to lookup company:', err);
+        setCompany(null);
+        setError(err.response?.data?.error || err.message || 'Failed to lookup company');
       } finally {
-        setSearching(false);
+        setLookingUp(false);
       }
-    }, 300);
+    }, 500); // Slightly longer delay to avoid too many API calls
 
     return () => clearTimeout(timeoutId);
   }, [companySearch, companyHQId, ownerHydrated]);
-
-  // Auto-fill create form from search query
-  useEffect(() => {
-    if (showCreateForm && companySearch.trim() && !companyName) {
-      setCompanyName(companySearch.trim());
-    }
-  }, [showCreateForm, companySearch, companyName]);
-
-  const handleSelectCompany = (company) => {
-    setSelectedCompany(company);
-    setCompanySearch(company.companyName);
-    setSearchResults([]);
-    setShowCreateForm(false);
-  };
-
-  const handleCreateCompany = async () => {
-    if (!companyName.trim()) {
-      setError('Company name is required');
-      return;
-    }
-
-    if (!companyHQId) {
-      setError('Company context is required. Please refresh the page.');
-      return;
-    }
-
-    setCreating(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      // Create the company
-      const response = await api.post('/api/companies', {
-        companyHQId,
-        companyName: companyName.trim(),
-        website: website.trim() || undefined,
-      });
-
-      if (response.data?.success && response.data.company) {
-        const newCompany = response.data.company;
-        setSelectedCompany(newCompany);
-        setCreatedCompany(newCompany);
-
-        // Auto-enrich if website is provided
-        if (website.trim() || newCompany.website || newCompany.domain) {
-          try {
-            const enriched = await handleEnrichCompany(
-              newCompany.id,
-              website.trim() || newCompany.website || newCompany.domain
-            );
-            if (enriched) {
-              setCreatedCompany(enriched);
-              setSelectedCompany(enriched);
-            }
-          } catch (enrichError) {
-            console.error('Auto-enrichment failed:', enrichError);
-            // Continue - enrichment is optional
-          }
-        }
-
-        // Optionally associate with contact if one is selected
-        if (selectedContactId) {
-          try {
-            await api.put(`/api/contacts/${selectedContactId}`, {
-              companyId: newCompany.id,
-            });
-          } catch (assocError) {
-            console.error('Failed to associate contact:', assocError);
-            // Don't fail the whole operation if association fails
-          }
-        }
-
-        setSuccess(true);
-      } else {
-        setError(response.data?.error || 'Failed to create company');
-      }
-    } catch (err) {
-      console.error('Failed to create company:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to create company');
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleContactSelect = (contact, company) => {
     setSelectedContactId(contact?.id || null);
     setSelectedContact(contact);
   };
 
-  const handleEnrichCompany = async (companyId, websiteOrDomain) => {
-    setEnriching(true);
+  const handleAssociateContact = async () => {
+    if (!selectedContactId || !company) return;
+
+    setAssociating(true);
     setError(null);
 
     try {
-      // Extract domain from website if it's a URL
-      let domain = websiteOrDomain;
-      if (websiteOrDomain && websiteOrDomain.includes('://')) {
-        try {
-          const url = new URL(websiteOrDomain);
-          domain = url.hostname.replace(/^www\./, '');
-        } catch {
-          // If URL parsing fails, try to extract domain manually
-          domain = websiteOrDomain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-        }
-      }
-
-      const response = await api.post('/api/companies/enrich', {
-        companyId,
-        domain: domain,
-        website: websiteOrDomain?.includes('://') ? websiteOrDomain : undefined,
+      await api.put(`/api/contacts/${selectedContactId}`, {
+        companyId: company.id,
       });
-
-      if (response.data?.success && response.data.company) {
-        setCreatedCompany(response.data.company);
-        return response.data.company;
-      } else {
-        throw new Error(response.data?.error || 'Enrichment failed');
-      }
+      setSuccess(true);
     } catch (err) {
-      console.error('Failed to enrich company:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to enrich company');
-      throw err;
+      console.error('Failed to associate contact:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to associate contact');
     } finally {
-      setEnriching(false);
+      setAssociating(false);
     }
   };
 
   const handleReset = () => {
     setSuccess(false);
-    setCreatedCompany(null);
-    setSelectedCompany(null);
+    setCompany(null);
+    setSource(null);
     setCompanySearch('');
-    setCompanyName('');
-    setWebsite('');
     setSelectedContactId(null);
     setSelectedContact(null);
-    setShowCreateForm(false);
-    setSearchResults([]);
     setError(null);
-  };
-
-  const handleSaveAndContinue = () => {
-    if (!selectedCompany) return;
-    
-    // Associate with contact if selected
-    if (selectedContactId) {
-      api.put(`/api/contacts/${selectedContactId}`, {
-        companyId: selectedCompany.id,
-      }).catch(err => {
-        console.error('Failed to associate contact:', err);
-      });
-    }
-    
-    setSuccess(true);
-    setCreatedCompany(selectedCompany);
   };
 
   if (!ownerHydrated) {
@@ -246,16 +123,14 @@ export default function CompanyHubPage() {
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="🏢 Company Hub"
-          subtitle="Add a company and optionally associate it with a contact"
+          subtitle="Look up company details from database or Apollo"
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
         />
 
-        {success && (createdCompany || selectedCompany) ? (
-          (() => {
-            const company = createdCompany || selectedCompany;
-            return (
-              <div className="rounded-2xl bg-white p-8 shadow-lg">
+        {/* Success Message */}
+        {success ? (
+          <div className="rounded-2xl bg-white p-8 shadow-lg">
             <div className="text-center">
               <div className="mb-4 flex justify-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600">
@@ -263,113 +138,111 @@ export default function CompanyHubPage() {
                 </div>
               </div>
               <h2 className="mb-2 text-2xl font-bold text-gray-900">
-                Company Created!
+                Contact Associated!
               </h2>
               <p className="mb-4 text-gray-600">
-                <strong>{company.companyName}</strong> {createdCompany ? 'has been created' : 'has been selected'} successfully.
-                {selectedContactId && ' It has been associated with the selected contact.'}
+                Company has been associated with the selected contact.
               </p>
-              
-              {/* Show enrichment status if available */}
-              {company.companyHealthScore !== null && company.companyHealthScore !== undefined && (
-                <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-5 w-5 text-blue-600" />
-                    <h3 className="font-semibold text-blue-900">Company Enriched</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-blue-700">Health Score:</span>
-                      <span className="ml-2 font-semibold text-blue-900">{company.companyHealthScore}/100</span>
-                    </div>
-                    {company.growthScore !== null && (
-                      <div>
-                        <span className="text-blue-700">Growth Score:</span>
-                        <span className="ml-2 font-semibold text-blue-900">{company.growthScore}/100</span>
-                      </div>
-                    )}
-                    {company.headcount && (
-                      <div>
-                        <span className="text-blue-700">Headcount:</span>
-                        <span className="ml-2 font-semibold text-blue-900">{company.headcount.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {company.revenue && (
-                      <div>
-                        <span className="text-blue-700">Revenue:</span>
-                        <span className="ml-2 font-semibold text-blue-900">
-                          ${(company.revenue / 1000000).toFixed(1)}M
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Enrich button if not enriched yet */}
-              {(!company.companyHealthScore && (company.website || company.domain)) && (
-                <div className="mb-6">
-                  <button
-                    type="button"
-                    onClick={() => handleEnrichCompany(company.id, company.website || company.domain)}
-                    disabled={enriching}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {enriching ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Enriching...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-5 w-5" />
-                        Enrich Company with Intelligence Data
-                      </>
-                    )}
-                  </button>
-                  <p className="mt-2 text-sm text-gray-500 text-center">
-                    Get health scores, growth metrics, and company intelligence
-                  </p>
-                </div>
-              )}
-
               <div className="flex justify-center gap-4">
                 <button
                   type="button"
                   onClick={handleReset}
                   className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
                 >
-                  Add Another Company
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push('/people')}
-                  className="rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  Go to People Hub
+                  Look Up Another Company
                 </button>
               </div>
             </div>
           </div>
-            );
-          })()
-        ) : selectedCompany && !success ? (
-          // Company selected - show association option
+        ) : company ? (
+          /* Company Details View */
           <div className="rounded-2xl bg-white p-8 shadow-lg">
-            <div className="mb-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                  <Building2 className="h-6 w-6" />
+            {/* Company Header */}
+            <div className="mb-6 pb-6 border-b border-gray-200">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                    <Building2 className="h-8 w-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">{company.companyName}</h2>
+                    {company.website && (
+                      <a
+                        href={company.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 mt-1"
+                      >
+                        {company.website}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    {source && (
+                      <span className="inline-block mt-2 px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-700">
+                        {source === 'database' ? 'From Database' : 'Enriched from Apollo'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{selectedCompany.companyName}</h3>
-                  {selectedCompany.website && (
-                    <p className="text-sm text-gray-500">{selectedCompany.website}</p>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
             </div>
 
+            {/* Company Intelligence Scores */}
+            {company.companyHealthScore !== null && company.companyHealthScore !== undefined && (
+              <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <h3 className="font-semibold text-blue-900">Company Intelligence</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700">Health Score:</span>
+                    <span className="ml-2 font-semibold text-blue-900">{company.companyHealthScore}/100</span>
+                  </div>
+                  {company.growthScore !== null && (
+                    <div>
+                      <span className="text-blue-700">Growth Score:</span>
+                      <span className="ml-2 font-semibold text-blue-900">{company.growthScore}/100</span>
+                    </div>
+                  )}
+                  {company.headcount && (
+                    <div>
+                      <span className="text-blue-700">Headcount:</span>
+                      <span className="ml-2 font-semibold text-blue-900">{company.headcount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {company.revenue && (
+                    <div>
+                      <span className="text-blue-700">Revenue:</span>
+                      <span className="ml-2 font-semibold text-blue-900">
+                        ${(company.revenue / 1000000).toFixed(1)}M
+                      </span>
+                    </div>
+                  )}
+                  {company.industry && (
+                    <div>
+                      <span className="text-blue-700">Industry:</span>
+                      <span className="ml-2 font-semibold text-blue-900">{company.industry}</span>
+                    </div>
+                  )}
+                  {company.growthRate !== null && company.growthRate !== undefined && (
+                    <div>
+                      <span className="text-blue-700">Growth Rate:</span>
+                      <span className="ml-2 font-semibold text-blue-900">{company.growthRate}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Contact Association */}
             <div className="mb-6">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Associate with Contact (Optional)
@@ -391,33 +264,35 @@ export default function CompanyHubPage() {
               </div>
             )}
 
-            <div className="flex justify-end gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCompany(null);
-                  setCompanySearch('');
-                }}
-                className="rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveAndContinue}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
-              >
-                <Check className="h-5 w-5" />
-                Continue
-              </button>
-            </div>
+            {selectedContactId && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleAssociateContact}
+                  disabled={associating}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {associating ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Associating...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-5 w-5" />
+                      Associate with Contact
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
-          // Search/Create view
+          /* Search View */
           <div className="rounded-2xl bg-white p-8 shadow-lg">
             <div className="mb-6">
               <label htmlFor="companySearch" className="block text-sm font-semibold text-gray-700 mb-2">
-                Search for Company
+                Look Up Company
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -426,107 +301,23 @@ export default function CompanyHubPage() {
                   id="companySearch"
                   value={companySearch}
                   onChange={(e) => setCompanySearch(e.target.value)}
-                  className="w-full pl-10 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Type company name or website..."
+                  className="w-full pl-10 pr-10 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type company name or website (e.g., 'Acme Corp' or 'acme.com')..."
                   autoFocus
                 />
-                {searching && (
+                {lookingUp && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
                   </div>
                 )}
               </div>
               <p className="mt-2 text-sm text-gray-500">
-                Search existing companies or create a new one
+                Searches database first, then Apollo if not found. Saves API calls automatically.
               </p>
             </div>
 
-            {/* Search Results */}
-            {searchResults.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Select Company</h3>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {searchResults.map((company) => (
-                    <button
-                      key={company.id}
-                      type="button"
-                      onClick={() => handleSelectCompany(company)}
-                      className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Building2 className="h-5 w-5 text-gray-400" />
-                        <div>
-                          <p className="font-medium text-gray-900">{company.companyName}</p>
-                          {company.website && (
-                            <p className="text-sm text-gray-500">{company.website}</p>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Create Form (shown when no results) */}
-            {showCreateForm && (
-              <div className="mb-6 rounded-lg border border-gray-200 p-6 bg-gray-50">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4">Create New Company</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="newCompanyName" className="block text-sm font-medium text-gray-700 mb-2">
-                      Company Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="newCompanyName"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter company name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="newWebsite" className="block text-sm font-medium text-gray-700 mb-2">
-                      Website (Optional)
-                    </label>
-                    <input
-                      type="url"
-                      id="newWebsite"
-                      value={website}
-                      onChange={(e) => setWebsite(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="https://example.com"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Adding a website will automatically enrich company data
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCreateCompany}
-                    disabled={creating || !companyName.trim()}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {creating ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4" />
-                        Create Company
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {error && (
-              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4">
+              <div className="rounded-lg bg-red-50 border border-red-200 p-4">
                 <p className="text-sm text-red-800">{error}</p>
               </div>
             )}
@@ -536,4 +327,3 @@ export default function CompanyHubPage() {
     </div>
   );
 }
-

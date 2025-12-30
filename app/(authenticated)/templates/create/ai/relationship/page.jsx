@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
@@ -12,6 +12,8 @@ import { useOwner } from '@/hooks/useOwner';
  */
 export default function RelationshipAwareTemplatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const { ownerId } = useOwner();
   const [relationship, setRelationship] = useState('WARM');
   const [typeOfPerson, setTypeOfPerson] = useState('FORMER_COWORKER');
@@ -24,6 +26,28 @@ export default function RelationshipAwareTemplatePage() {
   const [desiredOutcome, setDesiredOutcome] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/templates/create/ai/relationship?companyHQId=${stored}`);
+      } else {
+        router.push('/templates');
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -63,6 +87,9 @@ export default function RelationshipAwareTemplatePage() {
           subject: response.data.subject || '',
           body: response.data.body || response.data.template || '',
         });
+        if (companyHQId) {
+          params.append('companyHQId', companyHQId);
+        }
         
         router.push(`/builder/template/new?${params.toString()}`);
       } else {

@@ -1,19 +1,41 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Mail, Users } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import { useCompanyHydration } from '@/hooks/useCompanyHydration';
 
 const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
   ssr: false,
 });
 
-export default function GrowthDashboardPage() {
+function GrowthDashboardPageContent() {
   const router = useRouter();
-  const { companyHQId } = useCompanyHQ();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/growth-dashboard?companyHQId=${stored}`);
+      } else {
+        router.push('/people');
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
   
   // Use the hydration hook - loads from localStorage immediately, no auto-fetch
   const { data, loading, hydrated } = useCompanyHydration(companyHQId);

@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { FileCode, Plus } from 'lucide-react';
 
@@ -11,6 +11,28 @@ import { FileCode, Plus } from 'lucide-react';
  */
 function TemplatesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/templates?companyHQId=${stored}`);
+      }
+    }
+  }, [companyHQId, router]);
+
+  // Log CompanyHQ from URL params
+  useEffect(() => {
+    if (companyHQId) {
+      console.log('🏢 CompanyHQ from URL params:', {
+        companyHQId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [companyHQId]);
 
   const OPTIONS = [
     {
@@ -19,7 +41,7 @@ function TemplatesContent() {
       description: 'Browse and edit your existing email templates',
       icon: FileCode,
       buttonText: 'View Templates',
-      route: '/templates/library-email',
+      route: companyHQId ? `/templates/library-email?companyHQId=${companyHQId}` : '/templates/library-email',
     },
     {
       id: 'create',
@@ -27,7 +49,7 @@ function TemplatesContent() {
       description: 'Create a new email template using Manual, AI, or Clone',
       icon: Plus,
       buttonText: 'Create New',
-      route: '/templates/create',
+      route: companyHQId ? `/templates/create?companyHQId=${companyHQId}` : '/templates/create',
     },
   ];
 
