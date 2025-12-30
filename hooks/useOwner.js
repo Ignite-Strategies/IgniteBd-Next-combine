@@ -85,7 +85,7 @@ export function useOwner() {
     const handleStorageChange = (e) => {
       // When companyHQId or companyHQ changes, refresh
       if (e.key === 'companyHQId' || e.key === 'companyHQ' || e.key === 'memberships') {
-        console.log('🔄 Storage changed, refreshing owner context:', e.key);
+        // Silent refresh - no console spam
         loadFromStorage();
       }
     };

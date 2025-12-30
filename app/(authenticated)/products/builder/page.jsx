@@ -83,27 +83,28 @@ export default function ProductBuilderPage({ searchParams }) {
   }, []);
 
   // Pre-fill form with test data when creating a new product (not editing)
+  // DISABLED: Auto-fetch personas - fail silently
   // Also fetch personas for dropdown
-  useEffect(() => {
-    if (!derivedCompanyId) return;
-    
-    // Fetch personas for "Targeted To" dropdown
-    const fetchPersonas = async () => {
-      try {
-        const response = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
-        const personasData = Array.isArray(response.data) ? response.data : [];
-        setPersonas(personasData);
-      } catch (err) {
-        console.warn('Failed to fetch personas:', err);
-      }
-    };
-    
-    if (derivedCompanyId && !hasInitialized) {
-      setValue('companyId', derivedCompanyId);
-      setHasInitialized(true);
-      fetchPersonas();
-    }
-  }, [derivedCompanyId, productId, setValue, reset, hasInitialized]);
+  // useEffect(() => {
+  //   if (!derivedCompanyId) return;
+  //   
+  //   // Fetch personas for "Targeted To" dropdown
+  //   const fetchPersonas = async () => {
+  //     try {
+  //       const response = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
+  //       const personasData = Array.isArray(response.data) ? response.data : [];
+  //       setPersonas(personasData);
+  //     } catch (err) {
+  //       // Silent fail - no console spam
+  //     }
+  //   };
+  //   
+  //   if (derivedCompanyId && !hasInitialized) {
+  //     setValue('companyId', derivedCompanyId);
+  //     setHasInitialized(true);
+  //     fetchPersonas();
+  //   }
+  // }, [derivedCompanyId, productId, setValue, reset, hasInitialized]);
 
   // Open AI modal if coming from "Build with AI" fork
   useEffect(() => {
@@ -142,14 +143,15 @@ export default function ProductBuilderPage({ searchParams }) {
         reset(formData);
         setHasInitialized(true);
         
+        // DISABLED: Auto-fetch personas - fail silently
         // Also fetch personas for dropdown
-        try {
-          const personasResponse = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
-          const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
-          setPersonas(personasData);
-        } catch (err) {
-          console.warn('Failed to fetch personas:', err);
-        }
+        // try {
+        //   const personasResponse = await api.get(`/api/personas?companyHQId=${derivedCompanyId}`);
+        //   const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
+        //   setPersonas(personasData);
+        // } catch (err) {
+        //   // Silent fail - no console spam
+        // }
       } catch (error) {
         if (!isMounted) return;
         const message =

@@ -47,6 +47,7 @@ export async function GET(request) {
     // Membership guard
     const { membership } = await resolveMembership(owner.id, companyHQId);
     if (!membership) {
+      // Silent fail - don't log to console (personas are disabled/optional)
       return NextResponse.json(
         { error: 'Forbidden: No membership in this CompanyHQ' },
         { status: 403 },

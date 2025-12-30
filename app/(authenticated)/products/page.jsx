@@ -78,20 +78,21 @@ export default function ProductsPage() {
         window.localStorage.setItem('products', JSON.stringify(productsData));
       }
 
+      // DISABLED: Auto-fetch personas - fail silently
       // Also sync personas if needed (for display purposes)
-      const cachedPersonas = window.localStorage.getItem('personas');
-      if (!cachedPersonas) {
-        try {
-          const personasResponse = await api.get(`/api/personas?companyHQId=${companyHQId}`);
-          const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
-          setPersonas(personasData);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('personas', JSON.stringify(personasData));
-          }
-        } catch (err) {
-          console.warn('Failed to fetch personas:', err);
-        }
-      }
+      // const cachedPersonas = window.localStorage.getItem('personas');
+      // if (!cachedPersonas) {
+      //   try {
+      //     const personasResponse = await api.get(`/api/personas?companyHQId=${companyHQId}`);
+      //     const personasData = Array.isArray(personasResponse.data) ? personasResponse.data : [];
+      //     setPersonas(personasData);
+      //     if (typeof window !== 'undefined') {
+      //       window.localStorage.setItem('personas', JSON.stringify(personasData));
+      //     }
+      //   } catch (err) {
+      //     // Silent fail - no console spam
+      //   }
+      // }
       
       setError(null);
     } catch (err) {

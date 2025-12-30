@@ -16,19 +16,7 @@ export default function PeopleLayout({ children }) {
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
 
-  // NO localStorage - always fetch from API when companyHQId is available
-  useEffect(() => {
-    if (!companyHQId) {
-      setContacts([]);
-      setHydrated(false);
-      return;
-    }
-    
-    // Always fetch from API - no localStorage cache
-    refreshContacts();
-  }, [companyHQId, refreshContacts]);
-
-  // Step 2: Fetch from API when companyHQId is available
+  // Step 1: Fetch from API when companyHQId is available
   const refreshContacts = useCallback(async () => {
     if (!companyHQId) {
       console.warn('⚠️ refreshContacts called without companyHQId');
@@ -60,6 +48,18 @@ export default function PeopleLayout({ children }) {
       setHydrating(false);
     }
   }, [companyHQId]);
+
+  // NO localStorage - always fetch from API when companyHQId is available
+  useEffect(() => {
+    if (!companyHQId) {
+      setContacts([]);
+      setHydrated(false);
+      return;
+    }
+    
+    // Always fetch from API - no localStorage cache
+    refreshContacts();
+  }, [companyHQId, refreshContacts]);
 
   // Contacts are always fetched from API when companyHQId changes (handled above)
 

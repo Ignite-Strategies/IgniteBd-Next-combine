@@ -56,31 +56,32 @@ function PersonasPageContent() {
       }
     }
 
+    // DISABLED: Auto-fetch personas - user can manually sync if needed
     // Then fetch fresh data from API
-    const fetchPersonas = async () => {
-      setLoading(true);
-      try {
-        const response = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
-        const personasData = Array.isArray(response.data) ? response.data : [];
-        setPersonas(personasData);
-        setError(null);
-        
-        // Update localStorage
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem('personas', JSON.stringify(personasData));
-        }
-      } catch (err) {
-        console.error('Failed to fetch personas:', err);
-        // Don't set error if we have cached data
-        if (!cached) {
-          setError('Failed to load personas. Click Sync to retry.');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
+    // const fetchPersonas = async () => {
+    //   setLoading(true);
+    //   try {
+    //     const response = await api.get(`/api/personas?companyHQId=${storedCompanyHQId}`);
+    //     const personasData = Array.isArray(response.data) ? response.data : [];
+    //     setPersonas(personasData);
+    //     setError(null);
+    //     
+    //     // Update localStorage
+    //     if (typeof window !== 'undefined') {
+    //       window.localStorage.setItem('personas', JSON.stringify(personasData));
+    //     }
+    //   } catch (err) {
+    //     // Silent fail - no console spam
+    //     // Don't set error if we have cached data
+    //     if (!cached) {
+    //       setError('Failed to load personas. Click Sync to retry.');
+    //     }
+    //   } finally {
+    //     setLoading(false);
+    //   }
+    // };
 
-    fetchPersonas();
+    // fetchPersonas();
   }, [ownerId, ownerHydrated]); // Wait for auth before fetching
 
   // Check for success message in URL params
