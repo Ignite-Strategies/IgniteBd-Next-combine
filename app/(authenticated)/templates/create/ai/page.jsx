@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Zap, Heart } from 'lucide-react';
 
@@ -8,7 +8,7 @@ import { ArrowLeft, Zap, Heart } from 'lucide-react';
  * AI Template Creation Fork Page
  * Choose between Quick Idea or Relationship-aware AI generation
  */
-export default function AITemplateCreatePage() {
+function AITemplateCreateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
@@ -115,6 +115,20 @@ export default function AITemplateCreatePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AITemplateCreatePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AITemplateCreateContent />
+    </Suspense>
   );
 }
 
