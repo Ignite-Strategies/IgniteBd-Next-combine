@@ -236,14 +236,20 @@ Return EXACTLY this JSON structure:
   "company": ""               // Optional - Company type/archetype (e.g., "mid-market SaaS") - can be null
 }`;
 
+    // Build product context - if no product, generate basic persona info only
     const productContext = product
       ? `Our Product:
 Name: ${product.name}
 Description: ${product.description || 'Not specified'}
 Value Prop: ${product.valueProp || 'Not specified'}`
       : productDescription
-      ? `Our Product Description: ${productDescription}`
-      : `Our Product: Not yet defined. Generate a persona that would be interested in business development services.`;
+      ? `Our Product Description: ${productDescription}
+
+IMPORTANT: This is a DEEP DIVE phase. The persona already has basic info (title, company, industry). 
+Focus on product-specific analysis: coreGoal, needForOurProduct, painPoints that our product solves, potentialPitch.`
+      : `Phase 1: Generate basic persona information only (title, company, industry, companySize, company type).
+Do NOT generate product-specific fields like needForOurProduct, potentialPitch, or detailed painPoints yet.
+Those will come in Phase 2 when product context is provided.`;
 
     const companyContext = `Our Company:
 Name: ${companyHQ.companyName}

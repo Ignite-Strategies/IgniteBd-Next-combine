@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Save, Loader2, Package, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Package, Sparkles, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 
@@ -12,17 +12,16 @@ function FromContactContent() {
   const contactId = searchParams?.get('contactId');
 
   const [contact, setContact] = useState(null);
+  const [phase, setPhase] = useState(1); // 1 = initial grab, 2 = product deep dive
+  const [initialPersona, setInitialPersona] = useState(null);
   const [personaData, setPersonaData] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [selectedProductId, setSelectedProductId] = useState('');
   const [productDescription, setProductDescription] = useState('');
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [generatingPhase1, setGeneratingPhase1] = useState(false);
+  const [generatingPhase2, setGeneratingPhase2] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [needsProduct, setNeedsProduct] = useState(false);
-  const [showProductInput, setShowProductInput] = useState(false);
   
-  // Use hook to get companyHQId (fetches from API if not in localStorage)
+  // Use hook to get companyHQId
   const { companyHQId, loading: companyLoading, refresh } = useCompanyHQ();
 
   // Fetch companyHQId from API if not in localStorage
@@ -32,85 +31,118 @@ function FromContactContent() {
     }
   }, [companyHQId, companyLoading, refresh]);
 
-  // Load products
+  // Phase 1: Fetch contact and generate initial persona (basic info)
   useEffect(() => {
-    if (!companyHQId) return;
+    if (!contactId || !companyHQId || companyLoading || phase !== 1) return;
 
-    const loadProducts = async () => {
-      try {
-        const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
-        if (response.data && Array.isArray(response.data)) {
-          setProducts(response.data);
-          // Auto-select first product if only one exists
-          if (response.data.length === 1) {
-            setSelectedProductId(response.data[0].id);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load products:', err);
-      }
-    };
-
-    loadProducts();
-  }, [companyHQId]);
-
-  // Fetch contact
-  useEffect(() => {
-    if (!contactId || !companyHQId || companyLoading) return;
-
-    const fetchContact = async () => {
+    const fetchContactAndGenerateInitial = async () => {
       setLoading(true);
+      setGeneratingPhase1(true);
+
       try {
+        // Fetch contact
         const contactResponse = await api.get(`/api/contacts/${contactId}`);
         if (contactResponse.data?.success && contactResponse.data?.contact) {
           setContact(contactResponse.data.contact);
+
+          // Generate initial persona (basic info only - no product context)
+          try {
+            const personaResponse = await api.post('/api/personas/generate', {
+              companyHQId,
+              contactId,
+              // No product context - just basic persona info
+            });
+
+            if (personaResponse.data?.success && personaResponse.data?.persona) {
+              const persona = personaResponse.data.persona;
+              setInitialPersona(persona);
+              // Pre-fill basic info
+              setPersonaData({
+                personName: persona.personName || contact.fullName || 'New Persona',
+                title: persona.title || contact.title || '',
+                role: persona.role || null,
+                seniority: persona.seniority || contact.seniority || null,
+                industry: persona.industry || contact.companyIndustry || null,
+                companySize: persona.companySize || contact.companySize || null,
+                company: persona.company || contact.companyName || null,
+                coreGoal: persona.coreGoal || '',
+                painPoints: Array.isArray(persona.painPoints) ? persona.painPoints : [],
+                needForOurProduct: persona.needForOurProduct || '',
+                potentialPitch: persona.potentialPitch || null,
+              });
+            }
+          } catch (err) {
+            console.error('Failed to generate initial persona:', err);
+            // Soft fallback - just use contact data
+            setInitialPersona({});
+            setPersonaData({
+              personName: contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'New Persona',
+              title: contact.title || '',
+              role: null,
+              seniority: contact.seniority || null,
+              industry: contact.companyIndustry || null,
+              companySize: contact.companySize || null,
+              company: contact.companyName || null,
+              coreGoal: '',
+              painPoints: [],
+              needForOurProduct: '',
+              potentialPitch: null,
+            });
+          }
         }
       } catch (err) {
         console.error('Failed to fetch contact:', err);
       } finally {
         setLoading(false);
+        setGeneratingPhase1(false);
       }
     };
 
-    fetchContact();
-  }, [contactId, companyHQId, companyLoading]);
+    fetchContactAndGenerateInitial();
+  }, [contactId, companyHQId, companyLoading, phase]);
 
-  const handleGenerate = async () => {
-    if (!companyHQId) return;
+  // Phase 2: Deep dive on product fit
+  const handleProductDeepDive = async () => {
+    if (!productDescription.trim()) return;
 
-    // Check if we have product context
-    if (!selectedProductId && !productDescription.trim()) {
-      setNeedsProduct(true);
-      setShowProductInput(true);
-      return;
-    }
-
-    setGenerating(true);
-    setNeedsProduct(false);
+    setGeneratingPhase2(true);
 
     try {
       const response = await api.post('/api/personas/generate', {
         companyHQId,
         contactId,
-        productId: selectedProductId || null,
-        productDescription: productDescription.trim() || null,
+        productDescription: productDescription.trim(),
+        // Use initial persona as context for deeper analysis
+        description: initialPersona ? JSON.stringify({
+          personName: personaData.personName,
+          title: personaData.title,
+          industry: personaData.industry,
+          company: personaData.company,
+        }) : null,
       });
 
       if (response.data?.success && response.data?.persona) {
-        setPersonaData(response.data.persona);
-        setShowProductInput(false);
-      } else {
-        // Soft fallback - show product input instead of error
-        setNeedsProduct(true);
-        setShowProductInput(true);
+        const deepPersona = response.data.persona;
+        
+        // Merge deep dive results (product-specific fields)
+        setPersonaData((prev) => ({
+          ...prev,
+          coreGoal: deepPersona.coreGoal || prev.coreGoal || '',
+          needForOurProduct: deepPersona.needForOurProduct || prev.needForOurProduct || '',
+          potentialPitch: deepPersona.potentialPitch || prev.potentialPitch || null,
+          painPoints: deepPersona.painPoints && Array.isArray(deepPersona.painPoints) && deepPersona.painPoints.length > 0
+            ? deepPersona.painPoints
+            : prev.painPoints || [],
+        }));
+
+        setPhase(3); // Move to review/edit phase
       }
     } catch (err) {
-      console.error('Failed to generate persona:', err);
-      // Soft fallback - show product input
-      setNeedsProduct(true);
-      setShowProductInput(true);
+      console.error('Failed to generate product deep dive:', err);
+      // Soft fallback - just move to review phase
+      setPhase(3);
     } finally {
-      setGenerating(false);
+      setGeneratingPhase2(false);
     }
   };
 
@@ -138,7 +170,6 @@ function FromContactContent() {
     setSaving(true);
 
     try {
-      // Normalize array fields
       const painPointsArray = typeof personaData.painPoints === 'string'
         ? personaData.painPoints.split(/\n|,/).map(s => s.trim()).filter(Boolean)
         : (Array.isArray(personaData.painPoints) ? personaData.painPoints : []);
@@ -148,8 +179,8 @@ function FromContactContent() {
         title: personaData.title || '',
         role: personaData.role || null,
         seniority: personaData.seniority || null,
-        coreGoal: personaData.coreGoal || personaData.description || '',
-        needForOurProduct: personaData.needForOurProduct || personaData.whatTheyWant || '',
+        coreGoal: personaData.coreGoal || '',
+        needForOurProduct: personaData.needForOurProduct || '',
         potentialPitch: personaData.potentialPitch || null,
         painPoints: painPointsArray,
         industry: personaData.industry || null,
@@ -167,7 +198,6 @@ function FromContactContent() {
       }
     } catch (err) {
       console.error('Failed to save persona:', err);
-      // Soft error - just log, don't show error state
     } finally {
       setSaving(false);
     }
@@ -191,130 +221,79 @@ function FromContactContent() {
     );
   }
 
-  if (loading) {
+  if (loading || generatingPhase1) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
-            <p className="mt-4 text-gray-600">Loading contact...</p>
+            <p className="mt-4 text-gray-600">
+              {generatingPhase1 ? 'Grabbing initial persona info from contact...' : 'Loading contact...'}
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
-  // Show product selection/input if no persona data yet
-  if (!personaData) {
+  // Phase 2: Product Deep Dive
+  if (phase === 2) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="mb-6">
             <button
-              onClick={() => router.back()}
+              onClick={() => setPhase(3)}
               className="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
-            <h1 className="text-3xl font-bold text-gray-900">Generate Persona</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Product Fit Deep Dive</h1>
             <p className="mt-2 text-gray-600">
-              {contact?.fullName || contact?.firstName ? `Creating persona for ${contact.fullName || contact.firstName}` : 'Create a persona from this contact'}
+              Now let's go deeper on how {personaData?.personName || 'this person'} fits your product
             </p>
           </div>
 
-          {/* Product Selection */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
-              <Package className="h-5 w-5 text-blue-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Product Context</h2>
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Describe Your Product</h2>
             </div>
             <p className="mb-4 text-sm text-gray-600">
-              To generate a persona, we need to know which product you're targeting. Select a product or describe yours.
+              Describe the product you think best fits this persona. We'll analyze how well they align.
             </p>
 
-            {/* Product Dropdown */}
-            {products.length > 0 ? (
-              <div className="mb-4">
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Select a Product
-                </label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => {
-                    setSelectedProductId(e.target.value);
-                    setProductDescription('');
-                  }}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="">Choose a product...</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <p className="mb-3 text-sm text-blue-800">
-                  <strong>No products yet.</strong> Create a product first, or describe your product below.
-                </p>
-                <button
-                  onClick={() => router.push('/products/builder')}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Product
-                </button>
-              </div>
-            )}
+            <textarea
+              value={productDescription}
+              onChange={(e) => setProductDescription(e.target.value)}
+              placeholder="e.g., A BD platform that helps consultants scale their practice by automating outreach, managing client relationships, and providing analytics to track growth. Perfect for solo consultants ready to grow their revenue without working more hours..."
+              rows={6}
+              className="mb-4 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+            />
 
-            {/* Product Description Input */}
-            <div className="mb-4">
-              <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Or describe your product
-              </label>
-              <textarea
-                value={productDescription}
-                onChange={(e) => {
-                  setProductDescription(e.target.value);
-                  setSelectedProductId('');
-                }}
-                placeholder="e.g., A BD platform that helps consultants scale their practice by automating outreach and managing client relationships..."
-                rows={4}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                disabled={!!selectedProductId}
-              />
-              {selectedProductId && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Clear product selection above to use description instead
-                </p>
-              )}
-            </div>
-
-            {/* Generate Button */}
             <div className="flex justify-end gap-4">
               <button
-                onClick={() => router.back()}
+                onClick={() => setPhase(3)}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
               >
-                Cancel
+                Skip Deep Dive
               </button>
               <button
-                onClick={handleGenerate}
-                disabled={generating || (!selectedProductId && !productDescription.trim())}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleProductDeepDive}
+                disabled={generatingPhase2 || !productDescription.trim()}
+                className="flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {generating ? (
+                {generatingPhase2 ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating...
+                    Analyzing Product Fit...
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    Generate Persona
+                    Analyze Product Fit
+                    <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>
@@ -325,7 +304,25 @@ function FromContactContent() {
     );
   }
 
-  // Show persona form if we have persona data
+  // Phase 3: Review & Edit
+  if (!personaData) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
+            <p className="text-gray-600">No persona data available</p>
+            <button
+              onClick={() => router.back()}
+              className="mt-4 text-sm text-blue-600 hover:text-blue-800"
+            >
+              ← Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
@@ -344,116 +341,177 @@ function FromContactContent() {
           </p>
         </div>
 
+        {/* Phase 2 CTA if not done yet */}
+        {phase === 1 && (
+          <div className="mb-6 rounded-xl border-2 border-purple-200 bg-purple-50 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Want to go deeper on product fit?
+                </h3>
+                <p className="text-sm text-gray-600">
+                  We've grabbed the basics (title, company). Describe your product to analyze how well they align.
+                </p>
+              </div>
+              <button
+                onClick={() => setPhase(2)}
+                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+              >
+                Go Deeper
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Persona Form */}
         <div className="space-y-6 rounded-lg border border-gray-200 bg-white p-6">
-          {/* Basic Info */}
+          {/* WHO IS THIS PERSON */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Persona Name *
-            </label>
-            <input
-              type="text"
-              value={personaData.personName || ''}
-              onChange={(e) => handleFieldChange('personName', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              required
-            />
-          </div>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Who is this person?</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Persona Name *
+                </label>
+                <input
+                  type="text"
+                  value={personaData.personName || ''}
+                  onChange={(e) => handleFieldChange('personName', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  required
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Title *
-            </label>
-            <input
-              type="text"
-              value={personaData.title || ''}
-              onChange={(e) => handleFieldChange('title', e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={personaData.title || ''}
+                  onChange={(e) => handleFieldChange('title', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  required
+                />
+              </div>
 
-          {/* Core Goal */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Core Goal *
-            </label>
-            <p className="mb-2 text-xs text-gray-500">Their north star (regardless of our product)</p>
-            <textarea
-              value={personaData.coreGoal || ''}
-              onChange={(e) => handleFieldChange('coreGoal', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Role (Additional context)
+                </label>
+                <input
+                  type="text"
+                  value={personaData.role || ''}
+                  onChange={(e) => handleFieldChange('role', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
 
-          {/* Need for Our Product */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Need for Our Product *
-            </label>
-            <p className="mb-2 text-xs text-gray-500">What they need from OUR PRODUCT specifically</p>
-            <textarea
-              value={personaData.needForOurProduct || ''}
-              onChange={(e) => handleFieldChange('needForOurProduct', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              required
-            />
-          </div>
-
-          {/* Pain Points */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Pain Points (one per line or comma-separated)
-            </label>
-            <textarea
-              value={Array.isArray(personaData.painPoints) ? personaData.painPoints.join('\n') : (personaData.painPoints || '')}
-              onChange={(e) => handleArrayFieldChange('painPoints', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              placeholder="Enter pain points, one per line"
-            />
-          </div>
-
-          {/* Potential Pitch */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Potential Pitch
-            </label>
-            <textarea
-              value={personaData.potentialPitch || ''}
-              onChange={(e) => handleFieldChange('potentialPitch', e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-          </div>
-
-          {/* Industry & Company */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Industry
-              </label>
-              <input
-                type="text"
-                value={personaData.industry || ''}
-                onChange={(e) => handleFieldChange('industry', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              />
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Seniority</label>
+                <input
+                  type="text"
+                  value={personaData.seniority || ''}
+                  onChange={(e) => handleFieldChange('seniority', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Company Size
-              </label>
-              <input
-                type="text"
-                value={personaData.companySize || ''}
-                onChange={(e) => handleFieldChange('companySize', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              />
+          {/* WHAT DO THEY WANT */}
+          <div>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">What do they want?</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Core Goal *
+                </label>
+                <p className="mb-2 text-xs text-gray-500">Their north star (regardless of our product)</p>
+                <textarea
+                  value={personaData.coreGoal || ''}
+                  onChange={(e) => handleFieldChange('coreGoal', e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Need for Our Product *
+                </label>
+                <p className="mb-2 text-xs text-gray-500">What they need from OUR PRODUCT specifically</p>
+                <textarea
+                  value={personaData.needForOurProduct || ''}
+                  onChange={(e) => handleFieldChange('needForOurProduct', e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Pain Points (one per line)
+                </label>
+                <textarea
+                  value={Array.isArray(personaData.painPoints) ? personaData.painPoints.join('\n') : (personaData.painPoints || '')}
+                  onChange={(e) => handleArrayFieldChange('painPoints', e.target.value)}
+                  rows={4}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  placeholder="Enter pain points, one per line"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Potential Pitch
+                </label>
+                <textarea
+                  value={personaData.potentialPitch || ''}
+                  onChange={(e) => handleFieldChange('potentialPitch', e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* WHAT COMPANY ARE THEY AT */}
+          <div>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">What company are they at?</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Industry</label>
+                <input
+                  type="text"
+                  value={personaData.industry || ''}
+                  onChange={(e) => handleFieldChange('industry', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Size</label>
+                <input
+                  type="text"
+                  value={personaData.companySize || ''}
+                  onChange={(e) => handleFieldChange('companySize', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Company Type</label>
+                <input
+                  type="text"
+                  value={personaData.company || ''}
+                  onChange={(e) => handleFieldChange('company', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
             </div>
           </div>
         </div>
