@@ -54,44 +54,24 @@ function PeopleHubPageContent() {
     }
   }, []);
 
-  // Option B: URL params primary, localStorage fallback
-  // If missing from URL, check localStorage and add to URL
-  // If neither exists, redirect to welcome
+  // 🔍 DEBUG: Removed redirects to inspect the issue
+  // Log all relevant state for debugging
   useEffect(() => {
-    if (hasRedirectedRef.current) return;
+    if (typeof window === 'undefined') return;
     
-    const checkAndRedirect = () => {
-      if (typeof window === 'undefined') return;
-      
-      // Check if URL actually has companyHQId
-      const currentUrl = window.location.href;
-      const urlHasCompanyHQId = currentUrl.includes('companyHQId=');
-      
-      // If URL has companyHQId or searchParams has it, we're good
-      if (urlHasCompanyHQId || companyHQId) {
-        return; // No redirect needed
-      }
-      
-      // URL doesn't have companyHQId - check localStorage (Option B fallback)
-      const stored = localStorage.getItem('companyHQId');
-      if (stored) {
-        // Add companyHQId to URL from localStorage
-        hasRedirectedRef.current = true;
-        console.log(`🔄 People: Adding companyHQId from localStorage to URL: ${stored}`);
-        router.replace(`/people?companyHQId=${stored}`);
-        return;
-      }
-      
-      // Neither URL nor localStorage has companyHQId - redirect to welcome
-      hasRedirectedRef.current = true;
-      console.warn('⚠️ People: No companyHQId in URL or localStorage - redirecting to welcome');
-      router.push('/welcome');
-    };
+    const currentUrl = window.location.href;
+    const urlHasCompanyHQId = currentUrl.includes('companyHQId=');
+    const stored = localStorage.getItem('companyHQId');
     
-    // Small delay to let searchParams load
-    const timeoutId = setTimeout(checkAndRedirect, 100);
-    return () => clearTimeout(timeoutId);
-  }, [companyHQId, router]);
+    console.log('🔍 People Page Debug:', {
+      companyHQIdFromParams: companyHQId,
+      urlHasCompanyHQId,
+      currentUrl,
+      localStorageCompanyHQId: stored,
+      searchParams: searchParams?.toString(),
+      timestamp: new Date().toISOString(),
+    });
+  }, [companyHQId, searchParams]);
 
   // Load from cache and sync when companyHQId is available
   useEffect(() => {

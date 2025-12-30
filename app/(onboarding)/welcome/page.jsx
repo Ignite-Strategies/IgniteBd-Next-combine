@@ -28,12 +28,21 @@ export default function WelcomePage() {
   useEffect(() => {
     // Wait for Firebase auth to initialize before making API call
     // This prevents 401 errors when page loads before Firebase is ready
+    let hasRun = false; // Guard to prevent multiple runs
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (hasRun) {
+        console.log('⚠️ Welcome: Already ran, skipping to prevent loops...');
+        return;
+      }
+      
       if (!firebaseUser) {
         console.log('⚠️ Welcome: No Firebase user, redirecting to signup');
         router.push('/signup');
         return;
       }
+
+      hasRun = true; // Mark as run
+      console.log('🔍 Welcome: Running checkMemberships (first time only)');
 
       const checkMemberships = async () => {
         try {
@@ -152,9 +161,10 @@ export default function WelcomePage() {
                 setLoading(false);
                 return; // Show UI with Continue button
               } else {
-                // No memberships and no owner.companyHQId - go to setup
-                console.log('⚠️ Welcome: No memberships and no owner.companyHQId - routing to setup');
-                router.push('/company/create-or-choose');
+                // No memberships and no owner.companyHQId - show error instead of redirecting
+                console.log('⚠️ Welcome: No memberships and no owner.companyHQId');
+                setError('No company found. Please contact support to set up your account.');
+                setLoading(false);
                 return;
               }
             }
@@ -172,7 +182,10 @@ export default function WelcomePage() {
       checkMemberships();
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      hasRun = false; // Reset on unmount
+    };
   }, [router]);
 
   const handleContinue = async () => {
@@ -257,16 +270,14 @@ export default function WelcomePage() {
       });
     }
     
-    // Fetch contacts from API before routing (non-blocking)
-    try {
-      await api.get(`/api/contacts?companyHQId=${selectedCompanyHqId}`);
-    } catch (err) {
-      console.error('❌ Failed to fetch contacts on welcome page:', err);
-      // Continue to dashboard even if contacts fetch fails
-    }
-    
-    // Route to growth dashboard with companyHQId in URL
+    // Route immediately - dashboard will fetch contacts
     router.push(`/growth-dashboard?companyHQId=${selectedCompanyHqId}`);
+    
+    // Prefetch contacts in background (truly non-blocking)
+    api.get(`/api/contacts?companyHQId=${selectedCompanyHqId}`).catch(err => {
+      console.error('❌ Failed to prefetch contacts on welcome page:', err);
+      // Ignore errors - dashboard will fetch anyway
+    });
   };
 
   // Loading state
