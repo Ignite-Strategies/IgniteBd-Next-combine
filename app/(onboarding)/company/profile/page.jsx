@@ -4,11 +4,31 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 export default function CompanyProfilePage() {
   const router = useRouter();
-  const { owner, companyHQId: ownerCompanyHQId } = useOwner(); // CRITICAL: Use hook exclusively - NO API calls to hydrate
+  const [owner, setOwner] = useState(null);
+  const [ownerCompanyHQId, setOwnerCompanyHQId] = useState(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwner = localStorage.getItem('owner');
+      const storedCompanyHQId = localStorage.getItem('companyHQId');
+      
+      if (storedOwner) {
+        try {
+          const parsedOwner = JSON.parse(storedOwner);
+          setOwner(parsedOwner);
+          setOwnerCompanyHQId(parsedOwner.companyHQId || storedCompanyHQId || null);
+        } catch (error) {
+          console.warn('Failed to parse stored owner', error);
+        }
+      } else if (storedCompanyHQId) {
+        setOwnerCompanyHQId(storedCompanyHQId);
+      }
+    }
+  }, []);
   const [formData, setFormData] = useState({
     companyName: '',
     whatYouDo: '',

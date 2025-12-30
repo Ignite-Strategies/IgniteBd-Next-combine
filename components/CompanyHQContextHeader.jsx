@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, AlertCircle, ChevronDown } from 'lucide-react';
-import { useOwner } from '@/hooks/useOwner';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -14,10 +13,39 @@ import { useRouter } from 'next/navigation';
  * - Ability to switch to other CompanyHQs if user has multiple memberships
  */
 export function CompanyHQContextHeader() {
-  const { companyHQ, companyHQId, memberships, owner } = useOwner();
+  const [companyHQ, setCompanyHQ] = useState(null);
+  const [companyHQId, setCompanyHQId] = useState(null);
+  const [memberships, setMemberships] = useState([]);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [isValid, setIsValid] = useState(true);
   const router = useRouter();
+
+  // Load from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const storedCompanyHQId = localStorage.getItem('companyHQId');
+    const storedCompanyHQ = localStorage.getItem('companyHQ');
+    const storedMemberships = localStorage.getItem('memberships');
+
+    if (storedCompanyHQId) {
+      setCompanyHQId(storedCompanyHQId);
+    }
+    if (storedCompanyHQ) {
+      try {
+        setCompanyHQ(JSON.parse(storedCompanyHQ));
+      } catch (error) {
+        console.warn('Failed to parse stored companyHQ', error);
+      }
+    }
+    if (storedMemberships) {
+      try {
+        setMemberships(JSON.parse(storedMemberships));
+      } catch (error) {
+        console.warn('Failed to parse stored memberships', error);
+      }
+    }
+  }, []);
 
   // Validate context
   useEffect(() => {

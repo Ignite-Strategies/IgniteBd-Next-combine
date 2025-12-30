@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Save, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 import { VariableCatalogue } from '@/lib/variables/catalogue';
 
 /**
@@ -19,7 +18,32 @@ export default function TemplateBuilderPage() {
   const isNew = templateId === 'new';
   const cloneFrom = searchParams?.get('cloneFrom');
   
-  const { ownerId, owner, companyHQId } = useOwner();
+  const [ownerId, setOwnerId] = useState(null);
+  const [owner, setOwner] = useState(null);
+  const [companyHQId, setCompanyHQId] = useState(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwnerId = localStorage.getItem('ownerId');
+      const storedOwner = localStorage.getItem('owner');
+      const storedCompanyHQId = localStorage.getItem('companyHQId');
+      
+      if (storedOwnerId) {
+        setOwnerId(storedOwnerId);
+      }
+      if (storedOwner) {
+        try {
+          setOwner(JSON.parse(storedOwner));
+        } catch (error) {
+          console.warn('Failed to parse stored owner', error);
+        }
+      }
+      if (storedCompanyHQId) {
+        setCompanyHQId(storedCompanyHQId);
+      }
+    }
+  }, []);
 
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');

@@ -3,13 +3,17 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Heart, Loader2 } from 'lucide-react';
+import { Heart, Loader2, MapPin, Calendar, DollarSign, Building2 } from 'lucide-react';
 import api from '@/lib/api';
 
 interface EventPickerModel {
   eventTitle: string;
   description: string;
   whyGo: string;
+  location?: string;
+  timeFrame?: string;
+  sponsor?: string;
+  costEstimate?: string;
 }
 
 function SearchPickPageContent() {
@@ -217,7 +221,25 @@ function SearchPickPageContent() {
           </div>
         ) : (
           <div className="mt-8 space-y-4">
-            {events.map((event, index) => {
+            {events
+              .sort((a, b) => {
+                // Sort by timeFrame chronologically
+                const timeFrameOrder: { [key: string]: number } = {
+                  'Early 2025': 1,
+                  'Q1 2025': 2,
+                  'Spring 2025': 3,
+                  'Mid-2025': 4,
+                  'Q2 2025': 5,
+                  'Q3 2025': 6,
+                  'Late 2025': 7,
+                  'Q4 2025': 8,
+                  'Upcoming': 9,
+                };
+                const aOrder = timeFrameOrder[a.timeFrame || ''] || 99;
+                const bOrder = timeFrameOrder[b.timeFrame || ''] || 99;
+                return aOrder - bOrder;
+              })
+              .map((event, index) => {
               const isLiked = likedEventTitles.has(event.eventTitle);
               const isLiking = liking[event.eventTitle];
 
@@ -229,6 +251,34 @@ function SearchPickPageContent() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="text-xl font-semibold text-gray-900 mb-3">{event.eventTitle}</h3>
+                      
+                      {/* Event Details Row */}
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                        {event.location && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            <span>{event.location}</span>
+                          </div>
+                        )}
+                        {event.timeFrame && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{event.timeFrame}</span>
+                          </div>
+                        )}
+                        {event.costEstimate && (
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-4 w-4" />
+                            <span>{event.costEstimate}</span>
+                          </div>
+                        )}
+                        {event.sponsor && (
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-4 w-4" />
+                            <span>{event.sponsor}</span>
+                          </div>
+                        )}
+                      </div>
                       
                       <div className="mb-3">
                         <p className="text-sm text-gray-700">{event.description}</p>

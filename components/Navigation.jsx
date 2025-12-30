@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { TrendingUp, Settings, Menu, X, LogOut, User, ChevronDown } from 'lucide-react';
 import { signOutUser, getCurrentUser } from '@/lib/firebase';
-import { useOwner } from '@/hooks/useOwner';
 
 const NAV_ITEMS = [
   { path: '/growth-dashboard', label: 'Growth Dashboard', icon: TrendingUp },
@@ -18,7 +17,21 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [firebaseUser, setFirebaseUser] = useState(null);
-  const { owner } = useOwner();
+  const [owner, setOwner] = useState(null);
+
+  // Load owner from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwner = localStorage.getItem('owner');
+      if (storedOwner) {
+        try {
+          setOwner(JSON.parse(storedOwner));
+        } catch (error) {
+          console.warn('Failed to parse stored owner', error);
+        }
+      }
+    }
+  }, []);
 
   // Get Firebase user info
   useEffect(() => {

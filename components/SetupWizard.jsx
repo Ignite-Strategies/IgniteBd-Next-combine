@@ -3,11 +3,24 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react';
-import { useOwner } from '@/hooks/useOwner';
 
 export default function SetupWizard({ companyHQ, hasContacts = false, onComplete }) {
   const router = useRouter();
-  const { owner } = useOwner(); // CRITICAL: Use hook exclusively - NO API calls to hydrate
+  const [owner, setOwner] = useState(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwner = localStorage.getItem('owner');
+      if (storedOwner) {
+        try {
+          setOwner(JSON.parse(storedOwner));
+        } catch (error) {
+          console.warn('Failed to parse stored owner', error);
+        }
+      }
+    }
+  }, []);
   const [hasAssessment, setHasAssessment] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [companyComplete, setCompanyComplete] = useState(false);

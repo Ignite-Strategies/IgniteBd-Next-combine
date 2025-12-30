@@ -39,6 +39,10 @@ export interface EventPickerModel {
   eventTitle: string;
   description: string;
   whyGo: string;
+  location?: string; // City, State or City, Country
+  timeFrame?: string; // General timeframe like "Q1 2025", "Spring 2025", "Early 2025", "Mid-2025", "Late 2025", "Upcoming"
+  sponsor?: string; // Main sponsor or organizer name
+  costEstimate?: string; // Cost estimate like "$500-$2,000", "Free", "$5,000+"
 }
 
 export interface EventPickerResponse {
@@ -122,7 +126,11 @@ You MUST return JSON in exactly this format:
     {
       "eventTitle": "Name of the event",
       "description": "What this event is about in plain language",
-      "whyGo": "Why this event makes sense given the preferences"
+      "whyGo": "Why this event makes sense given the preferences",
+      "location": "City, State or City, Country (e.g., 'San Francisco, CA' or 'New York, NY')",
+      "timeFrame": "General timeframe like 'Q1 2025', 'Spring 2025', 'Early 2025', 'Mid-2025', 'Late 2025', 'Upcoming' - DO NOT use exact years like '2026' unless you're certain",
+      "sponsor": "Main sponsor or organizer name (optional, only if known)",
+      "costEstimate": "Cost estimate like '$500-$2,000', 'Free', '$5,000+', 'TBD' (optional)"
     }
   ]
 }
@@ -131,6 +139,9 @@ Rules:
 - eventPickerModel MUST be an array
 - Return at least 1 event
 - Be concise but thoughtful
+- Use general timeframes, not exact future years unless you're certain
+- Include location and timeFrame for all events
+- Include sponsor and costEstimate only if you have reasonable information
 - Do not invent IDs or metadata
 - Do not include anything outside the JSON object`;
 

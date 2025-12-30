@@ -5,11 +5,26 @@ import { useRouter } from 'next/navigation';
 import { Mail, CheckCircle2, Loader2, AlertCircle, ArrowLeft, ExternalLink } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 export default function SenderVerifyPage() {
   const router = useRouter();
-  const { ownerId, companyHQId } = useOwner();
+  const [ownerId, setOwnerId] = useState(null);
+  const [companyHQId, setCompanyHQId] = useState(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwnerId = localStorage.getItem('ownerId');
+      const storedCompanyHQId = localStorage.getItem('companyHQId');
+      
+      if (storedOwnerId) {
+        setOwnerId(storedOwnerId);
+      }
+      if (storedCompanyHQId) {
+        setCompanyHQId(storedCompanyHQId);
+      }
+    }
+  }, []);
   
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');

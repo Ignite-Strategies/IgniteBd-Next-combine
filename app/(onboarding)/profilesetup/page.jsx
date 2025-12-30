@@ -6,11 +6,31 @@ import { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 import api from '@/lib/api';
 import { inferCompanyNameFromEmail, inferWebsiteFromEmail } from '@/lib/services/CompanyEnrichmentService';
-import { useOwner } from '@/hooks/useOwner';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
-  const { owner, companyHQId, hydrated } = useOwner();
+  const [owner, setOwner] = useState(null);
+  const [companyHQId, setCompanyHQId] = useState(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwner = localStorage.getItem('owner');
+      const storedCompanyHQId = localStorage.getItem('companyHQId');
+      
+      if (storedOwner) {
+        try {
+          const parsedOwner = JSON.parse(storedOwner);
+          setOwner(parsedOwner);
+          setCompanyHQId(parsedOwner.companyHQId || storedCompanyHQId || null);
+        } catch (error) {
+          console.warn('Failed to parse stored owner', error);
+        }
+      } else if (storedCompanyHQId) {
+        setCompanyHQId(storedCompanyHQId);
+      }
+    }
+  }, []);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -35,11 +55,11 @@ export default function ProfileSetupPage() {
       }
     }
     
-    // Also check hydrated owner data
-    if (hydrated && owner?.firstName && owner?.lastName) {
+    // Also check owner data
+    if (owner?.firstName && owner?.lastName) {
       router.replace('/growth-dashboard');
     }
-  }, [hydrated, owner, router]);
+  }, [owner, router]);
 
   // Pre-fill form if owner data is available
   useEffect(() => {

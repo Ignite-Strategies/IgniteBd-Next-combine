@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Building2, Plus, Search } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 /**
  * CompanySelector Component - SEARCH FIRST
@@ -26,7 +25,17 @@ export default function CompanySelector({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
-  const { ownerId, hydrated: ownerHydrated } = useOwner();
+  const [ownerId, setOwnerId] = useState(null);
+
+  // Load ownerId from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwnerId = localStorage.getItem('ownerId');
+      if (storedOwnerId) {
+        setOwnerId(storedOwnerId);
+      }
+    }
+  }, []);
 
   // Get companyHQId from localStorage
   const getCompanyHQId = () => {
@@ -41,7 +50,7 @@ export default function CompanySelector({
   // Fetch companies from API when search term changes - WAIT FOR AUTH
   useEffect(() => {
     // CRITICAL: Wait for auth to be ready before making API calls
-    if (!ownerId || !ownerHydrated) {
+    if (!ownerId) {
       // Auth not ready yet - wait
       return;
     }
@@ -78,7 +87,7 @@ export default function CompanySelector({
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [companySearch, ownerId, ownerHydrated]); // Wait for auth before searching
+  }, [companySearch, ownerId]); // Wait for auth before searching
 
   // Set initial search value if company is selected
   const selectedCompanyObj = useMemo(() => {
@@ -146,7 +155,7 @@ export default function CompanySelector({
     }
 
     // CRITICAL: Wait for auth to be ready
-    if (!ownerId || !ownerHydrated) {
+    if (!ownerId) {
       alert('Please wait for authentication to complete.');
       return;
     }
