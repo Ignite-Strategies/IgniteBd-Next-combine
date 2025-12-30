@@ -15,9 +15,8 @@ function ComposeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Read companyHQId DIRECTLY from URL params - NO localStorage fallback
+  // Read companyHQId DIRECTLY from URL params
   const companyHQId = searchParams?.get('companyHQId') || '';
-  const hasRedirectedRef = useRef(false);
   
   // Direct read from localStorage for ownerId - needed for payload (not auth)
   const [ownerId, setOwnerId] = useState(null);
@@ -75,36 +74,8 @@ function ComposeContent() {
   const [savingQuickContact, setSavingQuickContact] = useState(false);
   const [quickContactError, setQuickContactError] = useState(null);
   
-  // Check if companyHQId is missing from URL params
-  const [missingCompanyKey, setMissingCompanyKey] = useState(false);
-  
-  useEffect(() => {
-    if (hasRedirectedRef.current) return;
-    if (typeof window === 'undefined') return;
-    
-    // If URL has companyHQId, we're good
-    if (companyHQId) {
-      setMissingCompanyKey(false);
-      return;
-    }
-    
-    // URL doesn't have companyHQId - check localStorage and add to URL
-    const stored = localStorage.getItem('companyHQId');
-    if (stored) {
-      hasRedirectedRef.current = true;
-      console.log(`🔄 Outreach Compose: Adding companyHQId from localStorage to URL: ${stored}`);
-      // Use setTimeout to avoid blocking render
-      setTimeout(() => {
-        router.replace(`/outreach/compose?companyHQId=${stored}`);
-      }, 0);
-      return;
-    }
-    
-    // Neither URL nor localStorage has companyHQId - show error
-    hasRedirectedRef.current = true;
-    console.warn('⚠️ Outreach Compose: No companyHQId in URL or localStorage');
-    setMissingCompanyKey(true);
-  }, [companyHQId, router]);
+  // Check if companyHQId is missing from URL params - just show error, no redirect
+  const missingCompanyKey = !companyHQId;
 
   // Log CompanyHQ from URL params
   useEffect(() => {
