@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Upload,
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 
-export default function LoadUpPage() {
+function LoadUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId');
@@ -174,4 +175,19 @@ export default function LoadUpPage() {
   );
 }
 
+export default function LoadUpPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-8">
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoadUpPageContent />
+    </Suspense>
+  );
+}
 
