@@ -48,15 +48,14 @@ export default function ContactSelector({
     });
   }, [companyId, propCompanyHQId]);
 
-  // Fetch contacts from API - WAIT FOR ownerId
-  // Axios interceptor handles auth token automatically
+  // Fetch contacts from API - ownerId needed for payload
+  // Auth handled globally via axios interceptor
   useEffect(() => {
     const fetchContacts = async () => {
       if (typeof window === 'undefined') return;
       
-      // CRITICAL: Wait for ownerId before making API calls
+      // Wait for ownerId (for payload, not auth)
       if (!ownerId || !ownerHydrated) {
-        // OwnerId not ready yet - wait
         return;
       }
       

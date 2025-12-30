@@ -11,63 +11,30 @@ function FromContactContent() {
   const contactId = searchParams?.get('contactId');
   const companyHQId = searchParams?.get('companyHQId') || '';
 
+  // Get generated data from query params (passed from contact-select page after API call)
+  const generatedPersonName = searchParams?.get('personName') || '';
+  const generatedTitle = searchParams?.get('title') || '';
+  const generatedCompany = searchParams?.get('company') || '';
+  const generatedCoreGoal = searchParams?.get('coreGoal') || '';
+
   // Individual field state - matches template builder pattern
   const [personName, setPersonName] = useState('');
   const [title, setTitle] = useState('');
   const [company, setCompany] = useState('');
   const [coreGoal, setCoreGoal] = useState('');
   
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Generate minimal persona - backend does all the work
-  // Form fields are always visible, we just populate them when generation succeeds
+  // Populate form fields from query params (data was generated on previous page)
   useEffect(() => {
-    if (!contactId || !companyHQId) {
-      setLoading(false);
-      return;
+    if (generatedPersonName || generatedTitle || generatedCompany || generatedCoreGoal) {
+      setPersonName(generatedPersonName);
+      setTitle(generatedTitle);
+      setCompany(generatedCompany);
+      setCoreGoal(generatedCoreGoal);
     }
-
-    const generatePersona = async () => {
-      setGenerating(true);
-      setError('');
-
-      try {
-        // Get ownerId from localStorage (required for auth)
-        const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
-        if (!ownerId) {
-          setError('Owner ID not found. Please sign in again.');
-          return;
-        }
-
-        const response = await api.post('/api/personas/generate-minimal', {
-          companyHQId,
-          contactId,
-          ownerId,
-        });
-
-        if (response.data?.success && response.data?.persona) {
-          const persona = response.data.persona;
-          setPersonName(persona.personName || '');
-          setTitle(persona.title || '');
-          setCompany(persona.company || '');
-          setCoreGoal(persona.coreGoal || '');
-        } else {
-          setError(response.data?.error || 'Failed to generate persona');
-        }
-      } catch (err) {
-        console.error('Failed to generate minimal persona:', err);
-        setError(err.response?.data?.error || 'Failed to generate persona');
-        // Don't block the form - user can still fill it manually
-      } finally {
-        setGenerating(false);
-      }
-    };
-
-    generatePersona();
-  }, [contactId, companyHQId]);
+  }, [generatedPersonName, generatedTitle, generatedCompany, generatedCoreGoal]);
 
   const handleSave = async () => {
     if (!companyHQId) {
@@ -156,14 +123,6 @@ function FromContactContent() {
             Just the essentials: who they are, what company, core goal
           </p>
         </div>
-
-        {/* Generating Indicator */}
-        {generating && (
-          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-center gap-3">
-            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-            <p className="text-sm text-blue-800">Generating persona from contact...</p>
-          </div>
-        )}
 
         {/* Error Display */}
         {error && (

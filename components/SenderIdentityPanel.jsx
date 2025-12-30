@@ -25,11 +25,10 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
   const [changingSender, setChangingSender] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load sender status - ONLY after ownerId is ready
-  // Axios interceptor handles auth token automatically
+  // Load sender status - ownerId needed for payload
+  // Auth handled globally via axios interceptor
   useEffect(() => {
     if (!ownerId) {
-      // No ownerId - clear state
       setSenderEmail(null);
       setSenderName(null);
       setLoading(false);
@@ -40,7 +39,6 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
       return;
     }
 
-    // OwnerId exists - load sender status
     loadSenderStatus();
   }, [ownerId]);
 

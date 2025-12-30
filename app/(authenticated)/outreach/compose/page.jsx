@@ -19,7 +19,7 @@ function ComposeContent() {
   const companyHQId = searchParams?.get('companyHQId') || '';
   const hasRedirectedRef = useRef(false);
   
-  // Direct read from localStorage for ownerId - needed for auth/authoring
+  // Direct read from localStorage for ownerId - needed for payload (not auth)
   const [ownerId, setOwnerId] = useState(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -114,10 +114,9 @@ function ComposeContent() {
     }
   }, [companyHQId]);
 
-  // Handle auth state changes - reset form if ownerId changes
+  // Reset sender state if ownerId is missing (for payload, not auth)
   useEffect(() => {
     if (!ownerId) {
-      // Auth state changed - user logged out or not authenticated
       setHasVerifiedSender(false);
       setSenderEmail(null);
       setSenderName(null);
@@ -127,8 +126,8 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates - Only after ownerId + companyHQId are ready
-  // Axios interceptor handles auth token automatically
+  // Load templates - ownerId needed for payload, companyHQId from URL params
+  // Auth handled globally via axios interceptor
   useEffect(() => {
     if (!ownerId || !companyHQId) return;
 
@@ -147,7 +146,7 @@ function ComposeContent() {
     };
 
     loadTemplates();
-  }, [ownerId, companyHQId]); // Wait for ownerId and companyHQId
+  }, [ownerId, companyHQId]);
 
   // Handle contactId from URL params (when navigating from success modal)
   useEffect(() => {

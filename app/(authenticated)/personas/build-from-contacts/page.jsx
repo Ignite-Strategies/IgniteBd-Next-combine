@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Users, Building2, Filter, X } from 'lucide-react';
+import { Search, Users, Building2, Filter, X, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { PIPELINE_STAGES, OFFICIAL_PIPELINES } from '@/lib/config/pipelineConfig';
 
@@ -15,6 +15,7 @@ export default function BuildFromContactsPage() {
   const [selectedPipeline, setSelectedPipeline] = useState('all');
   const [selectedStage, setSelectedStage] = useState('all');
   const [companyHQId, setCompanyHQId] = useState('');
+  const [generatingContactId, setGeneratingContactId] = useState(null);
 
   // Load companyHQId from localStorage
   useEffect(() => {
@@ -95,8 +96,56 @@ export default function BuildFromContactsPage() {
     return filtered;
   }, [contacts, selectedPipeline, selectedStage, searchQuery]);
 
-  const handleContactSelect = (contactId) => {
-    router.push(`/personas/from-contact?contactId=${contactId}${companyHQId ? `&companyHQId=${companyHQId}` : ''}`);
+  const handleContactSelect = async (contactId) => {
+    if (!companyHQId) {
+      setError('Company context is required');
+      return;
+    }
+
+    // Get ownerId from localStorage (required for auth)
+    const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
+    if (!ownerId) {
+      setError('Owner ID not found. Please sign in again.');
+      return;
+    }
+
+    try {
+      setGeneratingContactId(contactId);
+      setError(null);
+
+      console.log('🚀 Generating persona for contact:', contactId);
+      
+      // Call API to generate persona - WAIT for OpenAI to finish
+      const response = await api.post('/api/personas/generate-minimal', {
+        companyHQId,
+        contactId,
+        ownerId,
+      });
+
+      if (response.data?.success && response.data?.persona) {
+        const persona = response.data.persona;
+        console.log('✅ Persona generated successfully, navigating...');
+        
+        // Navigate with generated data in query params (like template flow)
+        const params = new URLSearchParams({
+          contactId,
+          companyHQId,
+          personName: persona.personName || '',
+          title: persona.title || '',
+          company: persona.company || '',
+          coreGoal: persona.coreGoal || '',
+        });
+        
+        router.push(`/personas/from-contact?${params.toString()}`);
+      } else {
+        setError(response.data?.error || 'Failed to generate persona');
+        setGeneratingContactId(null);
+      }
+    } catch (err) {
+      console.error('❌ Failed to generate persona:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to generate persona');
+      setGeneratingContactId(null);
+    }
   };
 
   const getPipelineBadgeColor = (pipeline) => {
@@ -230,6 +279,17 @@ export default function BuildFromContactsPage() {
           </div>
         )}
 
+        {/* Generating Persona Overlay */}
+        {generatingContactId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-xl">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
+              <p className="mt-4 text-lg font-semibold text-gray-900">Generating persona...</p>
+              <p className="mt-2 text-sm text-gray-600">Let OpenAI cook - this may take a moment</p>
+            </div>
+          </div>
+        )}
+
         {/* Loading State */}
         {loading && (
           <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
@@ -268,8 +328,12 @@ export default function BuildFromContactsPage() {
                   return (
                     <div
                       key={contact.id}
-                      onClick={() => handleContactSelect(contact.id)}
-                      className="cursor-pointer rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition hover:border-red-300 hover:shadow-md"
+                      onClick={() => !generatingContactId && handleContactSelect(contact.id)}
+                      className={`rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition ${
+                        generatingContactId
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'cursor-pointer hover:border-red-300 hover:shadow-md'
+                      }`}
                     >
                       <div className="mb-3">
                         <h3 className="text-lg font-semibold text-gray-900">{fullName}</h3>
