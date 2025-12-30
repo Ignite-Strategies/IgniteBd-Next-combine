@@ -98,39 +98,30 @@ export default function ProfileSetupPage() {
         name,
       });
 
-      // Check if company exists
-      const existingCompanyId = localStorage.getItem('companyHQId');
+      // Check if company exists and is complete
+      // Check both localStorage and owner hook data
+      const existingCompanyId = localStorage.getItem('companyHQId') || companyHQId;
+      const existingCompany = existingCompanyId 
+        ? (localStorage.getItem('companyHQ') 
+            ? JSON.parse(localStorage.getItem('companyHQ'))
+            : null)
+        : null;
       
-      if (!existingCompanyId) {
-        const firebaseUser = getAuth().currentUser;
-        const ownerEmail = owner?.email || firebaseUser?.email;
-        const ownerName = name || owner?.name || '';
-
-        // Infer company name from email if available
-        let inferredCompanyName = 'My Company';
-        if (ownerEmail) {
-          inferredCompanyName = inferCompanyNameFromEmail(ownerEmail) || 'My Company';
-        }
-        if (inferredCompanyName === 'My Company' && ownerName) {
-          inferredCompanyName = `${ownerName}'s Company`;
-        }
-
-        // Infer website from email
-        const inferredWebsite = ownerEmail ? inferWebsiteFromEmail(ownerEmail) : null;
-
-        // Create company using upsert endpoint
-        const companyData = {
-          companyName: inferredCompanyName,
-          whatYouDo: 'Business development and growth services',
-          companyWebsite: inferredWebsite || null,
-          teamSize: 'just-me',
-        };
-
-        await api.put('/api/company/upsert', companyData);
+      let companyIsComplete = false;
+      if (existingCompany) {
+        // Check if company has all required fields for setup wizard
+        companyIsComplete = !!(existingCompany?.companyName && existingCompany?.whatYouDo && existingCompany?.companyIndustry);
+      }
+      
+      // If no company or company is incomplete, redirect to company setup
+      if (!existingCompanyId || !companyIsComplete) {
+        // Redirect to company profile page to complete setup
+        router.push('/company/profile');
+        return;
       }
 
-      // Reload to get fresh data (hook will auto-hydrate)
-      window.location.reload();
+      // Company exists and is complete - go to dashboard
+      router.push('/growth-dashboard');
     } catch (error) {
       console.error('Profile setup error:', error);
       alert('Profile setup failed. Please try again.');
