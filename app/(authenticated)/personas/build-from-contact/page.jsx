@@ -25,6 +25,7 @@ function BuildFromContactContent() {
   // Persona generation state
   const [generating, setGenerating] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState(null);
+  const [personaGenerated, setPersonaGenerated] = useState(false); // Track if persona has been generated
   const [rawResponse, setRawResponse] = useState(null); // Debug: raw API response
 
   // Form fields (hydrated from API response)
@@ -53,14 +54,21 @@ function BuildFromContactContent() {
       setError('');
       try {
         const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
-        if (response.data?.success && Array.isArray(response.data.contacts)) {
+        if (response.data && Array.isArray(response.data)) {
+          // API returns array directly
+          setContacts(response.data);
+        } else if (response.data?.success && Array.isArray(response.data.contacts)) {
+          // API returns { success: true, contacts: [...] }
+          setContacts(response.data.contacts);
+        } else if (Array.isArray(response.data?.contacts)) {
+          // API returns { contacts: [...] }
           setContacts(response.data.contacts);
         } else {
-          setError('Failed to load contacts');
+          setError('Failed to load contacts: Invalid response format');
         }
       } catch (err) {
         console.error('Failed to fetch contacts:', err);
-        setError(err.response?.data?.error || 'Failed to load contacts');
+        setError(err.response?.data?.error || err.message || 'Failed to load contacts');
       } finally {
         setLoadingContacts(false);
       }
@@ -99,7 +107,7 @@ function BuildFromContactContent() {
     setError('');
     setSelectedContactId(contactId);
 
-    // Clear previous form data
+    // Clear previous form data and hide form
     setPersonName('');
     setTitle('');
     setCompanyType('');
@@ -109,6 +117,7 @@ function BuildFromContactContent() {
     setPainPoints('');
     setWhatProductNeeds('');
     setRawResponse(null);
+    setPersonaGenerated(false);
 
     try {
       console.log('🚀 Calling /api/personas/generate-minimal with:', { companyHQId, contactId });
@@ -137,6 +146,7 @@ function BuildFromContactContent() {
         setCoreGoal(persona.coreGoal || '');
         setPainPoints(Array.isArray(persona.painPoints) ? persona.painPoints.join('\n') : (persona.painPoints || ''));
         setWhatProductNeeds(persona.whatProductNeeds || '');
+        setPersonaGenerated(true); // Show form after persona is generated
       } else {
         console.error('❌ API returned success=false:', response.data);
         setError(response.data?.error || 'Failed to generate persona');
@@ -339,131 +349,123 @@ function BuildFromContactContent() {
             )}
           </div>
 
-          {/* Right: Persona Form */}
-          <div>
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Persona Details</h2>
+          {/* Right: Persona Form - Only show after persona is generated */}
+          {personaGenerated ? (
+            <div>
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Persona Details</h2>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
-              {/* Person Name */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Persona Name *
-                </label>
-                <input
-                  type="text"
-                  value={personName}
-                  onChange={(e) => setPersonName(e.target.value)}
-                  placeholder="e.g., Compliance Manager"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-              </div>
+              <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+                {/* Person Name */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Persona Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={personName}
+                    onChange={(e) => setPersonName(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Deputy Counsel"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-              </div>
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
-              {/* Company Type */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Company Type *
-                </label>
-                <input
-                  type="text"
-                  value={companyType}
-                  onChange={(e) => setCompanyType(e.target.value)}
-                  placeholder="e.g., Global Asset Management Firm"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-              </div>
+                {/* Company Type */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Company Type *
+                  </label>
+                  <input
+                    type="text"
+                    value={companyType}
+                    onChange={(e) => setCompanyType(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
-              {/* Company Size */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Company Size *
-                </label>
-                <input
-                  type="text"
-                  value={companySize}
-                  onChange={(e) => setCompanySize(e.target.value)}
-                  placeholder="e.g., 51-200, 200-1000, 1000+"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-              </div>
+                {/* Company Size */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Company Size *
+                  </label>
+                  <input
+                    type="text"
+                    value={companySize}
+                    onChange={(e) => setCompanySize(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
-              {/* Industry */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Industry *
-                </label>
-                <input
-                  type="text"
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  placeholder="e.g., Asset Management, Enterprise Software"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-              </div>
+                {/* Industry */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Industry *
+                  </label>
+                  <input
+                    type="text"
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
-              {/* Core Goal */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Core Goal *
-                </label>
-                <textarea
-                  value={coreGoal}
-                  onChange={(e) => setCoreGoal(e.target.value)}
-                  placeholder="e.g., Ensure regulatory compliance across all investment activities while minimizing operational risk"
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-              </div>
+                {/* Core Goal */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Core Goal *
+                  </label>
+                  <textarea
+                    value={coreGoal}
+                    onChange={(e) => setCoreGoal(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
-              {/* Pain Points */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Pain Points *
-                </label>
-                <textarea
-                  value={painPoints}
-                  onChange={(e) => setPainPoints(e.target.value)}
-                  placeholder="Enter one pain point per line&#10;e.g., Managing complex regulatory requirements&#10;Balancing compliance costs with efficiency"
-                  rows={4}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-                <p className="mt-1 text-xs text-gray-500">Enter one pain point per line</p>
-              </div>
+                {/* Pain Points */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Pain Points *
+                  </label>
+                  <textarea
+                    value={painPoints}
+                    onChange={(e) => setPainPoints(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
-              {/* What Product Needs */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  What Product Needs *
-                </label>
-                <textarea
-                  value={whatProductNeeds}
-                  onChange={(e) => setWhatProductNeeds(e.target.value)}
-                  placeholder="e.g., Compliance management platform that automates regulatory reporting and provides real-time risk monitoring"
-                  rows={2}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                  disabled={generating}
-                />
-              </div>
+                {/* What Product Needs */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    What Product Needs *
+                  </label>
+                  <textarea
+                    value={whatProductNeeds}
+                    onChange={(e) => setWhatProductNeeds(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    disabled={generating}
+                  />
+                </div>
 
               {/* Save Button */}
               <div className="pt-4">
@@ -487,6 +489,14 @@ function BuildFromContactContent() {
               </div>
             </div>
           </div>
+          ) : (
+            <div>
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">Persona Details</h2>
+              <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+                <p className="text-sm text-gray-600">Select a contact to generate a persona</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
