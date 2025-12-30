@@ -195,9 +195,12 @@ function ComposeContent() {
   }, [authReady, ownerId, companyHQId]); // Wait for ALL prerequisites
 
   // Handle contactId from URL params (when navigating from success modal)
+  // SEQUENTIAL: Only after auth is ready
   useEffect(() => {
+    if (!authReady || !ownerId) return;
+    
     const urlContactId = searchParams?.get('contactId');
-    if (urlContactId && urlContactId !== contactId && ownerId) {
+    if (urlContactId && urlContactId !== contactId) {
       // Fetch contact and select it
       const fetchAndSelectContact = async () => {
         try {
@@ -213,7 +216,7 @@ function ComposeContent() {
       fetchAndSelectContact();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, ownerId]);
+  }, [authReady, searchParams, ownerId]);
   
   // Quick contact creation
   const handleQuickSaveContact = async () => {
