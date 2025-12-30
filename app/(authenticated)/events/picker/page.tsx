@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Plus, Edit2, Trash2, DollarSign, MapPin, Calendar, Loader2, Sparkles, List } from 'lucide-react';
+import { Plus, Edit2, Trash2, DollarSign, MapPin, Calendar, Loader2, Sparkles, List, X } from 'lucide-react';
 import api from '@/lib/api';
 
 interface EventTuner {
@@ -59,11 +59,45 @@ function EventPickerPageContent() {
     }
   };
 
-  const handleSelectTuner = (tunerId: string) => {
-    const url = companyHQId 
-      ? `/events/ready-to-plan?tunerId=${tunerId}&companyHQId=${companyHQId}`
-      : `/events/ready-to-plan?tunerId=${tunerId}`;
-    router.push(url);
+  const [generatingTunerId, setGeneratingTunerId] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const handleSelectTuner = async (tunerId: string) => {
+    if (!tunerId || !companyHQId) {
+      alert('Missing required information. Please try again.');
+      return;
+    }
+
+    try {
+      setGeneratingTunerId(tunerId);
+      setGenerationError(null);
+
+      // Call API - WAIT for response (following OpenAI pattern)
+      const response = await api.get(`/api/event-tuners/${tunerId}/pick-events`);
+
+      if (response.data?.success) {
+        // Store generated events in localStorage (temporary state)
+        const eventsData = {
+          eventsByTimeFrame: response.data.eventsByTimeFrame || {},
+          summary: response.data.summary || '',
+          tunerId: tunerId,
+        };
+        localStorage.setItem('tempPickedEvents', JSON.stringify(eventsData));
+
+        // Navigate AFTER successful generation
+        const url = companyHQId 
+          ? `/events/search-pick/${tunerId}?tunerId=${tunerId}&companyHQId=${companyHQId}`
+          : `/events/search-pick/${tunerId}?tunerId=${tunerId}`;
+        router.push(url);
+      } else {
+        throw new Error(response.data?.error || 'Failed to generate events');
+      }
+    } catch (err: any) {
+      console.error('Failed to generate events:', err);
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate events. Please try again.';
+      setGenerationError(errorMessage);
+      setGeneratingTunerId(null);
+    }
   };
 
   const handleEditTuner = (tunerId: string, e: React.MouseEvent) => {
@@ -142,6 +176,41 @@ function EventPickerPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      {/* Loading Overlay - Following OpenAI Pattern */}
+      {generatingTunerId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-xl max-w-md mx-4">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-red-600" />
+            <p className="mt-4 text-lg font-semibold text-gray-900">Generating Your Events...</p>
+            <p className="mt-2 text-sm text-gray-600">This may take a moment. We're finding events that match your preferences.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {generationError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="rounded-lg border border-red-200 bg-white p-6 text-center shadow-xl max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-red-900">Error Generating Events</h3>
+              <button
+                onClick={() => setGenerationError(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-red-700 mb-4">{generationError}</p>
+            <button
+              onClick={() => setGenerationError(null)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Let's Pick Your Events"
@@ -242,9 +311,17 @@ function EventPickerPageContent() {
 
                   <button
                     onClick={() => handleSelectTuner(tuner.id)}
-                    className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    disabled={generatingTunerId === tuner.id}
+                    className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Generate My Events
+                    {generatingTunerId === tuner.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Generating Events...</span>
+                      </>
+                    ) : (
+                      'Generate My Events'
+                    )}
                   </button>
                 </div>
               ))}
