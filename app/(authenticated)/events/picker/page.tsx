@@ -119,11 +119,6 @@ function EventPickerPageContent() {
   };
 
   const handleGenerateEvents = async () => {
-    if (!name.trim()) {
-      alert('Please enter a title for your event preferences');
-      return;
-    }
-
     if (!ownerId || !companyHQId) {
       alert('Please ensure you are logged in and have a company selected.');
       return;
@@ -133,27 +128,33 @@ function EventPickerPageContent() {
       setGenerating(true);
       setGenerationError(null);
 
-      // First, save/create the tuner
       let tunerId: string;
       
       if (selectedTunerId) {
-        // Update existing tuner
-        const response = await api.patch(`/api/event-tuners/${selectedTunerId}`, {
-          name: name.trim(),
-          costRange: costRange || null,
-          travelDistance: travelDistance || null,
-          preferredStates: preferredStates.length > 0 ? preferredStates : undefined,
-          eventSearchRawText: eventSearchRawText.trim() || null,
-          conferencesPerQuarter: conferencesPerQuarter ? Number(conferencesPerQuarter) : null,
-          personaIds: selectedPersona ? [selectedPersona.id] : undefined,
-        });
-
-        if (!response.data?.success) {
-          throw new Error('Failed to update preferences');
+        // Use the selected preference - don't update it, just use it
+        tunerId = selectedTunerId;
+        
+        // If additional context was provided, update the tuner with it
+        if (additionalContext.trim()) {
+          // Load the tuner to get current search text
+          const tunerResponse = await api.get(`/api/event-tuners/${selectedTunerId}`);
+          const currentSearchText = tunerResponse.data?.tuner?.eventSearchRawText || '';
+          const combinedSearchText = currentSearchText 
+            ? `${currentSearchText}. Additional context: ${additionalContext.trim()}`
+            : `Additional context: ${additionalContext.trim()}`;
+          
+          await api.patch(`/api/event-tuners/${selectedTunerId}`, {
+            eventSearchRawText: combinedSearchText,
+          });
         }
-        tunerId = response.data.tuner.id;
       } else {
-        // Create new tuner
+        // Create new tuner from form
+        if (!name.trim()) {
+          alert('Please enter a title for your event preferences');
+          setGenerating(false);
+          return;
+        }
+
         const response = await api.post('/api/event-tuners/create', {
           companyHQId,
           ownerId,
@@ -161,7 +162,7 @@ function EventPickerPageContent() {
           costRange: costRange || null,
           travelDistance: travelDistance || null,
           preferredStates: preferredStates.length > 0 ? preferredStates : undefined,
-          eventSearchRawText: eventSearchRawText.trim() || null,
+          eventSearchRawText: eventSearchRawText.trim() || (additionalContext.trim() ? `Additional context: ${additionalContext.trim()}` : null),
           conferencesPerQuarter: conferencesPerQuarter ? Number(conferencesPerQuarter) : null,
           personaIds: selectedPersona ? [selectedPersona.id] : undefined,
         });
