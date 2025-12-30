@@ -89,22 +89,11 @@ function EventPickerPageContent() {
     }
   };
 
-  // Load preference into form when selected
+  // Load preference - just set the title, don't clobber the form
   const handleSelectPreference = (tuner: EventTuner) => {
     setSelectedTunerId(tuner.id);
+    // Only load the title - keep the form clean
     setName(tuner.name || '');
-    setCostRange(tuner.costRange || '');
-    setTravelDistance(tuner.travelDistance || '');
-    setEventSearchRawText(tuner.eventSearchRawText || '');
-    setConferencesPerQuarter(tuner.conferencesPerQuarter || '');
-    setPreferredStates(tuner.event_tuner_states?.map((ps: any) => ps.state) || []);
-    
-    if (tuner.event_tuner_personas && tuner.event_tuner_personas.length > 0) {
-      setSelectedPersona(tuner.event_tuner_personas[0].personas);
-    } else {
-      setSelectedPersona(null);
-    }
-    
     // Clear additional context when selecting a preference
     setAdditionalContext('');
   };
