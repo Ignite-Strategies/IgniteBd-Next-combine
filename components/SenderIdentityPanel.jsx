@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2, Plus, ChevronDown, X } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 /**
  * SenderIdentityPanel Component
@@ -12,11 +11,12 @@ import { useOwner } from '@/hooks/useOwner';
  * Shows current verified sender with option to change/select different sender
  * Handles all sender-related logic - parent components should not duplicate this
  * 
- * @param {Function} onSenderChange - Optional callback when sender state changes (hasSender: boolean)
+ * @param {string} ownerId - Owner ID from localStorage (required)
+ * @param {boolean} authReady - Whether Firebase auth is ready (required)
+ * @param {Function} onSenderChange - Optional callback when sender state changes (hasSender: boolean, email: string, name: string)
  */
-export default function SenderIdentityPanel({ onSenderChange }) {
+export default function SenderIdentityPanel({ ownerId, authReady, onSenderChange }) {
   const router = useRouter();
-  const { ownerId } = useOwner();
   const [senderEmail, setSenderEmail] = useState(null);
   const [senderName, setSenderName] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,31 +26,31 @@ export default function SenderIdentityPanel({ onSenderChange }) {
   const [changingSender, setChangingSender] = useState(false);
   const [error, setError] = useState(null);
 
-  // Handle auth state changes - reset sender state when ownerId changes or becomes null
+  // Load sender status - ONLY after auth is ready
   useEffect(() => {
-    if (!ownerId) {
-      // Auth state changed - user logged out or not authenticated
+    if (!authReady || !ownerId) {
+      // Auth not ready or no ownerId - clear state
       setSenderEmail(null);
       setSenderName(null);
       setLoading(false);
       setError(null);
       if (onSenderChange) {
-        onSenderChange(false);
+        onSenderChange(false, null, null);
       }
       return;
     }
 
-    // OwnerId exists - load sender status
+    // Auth ready and ownerId exists - load sender status
     loadSenderStatus();
-  }, [ownerId]);
+  }, [authReady, ownerId]);
 
   // Notify parent when sender state changes
   useEffect(() => {
     if (onSenderChange) {
-      onSenderChange(!!senderEmail);
+      onSenderChange(!!senderEmail, senderEmail, senderName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [senderEmail]); // Only depend on senderEmail, not onSenderChange (callback is stable)
+  }, [senderEmail, senderName]); // Notify parent of sender changes
 
   const loadSenderStatus = async () => {
     if (!ownerId) {

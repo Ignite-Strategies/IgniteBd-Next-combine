@@ -20,19 +20,30 @@ import { PersonaParsingService } from '@/lib/services/PersonaParsingService';
 import { OpenAI } from 'openai';
 
 export async function POST(request: NextRequest) {
-  console.log('🚀 POST /api/personas/generate-minimal - Request received');
+  console.log('🚀🚀🚀 POST /api/personas/generate-minimal - Request received');
+  console.log('📍 URL:', request.url);
+  console.log('📍 Method:', request.method);
+  
+  // Log headers (but not the token itself for security)
+  const authHeader = request.headers.get('authorization');
+  console.log('🔑 Auth header present:', !!authHeader);
+  console.log('🔑 Auth header starts with Bearer:', authHeader?.startsWith('Bearer '));
+  console.log('🔑 Auth header length:', authHeader?.length || 0);
   
   let firebaseUser;
   try {
+    console.log('🔐 Attempting Firebase token verification...');
     firebaseUser = await verifyFirebaseToken(request);
-    console.log('✅ Firebase token verified:', firebaseUser.uid);
+    console.log('✅✅✅ Firebase token verified successfully!');
+    console.log('✅ Firebase UID:', firebaseUser.uid);
+    console.log('✅ Firebase email:', firebaseUser.email);
   } catch (error: any) {
-    console.error('❌ Firebase authentication failed:', {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      stack: error.stack,
-    });
+    console.error('❌❌❌ Firebase authentication FAILED:');
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error name:', error.name);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return NextResponse.json(
       { success: false, error: 'Unauthorized', details: error.message },
       { status: 401 }
@@ -40,6 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    console.log('👤 Looking up owner in database...');
     // Get owner from Firebase token (like template route)
     const { prisma } = await import('@/lib/prisma');
     const owner = await prisma.owners.findUnique({
@@ -47,16 +59,22 @@ export async function POST(request: NextRequest) {
     });
 
     if (!owner) {
-      console.error('❌ Owner not found for firebaseId:', firebaseUser.uid);
+      console.error('❌❌❌ Owner not found for firebaseId:', firebaseUser.uid);
       return NextResponse.json(
         { success: false, error: 'Owner not found' },
         { status: 404 }
       );
     }
+    console.log('✅ Owner found:', { id: owner.id, email: owner.email });
 
+    console.log('📦 Parsing request body...');
     const body = await request.json();
     const { contactId, companyHQId, ownerId, description } = body;
-    console.log('📦 Request body:', { contactId, companyHQId, ownerId, hasDescription: !!description });
+    console.log('📦 Request body received:');
+    console.log('  - contactId:', contactId);
+    console.log('  - companyHQId:', companyHQId);
+    console.log('  - ownerId:', ownerId);
+    console.log('  - hasDescription:', !!description);
 
     if (!contactId) {
       console.error('❌ Missing contactId');
@@ -75,15 +93,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate membership - owner must have access to this companyHQ (like template route)
+    console.log('🔒 Validating membership...');
     const { resolveMembership } = await import('@/lib/membership');
     const { membership } = await resolveMembership(owner.id, companyHQId);
     if (!membership) {
-      console.error('❌ Access denied to companyHQ:', companyHQId);
+      console.error('❌❌❌ Access denied to companyHQ:', companyHQId);
+      console.error('❌ Owner ID:', owner.id);
       return NextResponse.json(
         { success: false, error: 'Access denied to this company' },
         { status: 403 }
       );
     }
+    console.log('✅ Membership validated');
 
     console.log('📊 Step 1: Preparing data...');
     // Step 1: Prepare data (fetch contact and companyHQ from DB)

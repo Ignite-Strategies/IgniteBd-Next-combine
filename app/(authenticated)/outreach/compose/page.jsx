@@ -8,33 +8,69 @@ import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
+import { auth } from '@/lib/firebase';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
 import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
 function ComposeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const companyHQId = searchParams?.get('companyHQId') || '';
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
   const hasRedirectedRef = useRef(false);
   
-  // Direct read from localStorage for ownerId and owner - needed for auth/authoring
+  // Read companyHQId from URL first, fallback to localStorage immediately (for ContactSelector)
+  const [companyHQId, setCompanyHQId] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return urlCompanyHQId || localStorage.getItem('companyHQId') || '';
+  });
+  
+  // Direct read from localStorage for ownerId - needed for auth/authoring
   const [ownerId, setOwnerId] = useState(null);
-  const [owner, setOwner] = useState(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedOwnerId = localStorage.getItem('ownerId');
-    const storedOwner = localStorage.getItem('owner');
     if (storedOwnerId) {
       setOwnerId(storedOwnerId);
     }
-    if (storedOwner) {
-      try {
-        setOwner(JSON.parse(storedOwner));
-      } catch (e) {
-        console.warn('Failed to parse owner', e);
-      }
-    }
   }, []);
+  
+  // Auth ready check - wait for Firebase auth to be ready before making API calls
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const checkAuth = async () => {
+      // Check if auth is already ready
+      if (auth.currentUser) {
+        setAuthReady(true);
+        return;
+      }
+      
+      // Poll for auth (max 2 seconds)
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (auth.currentUser) {
+          clearInterval(interval);
+          setAuthReady(true);
+        } else if (attempts >= 40) {
+          clearInterval(interval);
+          setAuthReady(false);
+        }
+      }, 50);
+      
+      return () => clearInterval(interval);
+    };
+    
+    checkAuth();
+  }, []);
+  
+  // Sync companyHQId from URL params (after redirect)
+  useEffect(() => {
+    if (urlCompanyHQId && urlCompanyHQId !== companyHQId) {
+      setCompanyHQId(urlCompanyHQId);
+    }
+  }, [urlCompanyHQId, companyHQId]);
   
   // Form state
   const [selectedContact, setSelectedContact] = useState(null);
@@ -137,12 +173,12 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates when companyHQId is available - NON-BLOCKING (load in background)
+  // Load templates - SEQUENTIAL: Only after auth + ownerId + companyHQId are ready
   useEffect(() => {
-    if (!companyHQId) return;
+    if (!authReady || !ownerId || !companyHQId) return;
 
-    // Load templates asynchronously without blocking render
     const loadTemplates = async () => {
+      setLoadingTemplates(true);
       try {
         const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
         if (response.data?.success) {
@@ -155,29 +191,8 @@ function ComposeContent() {
       }
     };
 
-    // Start loading (but don't wait for it)
-    setLoadingTemplates(true);
     loadTemplates();
-  }, [ownerId]); // Removed 'owner' from dependencies to avoid unnecessary re-renders
-
-  // Load sender email (needed for build-payload)
-  useEffect(() => {
-    if (!ownerId) return;
-
-    const loadSender = async () => {
-      try {
-        const response = await api.get('/api/outreach/verified-senders');
-        if (response.data?.success) {
-          setSenderEmail(response.data.verifiedEmail);
-          setSenderName(response.data.verifiedName);
-        }
-      } catch (err) {
-        console.error('Failed to load sender:', err);
-      }
-    };
-
-    loadSender();
-  }, [ownerId]);
+  }, [authReady, ownerId, companyHQId]); // Wait for ALL prerequisites
 
   // Handle contactId from URL params (when navigating from success modal)
   useEffect(() => {
@@ -495,18 +510,13 @@ function ComposeContent() {
                   From
                 </label>
                 <SenderIdentityPanel 
-                  onSenderChange={(hasSender) => {
+                  ownerId={ownerId}
+                  authReady={authReady}
+                  onSenderChange={(hasSender, email, name) => {
                     // Callback to track if sender is verified
                     setHasVerifiedSender(hasSender);
-                    // Reload sender email when sender changes
-                    if (hasSender && ownerId) {
-                      api.get('/api/outreach/verified-senders').then((response) => {
-                        if (response.data?.success) {
-                          setSenderEmail(response.data.verifiedEmail);
-                          setSenderName(response.data.verifiedName);
-                        }
-                      }).catch(console.error);
-                    }
+                    setSenderEmail(email);
+                    setSenderName(name);
                   }}
                 />
               </div>
@@ -532,6 +542,7 @@ function ComposeContent() {
                   selectedContact={selectedContact}
                   showLabel={false}
                   companyHQId={companyHQId}
+                  authReady={authReady}
                 />
               </div>
 
