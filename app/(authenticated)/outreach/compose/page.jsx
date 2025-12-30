@@ -83,6 +83,9 @@ function ComposeContent() {
     
     if (typeof window === 'undefined') return;
     
+    // Wait for searchParams to be ready
+    if (!searchParams) return;
+    
     // If URL has companyHQId, we're good
     if (companyHQId) {
       setMissingCompanyKey(false);
@@ -102,7 +105,7 @@ function ComposeContent() {
     hasRedirectedRef.current = true;
     console.warn('⚠️ Outreach Compose: No companyHQId in URL or localStorage');
     setMissingCompanyKey(true);
-  }, [companyHQId, router]);
+  }, [companyHQId, router, searchParams]);
 
   // Log CompanyHQ from URL params
   useEffect(() => {

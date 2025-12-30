@@ -6,6 +6,9 @@ import PageHeader from '@/components/PageHeader.jsx';
 import { Upload, FileText, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import api from '@/lib/api';
 
+// Force dynamic rendering - this page handles file uploads and doesn't need static generation
+export const dynamic = 'force-dynamic';
+
 /**
  * Deliverable CSV Upload Page with Validation and Preview
  */

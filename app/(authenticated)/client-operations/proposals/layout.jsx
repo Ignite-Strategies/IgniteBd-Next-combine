@@ -16,6 +16,8 @@ import { ProposalsContext } from './ProposalsContext';
 
 function ProposalsLayoutContent({ children }) {
   const searchParams = useSearchParams();
+  // Get companyHQId from searchParams (for manual refresh) or fallback to empty string
+  // This is safe because it's only used in refreshProposals which checks for it
   const companyHQId = searchParams?.get('companyHQId') || '';
   const [proposals, setProposals] = useState([]);
   const [hydrated, setHydrated] = useState(false);
