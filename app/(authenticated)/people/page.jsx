@@ -18,6 +18,7 @@ export default function PeopleHubPage() {
   const [companyHQId, setCompanyHQId] = useState('');
   const [contactCount, setContactCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [initialSyncComplete, setInitialSyncComplete] = useState(false);
   const hasRedirectedRef = useRef(false);
 
   // Sync contacts from API (non-blocking, background)
@@ -49,6 +50,7 @@ export default function PeopleHubPage() {
       // Don't update state on error - keep cached data
     } finally {
       if (showLoading) setSyncing(false);
+      setInitialSyncComplete(true);
     }
   }, []);
 
@@ -73,40 +75,36 @@ export default function PeopleHubPage() {
         const count = contacts.length;
         setContactCount(count);
         
-        // Only redirect if cached count is 0
-        if (count === 0 && storedCompanyHQId) {
-          hasRedirectedRef.current = true;
-          router.push('/people/load');
-          return;
+        // If we have cached contacts, no need to wait for sync
+        if (count > 0) {
+          setInitialSyncComplete(true);
         }
       } catch (error) {
         console.warn('Failed to parse cached contacts', error);
-        // If cache is corrupted, check if we need to redirect
-        if (storedCompanyHQId) {
-          hasRedirectedRef.current = true;
-          router.push('/people/load');
-          return;
-        }
-      }
-    } else {
-      // No cache at all - redirect to load if we have companyHQId
-      if (storedCompanyHQId) {
-        hasRedirectedRef.current = true;
-        router.push('/people/load');
-        return;
       }
     }
 
-    // Optional: Sync in background (non-blocking) after a short delay
-    // This keeps data fresh without blocking the UI
+    // Always do an initial sync to verify data is up to date
+    // This prevents race conditions where cache is stale
     if (storedCompanyHQId) {
-      const syncTimer = setTimeout(() => {
-        syncContacts(storedCompanyHQId, false);
-      }, 500); // Small delay to let UI render first
-      
-      return () => clearTimeout(syncTimer);
+      syncContacts(storedCompanyHQId, false);
+    } else {
+      // No companyHQId, so sync is complete (nothing to sync)
+      setInitialSyncComplete(true);
     }
   }, [syncContacts]);
+
+  // Handle redirect after initial sync completes
+  useEffect(() => {
+    if (!initialSyncComplete || hasRedirectedRef.current) return;
+    if (!companyHQId) return;
+    
+    // Only redirect if we've confirmed there are no contacts after sync
+    if (contactCount === 0) {
+      hasRedirectedRef.current = true;
+      router.push('/people/load');
+    }
+  }, [initialSyncComplete, contactCount, companyHQId, router]);
 
   const ACTION_CARDS = [
     {

@@ -90,7 +90,8 @@ export default function WorkPackagesViewPage() {
         console.warn('Failed to refresh hydration cache:', err);
       });
     }
-  }, [companyHQId, refreshHydration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyHQId]); // refreshHydration is stable from hook, only need companyHQId
 
   // Load from localStorage on mount (fallback if hook hasn't loaded yet)
   useEffect(() => {

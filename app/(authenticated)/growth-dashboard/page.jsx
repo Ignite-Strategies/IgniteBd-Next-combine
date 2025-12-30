@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, Suspense } from 'react';
+import { useMemo, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Mail, Users } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -14,26 +14,38 @@ function GrowthDashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
+  const hasRedirectedRef = useRef(false);
   
-  // Redirect if no companyHQId in URL
+  // Redirect logic: URL param is the source of truth - if missing, go to welcome
   useEffect(() => {
+    // Prevent multiple redirects
+    if (hasRedirectedRef.current) return;
+    
     if (!companyHQId && typeof window !== 'undefined') {
-      const stored = localStorage.getItem('companyHQId');
-      if (stored) {
-        router.replace(`/growth-dashboard?companyHQId=${stored}`);
-      } else {
-        router.push('/people');
-      }
+      // No companyHQId in URL - redirect to welcome where it gets set
+      hasRedirectedRef.current = true;
+      router.push('/welcome');
     }
   }, [companyHQId, router]);
 
-  // Log CompanyHQ from URL params
+  // Log CompanyHQ from URL params and confirm it's set
   useEffect(() => {
     if (companyHQId) {
       console.log('🏢 CompanyHQ from URL params:', {
         companyHQId,
         timestamp: new Date().toISOString(),
       });
+      
+      // ✅ CONFIRMATION: URL param is our source of truth - sync to localStorage
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('companyHQId');
+        if (stored !== companyHQId) {
+          console.log(`🔄 Syncing localStorage to match URL param: ${companyHQId}`);
+          localStorage.setItem('companyHQId', companyHQId);
+        } else {
+          console.log(`✅ Confirmed: localStorage matches URL param: ${companyHQId}`);
+        }
+      }
     }
   }, [companyHQId]);
   

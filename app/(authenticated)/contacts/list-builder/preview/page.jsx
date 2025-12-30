@@ -41,7 +41,8 @@ function ContactListPreviewContent() {
     if (!hydrated && companyHQId) {
       refreshContacts();
     }
-  }, [hydrated, companyHQId, refreshContacts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, companyHQId]); // refreshContacts is stable from context, only need hydrated and companyHQId
 
   // Filter contacts based on selected filter type (without search - for selectAll)
   const qualifyingContacts = useMemo(() => {

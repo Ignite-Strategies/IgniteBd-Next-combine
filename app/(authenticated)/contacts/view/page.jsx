@@ -121,7 +121,8 @@ function ContactsViewPageContent() {
     });
     lastValidatedCompanyHQId.current = companyHQId;
     refreshContactsFromAPI(true);
-  }, [companyHQId, refreshContactsFromAPI]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyHQId]); // Only depend on companyHQId - refreshContactsFromAPI is stable within its useCallback
 
   const handleSelectContact = (contactId) => {
     setSelectedContacts((prev) => {

@@ -23,7 +23,7 @@ export default function ContactsLayout({ children }) {
   const [listsHydrating, setListsHydrating] = useState(false);
 
   // Step 2: Fetch from API when companyHQId is available
-  // Define refreshContacts BEFORE using it in useEffect
+  // Define refreshContacts as a stable callback for use in context and other components
   const refreshContacts = useCallback(async () => {
     if (!companyHQId) {
       console.warn('⚠️ refreshContacts called without companyHQId');
@@ -65,8 +65,46 @@ export default function ContactsLayout({ children }) {
     }
     
     // Always fetch from API - no localStorage cache
-    refreshContacts();
-  }, [companyHQId, refreshContacts]);
+    // Call refreshContacts directly - it's stable within its useCallback
+    let isMounted = true;
+    const fetchContacts = async () => {
+      setHydrating(true);
+      try {
+        console.log('🔄 Fetching contacts for companyHQId:', companyHQId);
+        const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+        
+        if (!isMounted) return;
+        
+        if (response.data?.success && Array.isArray(response.data.contacts)) {
+          const fetchedContacts = response.data.contacts;
+          console.log('✅ Fetched contacts from API:', fetchedContacts.length, 'for companyHQId:', companyHQId);
+          setContacts(fetchedContacts);
+          // NO localStorage - API only
+          setHydrated(true);
+        } else {
+          console.warn('⚠️ API response missing success or contacts array:', response.data);
+          const fetchedContacts = response.data?.contacts ?? [];
+          setContacts(fetchedContacts);
+          setHydrated(true);
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('❌ Error fetching contacts:', error);
+        console.error('❌ Error response:', error.response?.data);
+        // Don't clear contacts on error - keep cached data
+      } finally {
+        if (isMounted) {
+          setHydrating(false);
+        }
+      }
+    };
+    
+    fetchContacts();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [companyHQId]);
 
   // Step 1: Check localStorage cache on mount for contact lists
   useEffect(() => {

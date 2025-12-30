@@ -106,6 +106,18 @@ export async function GET(request) {
 
     console.log(`✅ OWNER HYDRATE: Found ${memberships.length} membership(s) for owner ${owner.id}`);
 
+    // 🔍 DEBUG: Log first membership to see what's actually loaded
+    if (memberships.length > 0) {
+      console.log('🔍 MEMBERSHIP DEBUG - First membership structure:');
+      console.log('  - id:', memberships[0].id);
+      console.log('  - companyHqId:', memberships[0].companyHqId);
+      console.log('  - role:', memberships[0].role);
+      console.log('  - has company_hqs:', !!memberships[0].company_hqs);
+      console.log('  - company_hqs keys:', memberships[0].company_hqs ? Object.keys(memberships[0].company_hqs) : 'N/A');
+      console.log('  - company_hqs.companyName:', memberships[0].company_hqs?.companyName);
+      console.log('  - Full membership object:', JSON.stringify(memberships[0], null, 2));
+    }
+
     // Get default CompanyHQ (first one after role-based sorting: OWNER > MANAGER > others)
     const defaultMembership = memberships[0];
 

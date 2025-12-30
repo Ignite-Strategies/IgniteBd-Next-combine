@@ -50,7 +50,8 @@ export const useMicrosoftGraph = () => {
     };
     
     checkAuth();
-  }, [loadUserProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // loadUserProfile has no dependencies, is stable - only run once on mount
 
   // Sign in with Microsoft
   const signIn = useCallback(async () => {
