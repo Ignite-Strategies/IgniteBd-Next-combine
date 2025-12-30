@@ -251,7 +251,7 @@ function SearchPickPageContent() {
               </div>
             )}
 
-            {/* Group events by quarter */}
+            {/* Display events grouped by quarter (OpenAI already organized them) */}
             {['Q1 2025', 'Q2 2025', 'Q3 2025', 'Q4 2025'].map((quarter) => {
               const quarterEvents = events.filter(e => e.timeFrame === quarter);
               if (quarterEvents.length === 0) return null;

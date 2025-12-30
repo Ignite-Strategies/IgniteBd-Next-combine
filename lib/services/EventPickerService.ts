@@ -136,11 +136,12 @@ You MUST return JSON in exactly this format, organized by quarters:
 }
 
 CRITICAL ORGANIZATION RULES:
-- Return events organized by quarters: Q1 2025, Q2 2025, Q3 2025, Q4 2025
+- YOU MUST organize events by quarters: Q1 2025, Q2 2025, Q3 2025, Q4 2025
 - Return at least 3 events per quarter (3+N format - 3 options plus more if relevant)
-- Distribute events evenly across quarters
-- If user specified conferencesPerQuarter, use that as the minimum per quarter, but still give 3+ options
-- Use timeFrame format: "Q1 2025", "Q2 2025", "Q3 2025", "Q4 2025" (not "Spring 2025" or "Early 2025")
+- Distribute events evenly across all 4 quarters
+- If user specified conferencesPerQuarter, use that as the minimum per quarter, but still give 3+ options per quarter
+- Use timeFrame format EXACTLY: "Q1 2025", "Q2 2025", "Q3 2025", "Q4 2025" (NOT "Spring 2025", "Early 2025", or any other format)
+- Ensure every quarter has events - don't skip quarters
 
 Rules:
 - eventPickerModel MUST be an array
