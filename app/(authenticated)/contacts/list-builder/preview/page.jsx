@@ -164,7 +164,7 @@ function ContactListPreviewContent() {
       }
 
       const response = await api.post('/api/contact-lists', {
-        ownerId, // Use ownerId like templates (from useOwner hook)
+        ownerId, // ownerId from localStorage
         companyHQId: companyHQId || undefined, // Optional, will be resolved from owner if not provided
         title: listName.trim(), // Use 'title' like templates (maps to 'name' in schema)
         description: listDescription.trim() || undefined,
