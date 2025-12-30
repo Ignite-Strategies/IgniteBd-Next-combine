@@ -1,32 +1,31 @@
 /**
  * PersonaPromptPrepService
  * 
- * Prepares data needed for persona generation:
- * - Fetches contact from DB
- * - Fetches companyHQ from DB
- * - Returns structured data for prompt building
+ * SIMPLE DATA HYDRATION - NO BUSINESS LOGIC
+ * 
+ * Fetches raw database records for persona generation:
+ * - CompanyHQ record (CRM context)
+ * - Contact record (the person)
+ * - Contact's Company record (if exists)
+ * 
+ * Returns full records as JSON. No reshaping, no inference, no normalization.
  */
 
 import { prisma } from '@/lib/prisma';
 
 export interface PreparedData {
-  contact: {
-    firstName?: string;
-    lastName?: string;
-    title?: string;
-    companyName?: string;
-    companyIndustry?: string;
-  } | null;
-  companyHQ: {
-    companyName: string;
-    companyIndustry?: string;
-    whatYouDo?: string;
-  };
+  contact: any; // Full Contact record as JSON
+  contactCompany: any | null; // Full Company record as JSON (if exists)
+  companyHQ: any; // Full CompanyHQ record as JSON
 }
 
 export class PersonaPromptPrepService {
   /**
-   * Prepare data for persona generation
+   * Hydrate raw database records for persona generation
+   * 
+   * @param contactId - Contact ID
+   * @param companyHQId - CompanyHQ ID (CRM context)
+   * @returns Full records as JSON
    */
   static async prepare(params: {
     contactId: string;
@@ -39,52 +38,68 @@ export class PersonaPromptPrepService {
     try {
       const { contactId, companyHQId } = params;
 
+      // Input validation
+      if (!contactId || typeof contactId !== 'string' || contactId.trim() === '') {
+        return { success: false, error: 'contactId is required and must be a non-empty string' };
+      }
+
+      if (!companyHQId || typeof companyHQId !== 'string' || companyHQId.trim() === '') {
+        return { success: false, error: 'companyHQId is required and must be a non-empty string' };
+      }
+
       if (!prisma) {
-        console.error('❌ Prisma is undefined');
         return { success: false, error: 'Database connection not available' };
       }
 
-      console.log('📊 PersonaPromptPrepService: Fetching contact and companyHQ...');
-      // Fetch contact and companyHQ in parallel
-      const [contact, companyHQ] = await Promise.all([
-        prisma.contact.findUnique({
-          where: { id: contactId },
-          select: {
-            firstName: true,
-            lastName: true,
-            title: true,
-            companyName: true,
-            companyIndustry: true,
-          },
-        }),
-        prisma.companyHQ.findUnique({
-          where: { id: companyHQId },
-          select: {
-            companyName: true,
-            companyIndustry: true,
-            whatYouDo: true,
-          },
-        }),
-      ]);
+      // Fetch CompanyHQ (CRM context)
+      const companyHQ = await prisma.company_hqs.findUnique({
+        where: { id: companyHQId.trim() },
+      });
 
       if (!companyHQ) {
-        console.error('❌ CompanyHQ not found:', companyHQId);
-        return { success: false, error: 'Company not found' };
+        return { success: false, error: 'CompanyHQ not found' };
       }
 
-      console.log('✅ PersonaPromptPrepService: Data prepared successfully');
-      console.log('  - Contact:', contact ? `${contact.firstName} ${contact.lastName}` : 'null');
-      console.log('  - CompanyHQ:', companyHQ.companyName);
+      // Fetch Contact
+      const contact = await prisma.contact.findUnique({
+        where: { id: contactId.trim() },
+      });
 
+      if (!contact) {
+        return { success: false, error: 'Contact not found' };
+      }
+
+      // Verify contact belongs to same company context (crmId ↔ companyHQId)
+      if (contact.crmId !== companyHQId.trim()) {
+        return { success: false, error: 'Contact does not belong to this company context' };
+      }
+
+      // Fetch Contact's Company (if contactCompanyId exists)
+      let contactCompany = null;
+      if (contact.contactCompanyId) {
+        contactCompany = await prisma.companies.findUnique({
+          where: { id: contact.contactCompanyId },
+        });
+        // Return null explicitly if not found (don't fail)
+      }
+
+      // Return full records as JSON
       return {
         success: true,
         data: {
-          contact,
-          companyHQ,
+          contact: contact as any, // Full Contact record
+          contactCompany: contactCompany as any | null, // Full Company record or null
+          companyHQ: companyHQ as any, // Full CompanyHQ record
         },
       };
     } catch (error: any) {
       console.error('❌ PersonaPromptPrepService error:', error);
+      
+      // Prisma-specific errors
+      if (error.code === 'P2025') {
+        return { success: false, error: 'Record not found' };
+      }
+      
       return {
         success: false,
         error: error.message || 'Failed to prepare persona data',
@@ -92,4 +107,3 @@ export class PersonaPromptPrepService {
     }
   }
 }
-

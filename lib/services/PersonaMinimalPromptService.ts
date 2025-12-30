@@ -22,20 +22,24 @@ export class PersonaMinimalPromptService {
    * Follows the template service pattern for consistency
    */
   static buildPrompts(data: PreparedData, description?: string): PromptResult {
-    const { contact, companyHQ } = data;
+    const { contact, contactCompany, companyHQ } = data;
 
     // System prompt: Explicit, deterministic, JSON-focused
     const systemPrompt = `You are a deterministic business persona generator. You MUST strictly follow all formatting and content rules. If any rule conflicts, prioritize JSON correctness and rule compliance over writing quality. Return only valid JSON. Never include markdown code blocks, explanations, or any text outside the JSON object.`;
 
-    // Build contact context section
+    // Build contact context section from full records
     let contactContext = '';
     if (contact) {
       const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+      // Use contactCompany if available, otherwise fall back to contact.companyName
+      const companyName = contactCompany?.companyName || contact.companyName || 'Not specified';
+      const industry = contactCompany?.industry || contact.companyIndustry || 'Not specified';
+      
       contactContext = `=== CONTACT INFORMATION ===
 Name: ${fullName || 'Not specified'}
 Title: ${contact.title || 'Not specified'}
-Company: ${contact.companyName || 'Not specified'}
-Industry: ${contact.companyIndustry || 'Not specified'}`;
+Company: ${companyName}
+Industry: ${industry}`;
     } else if (description) {
       contactContext = `=== DESCRIPTION ===
 ${description}`;
@@ -44,7 +48,7 @@ ${description}`;
     // User prompt: Explicit format requirements matching template service pattern
     const userPrompt = `You are an expert in business persona modeling. Your task is to generate a MINIMAL persona based on the provided context.
 
-=== COMPANY CONTEXT ===
+=== COMPANY CONTEXT (CRM) ===
 Company Name: ${companyHQ.companyName}
 Industry: ${companyHQ.companyIndustry || 'Not specified'}
 What We Do: ${companyHQ.whatYouDo || 'Not specified'}
