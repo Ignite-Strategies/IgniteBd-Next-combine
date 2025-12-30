@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Heart, Loader2, MapPin, Calendar, DollarSign, Sparkles } from 'lucide-react';
@@ -22,7 +22,7 @@ interface PickedEvent {
   recommendationRationale: string;
 }
 
-export default function SearchPickPage() {
+function SearchPickPageContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -281,6 +281,23 @@ export default function SearchPickPage() {
         {likedEventIds.size > 0 && <div className="h-24" />}
       </div>
     </div>
+  );
+}
+
+export default function SearchPickPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-red-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <SearchPickPageContent />
+    </Suspense>
   );
 }
 
