@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  Suspense,
 } from 'react';
 import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
@@ -13,7 +14,7 @@ import { ProposalsContext } from './ProposalsContext';
 // Note: Proposals are hydrated by Growth Dashboard
 // This layout just reads from localStorage - no separate API calls
 
-export default function ProposalsLayout({ children }) {
+function ProposalsLayoutContent({ children }) {
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
   const [proposals, setProposals] = useState([]);
@@ -115,6 +116,18 @@ export default function ProposalsLayout({ children }) {
     <ProposalsContext.Provider value={contextValue}>
       {children}
     </ProposalsContext.Provider>
+  );
+}
+
+export default function ProposalsLayout({ children }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-sm text-gray-500">Loading...</div>
+      </div>
+    }>
+      <ProposalsLayoutContent>{children}</ProposalsLayoutContent>
+    </Suspense>
   );
 }
 
