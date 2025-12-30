@@ -7,6 +7,8 @@
  * - Returns structured data for prompt building
  */
 
+import { prisma } from '@/lib/prisma';
+
 export interface PreparedData {
   contact: {
     firstName?: string;
@@ -37,11 +39,8 @@ export class PersonaPromptPrepService {
     try {
       const { contactId, companyHQId } = params;
 
-      // Dynamic import to ensure Prisma is initialized
-      const { prisma } = await import('@/lib/prisma');
-      
       if (!prisma) {
-        console.error('❌ Prisma is undefined after import');
+        console.error('❌ Prisma is undefined');
         return { success: false, error: 'Database connection not available' };
       }
 
