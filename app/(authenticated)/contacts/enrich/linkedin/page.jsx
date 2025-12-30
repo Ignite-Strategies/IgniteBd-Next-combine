@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
-import { Search, RefreshCw, Linkedin, X, Save, CheckCircle, User, ArrowRight, Mail } from 'lucide-react';
+import { Search, RefreshCw, Linkedin, X, Save, CheckCircle, User, ArrowRight, Mail, Sparkles } from 'lucide-react';
 
 function LinkedInEnrichContent() {
   const router = useRouter();
@@ -18,8 +18,10 @@ function LinkedInEnrichContent() {
   const [loading, setLoading] = useState(false);
   const [enrichmentData, setEnrichmentData] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [enrichingFullProfile, setEnrichingFullProfile] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedContactId, setSavedContactId] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
   const [missingCompanyKey, setMissingCompanyKey] = useState(false);
 
   // Log CompanyHQ from URL params
@@ -215,12 +217,51 @@ function LinkedInEnrichContent() {
       });
 
       setSaving(false);
+      setSuccessMessage('Contact saved successfully!');
       setShowSuccessModal(true);
       setSavedContactId(contactId);
     } catch (err) {
       console.error('❌ Save error:', err);
       alert(err.response?.data?.error || err.message || 'Failed to save contact');
       setSaving(false);
+    }
+  }
+
+  // Enrich Full Profile - generates intelligence and goes to intelligence preview page
+  async function handleEnrichFullProfile() {
+    if (!enrichmentData || !url) {
+      alert('Please enrich the contact first');
+      return;
+    }
+
+    if (!companyHQId) {
+      alert('Company context required. Please refresh the page with a companyHQId parameter.');
+      return;
+    }
+
+    setEnrichingFullProfile(true);
+
+    try {
+      console.log('🧠 Generating full intelligence profile for:', url);
+
+      // Call generate-intel API to create intelligence scores and get previewId
+      const intelResponse = await api.post('/api/contacts/enrich/generate-intel', {
+        linkedinUrl: url,
+      });
+
+      if (!intelResponse.data?.success || !intelResponse.data?.previewId) {
+        throw new Error(intelResponse.data?.error || 'Failed to generate intelligence');
+      }
+
+      const previewId = intelResponse.data.previewId;
+      console.log('✅ Intelligence generated, previewId:', previewId);
+
+      // Navigate to intelligence preview page
+      router.push(`/contacts/enrich/intelligence?previewId=${previewId}&companyHQId=${companyHQId}`);
+    } catch (err) {
+      console.error('❌ Full profile enrichment error:', err);
+      alert(err.response?.data?.error || err.message || 'Failed to generate full profile');
+      setEnrichingFullProfile(false);
     }
   }
 
@@ -247,11 +288,11 @@ function LinkedInEnrichContent() {
                 handleEnrich();
               }
             }}
-            disabled={loading || saving}
+            disabled={loading || saving || enrichingFullProfile}
           />
           <button
             onClick={handleEnrich}
-            disabled={loading || !url || saving}
+            disabled={loading || !url || saving || enrichingFullProfile}
             className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? <RefreshCw className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
@@ -330,11 +371,31 @@ function LinkedInEnrichContent() {
               </a>
             </div>
 
-            {/* Save Button */}
-            <div className="mt-6 border-t pt-6">
+            {/* Action Buttons */}
+            <div className="mt-6 border-t pt-6 space-y-3">
+              {/* Enrich Full Profile Button */}
+              <button
+                onClick={handleEnrichFullProfile}
+                disabled={saving || enrichingFullProfile}
+                className="w-full bg-purple-600 text-white px-6 py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-purple-700 transition shadow-md"
+              >
+                {enrichingFullProfile ? (
+                  <>
+                    <RefreshCw className="animate-spin h-5 w-5" />
+                    <span>Generating Intelligence...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-5 w-5" />
+                    <span>Enrich Full Profile</span>
+                  </>
+                )}
+              </button>
+
+              {/* Save Contact Button */}
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || enrichingFullProfile}
                 className="w-full bg-green-600 text-white px-6 py-4 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold hover:bg-green-700 transition shadow-md"
               >
                 {saving ? (
@@ -364,10 +425,12 @@ function LinkedInEnrichContent() {
                   </div>
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
-                  Contact Saved Successfully!
+                  {successMessage || 'Contact Saved Successfully!'}
                 </h2>
                 <p className="text-gray-600 text-center mb-6">
-                  Contact has been saved to your CRM.
+                  {successMessage.includes('Full Profile') 
+                    ? 'Contact has been enriched with full intelligence scores and saved to your CRM.'
+                    : 'Contact has been saved to your CRM.'}
                 </p>
                 
                 <div className="space-y-3">
