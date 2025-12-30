@@ -11,110 +11,76 @@ function FromContactContent() {
   const contactId = searchParams?.get('contactId');
   const companyHQId = searchParams?.get('companyHQId') || '';
 
-  const [contact, setContact] = useState(null);
-  const [personaData, setPersonaData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Individual field state - matches template builder pattern
+  const [personName, setPersonName] = useState('');
+  const [title, setTitle] = useState('');
+  const [company, setCompany] = useState('');
+  const [coreGoal, setCoreGoal] = useState('');
+  
+  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  // Fetch contact and generate minimal persona
+  // Generate minimal persona - backend does all the work
+  // Form fields are always visible, we just populate them when generation succeeds
   useEffect(() => {
-    if (!contactId || !companyHQId) return;
+    if (!contactId || !companyHQId) {
+      setLoading(false);
+      return;
+    }
 
-    const fetchContactAndGenerate = async () => {
-      setLoading(true);
+    const generatePersona = async () => {
       setGenerating(true);
+      setError('');
 
       try {
-        // Fetch contact
-        const contactResponse = await api.get(`/api/contacts/${contactId}`);
-        if (contactResponse.data?.success && contactResponse.data?.contact) {
-          const fetchedContact = contactResponse.data.contact;
-          setContact(fetchedContact);
+        const response = await api.post('/api/personas/generate-minimal', {
+          companyHQId,
+          contactId,
+        });
 
-          // Generate minimal persona (MVP1 - just basics)
-          // API will fetch contact from DB - we just pass contactId
-          try {
-            const personaResponse = await api.post('/api/personas/generate-minimal', {
-              companyHQId,
-              contactId,
-            });
-
-            if (personaResponse.data?.success && personaResponse.data?.persona) {
-              const persona = personaResponse.data.persona;
-              setPersonaData({
-                personName: persona.personName || fetchedContact.fullName || `${fetchedContact.firstName || ''} ${fetchedContact.lastName || ''}`.trim() || 'New Persona',
-                title: persona.title || fetchedContact.title || '',
-                company: persona.company || fetchedContact.companyName || '',
-                coreGoal: persona.coreGoal || '',
-              });
-            }
-          } catch (err) {
-            console.error('Failed to generate minimal persona:', err);
-            // Soft fallback - use contact data (only if contact was successfully fetched)
-            if (fetchedContact) {
-              setPersonaData({
-                personName: fetchedContact.fullName || `${fetchedContact.firstName || ''} ${fetchedContact.lastName || ''}`.trim() || 'New Persona',
-                title: fetchedContact.title || '',
-                company: fetchedContact.companyName || '',
-                coreGoal: '',
-              });
-            } else {
-              // If no contact data, set minimal defaults
-              setPersonaData({
-                personName: 'New Persona',
-                title: '',
-                company: '',
-                coreGoal: '',
-              });
-            }
-          }
+        if (response.data?.success && response.data?.persona) {
+          const persona = response.data.persona;
+          setPersonName(persona.personName || '');
+          setTitle(persona.title || '');
+          setCompany(persona.company || '');
+          setCoreGoal(persona.coreGoal || '');
         } else {
-          // Contact fetch failed or returned no data
-          console.error('Failed to fetch contact or contact not found');
-          setPersonaData({
-            personName: 'New Persona',
-            title: '',
-            company: '',
-            coreGoal: '',
-          });
+          setError(response.data?.error || 'Failed to generate persona');
         }
       } catch (err) {
-        console.error('Failed to fetch contact:', err);
-        // Set minimal defaults on error
-        setPersonaData({
-          personName: 'New Persona',
-          title: '',
-          company: '',
-          coreGoal: '',
-        });
+        console.error('Failed to generate minimal persona:', err);
+        setError(err.response?.data?.error || 'Failed to generate persona');
+        // Don't block the form - user can still fill it manually
       } finally {
-        setLoading(false);
         setGenerating(false);
       }
     };
 
-    fetchContactAndGenerate();
+    generatePersona();
   }, [contactId, companyHQId]);
 
-  const handleFieldChange = (field, value) => {
-    setPersonaData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
   const handleSave = async () => {
-    if (!personaData || !companyHQId) return;
+    if (!companyHQId) {
+      setError('Company context is required');
+      return;
+    }
+
+    if (!personName.trim() || !title.trim() || !company.trim() || !coreGoal.trim()) {
+      setError('All fields are required');
+      return;
+    }
 
     setSaving(true);
+    setError('');
 
     try {
       const payload = {
-        personName: personaData.personName || '',
-        title: personaData.title || '',
-        company: personaData.company || '',
-        coreGoal: personaData.coreGoal || '',
+        personName: personName.trim(),
+        title: title.trim(),
+        company: company.trim(),
+        coreGoal: coreGoal.trim(),
         // MVP2 fields (scaffolded but not generated yet)
         role: null,
         seniority: null,
@@ -132,9 +98,12 @@ function FromContactContent() {
 
       if (response.data?.success) {
         router.push(`/personas?companyHQId=${companyHQId}&saved=true`);
+      } else {
+        setError(response.data?.error || 'Failed to save persona');
       }
     } catch (err) {
       console.error('Failed to save persona:', err);
+      setError(err.response?.data?.error || 'Failed to save persona');
     } finally {
       setSaving(false);
     }
@@ -158,36 +127,9 @@ function FromContactContent() {
     );
   }
 
-  if (loading || generating) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
-            <p className="mt-4 text-gray-600">Generating minimal persona...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Show form immediately - fields are always visible
+  // Generation happens in background and populates fields when ready
 
-  if (!personaData) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
-            <p className="text-gray-600">No persona data available</p>
-            <button
-              onClick={() => router.back()}
-              className="mt-4 text-sm text-blue-600 hover:text-blue-800"
-            >
-              ← Go Back
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -207,7 +149,23 @@ function FromContactContent() {
           </p>
         </div>
 
-        {/* Persona Form - MVP1 Only */}
+        {/* Generating Indicator */}
+        {generating && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+            <p className="text-sm text-blue-800">Generating persona from contact...</p>
+          </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            {error}
+            <p className="mt-2 text-xs text-red-700">You can still fill out the form manually below.</p>
+          </div>
+        )}
+
+        {/* Persona Form - MVP1 Only - Always Visible */}
         <div className="space-y-6 rounded-lg border border-gray-200 bg-white p-6">
           {/* WHO IS THIS PERSON */}
           <div>
@@ -219,8 +177,8 @@ function FromContactContent() {
                 </label>
                 <input
                   type="text"
-                  value={personaData.personName || ''}
-                  onChange={(e) => handleFieldChange('personName', e.target.value)}
+                  value={personName}
+                  onChange={(e) => setPersonName(e.target.value)}
                   placeholder="e.g., Compliance Manager"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   required
@@ -233,8 +191,8 @@ function FromContactContent() {
                 </label>
                 <input
                   type="text"
-                  value={personaData.title || ''}
-                  onChange={(e) => handleFieldChange('title', e.target.value)}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g., Deputy Counsel"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   required
@@ -252,8 +210,8 @@ function FromContactContent() {
               </label>
               <input
                 type="text"
-                value={personaData.company || ''}
-                onChange={(e) => handleFieldChange('company', e.target.value)}
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
                 placeholder="e.g., X Firm"
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 required
@@ -270,8 +228,8 @@ function FromContactContent() {
               </label>
               <p className="mb-2 text-xs text-gray-500">Their north star (one sentence)</p>
               <textarea
-                value={personaData.coreGoal || ''}
-                onChange={(e) => handleFieldChange('coreGoal', e.target.value)}
+                value={coreGoal}
+                onChange={(e) => setCoreGoal(e.target.value)}
                 placeholder="e.g., Ensure compliance with industry regulations while minimizing operational overhead"
                 rows={3}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
@@ -298,7 +256,7 @@ function FromContactContent() {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || !personaData.personName || !personaData.title || !personaData.company || !personaData.coreGoal}
+            disabled={saving || !personName.trim() || !title.trim() || !company.trim() || !coreGoal.trim()}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
