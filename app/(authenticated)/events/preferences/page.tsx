@@ -58,9 +58,28 @@ function PreferencesPageContent() {
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Redirect if no companyHQId in URL
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/events/preferences?companyHQId=${stored}`);
+      } else {
+        // If no companyHQId available, redirect back to events page
+        router.push('/events');
+      }
+    }
+  }, [companyHQId, router]);
+
   useEffect(() => {
     if (ownerId && companyHQId) {
       loadPreviousTuner();
+    } else if (!companyHQId) {
+      // If we don't have companyHQId yet, keep loading
+      setLoading(true);
+    } else {
+      // If we have companyHQId but no ownerId, stop loading
+      setLoading(false);
     }
   }, [ownerId, companyHQId]);
 
@@ -139,8 +158,11 @@ function PreferencesPageContent() {
 
       if (response.data?.success) {
         const tunerId = response.data.tuner.id;
-        // Redirect to ready-to-plan with the tuner ID
-        router.push(`/events/ready-to-plan?tunerId=${tunerId}`);
+        // Redirect to ready-to-plan with the tuner ID and companyHQId
+        const url = companyHQId 
+          ? `/events/ready-to-plan?tunerId=${tunerId}&companyHQId=${companyHQId}`
+          : `/events/ready-to-plan?tunerId=${tunerId}`;
+        router.push(url);
       } else {
         throw new Error('Failed to save preferences');
       }

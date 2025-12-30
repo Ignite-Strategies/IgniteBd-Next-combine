@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { List, Loader2, MapPin, Calendar, DollarSign, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
@@ -25,22 +25,39 @@ interface EventOp {
   createdAt: string;
 }
 
-export default function EventsListPage() {
+function EventsListPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [events, setEvents] = useState<EventOp[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Redirect if no companyHQId in URL
   useEffect(() => {
-    loadEvents();
-  }, []);
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/events/list?companyHQId=${stored}`);
+      } else {
+        router.push('/events');
+      }
+    }
+  }, [companyHQId, router]);
+
+  useEffect(() => {
+    if (companyHQId) {
+      loadEvents();
+    }
+  }, [companyHQId]);
 
   const loadEvents = async () => {
+    if (!companyHQId) return;
+    
     try {
       setLoading(true);
-      const companyHQId = localStorage.getItem('companyHQId') || '';
       const ownerId = localStorage.getItem('ownerId') || '';
 
-      if (!companyHQId || !ownerId) {
+      if (!ownerId) {
         setLoading(false);
         return;
       }
@@ -121,13 +138,13 @@ export default function EventsListPage() {
             </p>
             <div className="flex gap-4 justify-center">
               <button
-                onClick={() => router.push('/events/build-from-persona')}
+                onClick={() => router.push(companyHQId ? `/events/build-from-persona?companyHQId=${companyHQId}` : '/events/build-from-persona')}
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
               >
                 Research by Persona
               </button>
               <button
-                onClick={() => router.push('/events/set-plan')}
+                onClick={() => router.push(companyHQId ? `/events/set-plan?companyHQId=${companyHQId}` : '/events/set-plan')}
                 className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
               >
                 Set Your Plan
@@ -204,3 +221,19 @@ export default function EventsListPage() {
   );
 }
 
+export default function EventsListPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">Loading events...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <EventsListPageContent />
+    </Suspense>
+  );
+}

@@ -1,11 +1,38 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Sparkles, Calendar, List } from 'lucide-react';
+import { Sparkles, Calendar, List, RefreshCw } from 'lucide-react';
 
-export default function EventsPage() {
+function EventsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+
+  const navigateToPreferences = () => {
+    if (companyHQId) {
+      router.push(`/events/preferences?companyHQId=${companyHQId}`);
+    } else {
+      router.push('/events/preferences');
+    }
+  };
+
+  const navigateToBuildFromPersona = () => {
+    if (companyHQId) {
+      router.push(`/events/build-from-persona?companyHQId=${companyHQId}`);
+    } else {
+      router.push('/events/build-from-persona');
+    }
+  };
+
+  const navigateToList = () => {
+    if (companyHQId) {
+      router.push(`/events/list?companyHQId=${companyHQId}`);
+    } else {
+      router.push('/events/list');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -21,7 +48,7 @@ export default function EventsPage() {
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main - Find and Select Events (2 columns) */}
           <div
-            onClick={() => router.push('/events/preferences')}
+            onClick={navigateToPreferences}
             className="lg:col-span-2 cursor-pointer rounded-2xl border-2 border-gray-200 bg-white p-8 shadow-lg hover:shadow-xl transition-all hover:border-red-300"
           >
             <div className="flex items-start gap-4">
@@ -47,7 +74,7 @@ export default function EventsPage() {
           <div className="lg:col-span-1 space-y-6">
             {/* Research Best Events by Persona */}
             <div
-              onClick={() => router.push('/events/build-from-persona')}
+              onClick={navigateToBuildFromPersona}
               className="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md hover:shadow-lg transition-all hover:border-blue-300"
             >
               <div className="flex items-start gap-4">
@@ -71,7 +98,7 @@ export default function EventsPage() {
 
             {/* See Events */}
             <div
-              onClick={() => router.push('/events/list')}
+              onClick={navigateToList}
               className="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-6 shadow-md hover:shadow-lg transition-all hover:border-orange-300"
             >
               <div className="flex items-start gap-4">
@@ -96,5 +123,22 @@ export default function EventsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-8">
+            <RefreshCw className="animate-spin h-6 w-6 mx-auto mb-2 text-gray-400" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <EventsPageContent />
+    </Suspense>
   );
 }

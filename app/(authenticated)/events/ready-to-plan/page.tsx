@@ -8,13 +8,21 @@ function ReadyToPlanContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tunerId = searchParams.get('tunerId');
+  const companyHQId = searchParams.get('companyHQId') || '';
 
   const handleContinue = () => {
     if (tunerId) {
-      // Redirect to search/pick page
-      router.push(`/events/search-pick/${tunerId}`);
+      // Redirect to search/pick page with companyHQId if available
+      const url = companyHQId 
+        ? `/events/search-pick/${tunerId}?companyHQId=${companyHQId}`
+        : `/events/search-pick/${tunerId}`;
+      router.push(url);
     } else {
-      router.push('/events/preferences');
+      // Redirect to preferences with companyHQId if available
+      const url = companyHQId 
+        ? `/events/preferences?companyHQId=${companyHQId}`
+        : '/events/preferences';
+      router.push(url);
     }
   };
 
