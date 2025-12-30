@@ -334,7 +334,8 @@ function ComposeContent() {
         },
         hydrated: selectedTemplateId && contactId,
       });
-      setShowPreviewModal(true);
+      // Show preview below instead of modal
+      setShowPreviewModal(false);
     } catch (err) {
       console.error('Preview error:', err);
       setPreviewError(err.response?.data?.error || err.message || 'Failed to preview');
@@ -744,6 +745,24 @@ function ComposeContent() {
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4">
                 <button
+                  type="button"
+                  onClick={handlePreview}
+                  disabled={previewLoading || sending || !ownerId || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
+                  className="inline-flex items-center gap-2 rounded-md bg-gray-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {previewLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4" />
+                      Preview
+                    </>
+                  )}
+                </button>
+                <button
                   type="submit"
                   disabled={sending || !ownerId || !hasVerifiedSender || !senderEmail || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
                   className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -831,6 +850,63 @@ function ComposeContent() {
             </div>
           </div>
         </div>
+
+        {/* Preview Section - Shows below when preview is loaded */}
+        {previewData && !showPreviewModal && (
+          <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Email Preview</h2>
+                <button
+                  onClick={() => {
+                    setPreviewData(null);
+                    setPreviewError(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              {previewError && (
+                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+                  <p className="text-sm font-medium text-red-900">{previewError}</p>
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+                  <div className="text-sm text-gray-900">
+                    {previewData.preview.from?.name 
+                      ? `${previewData.preview.from.name} <${previewData.preview.from.email}>`
+                      : previewData.preview.from?.email}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+                  <div className="text-sm text-gray-900">{previewData.preview.to}</div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                  <div className="text-sm text-gray-900 font-medium">{previewData.preview.subject}</div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Message</label>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 min-h-[200px]">
+                    <div 
+                      className="text-sm text-gray-900 whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: previewData.preview.body || previewData.preview.content?.[0]?.value || '' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Preview Modal - Split Screen, Inline Editable (like sandbox) */}
