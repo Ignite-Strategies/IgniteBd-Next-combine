@@ -49,6 +49,7 @@ function Sidebar() {
       name: 'Growth Ops',
       items: [
         { key: 'personas', label: 'Personas', href: '/personas', icon: UserCircle },
+        { key: 'products', label: 'Products', href: '/products', icon: Package },
       ],
     },
     {

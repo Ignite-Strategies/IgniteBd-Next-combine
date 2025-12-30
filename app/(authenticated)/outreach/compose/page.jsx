@@ -130,10 +130,9 @@ function ComposeContent() {
     }
   }, [ownerId]);
 
-  // Load templates - ownerId needed for payload, companyHQId from URL params
-  // Auth handled globally via axios interceptor
+  // Load templates - only needs companyHQId (auth handled globally via axios interceptor)
   useEffect(() => {
-    if (!ownerId || !companyHQId) return;
+    if (!companyHQId) return;
 
     const loadTemplates = async () => {
       setLoadingTemplates(true);
@@ -141,16 +140,19 @@ function ComposeContent() {
         const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
         if (response.data?.success) {
           setTemplates(response.data.templates || []);
+        } else {
+          console.warn('Templates API response not successful:', response.data);
         }
       } catch (err) {
         console.error('Failed to load templates:', err);
+        setTemplates([]); // Clear templates on error
       } finally {
         setLoadingTemplates(false);
       }
     };
 
     loadTemplates();
-  }, [ownerId, companyHQId]);
+  }, [companyHQId]);
 
   // Handle contactId from URL params (when navigating from success modal)
   useEffect(() => {
@@ -444,52 +446,11 @@ function ComposeContent() {
           backLabel="Back to Outreach"
         />
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Main Compose Form - Left Column (1/2 width) */}
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Compose Form - Left Column (2/3 width) */}
+          <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-6">Compose Email</h2>
-            
-            {/* Template Selector - Moved to top of form */}
-            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900">Choose Template</h3>
-              </div>
-              <div className="p-4 max-h-48 overflow-y-auto">
-                {loadingTemplates ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                    <span className="ml-2 text-xs text-gray-600">Loading templates...</span>
-                  </div>
-                ) : templates.length === 0 ? (
-                  <p className="text-xs text-gray-500 text-center py-4">No templates available</p>
-                ) : (
-                  <div className="space-y-2">
-                    {templates.map((template) => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTemplateId(template.id);
-                          setSubject(template.subject || '');
-                          setBody(template.body || '');
-                        }}
-                        className={`w-full text-left p-2 rounded border transition text-xs ${
-                          selectedTemplateId === template.id
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="font-medium text-gray-900">{template.title}</div>
-                        {template.subject && (
-                          <div className="text-gray-600 truncate">{template.subject}</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
             
             {success && (
               <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3 flex items-center gap-2">
@@ -804,10 +765,77 @@ function ComposeContent() {
             </div>
           </div>
 
-          {/* Live Preview - Right Column (1/2 width) */}
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Preview</h2>
+          {/* Template Selector Sidebar - Right Column (1/3 width) */}
+          <div className="lg:col-span-1 rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900">Choose Template</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Select a template to fill subject and body
+              </p>
+            </div>
+            <div className="p-4">
+              {loadingTemplates ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-600">Loading templates...</span>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-8">
+                  <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No templates available</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Create templates in the Templates section
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+                  {templates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplateId(template.id);
+                        // Fill subject and body with template content (variables shown as-is)
+                        setSubject(template.subject || '');
+                        setBody(template.body || '');
+                      }}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                        selectedTemplateId === template.id
+                          ? 'border-red-500 bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-medium text-sm text-gray-900 mb-1">
+                        {template.title}
+                      </div>
+                      {template.subject && (
+                        <div className="text-xs text-gray-600 truncate mb-1" title={template.subject}>
+                          {template.subject}
+                        </div>
+                      )}
+                      {template.body && (
+                        <div className="text-xs text-gray-500 line-clamp-2">
+                          {template.body.replace(/\{\{(\w+)\}\}/g, '[var]').substring(0, 60)}...
+                        </div>
+                      )}
+                      {selectedTemplateId === template.id && (
+                        <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>Selected</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Live Preview Section - Full Width Below */}
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Preview</h2>
               
               {hydratedPreview.loading ? (
                 <div className="flex items-center justify-center py-12">

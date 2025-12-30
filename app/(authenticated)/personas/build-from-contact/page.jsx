@@ -6,6 +6,12 @@ import { Search, Users, Building2, Loader2, ArrowLeft, Save } from 'lucide-react
 import api from '@/lib/api';
 
 function BuildFromContactContent() {
+  // TEMPORARY: Page load verification
+  console.log('🎯 BUILD-FROM-CONTACT PAGE LOADED', {
+    time: new Date().toISOString(),
+    random: Math.random(),
+  });
+  
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';

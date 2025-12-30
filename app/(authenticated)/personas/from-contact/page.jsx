@@ -4,18 +4,22 @@ import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-function BuildFromContactsRedirect() {
+function FromContactRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
+  const contactId = searchParams?.get('contactId') || '';
 
   useEffect(() => {
     // Redirect to new build-from-contact page
-    const url = companyHQId 
-      ? `/personas/build-from-contact?companyHQId=${companyHQId}`
-      : '/personas/build-from-contact';
+    let url = '/personas/build-from-contact';
+    const params = new URLSearchParams();
+    if (companyHQId) params.set('companyHQId', companyHQId);
+    if (contactId) params.set('contactId', contactId);
+    if (params.toString()) url += `?${params.toString()}`;
+    
     router.replace(url);
-  }, [router, companyHQId]);
+  }, [router, companyHQId, contactId]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -26,14 +30,15 @@ function BuildFromContactsRedirect() {
   );
 }
 
-export default function BuildFromContactsPage() {
+export default function FromContactPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-600">Loading...</p>
       </div>
     }>
-      <BuildFromContactsRedirect />
+      <FromContactRedirect />
     </Suspense>
   );
 }
+

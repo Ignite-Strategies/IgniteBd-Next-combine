@@ -1,22 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { TrendingUp, Settings, Menu, X, Package } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { TrendingUp, Settings, Menu, X, LogOut, User, ChevronDown } from 'lucide-react';
+import { signOutUser, getCurrentUser } from '@/lib/firebase';
+import { useOwner } from '@/hooks/useOwner';
 
 const NAV_ITEMS = [
   { path: '/growth-dashboard', label: 'Growth Dashboard', icon: TrendingUp },
-  { path: '/products', label: 'Products', icon: Package },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const { owner } = useOwner();
+
+  // Get Firebase user info
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const user = getCurrentUser();
+      setFirebaseUser(user);
+      
+      // Listen for auth state changes
+      import('firebase/auth').then(({ onAuthStateChanged }) => {
+        import('@/lib/firebase').then(({ auth }) => {
+          onAuthStateChanged(auth, (user) => {
+            setFirebaseUser(user);
+          });
+        });
+      });
+    }
+  }, []);
 
   const isActive = (path) =>
     pathname === path || pathname.startsWith(`${path}/`);
+
+  const handleLogout = async () => {
+    try {
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+      }
+      
+      // Sign out from Firebase
+      await signOutUser();
+      
+      // Redirect to signin
+      router.push('/signin');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still redirect even if logout fails
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+      }
+      router.push('/signin');
+    }
+  };
+
+  // Get display name/email
+  const displayName = owner?.name || owner?.firstName || firebaseUser?.displayName || null;
+  const displayEmail = owner?.email || firebaseUser?.email || null;
+  const userDisplay = displayName || displayEmail || 'User';
 
   return (
     <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
@@ -48,6 +97,46 @@ export default function Navigation() {
               </Link>
             );
           })}
+          
+          {/* User Menu */}
+          <div className="relative ml-2">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 transition focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <User className="h-4 w-4" />
+              <span className="max-w-[120px] truncate">{userDisplay}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {userMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setUserMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg border border-gray-200 py-1 z-20">
+                  <div className="px-4 py-2 border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {displayName || 'User'}
+                    </p>
+                    {displayEmail && (
+                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                        {displayEmail}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Mobile Menu Button */}
@@ -87,6 +176,30 @@ export default function Navigation() {
                 </Link>
               );
             })}
+            
+            {/* Mobile User Info & Logout */}
+            <div className="px-4 py-3 border-t border-gray-200 mt-2">
+              <div className="mb-2">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {displayName || 'User'}
+                </p>
+                {displayEmail && (
+                  <p className="text-xs text-gray-500 truncate mt-0.5">
+                    {displayEmail}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLogout();
+                }}
+                className="flex items-center gap-3 w-full rounded-lg px-4 py-3 text-base font-semibold text-gray-700 hover:bg-red-50 hover:text-red-600 transition"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

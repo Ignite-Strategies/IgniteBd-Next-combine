@@ -35,6 +35,12 @@ export class PersonaPromptPrepService {
     data?: PreparedData;
     error?: string;
   }> {
+    // TEMPORARY: Service execution log
+    console.log('🧠 SERVICE EXECUTED', {
+      time: new Date().toISOString(),
+      random: Math.random(),
+    });
+    
     try {
       const { contactId, companyHQId } = params;
 

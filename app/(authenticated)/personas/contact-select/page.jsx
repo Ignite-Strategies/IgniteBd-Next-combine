@@ -4,16 +4,17 @@ import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-function BuildFromContactsRedirect() {
+function ContactSelectRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
 
   useEffect(() => {
-    // Redirect to new build-from-contact page
+    // IMMEDIATE redirect - no delay
     const url = companyHQId 
       ? `/personas/build-from-contact?companyHQId=${companyHQId}`
       : '/personas/build-from-contact';
+    // Use replace to avoid adding to history
     router.replace(url);
   }, [router, companyHQId]);
 
@@ -26,14 +27,15 @@ function BuildFromContactsRedirect() {
   );
 }
 
-export default function BuildFromContactsPage() {
+export default function ContactSelectPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-600">Loading...</p>
       </div>
     }>
-      <BuildFromContactsRedirect />
+      <ContactSelectRedirect />
     </Suspense>
   );
 }
+

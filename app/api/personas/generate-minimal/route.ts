@@ -48,7 +48,15 @@ import { PersonaParsingService } from '@/lib/services/PersonaParsingService';
 import { OpenAI } from 'openai';
 import { prisma } from '@/lib/prisma';
 
+// TEMPORARY: Build verification log
+console.log('🚀 API ROUTE LOADED - BUILD', new Date().toISOString());
+
 export async function POST(request: NextRequest) {
+  // TEMPORARY: Handler invocation log
+  console.log('➡️ API HANDLER INVOKED', {
+    time: new Date().toISOString(),
+    random: Math.random(),
+  });
   // ============================================
   // STEP 1: AUTHENTICATION
   // ============================================
