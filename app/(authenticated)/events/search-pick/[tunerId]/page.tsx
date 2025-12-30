@@ -261,90 +261,90 @@ function SearchPickPageContent() {
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">{quarter}</h2>
                   <div className="space-y-4">
                     {quarterEvents.map((event, index) => {
-              const isLiked = likedEventTitles.has(event.eventTitle);
-              const isLiking = liking[event.eventTitle];
+                      const isLiked = likedEventTitles.has(event.eventTitle);
+                      const isLiking = liking[event.eventTitle];
 
-              return (
-                <div
-                  key={index}
-                  className="rounded-lg border-2 border-gray-200 bg-white p-6 hover:border-gray-300 transition-all"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-3">{event.eventTitle}</h3>
-                      
-                      {/* Event Details Row */}
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
-                        {event.location && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            <span>{event.location}</span>
-                          </div>
-                        )}
-                        {event.timeFrame && (
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>{event.timeFrame}</span>
-                          </div>
-                        )}
-                        {event.costEstimate && (
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-4 w-4" />
-                            <span>{event.costEstimate}</span>
-                          </div>
-                        )}
-                        {event.sponsor && (
-                          <div className="flex items-center gap-1">
-                            <Building2 className="h-4 w-4" />
-                            <span>{event.sponsor}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="mb-3">
-                        <p className="text-sm text-gray-700">{event.description}</p>
-                      </div>
+                      return (
+                        <div
+                          key={index}
+                          className="rounded-lg border-2 border-gray-200 bg-white p-6 hover:border-gray-300 transition-all"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <h3 className="text-xl font-semibold text-gray-900 mb-3">{event.eventTitle}</h3>
+                              
+                              {/* Event Details Row */}
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                                {event.location && (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{event.location}</span>
+                                  </div>
+                                )}
+                                {event.timeFrame && (
+                                  <div className="flex items-center gap-1">
+                                    <Calendar className="h-4 w-4" />
+                                    <span>{event.timeFrame}</span>
+                                  </div>
+                                )}
+                                {event.costEstimate && (
+                                  <div className="flex items-center gap-1">
+                                    <DollarSign className="h-4 w-4" />
+                                    <span>{event.costEstimate}</span>
+                                  </div>
+                                )}
+                                {event.sponsor && (
+                                  <div className="flex items-center gap-1">
+                                    <Building2 className="h-4 w-4" />
+                                    <span>{event.sponsor}</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="mb-3">
+                                <p className="text-sm text-gray-700">{event.description}</p>
+                              </div>
 
-                      <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm font-medium text-blue-900 mb-1">Why you should go:</p>
-                        <p className="text-sm text-blue-700">{event.whyGo}</p>
-                      </div>
-                    </div>
+                              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                <p className="text-sm font-medium text-blue-900 mb-1">Why you should go:</p>
+                                <p className="text-sm text-blue-700">{event.whyGo}</p>
+                              </div>
+                            </div>
 
-                    <button
-                      onClick={() => handleLike(event)}
-                      disabled={isLiked || isLiking}
-                      className={`flex-shrink-0 px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                        isLiked
-                          ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
-                          : isLiking
-                            ? 'bg-gray-100 text-gray-500 cursor-wait'
-                            : 'bg-red-600 text-white hover:bg-red-700'
-                      }`}
-                    >
-                      {isLiking ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Saving...</span>
-                        </>
-                      ) : isLiked ? (
-                        <>
-                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span>Saved!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Heart className="h-4 w-4" />
-                          <span>I like it</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                            <button
+                              onClick={() => handleLike(event)}
+                              disabled={isLiked || isLiking}
+                              className={`flex-shrink-0 px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                                isLiked
+                                  ? 'bg-green-100 text-green-700 border-2 border-green-300 cursor-default'
+                                  : isLiking
+                                    ? 'bg-gray-100 text-gray-500 cursor-wait'
+                                    : 'bg-red-600 text-white hover:bg-red-700'
+                              }`}
+                            >
+                              {isLiking ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span>Saving...</span>
+                                </>
+                              ) : isLiked ? (
+                                <>
+                                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  <span>Saved!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Heart className="h-4 w-4" />
+                                  <span>I like it</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
