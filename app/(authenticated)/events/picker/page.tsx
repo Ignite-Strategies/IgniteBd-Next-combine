@@ -214,7 +214,7 @@ function EventPickerPageContent() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Let's Pick Your Events"
-          subtitle="Choose or create your preferences to generate your event plan"
+          subtitle="Select events that match your goals. Create preferences to get started."
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
         />
@@ -230,8 +230,8 @@ function EventPickerPageContent() {
                 <Plus className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Create New Preferences</h3>
-                <p className="text-sm text-gray-600">Set up a new set of preferences for finding events</p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Need to Set Up Preferences?</h3>
+                <p className="text-sm text-gray-600">Create preferences to find events that match your criteria</p>
               </div>
             </div>
           </div>
@@ -246,16 +246,16 @@ function EventPickerPageContent() {
         ) : tuners.length === 0 ? (
           <div className="text-center py-12 rounded-xl border border-gray-200 bg-white">
             <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-lg font-semibold text-gray-800 mb-2">No preferences yet</p>
+            <p className="text-lg font-semibold text-gray-800 mb-2">Ready to Pick Your Events</p>
             <p className="text-sm text-gray-500 mb-6">
-              Create your first set of preferences to start picking events
+              Create preferences first to find events that match your goals
             </p>
           </div>
         ) : (
           <>
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Your Preferences</h2>
-              <p className="text-sm text-gray-600 mt-1">Select a preference to generate your events</p>
+              <h2 className="text-2xl font-bold text-gray-900">Pick Your Events</h2>
+              <p className="text-sm text-gray-600 mt-1">Select a preference set to generate your event recommendations</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {tuners.map((tuner) => (
