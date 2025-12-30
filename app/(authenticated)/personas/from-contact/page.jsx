@@ -9,34 +9,13 @@ function FromContactContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contactId = searchParams?.get('contactId');
-  const companyHQIdFromUrl = searchParams?.get('companyHQId') || '';
+  const companyHQId = searchParams?.get('companyHQId') || '';
 
   const [contact, setContact] = useState(null);
   const [personaData, setPersonaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [companyHQId, setCompanyHQId] = useState('');
-
-  // Get companyHQId from URL params first, fallback to localStorage (params-first flow)
-  useEffect(() => {
-    if (companyHQIdFromUrl) {
-      setCompanyHQId(companyHQIdFromUrl);
-      return;
-    }
-
-    // Fallback to localStorage if not in URL
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-      if (stored) {
-        setCompanyHQId(stored);
-        // Optionally update URL to include companyHQId
-        if (contactId) {
-          router.replace(`/personas/from-contact?contactId=${contactId}&companyHQId=${stored}`);
-        }
-      }
-    }
-  }, [companyHQIdFromUrl, contactId, router]);
 
   // Fetch contact and generate minimal persona
   useEffect(() => {
