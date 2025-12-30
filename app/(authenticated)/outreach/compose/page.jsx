@@ -80,11 +80,7 @@ function ComposeContent() {
   
   useEffect(() => {
     if (hasRedirectedRef.current) return;
-    
     if (typeof window === 'undefined') return;
-    
-    // Wait for searchParams to be ready
-    if (!searchParams) return;
     
     // If URL has companyHQId, we're good
     if (companyHQId) {
@@ -97,7 +93,10 @@ function ComposeContent() {
     if (stored) {
       hasRedirectedRef.current = true;
       console.log(`🔄 Outreach Compose: Adding companyHQId from localStorage to URL: ${stored}`);
-      router.replace(`/outreach/compose?companyHQId=${stored}`);
+      // Use setTimeout to avoid blocking render
+      setTimeout(() => {
+        router.replace(`/outreach/compose?companyHQId=${stored}`);
+      }, 0);
       return;
     }
     
@@ -105,7 +104,7 @@ function ComposeContent() {
     hasRedirectedRef.current = true;
     console.warn('⚠️ Outreach Compose: No companyHQId in URL or localStorage');
     setMissingCompanyKey(true);
-  }, [companyHQId, router, searchParams]);
+  }, [companyHQId, router]);
 
   // Log CompanyHQ from URL params
   useEffect(() => {
