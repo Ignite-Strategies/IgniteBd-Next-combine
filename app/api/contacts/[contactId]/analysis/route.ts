@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ContactAnalysisService } from '@/lib/services/ContactAnalysisService';
+import { ContactAnalysisMinimalService } from '@/lib/services/ContactAnalysisMinimalService';
+// Full service kept for MVP2: import { ContactAnalysisService } from '@/lib/services/ContactAnalysisService';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
@@ -26,9 +27,9 @@ export async function POST(
   try {
     const { contactId } = await params;
     const body = await request.json();
-    const { productId } = body;
+    const { companyHQId } = body;
 
-    // Verify contact exists and belongs to companyHQ
+    // Verify contact exists
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
       select: {
@@ -44,10 +45,10 @@ export async function POST(
       );
     }
 
-    // Generate analysis
-    const result = await ContactAnalysisService.generate({
+    // Generate minimal analysis (MVP1)
+    const result = await ContactAnalysisMinimalService.generate({
       contactId,
-      productId,
+      companyHQId,
     });
 
     if (!result.success) {
@@ -55,43 +56,25 @@ export async function POST(
         {
           success: false,
           error: result.error || 'Failed to generate contact analysis',
-          details: result.details,
         },
         { status: 400 }
       );
     }
 
-    // Save to database
+    // Save to database (using existing schema fields)
     const savedAnalysis = await prisma.contact_analyses.upsert({
       where: { contactId },
       create: {
         contactId,
-        fitScore: result.analysis!.fitScore,
-        painAlignmentScore: result.analysis!.painAlignmentScore,
-        workflowFitScore: result.analysis!.workflowFitScore,
-        urgencyScore: result.analysis!.urgencyScore,
-        adoptionBarrierScore: result.analysis!.adoptionBarrierScore,
-        risks: result.analysis!.risks.length > 0 ? result.analysis!.risks : null,
-        opportunities: result.analysis!.opportunities.length > 0 ? result.analysis!.opportunities : null,
         recommendedTalkTrack: result.analysis!.recommendedTalkTrack || null,
-        recommendedSequence: result.analysis!.recommendedSequence || null,
-        recommendedLeadSource: result.analysis!.recommendedLeadSource || null,
-        finalSummary: result.analysis!.finalSummary || null,
+        finalSummary: result.analysis!.meetingPrepSummary || null, // Map meetingPrepSummary to finalSummary
+        // MVP2 fields left null for now
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       update: {
-        fitScore: result.analysis!.fitScore,
-        painAlignmentScore: result.analysis!.painAlignmentScore,
-        workflowFitScore: result.analysis!.workflowFitScore,
-        urgencyScore: result.analysis!.urgencyScore,
-        adoptionBarrierScore: result.analysis!.adoptionBarrierScore,
-        risks: result.analysis!.risks.length > 0 ? result.analysis!.risks : null,
-        opportunities: result.analysis!.opportunities.length > 0 ? result.analysis!.opportunities : null,
         recommendedTalkTrack: result.analysis!.recommendedTalkTrack || null,
-        recommendedSequence: result.analysis!.recommendedSequence || null,
-        recommendedLeadSource: result.analysis!.recommendedLeadSource || null,
-        finalSummary: result.analysis!.finalSummary || null,
+        finalSummary: result.analysis!.meetingPrepSummary || null,
         updatedAt: new Date(),
       },
     });

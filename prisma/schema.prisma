@@ -131,6 +131,7 @@ model bd_intels {
 model contact_analyses {
   id                    String   @id @default(cuid())
   contactId             String   @unique
+  // MVP2 fields (full BD intelligence scoring)
   fitScore              Int?
   painAlignmentScore    Int?
   workflowFitScore      Int?
@@ -138,10 +139,12 @@ model contact_analyses {
   adoptionBarrierScore  Int?
   risks                 Json?
   opportunities         Json?
-  recommendedTalkTrack  String? // How to speak with THIS person
   recommendedSequence   String? // Outreach sequence for THIS person
   recommendedLeadSource String?
-  finalSummary          String? // Prep summary for meeting
+  // MVP1 fields (simple meeting prep)
+  recommendedTalkTrack  String? // How to speak with THIS person (MVP1 key field)
+  whatTheyMightWant     String? // What they might want (MVP1)
+  finalSummary          String? // Prep summary for meeting (MVP1 - can use as meetingPrepSummary)
   createdAt             DateTime @default(now())
   updatedAt             DateTime
   contacts              Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)

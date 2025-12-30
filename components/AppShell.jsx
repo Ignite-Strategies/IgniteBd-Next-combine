@@ -21,7 +21,6 @@ const ROUTES_WITH_SIDEBAR = [
   '/events',
   '/meetings',
   '/insights',
-  '/bd-intelligence',
   '/settings',
   '/client-operations',
   '/workpackages',

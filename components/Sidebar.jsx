@@ -6,7 +6,6 @@ import {
   TrendingUp,
   UserCircle,
   Package,
-  Brain,
   Users,
   MessageSquare,
   GitBranch,
@@ -39,9 +38,7 @@ function Sidebar() {
     {
       name: 'Growth Ops',
       items: [
-        { key: 'products', label: 'Products', href: '/products', icon: Package },
         { key: 'personas', label: 'Personas', href: '/personas', icon: UserCircle },
-        { key: 'bd-intelligence', label: 'BD Intelligence', href: '/bd-intelligence', icon: Brain },
       ],
     },
     {
