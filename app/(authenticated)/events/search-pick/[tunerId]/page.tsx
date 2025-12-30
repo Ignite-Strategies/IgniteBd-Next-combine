@@ -69,9 +69,34 @@ function SearchPickPageContent() {
   const [likedEventIds, setLikedEventIds] = useState<Set<string>>(new Set());
   const [liking, setLiking] = useState<{ [key: string]: boolean }>({});
 
+  // Load generated events from localStorage first (following OpenAI pattern)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const tempData = localStorage.getItem('tempPickedEvents');
+    if (tempData) {
+      try {
+        const data = JSON.parse(tempData);
+        if (data.tunerId === tunerId) {
+          // Use data from localStorage
+          setEventsByTimeFrame(data.eventsByTimeFrame || {});
+          setSummary(data.summary || '');
+          setLoading(false);
+          
+          // Clean up after using
+          localStorage.removeItem('tempPickedEvents');
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to parse temp picked events:', err);
+      }
+    }
+    
+    // If no localStorage data, load from API
     if (tunerId && companyHQId) {
       loadPickedEvents();
+    } else {
+      setLoading(false);
     }
   }, [tunerId, companyHQId]);
 
