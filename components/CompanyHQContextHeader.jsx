@@ -154,6 +154,7 @@ export function CompanyHQContextHeader() {
                       </div>
                       {memberships.map((membership) => {
                         const isActive = membership.companyHqId === companyHQId;
+                        const companyHQ = membership.company_hqs || membership.companyHQ || null;
                         return (
                           <button
                             key={membership.companyHqId}
@@ -165,10 +166,10 @@ export function CompanyHQContextHeader() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="font-medium text-gray-900">
-                                  {membership.company_hqs.companyName}
+                                  {companyHQ?.companyName || 'Unnamed Company'}
                                 </div>
                                 <div className="text-xs text-gray-500 mt-0.5">
-                                  {membership.company_hqs.companyIndustry || 'No industry'}
+                                  {companyHQ?.companyIndustry || 'No industry'}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">

@@ -22,7 +22,7 @@ function Sidebar() {
   const searchParams = useSearchParams();
   
   // Get companyHQId from URL params first, then localStorage fallback
-  const [companyHQId, setCompanyHQId] = useState<string>('');
+  const [companyHQId, setCompanyHQId] = useState('');
   
   useEffect(() => {
     if (typeof window === 'undefined') return;
