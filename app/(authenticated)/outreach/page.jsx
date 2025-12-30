@@ -227,7 +227,16 @@ function OutreachContent() {
               </div>
               <button
                 type="button"
-                onClick={() => router.push('/outreach/compose')}
+                onClick={() => {
+                  // Get companyHQId from localStorage and pass it in URL
+                  const companyHQId = typeof window !== 'undefined' 
+                    ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') || ''
+                    : '';
+                  const url = companyHQId 
+                    ? `/outreach/compose?companyHQId=${companyHQId}`
+                    : '/outreach/compose';
+                  router.push(url);
+                }}
                 className="self-start rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 Compose Email →

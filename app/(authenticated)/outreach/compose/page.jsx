@@ -15,8 +15,32 @@ function ComposeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Read companyHQId DIRECTLY from URL params
-  const companyHQId = searchParams?.get('companyHQId') || '';
+  // Read companyHQId from URL params, with fallback to localStorage
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+  const [companyHQId, setCompanyHQId] = useState(urlCompanyHQId);
+  const hasRedirectedRef = useRef(false);
+  
+  // Fallback: If not in URL, check localStorage and redirect (preserving all existing params)
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    if (urlCompanyHQId) {
+      setCompanyHQId(urlCompanyHQId);
+      return;
+    }
+    
+    // No companyHQId in URL - check localStorage
+    if (typeof window === 'undefined') return;
+    
+    const storedCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    if (storedCompanyHQId) {
+      hasRedirectedRef.current = true;
+      // Preserve all existing search params and add companyHQId
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('companyHQId', storedCompanyHQId);
+      router.replace(currentUrl.pathname + currentUrl.search);
+      setCompanyHQId(storedCompanyHQId);
+    }
+  }, [urlCompanyHQId, router]);
   
   // Direct read from localStorage for ownerId - needed for payload (not auth)
   const [ownerId, setOwnerId] = useState(null);

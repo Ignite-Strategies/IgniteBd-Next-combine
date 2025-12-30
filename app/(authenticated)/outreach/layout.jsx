@@ -5,11 +5,29 @@ import {
   useEffect,
   useMemo,
   useState,
+  Suspense,
 } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { OutreachContext } from './OutreachContext';
 
-export default function OutreachLayout({ children }) {
+function OutreachLayoutContent({ children }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Auto-redirect if companyHQId missing from URL but exists in localStorage
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+      if (stored) {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('companyHQId', stored);
+        router.replace(currentUrl.pathname + currentUrl.search);
+      }
+    }
+  }, [companyHQId, router]);
+  
   const [campaigns, setCampaigns] = useState([]);
   const [hydrating, setHydrating] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -64,4 +82,12 @@ export default function OutreachLayout({ children }) {
   );
 
   return <OutreachContext.Provider value={value}>{children}</OutreachContext.Provider>;
+}
+
+export default function OutreachLayout({ children }) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OutreachLayoutContent>{children}</OutreachLayoutContent>
+    </Suspense>
+  );
 }
