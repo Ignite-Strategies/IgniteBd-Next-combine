@@ -15,7 +15,9 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const { personaId } = params || {};
+    // Handle async params (Next.js 15)
+    const resolvedParams = params && typeof params.then === 'function' ? await params : params;
+    const { personaId } = resolvedParams || {};
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId') || DEFAULT_COMPANY_HQ_ID;
 

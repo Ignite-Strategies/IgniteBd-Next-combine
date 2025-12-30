@@ -69,13 +69,13 @@ function PersonaBuilderContent({ searchParams }) {
 
   // Load existing persona if editing
   useEffect(() => {
-    if (!personaId) return;
+    if (!personaId || !companyHQId) return;
 
     const loadPersona = async () => {
       setLoading(true);
       setError('');
       try {
-        const response = await api.get(`/api/personas/${personaId}`);
+        const response = await api.get(`/api/personas/${personaId}?companyHQId=${companyHQId}`);
         const persona = response.data;
 
         if (!persona) {
@@ -96,18 +96,18 @@ function PersonaBuilderContent({ searchParams }) {
           potentialPitch: persona.potentialPitch || '',
           industry: persona.industry || '',
           companySize: persona.companySize || '',
-          company: persona.company || '',
+          company: persona.company || persona.companyType || '',
         });
       } catch (err) {
         console.error('Failed to load persona:', err);
-        setError(err.response?.data?.error || 'Failed to load persona');
+        setError(err.response?.data?.error || err.message || 'Failed to load persona');
       } finally {
         setLoading(false);
       }
     };
 
     loadPersona();
-  }, [personaId]);
+  }, [personaId, companyHQId]);
 
   // Generate persona (hydrate mode)
   const handleGenerate = async () => {

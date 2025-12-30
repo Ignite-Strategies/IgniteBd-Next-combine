@@ -381,10 +381,10 @@ function PersonasPageContent() {
                   </div>
                   <div className="flex items-center gap-3">
                   <Link
-                    href={`/personas/builder?personaId=${persona.id}`}
+                    href={companyHQId ? `/personas/${persona.id}?companyHQId=${companyHQId}` : `/personas/${persona.id}`}
                     className="text-sm font-semibold text-red-600 transition hover:text-red-700"
                   >
-                    Edit
+                    View
                   </Link>
                     <button
                       onClick={() => handleDelete(persona.id)}
