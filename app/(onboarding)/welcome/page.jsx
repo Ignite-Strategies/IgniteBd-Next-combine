@@ -76,6 +76,16 @@ export default function WelcomePage() {
             
             // ✅ MODE A — SINGLE MEMBERSHIP (AUTO-SELECT BUT STILL A CHOICE)
             if (memberships.length === 1) {
+              // First check if profile is complete (has firstName and lastName)
+              const hasProfile = !!(owner.firstName && owner.lastName);
+              
+              if (!hasProfile) {
+                // Profile incomplete - redirect to profile setup first
+                console.log('⚠️ Welcome: Profile incomplete - redirecting to profile setup');
+                router.push('/profilesetup');
+                return;
+              }
+              
               const companyHQId = memberships[0].companyHqId;
               const companyHQ = memberships[0].company_hqs;
               
@@ -108,6 +118,16 @@ export default function WelcomePage() {
             
             // ✅ MODE B — MULTIPLE MEMBERSHIPS (USER SELECTION REQUIRED)
             if (memberships.length > 1) {
+              // First check if profile is complete (has firstName and lastName)
+              const hasProfile = !!(owner.firstName && owner.lastName);
+              
+              if (!hasProfile) {
+                // Profile incomplete - redirect to profile setup first
+                console.log('⚠️ Welcome: Profile incomplete - redirecting to profile setup');
+                router.push('/profilesetup');
+                return;
+              }
+              
               // ❌ Do NOT persist companyHQId here
               // ❌ Do NOT auto-default
               // ✅ Use React state only
@@ -134,6 +154,16 @@ export default function WelcomePage() {
             
             // ✅ MODE C — NO MEMBERSHIPS (LEGACY FALLBACK)
             if (memberships.length === 0) {
+              // First check if profile is complete (has firstName and lastName)
+              const hasProfile = !!(owner.firstName && owner.lastName);
+              
+              if (!hasProfile) {
+                // Profile incomplete - redirect to profile setup first
+                console.log('⚠️ Welcome: Profile incomplete - redirecting to profile setup');
+                router.push('/profilesetup');
+                return;
+              }
+              
               if (owner.companyHQId) {
                 // ❌ Do NOT persist yet - wait for Continue click
                 // ✅ Auto-select for display only
@@ -161,9 +191,9 @@ export default function WelcomePage() {
                 setLoading(false);
                 return; // Show UI with Continue button
               } else {
-                // No memberships and no owner.companyHQId - redirect to company setup
-                console.log('⚠️ Welcome: No memberships and no owner.companyHQId - redirecting to company setup');
-                router.push('/company/profile');
+                // No memberships and no owner.companyHQId - redirect to company create-or-choose
+                console.log('⚠️ Welcome: No memberships and no owner.companyHQId - redirecting to company create-or-choose');
+                router.push('/company/create-or-choose');
                 return;
               }
             }

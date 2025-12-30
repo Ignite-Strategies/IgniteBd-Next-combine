@@ -92,11 +92,30 @@ export default function ProfileSetupPage() {
       const name = `${formData.firstName} ${formData.lastName}`.trim();
 
       // Update profile
-      await api.put(`/api/owner/${ownerId}/profile`, {
+      const profileResponse = await api.put(`/api/owner/${ownerId}/profile`, {
         firstName: formData.firstName,
         lastName: formData.lastName,
         name,
       });
+
+      // Update localStorage with new profile data
+      if (profileResponse.data?.owner) {
+        localStorage.setItem('owner', JSON.stringify(profileResponse.data.owner));
+      } else {
+        // Refresh owner data from localStorage if available
+        const storedOwner = localStorage.getItem('owner');
+        if (storedOwner) {
+          try {
+            const owner = JSON.parse(storedOwner);
+            owner.firstName = formData.firstName;
+            owner.lastName = formData.lastName;
+            owner.name = name;
+            localStorage.setItem('owner', JSON.stringify(owner));
+          } catch (e) {
+            console.warn('Failed to update owner in localStorage', e);
+          }
+        }
+      }
 
       // Check if company exists and is complete
       // Check both localStorage and owner hook data
@@ -113,10 +132,10 @@ export default function ProfileSetupPage() {
         companyIsComplete = !!(existingCompany?.companyName && existingCompany?.whatYouDo && existingCompany?.companyIndustry);
       }
       
-      // If no company or company is incomplete, redirect to company setup
+      // If no company or company is incomplete, redirect to company create-or-choose
       if (!existingCompanyId || !companyIsComplete) {
-        // Redirect to company profile page to complete setup
-        router.push('/company/profile');
+        // Redirect to company create-or-choose page (explainer with join or create)
+        router.push('/company/create-or-choose');
         return;
       }
 
