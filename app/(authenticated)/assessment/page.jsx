@@ -64,7 +64,7 @@ export default function AssessmentPage() {
     // Check for existing assessment - WAIT FOR AUTH
     const fetchExistingAssessment = async () => {
       // CRITICAL: Wait for auth to be ready before making API calls
-      if (!ownerId || !ownerHydrated) {
+      if (!ownerId) {
         return;
       }
       
@@ -97,7 +97,7 @@ export default function AssessmentPage() {
     };
 
     fetchExistingAssessment();
-  }, [ownerId, ownerHydrated]); // Wait for auth before fetching
+  }, [ownerId]); // Wait for ownerId before fetching
 
   const handleChange = (e) => {
     const { name, value } = e.target;
