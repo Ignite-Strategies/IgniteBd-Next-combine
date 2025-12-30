@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useEffect, Suspense, useRef } from 'react';
+import { useMemo, useEffect, Suspense, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Mail, Users } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCompanyHydration } from '@/hooks/useCompanyHydration';
+import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 
 const SetupWizard = dynamic(() => import('@/components/SetupWizard'), {
   ssr: false,
@@ -16,16 +17,36 @@ function GrowthDashboardPageContent() {
   const companyHQId = searchParams?.get('companyHQId') || '';
   const hasRedirectedRef = useRef(false);
   
-  // Redirect logic: URL param is the source of truth - if missing, go to welcome
+  // Option B: URL params primary, localStorage fallback
+  // If missing from URL, check localStorage and add to URL
+  // If neither exists, show error instead of redirecting
+  const [missingCompanyKey, setMissingCompanyKey] = useState(false);
+  
   useEffect(() => {
-    // Prevent multiple redirects
     if (hasRedirectedRef.current) return;
     
-    if (!companyHQId && typeof window !== 'undefined') {
-      // No companyHQId in URL - redirect to welcome where it gets set
-      hasRedirectedRef.current = true;
-      router.push('/welcome');
+    if (typeof window === 'undefined') return;
+    
+    // If URL has companyHQId, we're good
+    if (companyHQId) {
+      setMissingCompanyKey(false);
+      return;
     }
+    
+    // URL doesn't have companyHQId - check localStorage (Option B fallback)
+    const stored = localStorage.getItem('companyHQId');
+    if (stored) {
+      // Add companyHQId to URL from localStorage
+      hasRedirectedRef.current = true;
+      console.log(`🔄 Dashboard: Adding companyHQId from localStorage to URL: ${stored}`);
+      router.replace(`/growth-dashboard?companyHQId=${stored}`);
+      return;
+    }
+    
+    // Neither URL nor localStorage has companyHQId - show error
+    hasRedirectedRef.current = true;
+    console.warn('⚠️ Dashboard: No companyHQId in URL or localStorage');
+    setMissingCompanyKey(true);
   }, [companyHQId, router]);
 
   // Log CompanyHQ from URL params and confirm it's set
@@ -64,6 +85,11 @@ function GrowthDashboardPageContent() {
     // Filter by companyHQId if needed (contacts should already be filtered by companyHQId from the API)
     return contactsArray.length;
   }, [contacts]);
+
+  // Show error if company key is missing
+  if (missingCompanyKey) {
+    return <CompanyKeyMissingError />;
+  }
 
   // Show loading screen only if we have no cached data
   if (loading && !hydrated) {

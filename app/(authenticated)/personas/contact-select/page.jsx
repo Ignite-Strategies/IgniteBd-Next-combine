@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, User, Building2, ArrowRight } from 'lucide-react';
+import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
 
 function ContactSelectPageContent() {
@@ -16,16 +17,36 @@ function ContactSelectPageContent() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(null);
+  const [missingCompanyKey, setMissingCompanyKey] = useState(false);
 
-  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
-  // NO localStorage fallback - if missing, go to welcome where it gets set
+  // Option B: URL params primary, localStorage fallback
+  // If missing from URL, check localStorage and add to URL
+  // If neither exists, show error instead of redirecting
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     
-    if (!companyHQId && typeof window !== 'undefined') {
-      hasRedirectedRef.current = true;
-      router.push('/welcome');
+    if (typeof window === 'undefined') return;
+    
+    // If URL has companyHQId, we're good
+    if (companyHQId) {
+      setMissingCompanyKey(false);
+      return;
     }
+    
+    // URL doesn't have companyHQId - check localStorage (Option B fallback)
+    const stored = localStorage.getItem('companyHQId');
+    if (stored) {
+      // Add companyHQId to URL from localStorage
+      hasRedirectedRef.current = true;
+      console.log(`🔄 Contact Select: Adding companyHQId from localStorage to URL: ${stored}`);
+      router.replace(`/personas/contact-select?companyHQId=${stored}`);
+      return;
+    }
+    
+    // Neither URL nor localStorage has companyHQId - show error
+    hasRedirectedRef.current = true;
+    console.warn('⚠️ Contact Select: No companyHQId in URL or localStorage');
+    setMissingCompanyKey(true);
   }, [companyHQId, router]);
 
   // Log CompanyHQ from URL params
@@ -87,6 +108,11 @@ function ContactSelectPageContent() {
     if (!selectedContactId) return;
     router.push(`/personas/from-contact?contactId=${selectedContactId}${companyHQId ? `&companyHQId=${companyHQId}` : ''}`);
   };
+
+  // Show error if company key is missing
+  if (missingCompanyKey) {
+    return <CompanyKeyMissingError />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

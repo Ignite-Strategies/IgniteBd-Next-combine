@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
+import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import { Search, RefreshCw, Linkedin, X, Save, CheckCircle, User, ArrowRight, Mail } from 'lucide-react';
 
 function LinkedInEnrichContent() {
@@ -19,6 +20,7 @@ function LinkedInEnrichContent() {
   const [saving, setSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedContactId, setSavedContactId] = useState(null);
+  const [missingCompanyKey, setMissingCompanyKey] = useState(false);
 
   // Log CompanyHQ from URL params
   useEffect(() => {
@@ -30,13 +32,13 @@ function LinkedInEnrichContent() {
     }
   }, [companyHQId]);
 
-  // Redirect if no companyHQId in URL - URL param is the ONLY source of truth
-  // NO localStorage fallback - if missing, go to welcome where it gets set
-  // Add small delay to let searchParams load
+  // Option B: URL params primary, localStorage fallback
+  // If missing from URL, check localStorage and add to URL
+  // If neither exists, show error instead of redirecting
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     
-    const checkAndRedirect = () => {
+    const checkAndSetError = () => {
       if (typeof window === 'undefined') return;
       
       // Check if URL actually has companyHQId
@@ -45,17 +47,28 @@ function LinkedInEnrichContent() {
       
       // If URL has companyHQId or searchParams has it, we're good
       if (urlHasCompanyHQId || companyHQId) {
-        return; // No redirect needed
+        setMissingCompanyKey(false);
+        return; // No error needed
       }
       
-      // URL truly doesn't have companyHQId - redirect to welcome
+      // URL doesn't have companyHQId - check localStorage (Option B fallback)
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        // Add companyHQId to URL from localStorage
+        hasRedirectedRef.current = true;
+        console.log(`🔄 LinkedIn Enrich: Adding companyHQId from localStorage to URL: ${stored}`);
+        router.replace(`/contacts/enrich/linkedin?companyHQId=${stored}`);
+        return;
+      }
+      
+      // Neither URL nor localStorage has companyHQId - show error
       hasRedirectedRef.current = true;
-      console.warn('⚠️ LinkedIn Enrich: No companyHQId in URL - redirecting to welcome');
-      router.push('/welcome');
+      console.warn('⚠️ LinkedIn Enrich: No companyHQId in URL or localStorage');
+      setMissingCompanyKey(true);
     };
     
     // Small delay to let searchParams load
-    const timeoutId = setTimeout(checkAndRedirect, 100);
+    const timeoutId = setTimeout(checkAndSetError, 100);
     return () => clearTimeout(timeoutId);
   }, [companyHQId, router]);
 
@@ -75,18 +88,42 @@ function LinkedInEnrichContent() {
         linkedinUrl: url,
       });
 
+      console.log('📥 API Response:', response.data);
+
       if (response.data?.success) {
-        setEnrichmentData({
-          rawEnrichmentPayload: response.data.rawApolloResponse || response.data.rawEnrichmentPayload,
-          normalizedContact: response.data.enrichedData?.normalizedContact || response.data.normalizedContact,
-          normalizedCompany: response.data.enrichedData?.normalizedCompany || response.data.normalizedCompany,
+        // API returns: enrichedProfile (NormalizedContactData), rawApolloResponse, redisKey
+        const enrichedProfile = response.data.enrichedProfile || {};
+        const rawApolloResponse = response.data.rawApolloResponse;
+        
+        console.log('✅ Apollo enrichment successful:', {
+          enrichedProfile,
+          hasRawResponse: !!rawApolloResponse,
+          firstName: enrichedProfile.firstName,
+          lastName: enrichedProfile.lastName,
+          email: enrichedProfile.email,
+          title: enrichedProfile.title,
+          companyName: enrichedProfile.companyName,
         });
-        console.log('✅ Apollo enrichment successful');
+
+        // Set enrichment data - enrichedProfile IS the normalized contact data
+        const enrichmentDataToSet = {
+          rawEnrichmentPayload: rawApolloResponse,
+          normalizedContact: enrichedProfile, // enrichedProfile contains firstName, lastName, email, etc.
+          normalizedCompany: {
+            companyName: enrichedProfile.companyName,
+            companyDomain: enrichedProfile.companyDomain,
+          },
+        };
+        
+        console.log('📦 Setting enrichment data:', enrichmentDataToSet);
+        setEnrichmentData(enrichmentDataToSet);
+        console.log('✅ Enrichment data state updated');
       } else {
         alert(response.data?.error || 'Enrichment failed');
       }
     } catch (err) {
       console.error('❌ Enrichment error:', err);
+      console.error('❌ Error response:', err.response?.data);
       alert(err.response?.data?.error || err.message || 'Enrichment failed');
     } finally {
       setLoading(false);
@@ -172,6 +209,11 @@ function LinkedInEnrichContent() {
     }
   }
 
+  // Show error if company key is missing
+  if (missingCompanyKey) {
+    return <CompanyKeyMissingError />;
+  }
+
   return (
     <div className="py-10">
       <div className="mx-auto max-w-4xl px-6">
@@ -202,8 +244,18 @@ function LinkedInEnrichContent() {
           </button>
         </div>
 
+        {/* Debug: Show enrichment data state */}
+        {process.env.NODE_ENV === 'development' && enrichmentData && (
+          <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+            <strong>Debug:</strong> enrichmentData exists: {JSON.stringify({
+              hasNormalizedContact: !!enrichmentData.normalizedContact,
+              normalizedContactKeys: enrichmentData.normalizedContact ? Object.keys(enrichmentData.normalizedContact) : [],
+            })}
+          </div>
+        )}
+
         {/* Enrichment Results */}
-        {enrichmentData && enrichmentData.normalizedContact && (
+        {enrichmentData && enrichmentData.normalizedContact && Object.keys(enrichmentData.normalizedContact).length > 0 && (
           <div className="bg-white p-5 rounded-lg shadow border mb-6">
             <div className="flex justify-between mb-4">
               <h2 className="font-semibold text-lg">Enrichment Results</h2>

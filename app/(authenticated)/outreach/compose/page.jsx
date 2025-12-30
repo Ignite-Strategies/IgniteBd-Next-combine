@@ -6,6 +6,7 @@ import { Send, Mail, Loader2, CheckCircle2, Plus, X, Info, ChevronDown, ChevronU
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
+import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
 import { useOwner } from '@/hooks/useOwner';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
@@ -66,7 +67,9 @@ function ComposeContent() {
   
   // Option B: URL params primary, localStorage fallback
   // If missing from URL, check localStorage and add to URL
-  // If neither exists, redirect to welcome
+  // If neither exists, show error instead of redirecting
+  const [missingCompanyKey, setMissingCompanyKey] = useState(false);
+  
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     
@@ -74,6 +77,7 @@ function ComposeContent() {
     
     // If URL has companyHQId, we're good
     if (companyHQId) {
+      setMissingCompanyKey(false);
       return;
     }
     
@@ -87,10 +91,10 @@ function ComposeContent() {
       return;
     }
     
-    // Neither URL nor localStorage has companyHQId - redirect to welcome
+    // Neither URL nor localStorage has companyHQId - show error
     hasRedirectedRef.current = true;
-    console.warn('⚠️ Outreach Compose: No companyHQId in URL or localStorage - redirecting to welcome');
-    router.push('/welcome');
+    console.warn('⚠️ Outreach Compose: No companyHQId in URL or localStorage');
+    setMissingCompanyKey(true);
   }, [companyHQId, router]);
 
   // Log CompanyHQ from URL params
@@ -432,6 +436,11 @@ function ComposeContent() {
       setSending(false);
     }
   };
+
+  // Show error if company key is missing
+  if (missingCompanyKey) {
+    return <CompanyKeyMissingError />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
