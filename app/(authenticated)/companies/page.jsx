@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Plus, Check, X } from 'lucide-react';
+import { Building2, Plus, Check, X, Sparkles } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import { useOwner } from '@/hooks/useOwner';
@@ -19,9 +19,11 @@ export default function CompanyHubPage() {
   const [selectedContactId, setSelectedContactId] = useState(null);
   const [selectedContact, setSelectedContact] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const [success, setSuccess] = useState(false);
   const [createdCompany, setCreatedCompany] = useState(null);
   const [error, setError] = useState(null);
+  const [autoEnrich, setAutoEnrich] = useState(true);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -67,6 +69,16 @@ export default function CompanyHubPage() {
           }
         }
 
+        // Auto-enrich if website/domain is provided and auto-enrich is enabled
+        if (autoEnrich && (website.trim() || newCompany.website || newCompany.domain)) {
+          try {
+            await handleEnrichCompany(newCompany.id, website.trim() || newCompany.website || newCompany.domain);
+          } catch (enrichError) {
+            console.error('Auto-enrichment failed:', enrichError);
+            // Don't fail the whole operation - user can enrich manually
+          }
+        }
+
         setSuccess(true);
         // Reset form
         setCompanyName('');
@@ -89,6 +101,44 @@ export default function CompanyHubPage() {
   const handleContactSelect = (contact, company) => {
     setSelectedContactId(contact?.id || null);
     setSelectedContact(contact);
+  };
+
+  const handleEnrichCompany = async (companyId, websiteOrDomain) => {
+    setEnriching(true);
+    setError(null);
+
+    try {
+      // Extract domain from website if it's a URL
+      let domain = websiteOrDomain;
+      if (websiteOrDomain && websiteOrDomain.includes('://')) {
+        try {
+          const url = new URL(websiteOrDomain);
+          domain = url.hostname.replace(/^www\./, '');
+        } catch {
+          // If URL parsing fails, try to extract domain manually
+          domain = websiteOrDomain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+        }
+      }
+
+      const response = await api.post('/api/companies/enrich', {
+        companyId,
+        domain: domain,
+        website: websiteOrDomain?.includes('://') ? websiteOrDomain : undefined,
+      });
+
+      if (response.data?.success && response.data.company) {
+        setCreatedCompany(response.data.company);
+        return response.data.company;
+      } else {
+        throw new Error(response.data?.error || 'Enrichment failed');
+      }
+    } catch (err) {
+      console.error('Failed to enrich company:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to enrich company');
+      throw err;
+    } finally {
+      setEnriching(false);
+    }
   };
 
   const handleReset = () => {
@@ -140,6 +190,70 @@ export default function CompanyHubPage() {
                 <strong>{createdCompany.companyName}</strong> has been created successfully.
                 {selectedContactId && ' It has been associated with the selected contact.'}
               </p>
+              
+              {/* Show enrichment status if available */}
+              {createdCompany.companyHealthScore !== null && createdCompany.companyHealthScore !== undefined && (
+                <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-semibold text-blue-900">Company Enriched</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-blue-700">Health Score:</span>
+                      <span className="ml-2 font-semibold text-blue-900">{createdCompany.companyHealthScore}/100</span>
+                    </div>
+                    {createdCompany.growthScore !== null && (
+                      <div>
+                        <span className="text-blue-700">Growth Score:</span>
+                        <span className="ml-2 font-semibold text-blue-900">{createdCompany.growthScore}/100</span>
+                      </div>
+                    )}
+                    {createdCompany.headcount && (
+                      <div>
+                        <span className="text-blue-700">Headcount:</span>
+                        <span className="ml-2 font-semibold text-blue-900">{createdCompany.headcount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {createdCompany.revenue && (
+                      <div>
+                        <span className="text-blue-700">Revenue:</span>
+                        <span className="ml-2 font-semibold text-blue-900">
+                          ${(createdCompany.revenue / 1000000).toFixed(1)}M
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Enrich button if not enriched yet */}
+              {(!createdCompany.companyHealthScore && (createdCompany.website || createdCompany.domain)) && (
+                <div className="mb-6">
+                  <button
+                    type="button"
+                    onClick={() => handleEnrichCompany(createdCompany.id, createdCompany.website || createdCompany.domain)}
+                    disabled={enriching}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {enriching ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Enriching...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-5 w-5" />
+                        Enrich Company with Intelligence Data
+                      </>
+                    )}
+                  </button>
+                  <p className="mt-2 text-sm text-gray-500 text-center">
+                    Get health scores, growth metrics, and company intelligence
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-center gap-4">
                 <button
                   type="button"
@@ -208,20 +322,39 @@ export default function CompanyHubPage() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="website" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Website
-                  </label>
+              <div>
+                <label htmlFor="website" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Website
+                </label>
+                <input
+                  type="url"
+                  id="website"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com"
+                  disabled={creating}
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Provide a website to automatically enrich company data (health scores, growth metrics, etc.)
+                </p>
+              </div>
+
+              {website.trim() && (
+                <div className="flex items-center gap-2 rounded-lg bg-purple-50 border border-purple-200 p-3">
                   <input
-                    type="url"
-                    id="website"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://example.com"
+                    type="checkbox"
+                    id="autoEnrich"
+                    checked={autoEnrich}
+                    onChange={(e) => setAutoEnrich(e.target.checked)}
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                     disabled={creating}
                   />
+                  <label htmlFor="autoEnrich" className="text-sm text-purple-900 cursor-pointer">
+                    Automatically enrich company after creation (recommended)
+                  </label>
                 </div>
+              )}
               </div>
 
               <div>

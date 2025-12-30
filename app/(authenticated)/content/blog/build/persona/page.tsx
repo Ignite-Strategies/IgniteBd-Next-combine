@@ -32,6 +32,13 @@ export default function BlogBuildPersonaPage() {
   const loadPersonas = async () => {
     try {
       setLoading(true);
+      
+      // Guard for client-side only
+      if (typeof window === 'undefined') {
+        setLoading(false);
+        return;
+      }
+      
       const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
       
       if (!companyHQId) {
@@ -70,6 +77,13 @@ export default function BlogBuildPersonaPage() {
 
     try {
       setGenerating(true);
+      
+      // Guard for client-side only
+      if (typeof window === 'undefined') {
+        setError('This action requires a browser environment');
+        setGenerating(false);
+        return;
+      }
       
       const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
       
@@ -138,6 +152,12 @@ export default function BlogBuildPersonaPage() {
   const handleSave = async () => {
     if (!generatedBlogDraft) return;
 
+    // Guard for client-side only
+    if (typeof window === 'undefined') {
+      setError('This action requires a browser environment');
+      return;
+    }
+
     const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
     
     if (!companyHQId) {
@@ -167,7 +187,7 @@ export default function BlogBuildPersonaPage() {
         const savedBlog = createResponse.data.blog;
         
         // 🎯 LOCAL-FIRST: Save to localStorage
-        if (typeof window !== 'undefined' && companyHQId) {
+        if (companyHQId && typeof window !== 'undefined') {
           try {
             const cachedKey = `blogs_${companyHQId}`;
             const cached = localStorage.getItem(cachedKey);

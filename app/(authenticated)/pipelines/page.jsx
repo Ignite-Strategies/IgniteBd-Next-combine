@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader.jsx';
 import { usePipelinesContext } from './PipelinesContext';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
+import { getValidatedContactsCache } from '@/lib/utils/validateContactsCache';
 
 const FALLBACK_PIPELINES = {
   unassigned: [],
@@ -50,43 +51,41 @@ export default function PipelinesPage() {
   const [activePipeline, setActivePipeline] = useState(pipelineKeys[0] ?? 'prospect');
   const [selectedStage, setSelectedStage] = useState(null); // null = show all stages
 
-  // Load contacts from localStorage first, then optionally fetch from API
+  // Load contacts with validation - only use cache if valid for current company
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !companyHQId) return;
 
-    // Step 1: Load from localStorage for quick display
-    const cached = window.localStorage.getItem('contacts');
-    if (cached) {
+    // Use validation utility to safely get cached contacts
+    const cacheResult = getValidatedContactsCache(companyHQId);
+    
+    if (cacheResult.isValid && cacheResult.contacts.length > 0) {
+      console.log('✅ Using validated contacts cache for pipelines:', cacheResult.contacts.length);
+      setContacts(cacheResult.contacts);
+    } else {
+      // Invalid or empty cache - fetch from API
+      console.log('⚠️ Contacts cache invalid, fetching from API');
+      setContacts([]);
+    }
+
+    // Always fetch from API to get latest data (validates and updates cache)
+    const fetchContacts = async () => {
+      setContactsHydrating(true);
       try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          setContacts(parsed);
+        const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+        if (response.data?.success && Array.isArray(response.data.contacts)) {
+          setContacts(response.data.contacts);
+          // Update localStorage with validated data
+          window.localStorage.setItem('contacts', JSON.stringify(response.data.contacts));
         }
       } catch (error) {
-        console.warn('Failed to parse cached contacts', error);
+        console.warn('Failed to fetch contacts from API', error);
+        // Don't use stale cache if API fails - keep empty array
+      } finally {
+        setContactsHydrating(false);
       }
-    }
+    };
 
-    // Step 2: Fetch from API to get latest data (optional background refresh)
-    if (companyHQId) {
-      const fetchContacts = async () => {
-        setContactsHydrating(true);
-        try {
-          const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
-          if (response.data?.success && Array.isArray(response.data.contacts)) {
-            setContacts(response.data.contacts);
-            // Update localStorage
-            window.localStorage.setItem('contacts', JSON.stringify(response.data.contacts));
-          }
-        } catch (error) {
-          console.warn('Failed to fetch contacts from API, using cache', error);
-        } finally {
-          setContactsHydrating(false);
-        }
-      };
-
-      fetchContacts();
-    }
+    fetchContacts();
   }, [companyHQId]);
 
   const contactsByPipeline = useMemo(() => {

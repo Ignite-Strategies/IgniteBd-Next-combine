@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import api from '@/lib/api';
+import { wipeTenantData } from '@/lib/localStorageWiper';
 
 /**
  * Welcome Page - Company Selection + Routing
@@ -115,27 +116,43 @@ export default function WelcomePage() {
       );
       
       if (selectedMembership) {
-        // Update localStorage with selected company
-        localStorage.setItem('companyHQId', selectedCompanyHqId);
-        if (selectedMembership.companyHQ) {
-          localStorage.setItem('companyHQ', JSON.stringify(selectedMembership.companyHQ));
+        // Get current companyHQId to check if we're switching
+        const currentCompanyHQId = typeof window !== 'undefined' 
+          ? localStorage.getItem('companyHQId') 
+          : null;
+        
+        // If switching to a different company, wipe tenant data first
+        if (currentCompanyHQId && currentCompanyHQId !== selectedCompanyHqId) {
+          console.log(`🔄 Switching tenant from ${currentCompanyHQId} to ${selectedCompanyHqId} - wiping tenant data...`);
+          wipeTenantData({ 
+            preserveCompanyHQ: false,
+            newCompanyHQId: selectedCompanyHqId 
+          });
         }
         
-        // Update owner object in localStorage with selected companyHQ
-        const storedOwner = localStorage.getItem('owner');
-        if (storedOwner) {
-          try {
-            const owner = JSON.parse(storedOwner);
-            owner.companyHQId = selectedCompanyHqId;
-            owner.companyHQ = selectedMembership.companyHQ;
-            localStorage.setItem('owner', JSON.stringify(owner));
-          } catch (err) {
-            console.warn('Failed to update owner in localStorage', err);
+        // Update localStorage with selected company
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('companyHQId', selectedCompanyHqId);
+          if (selectedMembership.companyHQ) {
+            localStorage.setItem('companyHQ', JSON.stringify(selectedMembership.companyHQ));
+          }
+          
+          // Update owner object in localStorage with selected companyHQ
+          const storedOwner = localStorage.getItem('owner');
+          if (storedOwner) {
+            try {
+              const owner = JSON.parse(storedOwner);
+              owner.companyHQId = selectedCompanyHqId;
+              owner.companyHQ = selectedMembership.companyHQ;
+              localStorage.setItem('owner', JSON.stringify(owner));
+            } catch (err) {
+              console.warn('Failed to update owner in localStorage', err);
+            }
           }
         }
         
         // Route to growth dashboard (no gating)
-          router.push('/growth-dashboard');
+        router.push('/growth-dashboard');
       }
     } else {
       // No memberships - go to onboarding flow

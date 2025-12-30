@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useCompanyHQ } from '@/hooks/useCompanyHQ';
 import api from '@/lib/api';
+import { getValidatedContactsCache } from '@/lib/utils/validateContactsCache';
 import { ContactsContext } from './ContactsContext';
 import { ContactListsContext } from './ContactListsContext';
 
@@ -22,23 +23,24 @@ export default function ContactsLayout({ children }) {
   const [listsHydrated, setListsHydrated] = useState(false);
   const [listsHydrating, setListsHydrating] = useState(false);
 
-  // Step 1: Check localStorage cache on mount for contacts
+  // Step 1: Check localStorage cache with validation (only when companyHQId is available)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !companyHQId) return;
 
-    const cached = window.localStorage.getItem('contacts');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          setContacts(parsed);
-          setHydrated(true);
-        }
-      } catch (error) {
-        console.warn('Failed to parse cached contacts', error);
-      }
+    // Use validation utility to safely get cached contacts
+    const cacheResult = getValidatedContactsCache(companyHQId);
+    
+    if (cacheResult.isValid && cacheResult.contacts.length > 0) {
+      console.log('✅ Using validated contacts cache:', cacheResult.contacts.length);
+      setContacts(cacheResult.contacts);
+      setHydrated(true);
+    } else {
+      // Invalid or empty cache - will be fetched by refreshContacts
+      console.log('⚠️ Contacts cache invalid or empty:', cacheResult.reason);
+      setContacts([]);
+      setHydrated(false);
     }
-  }, []);
+  }, [companyHQId]);
 
   // Step 1: Check localStorage cache on mount for contact lists
   useEffect(() => {
@@ -95,36 +97,16 @@ export default function ContactsLayout({ children }) {
     }
   }, [companyHQId]);
 
-  // Listen for companyHQId changes and auto-refresh contacts
+  // Auto-refresh contacts when companyHQId changes (if cache is invalid or empty)
   useEffect(() => {
     if (!companyHQId) return;
     
-    // Check if contacts in localStorage match current companyHQId
-    // If they don't match, clear and refresh
-    const cachedContacts = typeof window !== 'undefined' 
-      ? window.localStorage.getItem('contacts')
-      : null;
-    
-    if (cachedContacts) {
-      try {
-        const parsed = JSON.parse(cachedContacts);
-        // If we have cached contacts, check if they belong to this CompanyHQ
-        // If any contact has different crmId, we need to refresh
-        const hasMismatch = Array.isArray(parsed) && parsed.some(contact => 
-          contact.crmId && contact.crmId !== companyHQId
-        );
-        
-        if (hasMismatch) {
-          console.log('🔄 CompanyHQ changed, clearing stale contacts...');
-          setContacts([]);
-          setHydrated(false);
-          refreshContacts();
-        }
-      } catch (error) {
-        console.warn('Failed to check cached contacts:', error);
-      }
+    // If we don't have valid cached contacts, fetch from API
+    if (!hydrated || contacts.length === 0) {
+      console.log('🔄 Fetching contacts - no valid cache');
+      refreshContacts();
     }
-  }, [companyHQId, refreshContacts]);
+  }, [companyHQId, hydrated, contacts.length, refreshContacts]);
 
   // Listen for hydration events from CompanyHQ switch
   useEffect(() => {
