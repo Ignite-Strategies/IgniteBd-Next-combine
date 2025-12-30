@@ -25,7 +25,8 @@ function PersonasPageContent() {
   }, []);
   const [personas, setPersonas] = useState([]);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
+  const [hydrated, setHydrated] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showBuildOptions, setShowBuildOptions] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -63,27 +64,50 @@ function PersonasPageContent() {
     }
   }, [companyHQId, router]);
 
-  // Load personas from localStorage immediately (don't wait for auth)
+  // Auto-hydrate personas from API when companyHQId is available (like contacts)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Load from localStorage first for instant display (no auth required)
-    const cached = window.localStorage.getItem('personas');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          setPersonas(parsed);
-          setError(null);
-        }
-      } catch (error) {
-        console.warn('Failed to parse cached personas', error);
-      }
+    if (!companyHQId) {
+      setLoading(false);
+      setHydrated(false);
+      return;
     }
-  }, []); // Run once on mount
 
-  // No need to wait for auth hooks - we have companyHQId from URL and ownerId from localStorage
-  // Auto-fetch is disabled - user can manually sync if needed
+    const fetchPersonas = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        console.log('🔄 Auto-fetching personas for companyHQId:', companyHQId);
+        const response = await api.get(`/api/personas?companyHQId=${companyHQId}`);
+        
+        // Handle multiple response formats
+        let personasData = [];
+        if (Array.isArray(response.data)) {
+          personasData = response.data;
+        } else if (response.data?.success && Array.isArray(response.data.personas)) {
+          personasData = response.data.personas;
+        } else if (Array.isArray(response.data?.personas)) {
+          personasData = response.data.personas;
+        }
+        
+        setPersonas(personasData);
+        setHydrated(true);
+        setError(null);
+        
+        // Store in localStorage for quick access
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('personas', JSON.stringify(personasData));
+        }
+      } catch (err) {
+        console.error('Failed to fetch personas:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to load personas');
+        setHydrated(true); // Set hydrated even on error so UI can render
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPersonas();
+  }, [companyHQId]);
 
   // Check for success message in URL params
   useEffect(() => {
@@ -145,8 +169,16 @@ function PersonasPageContent() {
     try {
       const response = await api.get(`/api/personas?companyHQId=${companyHQId}`);
       
-      // API returns array directly
-      const personasData = Array.isArray(response.data) ? response.data : [];
+      // Handle multiple response formats
+      let personasData = [];
+      if (Array.isArray(response.data)) {
+        personasData = response.data;
+      } else if (response.data?.success && Array.isArray(response.data.personas)) {
+        personasData = response.data.personas;
+      } else if (Array.isArray(response.data?.personas)) {
+        personasData = response.data.personas;
+      }
+      
       setPersonas(personasData);
       
       // Store in localStorage
@@ -154,9 +186,10 @@ function PersonasPageContent() {
         window.localStorage.setItem('personas', JSON.stringify(personasData));
       }
       setError(null);
+      setHydrated(true);
     } catch (err) {
       console.error('Failed to sync personas:', err);
-      setError('Failed to sync personas. Please try again.');
+      setError(err.response?.data?.error || err.message || 'Failed to sync personas. Please try again.');
     } finally {
       setSyncing(false);
     }
@@ -210,8 +243,8 @@ function PersonasPageContent() {
         </div>
 
         {showSuccess && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5" />
+          <div className="mb-6 rounded-lg border-2 border-green-500 bg-green-50 p-4 text-base font-semibold text-green-800 flex items-center gap-3 shadow-sm">
+            <CheckCircle2 className="h-6 w-6 flex-shrink-0" />
             <span>Persona saved successfully!</span>
           </div>
         )}
@@ -296,32 +329,43 @@ function PersonasPageContent() {
           </div>
         )}
 
-        {personas.length === 0 && !showBuildOptions ? (
-          <div className="rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 p-12 text-center shadow-lg">
-            <div className="mb-6 flex justify-center">
-              <div className="rounded-full bg-red-100 p-6">
-                <span className="text-5xl">🧠</span>
-              </div>
-            </div>
-            <h2 className="mb-3 text-2xl font-bold text-gray-900">
-              Create Your First Persona
-            </h2>
-            <p className="mb-2 text-lg text-gray-700">
-              Personas help you understand your ideal buyers
-            </p>
-            <p className="mb-8 text-gray-600">
-              Define their goals, pain points, and how your offer aligns with their needs
-            </p>
-            <button
-              onClick={() => setShowBuildOptions(true)}
-              className="rounded-lg bg-red-600 px-8 py-3 text-lg font-semibold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg"
-            >
-              Get Started →
-            </button>
+        {/* Loading State */}
+        {loading && !hydrated && (
+          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+            <RefreshCw className="mx-auto h-8 w-8 animate-spin text-gray-500" />
+            <p className="mt-4 text-gray-600">Loading personas...</p>
           </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {personas.map((persona) => (
+        )}
+
+        {/* Personas List - Show when hydrated (even if empty) */}
+        {hydrated && !loading && (
+          <>
+            {personas.length === 0 && !showBuildOptions ? (
+              <div className="rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 p-12 text-center shadow-lg">
+                <div className="mb-6 flex justify-center">
+                  <div className="rounded-full bg-red-100 p-6">
+                    <span className="text-5xl">🧠</span>
+                  </div>
+                </div>
+                <h2 className="mb-3 text-2xl font-bold text-gray-900">
+                  Create Your First Persona
+                </h2>
+                <p className="mb-2 text-lg text-gray-700">
+                  Personas help you understand your ideal buyers
+                </p>
+                <p className="mb-8 text-gray-600">
+                  Define their goals, pain points, and how your offer aligns with their needs
+                </p>
+                <button
+                  onClick={() => setShowBuildOptions(true)}
+                  className="rounded-lg bg-red-600 px-8 py-3 text-lg font-semibold text-white shadow-md transition hover:bg-red-700 hover:shadow-lg"
+                >
+                  Get Started →
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {personas.map((persona) => (
               <div
                 key={persona.id}
                 className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition hover:border-red-300 hover:shadow-md"
@@ -422,6 +466,8 @@ function PersonasPageContent() {
               </div>
             ))}
           </div>
+            )}
+          </>
         )}
       </div>
     </div>
