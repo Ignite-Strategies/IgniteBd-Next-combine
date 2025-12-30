@@ -54,11 +54,18 @@ export async function GET(request) {
       prisma.personas.findMany({
         where: { companyHQId },
         include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              valueProp: true,
+          product_fits: {
+            include: {
+              products: {
+                select: {
+                  id: true,
+                  name: true,
+                  valueProp: true,
+                  description: true,
+                  price: true,
+                  priceCurrency: true,
+                },
+              },
             },
           },
         },

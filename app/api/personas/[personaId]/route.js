@@ -47,7 +47,7 @@ export async function GET(request, { params }) {
         },
         // bd_intels removed - migrating to contact_analyses
         // bd_intels: true,
-        companyHQ: {
+        company_hqs: {
           select: {
             id: true,
             companyName: true,
