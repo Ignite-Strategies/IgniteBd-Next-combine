@@ -122,12 +122,17 @@ export async function upsertContactWithDomain(
     crmId,
   };
 
-  // Upsert contact (create or update by email)
+  // Upsert contact (create or update by email + crmId composite unique constraint)
+  // CRITICAL: Use email_crmId composite constraint, not just email, so contacts can exist
+  // in multiple CompanyHQs (same email, different crmId)
   const { crmId: _, ...updateData } = upsertData; // Remove crmId from update data
   
   const contact = await prisma.contact.upsert({
     where: {
-      email: normalizedEmail,
+      email_crmId: {
+        email: normalizedEmail,
+        crmId: crmId,
+      },
     },
     update: {
       // Update all fields except crmId (tenant identifier shouldn't change on existing contacts)
