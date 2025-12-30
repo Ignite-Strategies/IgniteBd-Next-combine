@@ -24,106 +24,180 @@ export class PersonaMinimalPromptService {
   static buildPrompts(data: PreparedData, description?: string): PromptResult {
     const { contact, contactCompany, companyHQ } = data;
 
-    // System prompt: Explicit, deterministic, JSON-focused
-    const systemPrompt = `You are a deterministic business persona generator. You MUST strictly follow all formatting and content rules. If any rule conflicts, prioritize JSON correctness and rule compliance over writing quality. Return only valid JSON. Never include markdown code blocks, explanations, or any text outside the JSON object.`;
-
-    // Build contact context section from full records
-    let contactContext = '';
-    if (contact) {
-      const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-      // Use contactCompany if available, otherwise fall back to contact.companyName
-      const companyName = contactCompany?.companyName || contact.companyName || 'Not specified';
-      const industry = contactCompany?.industry || contact.companyIndustry || 'Not specified';
-      
-      contactContext = `=== CONTACT INFORMATION ===
-Name: ${fullName || 'Not specified'}
-Title: ${contact.title || 'Not specified'}
-Company: ${companyName}
-Industry: ${industry}`;
-    } else if (description) {
-      contactContext = `=== DESCRIPTION ===
-${description}`;
+    // Validate required data
+    if (!companyHQ) {
+      throw new Error('companyHQ is required for persona generation');
     }
 
-    // User prompt: Explicit format requirements matching template service pattern
-    const userPrompt = `You are an expert in business persona modeling. Your task is to generate a MINIMAL persona based on the provided context.
+    // System prompt: Persona inference, not data mapping
+    const systemPrompt = `You are a business persona inference engine. Your task is to infer a REUSABLE PERSONA MODEL from input signals. You are NOT preserving CRM data or mapping fields. You are creating an archetypal model that represents "who we are selling to" - not "who is in our database". Return only valid JSON. Never include markdown code blocks, explanations, or any text outside the JSON object.`;
 
-=== COMPANY CONTEXT (CRM) ===
-Company Name: ${companyHQ.companyName}
-Industry: ${companyHQ.companyIndustry || 'Not specified'}
-What We Do: ${companyHQ.whatYouDo || 'Not specified'}
+    // Build input signals section (these are WEAK SIGNALS for inference, not outputs)
+    let inputSignals = '';
+    if (contact) {
+      const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+      const contactCompanyName = contactCompany?.companyName || contact.companyName || 'Not specified';
+      const contactIndustry = contactCompany?.industry || contact.companyIndustry || 'Not specified';
+      
+      inputSignals = `=== INPUT SIGNALS (for inference only) ===
+Contact Name: ${fullName || 'Not specified'}
+Contact Title: ${contact.title || 'Not specified'}
+Contact Company: ${contactCompanyName}
+Contact Industry: ${contactIndustry}`;
+    } else if (description) {
+      inputSignals = `=== INPUT SIGNAL (for inference only) ===
+Description: ${description}`;
+    }
 
-${contactContext ? `${contactContext}\n` : ''}
+    // Company context (also a signal, not output)
+    const companyHQName = companyHQ.companyName || 'Not specified';
+    const companyHQIndustry = companyHQ.companyIndustry || 'Not specified';
+    const companyHQWhatYouDo = companyHQ.whatYouDo || 'Not specified';
 
-=== YOUR TASK ===
-Generate a minimal persona with just the essentials:
-1. **personName**: A clear identifier/archetype (e.g., "Compliance Manager", "Deputy Counsel", "Operations Director")
-   - Should be a role archetype, NOT the actual person's name
-   - Should reflect their function/role type
-2. **title**: Their job title/role (e.g., "Deputy Counsel", "Compliance Manager at X Firm")
-   - Can be more specific than personName
-   - Should reflect their actual or inferred title
-3. **company**: Company name or company type/archetype (e.g., "X Firm", "Mid-size Asset Manager", "B2B SaaS Company")
-   - Use actual company name if available, otherwise infer type
-4. **coreGoal**: Their main goal/north star
-   - MUST be exactly ONE sentence
-   - NO bullet points, NO semicolons
-   - Maximum ~25 words
-   - Should be a single, clear statement of their primary objective
-   - Should be role/industry-appropriate
-   - Should be actionable and specific
+    // User prompt: Persona inference philosophy
+    const userPrompt = `You are inferring a REUSABLE PERSONA MODEL. This is NOT CRM hydration and NOT data preservation.
+
+=== AUTHORITATIVE CONCEPT ===
+
+We are inferring a REUSABLE PERSONA MODEL.
+
+The persona should still make sense if:
+- the person changes jobs
+- the company name changes  
+- the specific contact disappears
+
+If the output resembles a real individual or exact employer, the persona is WRONG.
+
+=== INPUT SIGNALS (for inference only) ===
+
+CRM Context:
+Company: ${companyHQName}
+Industry: ${companyHQIndustry}
+What We Do: ${companyHQWhatYouDo}
+
+${inputSignals ? `${inputSignals}\n` : ''}
+
+=== RULES (NON-NEGOTIABLE) ===
+
+1. Contact name, exact title, and exact company name are NEVER the goal.
+   These fields exist ONLY to infer:
+   - role archetype
+   - company TYPE
+   - industry
+   - goals
+   - pain points
+   - product needs
+
+2. Literal reuse is allowed ONLY if it is already archetypal. Otherwise, GENERALIZE.
+
+   Examples of generalization:
+   - "Group Chief Compliance Officer" → "Chief Compliance Officer"
+   - "Gemcorp Capital" → "Global Asset Management Firm"
+   - "VP, Legal & Compliance" → "Compliance Leader"
+   - "John Smith" → NEVER use real names
+   - "Acme Corp" → "Mid-size B2B SaaS Company"
+
+3. OUTPUT IS A MODEL, NOT A RECORD
+
+   This output should feel like:
+   "Who we are selling to"
+   
+   NOT
+   "Who is in our database"
+
+4. THINKING MODE
+
+   Treat LinkedIn titles, company info, and CRM fields as WEAK SIGNALS.
+   Infer intent, responsibility, pressure, and incentives.
+   
+   If the output looks like it belongs on LinkedIn or in Salesforce, you FAILED.
+   If it looks like a slide titled "Target Persona: Compliance Leader at Asset Managers", you SUCCEEDED.
 
 === OUTPUT FORMAT ===
+
 CRITICAL: Return ONLY valid JSON in this exact format:
 {
-  "personName": "string (role archetype, e.g., 'Compliance Manager')",
-  "title": "string (job title/role, e.g., 'Deputy Counsel')",
-  "company": "string (company name or type, e.g., 'X Firm')",
-  "coreGoal": "string (one sentence describing their main goal/north star)"
+  "personName": "string",          // role archetype (never a real title string, never a person's name)
+  "title": "string",               // simplified / generalized role (NOT literal title)
+  "companyType": "string",         // abstracted company description (NOT literal company name)
+  "industry": "string",            // broad industry classification
+  "coreGoal": "string",            // one sentence, maximum ~25 words
+  "painPoints": ["string"],        // 3–5 inferred pains (array of strings)
+  "whatProductNeeds": "string"    // one sentence describing what product/service they need
 }
 
-=== PRIORITY RULES (CRITICAL) ===
-1. **Data Precedence**: If real contact or company data is provided, it MUST be used exactly as provided
-   - NEVER replace provided factual data with inferred data
-   - NEVER use archetyping when real data exists
-   - Inference or archetyping is allowed ONLY when data is missing or incomplete
-   - Example: If contact title is "Deputy Counsel", use "Deputy Counsel" - do NOT infer "Legal Manager"
+=== FIELD REQUIREMENTS ===
 
-2. **personName Semantics (CRITICAL)**:
-   - personName MUST be a role archetype label (e.g., "Compliance Manager", "Operations Director")
-   - NEVER use a real person's name (e.g., "John Smith" is INVALID)
-   - NEVER imply a specific individual
-   - Always return a role/archetype label that represents the function, not the person
+1. **personName**: Role archetype label. NEVER a real person's name. NEVER a literal job title. 
+   Examples: "Compliance Leader", "Operations Director", "Sales Executive", "Legal Counsel"
+   BAD: "John Smith", "Deputy Counsel", "VP of Sales at Acme"
 
-=== REQUIREMENTS ===
-1. **personName**: Must be a role archetype label, NEVER the actual contact's name or any individual identifier
-2. **title**: MUST use the contact's actual title if provided in context. Only infer if title is missing or "Not specified"
-3. **company**: MUST use the actual company name from context if provided. Only infer company type if company name is missing or "Not specified"
-4. **coreGoal**: 
-   - MUST be exactly ONE sentence
-   - NO bullet points
-   - NO semicolons
-   - Maximum ~25 words
-   - Specific to their role and industry context
-5. **All fields required**: Every field must have a non-empty string value
-6. **Be specific**: Avoid generic placeholders - use the context to infer realistic values when data is missing
+2. **title**: Simplified/generalized role. Generalize from input signals. Remove company-specific details.
+   Examples: "Chief Compliance Officer", "Operations Director", "Sales Leader"
+   BAD: "Group Chief Compliance Officer at Gemcorp Capital", "VP of Sales at Acme Corp"
+
+3. **companyType**: Abstracted company description. NEVER use literal company names.
+   Examples: "Global Asset Management Firm", "Mid-size B2B SaaS Company", "Enterprise Software Provider"
+   BAD: "Gemcorp Capital", "Acme Corp", "TechCorp"
+
+4. **industry**: Broad industry classification. Use standard industry categories.
+   Examples: "Asset Management", "Enterprise Software", "Financial Services", "Healthcare Technology"
+
+5. **coreGoal**: One sentence describing their primary objective. Maximum ~25 words. NO bullet points, NO semicolons.
+
+6. **painPoints**: Array of 3–5 inferred pain points. Each should be a complete sentence or phrase.
+   Infer from role, industry, and company type - not from literal contact data.
+
+7. **whatProductNeeds**: One sentence describing what product/service they need based on their role and pain points.
 
 === EXAMPLES ===
 
-If contact is "John Smith, Deputy Counsel at X Firm":
+Example 1: Input signal is "John Smith, Group Chief Compliance Officer at Gemcorp Capital"
 {
-  "personName": "Compliance Manager",
-  "title": "Deputy Counsel",
-  "company": "X Firm",
-  "coreGoal": "Ensure regulatory compliance while minimizing operational overhead and legal risk."
+  "personName": "Compliance Leader",
+  "title": "Chief Compliance Officer",
+  "companyType": "Global Asset Management Firm",
+  "industry": "Asset Management",
+  "coreGoal": "Ensure regulatory compliance across all investment activities while minimizing operational risk and maintaining investor trust.",
+  "painPoints": [
+    "Managing complex regulatory requirements across multiple jurisdictions",
+    "Balancing compliance costs with operational efficiency",
+    "Keeping up with evolving regulatory landscape",
+    "Ensuring consistent compliance across distributed teams"
+  ],
+  "whatProductNeeds": "Compliance management platform that automates regulatory reporting and provides real-time risk monitoring."
 }
 
-If contact is "Jane Doe, Operations Director at TechCorp":
+Example 2: Input signal is "Jane Doe, VP of Sales at Acme Corp (B2B SaaS)"
+{
+  "personName": "Sales Leader",
+  "title": "Sales Executive",
+  "companyType": "Mid-size B2B SaaS Company",
+  "industry": "Enterprise Software",
+  "coreGoal": "Drive predictable revenue growth through strategic account management and sales team enablement.",
+  "painPoints": [
+    "Forecasting accuracy and pipeline visibility",
+    "Sales team productivity and quota attainment",
+    "Competitive differentiation in crowded market",
+    "Customer acquisition cost optimization"
+  ],
+  "whatProductNeeds": "Sales enablement tools that improve pipeline management and accelerate deal cycles."
+}
+
+Example 3: Input signal is "Sarah Johnson, Operations Director at TechCorp"
 {
   "personName": "Operations Director",
-  "title": "Operations Director",
-  "company": "TechCorp",
-  "coreGoal": "Streamline operational processes to improve efficiency and reduce costs while maintaining quality standards."
+  "title": "Operations Leader",
+  "companyType": "Technology Services Company",
+  "industry": "Technology Services",
+  "coreGoal": "Optimize operational efficiency while scaling business processes to support growth.",
+  "painPoints": [
+    "Process standardization across growing organization",
+    "Resource allocation and capacity planning",
+    "Operational cost management",
+    "Maintaining quality standards during rapid scaling"
+  ],
+  "whatProductNeeds": "Operations management platform that provides process automation and performance analytics."
 }
 
 CRITICAL: Return ONLY the JSON object. Do not include markdown code blocks, explanations, or any text outside the JSON object.`;
