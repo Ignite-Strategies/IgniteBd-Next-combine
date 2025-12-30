@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 /**
  * Quick Idea AI Template Page
@@ -14,32 +13,23 @@ function QuickIdeaTemplateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
-  const { ownerId } = useOwner();
+  
+  // Direct read from localStorage - no hook needed
+  const [ownerId, setOwnerId] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) {
+      setOwnerId(stored);
+    }
+  }, []);
   const [idea, setIdea] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
-  // Redirect if no companyHQId in URL
-  useEffect(() => {
-    if (!companyHQId && typeof window !== 'undefined') {
-      const stored = localStorage.getItem('companyHQId');
-      if (stored) {
-        router.replace(`/templates/create/ai/quick?companyHQId=${stored}`);
-      } else {
-        router.push('/templates');
-      }
-    }
-  }, [companyHQId, router]);
+  // URL param is source of truth - no redirect needed, just show error if missing
 
-  // Log CompanyHQ from URL params
-  useEffect(() => {
-    if (companyHQId) {
-      console.log('🏢 CompanyHQ from URL params:', {
-        companyHQId,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }, [companyHQId]);
+  // No logging needed - URL param is source of truth
 
   const handleGenerate = async (e) => {
     e.preventDefault();

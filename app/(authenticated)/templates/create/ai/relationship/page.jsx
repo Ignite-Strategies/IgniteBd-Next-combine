@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
-import { useOwner } from '@/hooks/useOwner';
 
 /**
  * Relationship-Aware AI Template Page
@@ -14,7 +13,16 @@ function RelationshipAwareTemplateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
-  const { ownerId } = useOwner();
+  
+  // Direct read from localStorage - no hook needed
+  const [ownerId, setOwnerId] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('ownerId');
+    if (stored) {
+      setOwnerId(stored);
+    }
+  }, []);
   const [relationship, setRelationship] = useState('WARM');
   const [typeOfPerson, setTypeOfPerson] = useState('FORMER_COWORKER');
   const [whyReachingOut, setWhyReachingOut] = useState('');
@@ -39,15 +47,7 @@ function RelationshipAwareTemplateContent() {
     }
   }, [companyHQId, router]);
 
-  // Log CompanyHQ from URL params
-  useEffect(() => {
-    if (companyHQId) {
-      console.log('🏢 CompanyHQ from URL params:', {
-        companyHQId,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }, [companyHQId]);
+  // No logging needed - URL param is source of truth
 
   const handleGenerate = async (e) => {
     e.preventDefault();
