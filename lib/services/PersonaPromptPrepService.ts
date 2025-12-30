@@ -7,8 +7,6 @@
  * - Returns structured data for prompt building
  */
 
-import { prisma } from '@/lib/prisma';
-
 export interface PreparedData {
   contact: {
     firstName?: string;
@@ -39,10 +37,15 @@ export class PersonaPromptPrepService {
     try {
       const { contactId, companyHQId } = params;
 
+      // Dynamic import to ensure Prisma is initialized
+      const { prisma } = await import('@/lib/prisma');
+      
       if (!prisma) {
+        console.error('❌ Prisma is undefined after import');
         return { success: false, error: 'Database connection not available' };
       }
 
+      console.log('📊 PersonaPromptPrepService: Fetching contact and companyHQ...');
       // Fetch contact and companyHQ in parallel
       const [contact, companyHQ] = await Promise.all([
         prisma.contact.findUnique({
@@ -66,8 +69,13 @@ export class PersonaPromptPrepService {
       ]);
 
       if (!companyHQ) {
+        console.error('❌ CompanyHQ not found:', companyHQId);
         return { success: false, error: 'Company not found' };
       }
+
+      console.log('✅ PersonaPromptPrepService: Data prepared successfully');
+      console.log('  - Contact:', contact ? `${contact.firstName} ${contact.lastName}` : 'null');
+      console.log('  - CompanyHQ:', companyHQ.companyName);
 
       return {
         success: true,
