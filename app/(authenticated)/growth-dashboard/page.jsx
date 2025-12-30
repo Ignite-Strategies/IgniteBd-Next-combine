@@ -102,7 +102,7 @@ function GrowthDashboardPageContent() {
         </h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <button
-            onClick={() => router.push('/people/load')}
+            onClick={() => router.push(companyHQId ? `/people/load?companyHQId=${companyHQId}` : '/people/load')}
             className="group flex items-center gap-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-4 text-left transition hover:border-blue-300 hover:bg-blue-100"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500 transition-transform group-hover:scale-110">
@@ -117,7 +117,7 @@ function GrowthDashboardPageContent() {
           </button>
 
           <button
-            onClick={() => router.push('/outreach/compose')}
+            onClick={() => router.push(companyHQId ? `/outreach/compose?companyHQId=${companyHQId}` : '/outreach/compose')}
             className="group flex items-center gap-4 rounded-lg border-2 border-purple-200 bg-purple-50 p-4 text-left transition hover:border-purple-300 hover:bg-purple-100"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500 transition-transform group-hover:scale-110">
@@ -151,5 +151,27 @@ function GrowthDashboardPageContent() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function GrowthDashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="h-16 w-16 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
+          </div>
+          <h2 className="mb-2 text-2xl font-bold text-gray-900">
+            Getting your dashboard ready...
+          </h2>
+          <p className="text-gray-600">
+            Loading your company data and metrics
+          </p>
+        </div>
+      </div>
+    }>
+      <GrowthDashboardPageContent />
+    </Suspense>
   );
 }
