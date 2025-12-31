@@ -288,54 +288,101 @@ function ComposeContent() {
     setPreviewData(null);
 
     try {
-      // Universal variable hydration - works on ANY content (template or manual)
-      // Body field is single source of truth - variables get resolved from database
+      // Hydrate variables - works for both template and manual content
       let hydratedSubject = subject || '';
       let hydratedBody = body || '';
       
+      // Check if there are variables in content
+      const subjectVars = extractVariableNames(subject || '');
+      const bodyVars = extractVariableNames(body || '');
+      const hasVariables = subjectVars.length > 0 || bodyVars.length > 0;
+      
       // Always hydrate variables if we have content and contact info
-      // This works whether content came from template or was manually typed
       if ((subject || body) && (contactId || to)) {
-        // Use universal variable hydration API
-        // It doesn't care if content came from template or was manually typed
-        
-        // Hydrate subject if it has content
-        if (subject) {
+        if (selectedTemplateId && contactId) {
+          // Use template hydration API if template is selected
           try {
-            const subjectResponse = await api.post('/api/variables/hydrate', {
-              content: subject,
-              contactId: contactId || undefined,
-              to: to || undefined,
+            const hydrateResponse = await api.post('/api/template/hydrate-with-contact', {
+              templateId: selectedTemplateId,
+              contactId: contactId,
+              to: to, // Pass 'to' field as fallback if contactId is invalid
               metadata: {},
             });
             
-            if (subjectResponse.data?.success) {
-              hydratedSubject = subjectResponse.data.hydratedContent || subject;
+            if (hydrateResponse.data?.success) {
+              hydratedSubject = hydrateResponse.data.hydratedSubject || subject;
+              hydratedBody = hydrateResponse.data.hydratedBody || body;
             }
           } catch (err) {
-            console.warn('Failed to hydrate subject variables:', err);
-            // Keep original subject if hydration fails
+            console.warn('Failed to hydrate template, falling back to universal hydration:', err);
+            // Fall through to universal hydration
           }
         }
         
-        // Hydrate body if it has content
-        if (body) {
-          try {
-            const bodyResponse = await api.post('/api/variables/hydrate', {
-              content: body,
-              contactId: contactId || undefined,
-              to: to || undefined,
-              metadata: {},
-            });
-            
-            if (bodyResponse.data?.success) {
-              hydratedBody = bodyResponse.data.hydratedContent || body;
+        // Use universal variable hydration for manual content or as fallback
+        // This works whether content came from template or was manually typed
+        if (hydratedSubject === subject && hydratedBody === body) {
+          // Hydrate subject if it has content and wasn't already hydrated
+          if (subject) {
+            try {
+              const subjectResponse = await api.post('/api/variables/hydrate', {
+                content: subject,
+                contactId: contactId || undefined,
+                to: to || undefined,
+                metadata: {},
+              });
+              
+              if (subjectResponse.data?.success) {
+                hydratedSubject = subjectResponse.data.hydratedContent || subject;
+              }
+            } catch (err) {
+              console.warn('Failed to hydrate subject variables:', err);
+              // Keep original subject if hydration fails
             }
-          } catch (err) {
-            console.warn('Failed to hydrate body variables:', err);
-            // Keep original body if hydration fails
+          }
+          
+          // Hydrate body if it has content and wasn't already hydrated
+          if (body) {
+            try {
+              const bodyResponse = await api.post('/api/variables/hydrate', {
+                content: body,
+                contactId: contactId || undefined,
+                to: to || undefined,
+                metadata: {},
+              });
+              
+              if (bodyResponse.data?.success) {
+                hydratedBody = bodyResponse.data.hydratedContent || body;
+              }
+            } catch (err) {
+              console.warn('Failed to hydrate body variables:', err);
+              // Keep original body if hydration fails
+            }
           }
         }
+        
+        // Check if variables weren't fully resolved (still contain {{variable}} tags)
+        const unresolvedSubjectVars = extractVariableNames(hydratedSubject);
+        const unresolvedBodyVars = extractVariableNames(hydratedBody);
+        const hasUnresolvedVars = unresolvedSubjectVars.length > 0 || unresolvedBodyVars.length > 0;
+        
+        // Show warning if variables exist but contact not found
+        if (hasUnresolvedVars && !contactId && to) {
+          // Try to parse email to see if we can at least get name
+          const parsed = parseEmailString(to);
+          if (!parsed.name || parsed.name.trim() === parsed.email) {
+            // No name in 'to' field, show helpful message
+            setPreviewError(
+              '⚠️ Variables like {{firstName}} cannot be resolved until you make this person a contact. ' +
+              'You can either select an existing contact or use the "Quick Save" button to create one.'
+            );
+          }
+        }
+      } else if (hasVariables && !contactId && !to) {
+        // Variables in content but no contact info at all
+        setPreviewError(
+          '⚠️ Variables like {{firstName}} require a contact. Please select a contact or enter an email address.'
+        );
       }
       
       // Build preview data (no requestId - just hydrated content)
@@ -720,6 +767,12 @@ function ComposeContent() {
                       {!contactId && (
                         <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
                           💡 Select a contact to see how variables will be resolved from the database.
+                          {to && !contactId && (
+                            <span className="block mt-1">
+                              ⚠️ Variables like {{firstName}} cannot be fully resolved until you make this person a contact. 
+                              Use "Quick Save" to create a contact.
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>
@@ -763,6 +816,12 @@ function ComposeContent() {
                       <p className="mt-3 text-xs text-gray-600">
                         💡 Variables are automatically resolved from the database when you select a contact and template.
                       </p>
+                      {to && !contactId && (extractVariableNames(subject || '').length > 0 || extractVariableNames(body || '').length > 0) && (
+                        <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                          ⚠️ Variables like {{firstName}} cannot be fully resolved until you make this person a contact. 
+                          Use "Quick Save" to create a contact, or select an existing contact.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
