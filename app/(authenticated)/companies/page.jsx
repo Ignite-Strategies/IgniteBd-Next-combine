@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Building2, Check, Sparkles, ExternalLink, X, Zap } from 'lucide-react';
+import { Building2, Check, Sparkles, ExternalLink, X, Search, Filter, Users } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import ContactSelector from '@/components/ContactSelector.jsx';
 import api from '@/lib/api';
 
 function CompanyHubPageContent() {
@@ -26,11 +25,15 @@ function CompanyHubPageContent() {
   
   // Input state
   const [companyInput, setCompanyInput] = useState('');
-  const [hydrating, setHydrating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [company, setCompany] = useState(null);
   const [source, setSource] = useState(null); // 'database' | 'apollo'
   
-  // Association state
+  // Contact association state
+  const [showContactAssociation, setShowContactAssociation] = useState(false);
+  const [allContacts, setAllContacts] = useState([]);
+  const [contactsHydrated, setContactsHydrated] = useState(false);
+  const [domainFilter, setDomainFilter] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(null);
   const [selectedContact, setSelectedContact] = useState(null);
   
@@ -39,16 +42,18 @@ function CompanyHubPageContent() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleHydrateCompany = async () => {
+  const handleSubmit = async () => {
     if (!companyHQId || !ownerHydrated || !companyInput.trim()) {
-      setError('Please enter a company name or domain');
+      setError('Please enter a company name');
       return;
     }
 
-    setHydrating(true);
+    setSubmitting(true);
     setError(null);
     setCompany(null);
     setSource(null);
+    setShowContactAssociation(false);
+    setContactsHydrated(false);
     
     try {
       const response = await api.post('/api/companies/lookup', {
@@ -59,20 +64,82 @@ function CompanyHubPageContent() {
       if (response.data?.success && response.data.company) {
         setCompany(response.data.company);
         setSource(response.data.source); // 'database' or 'apollo'
+        
+        // Extract domain from company website for filtering
+        if (response.data.company.domain || response.data.company.website) {
+          const domain = response.data.company.domain || 
+            response.data.company.website?.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+          setDomainFilter(domain || '');
+        }
+        
+        // Show contact association section after successful save
+        setShowContactAssociation(true);
       } else {
         setError(response.data?.error || 'Company not found');
       }
     } catch (err) {
-      console.error('Failed to hydrate company:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to hydrate company');
+      console.error('Failed to investigate company:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to investigate company');
     } finally {
-      setHydrating(false);
+      setSubmitting(false);
     }
   };
 
-  const handleContactSelect = (contact, company) => {
+  // Hydrate all contacts when showing contact association
+  useEffect(() => {
+    if (!showContactAssociation || !companyHQId || contactsHydrated) return;
+
+    const hydrateContacts = async () => {
+      try {
+        const response = await api.post('/api/contacts/hydrate', {
+          companyHQId,
+        });
+
+        if (response.data?.success && response.data.contacts) {
+          setAllContacts(response.data.contacts || []);
+          setContactsHydrated(true);
+        }
+      } catch (err) {
+        console.error('Failed to hydrate contacts:', err);
+      }
+    };
+
+    hydrateContacts();
+  }, [showContactAssociation, companyHQId, contactsHydrated]);
+
+  // Filter contacts by domain
+  const filteredContacts = useMemo(() => {
+    if (!domainFilter || !allContacts.length) return allContacts;
+    
+    const domainLower = domainFilter.toLowerCase();
+    return allContacts.filter(contact => {
+      if (!contact.email) return false;
+      const emailDomain = contact.email.split('@')[1]?.toLowerCase();
+      return emailDomain === domainLower;
+    });
+  }, [allContacts, domainFilter]);
+
+  // Contact search state for association
+  const [contactSearch, setContactSearch] = useState('');
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
+
+  // Filter contacts by search term
+  const searchFilteredContacts = useMemo(() => {
+    if (!contactSearch || !contactSearch.trim()) return [];
+    
+    const searchLower = contactSearch.toLowerCase();
+    return filteredContacts.filter(contact => {
+      const name = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
+      const email = (contact.email || '').toLowerCase();
+      return name.includes(searchLower) || email.includes(searchLower);
+    }).slice(0, 20);
+  }, [filteredContacts, contactSearch]);
+
+  const handleContactSelect = (contact) => {
     setSelectedContactId(contact?.id || null);
     setSelectedContact(contact);
+    setContactSearch(`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '');
+    setShowContactDropdown(false);
   };
 
   const handleAssociateContact = async () => {
@@ -102,18 +169,35 @@ function CompanyHubPageContent() {
     setSelectedContactId(null);
     setSelectedContact(null);
     setError(null);
+    setShowContactAssociation(false);
+    setContactsHydrated(false);
+    setAllContacts([]);
+    setDomainFilter('');
+    setContactSearch('');
+    setShowContactDropdown(false);
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showContactDropdown && !event.target.closest('.contact-selector-container')) {
+        setShowContactDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showContactDropdown]);
 
   if (!ownerHydrated) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <PageHeader
-            title="🏢 Company Hub"
-            subtitle="Manage prospect and client companies"
-            backTo="/growth-dashboard"
-            backLabel="Back to Growth Dashboard"
-          />
+        <PageHeader
+          title="Company Health Investigation"
+          subtitle="Want to know where a prospect company stands? Are they growing and ready to buy?"
+          backTo="/growth-dashboard"
+          backLabel="Back to Growth Dashboard"
+        />
           <div className="rounded-2xl bg-white p-8 shadow-lg text-center">
             <p className="text-gray-600">Loading...</p>
           </div>
@@ -126,8 +210,8 @@ function CompanyHubPageContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="🏢 Company Hub"
-          subtitle="Give us a company and we'll hydrate it. Optionally associate a contact."
+          title="Company Health Investigation"
+          subtitle="Want to know where a prospect company stands? Are they growing and ready to buy?"
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
         />
@@ -153,7 +237,7 @@ function CompanyHubPageContent() {
                   onClick={handleReset}
                   className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
                 >
-                  Hydrate Another Company
+                  Investigate Another Company
                 </button>
               </div>
             </div>
@@ -198,69 +282,147 @@ function CompanyHubPageContent() {
               </div>
             </div>
 
-            {/* Company Intelligence Scores */}
-            {company.companyHealthScore !== null && company.companyHealthScore !== undefined && (
-              <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-semibold text-blue-900">Company Intelligence</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-700">Health Score:</span>
-                    <span className="ml-2 font-semibold text-blue-900">{company.companyHealthScore}/100</span>
+            {/* Company Health Scores - Prominently Displayed */}
+            <div className="mb-6 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="h-6 w-6 text-blue-600" />
+                <h3 className="text-lg font-bold text-blue-900">Company Health Scores</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {company.companyHealthScore !== null && company.companyHealthScore !== undefined && (
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <div className="text-xs text-blue-600 mb-1">Health Score</div>
+                    <div className="text-2xl font-bold text-blue-900">{company.companyHealthScore}/100</div>
                   </div>
-                  {company.growthScore !== null && (
-                    <div>
-                      <span className="text-blue-700">Growth Score:</span>
-                      <span className="ml-2 font-semibold text-blue-900">{company.growthScore}/100</span>
+                )}
+                {company.growthScore !== null && company.growthScore !== undefined && (
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <div className="text-xs text-blue-600 mb-1">Growth Score</div>
+                    <div className="text-2xl font-bold text-blue-900">{company.growthScore}/100</div>
+                  </div>
+                )}
+                {company.headcount && (
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <div className="text-xs text-blue-600 mb-1">Headcount</div>
+                    <div className="text-xl font-bold text-blue-900">{company.headcount.toLocaleString()}</div>
+                  </div>
+                )}
+                {company.revenue && (
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <div className="text-xs text-blue-600 mb-1">Revenue</div>
+                    <div className="text-xl font-bold text-blue-900">
+                      ${(company.revenue / 1000000).toFixed(1)}M
                     </div>
-                  )}
-                  {company.headcount && (
-                    <div>
-                      <span className="text-blue-700">Headcount:</span>
-                      <span className="ml-2 font-semibold text-blue-900">{company.headcount.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {company.revenue && (
-                    <div>
-                      <span className="text-blue-700">Revenue:</span>
-                      <span className="ml-2 font-semibold text-blue-900">
-                        ${(company.revenue / 1000000).toFixed(1)}M
+                  </div>
+                )}
+                {company.industry && (
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <div className="text-xs text-blue-600 mb-1">Industry</div>
+                    <div className="text-lg font-semibold text-blue-900">{company.industry}</div>
+                  </div>
+                )}
+                {company.growthRate !== null && company.growthRate !== undefined && (
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <div className="text-xs text-blue-600 mb-1">Growth Rate</div>
+                    <div className="text-xl font-bold text-blue-900">{company.growthRate}%</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Contact Association - Only show after successful save */}
+            {showContactAssociation && (
+              <div className="mb-6 rounded-lg bg-gray-50 border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Associate with Contact (Optional)
+                </h3>
+                
+                {/* Domain Filter */}
+                {domainFilter && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Filter by Domain
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={domainFilter}
+                        onChange={(e) => setDomainFilter(e.target.value)}
+                        placeholder="e.g., acme.com"
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-500">
+                        {filteredContacts.length} contact{filteredContacts.length !== 1 ? 's' : ''} found
                       </span>
                     </div>
-                  )}
-                  {company.industry && (
-                    <div>
-                      <span className="text-blue-700">Industry:</span>
-                      <span className="ml-2 font-semibold text-blue-900">{company.industry}</span>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Showing contacts with email domain matching: <strong>{domainFilter}</strong>
+                    </p>
+                  </div>
+                )}
+
+                {/* Contact Selector - Use filtered contacts */}
+                <div className="mb-4 contact-selector-container">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Contact
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={contactSearch}
+                      onChange={(e) => {
+                        setContactSearch(e.target.value);
+                        setShowContactDropdown(true);
+                      }}
+                      onFocus={() => setShowContactDropdown(true)}
+                      placeholder={contactsHydrated ? `Search ${filteredContacts.length} contacts...` : "Loading contacts..."}
+                      disabled={!contactsHydrated}
+                      className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    />
+                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    {selectedContact && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Contact Dropdown */}
+                  {showContactDropdown && contactSearch && searchFilteredContacts.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+                      {searchFilteredContacts.map((contact) => (
+                        <button
+                          key={contact.id}
+                          type="button"
+                          onClick={() => handleContactSelect(contact)}
+                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                            selectedContactId === contact.id ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="text-sm font-semibold text-gray-900">
+                            {contact.firstName} {contact.lastName}
+                          </div>
+                          {contact.email && (
+                            <div className="text-xs text-gray-500">{contact.email}</div>
+                          )}
+                        </button>
+                      ))}
                     </div>
                   )}
-                  {company.growthRate !== null && company.growthRate !== undefined && (
-                    <div>
-                      <span className="text-blue-700">Growth Rate:</span>
-                      <span className="ml-2 font-semibold text-blue-900">{company.growthRate}%</span>
+
+                  {/* Selected Contact Display */}
+                  {selectedContact && (
+                    <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-2">
+                      <p className="text-xs text-green-800">
+                        <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
+                        {selectedContact.email && <span> • {selectedContact.email}</span>}
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
             )}
-
-            {/* Contact Association */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Associate with Contact (Optional)
-              </label>
-              <ContactSelector
-                contactId={selectedContactId}
-                onContactSelect={handleContactSelect}
-                selectedContact={selectedContact}
-                showLabel={false}
-              />
-              <p className="mt-2 text-sm text-gray-500">
-                Search for a contact to associate this company with
-              </p>
-            </div>
 
             {error && (
               <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4">
@@ -294,49 +456,47 @@ function CompanyHubPageContent() {
         ) : (
           /* Input View */
           <div className="rounded-2xl bg-white p-8 shadow-lg">
-            <div className="mb-6">
-              <label htmlFor="companyInput" className="block text-sm font-semibold text-gray-700 mb-2">
-                Company Name or Domain
-              </label>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  id="companyInput"
-                  value={companyInput}
-                  onChange={(e) => setCompanyInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !hydrating && companyInput.trim()) {
-                      handleHydrateCompany();
-                    }
-                  }}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 'Acme Corp' or 'acme.com'"
-                  autoFocus
-                  disabled={hydrating}
-                />
-                <button
-                  type="button"
-                  onClick={handleHydrateCompany}
-                  disabled={hydrating || !companyInput.trim()}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {hydrating ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Hydrating...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-5 w-5" />
-                      Hydrate Company
-                    </>
-                  )}
-                </button>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}
+            >
+              <div className="mb-6">
+                <label htmlFor="companyInput" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Company name
+                </label>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    id="companyInput"
+                    value={companyInput}
+                    onChange={(e) => setCompanyInput(e.target.value)}
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., Acme Corp"
+                    autoFocus
+                    disabled={submitting}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting || !companyInput.trim()}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit'
+                    )}
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  Type a company name and hit submit to see their health scores
+                </p>
               </div>
-              <p className="mt-2 text-sm text-gray-500">
-                We'll search the database first, then enrich from Apollo if needed.
-              </p>
-            </div>
+            </form>
 
             {error && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-4">
