@@ -6,8 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ContactAnalysisMinimalService } from '@/lib/services/ContactAnalysisMinimalService';
-// Full service kept for MVP2: import { ContactAnalysisService } from '@/lib/services/ContactAnalysisService';
+import { ContactAnalysisService } from '@/lib/services/ContactAnalysisService';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
@@ -45,10 +44,13 @@ export async function POST(
       );
     }
 
-    // Generate minimal analysis (MVP1)
-    const result = await ContactAnalysisMinimalService.generate({
+    // Get productId from body if provided (optional)
+    const { productId } = body;
+
+    // Generate full contact analysis with BD Intel scores (MVP1)
+    const result = await ContactAnalysisService.generate({
       contactId,
-      companyHQId,
+      productId,
     });
 
     if (!result.success) {
@@ -56,39 +58,65 @@ export async function POST(
         {
           success: false,
           error: result.error || 'Failed to generate contact analysis',
+          details: result.details,
         },
         { status: 400 }
       );
     }
 
-    // Save to database (using finalSummary field to store the basic info as JSON)
-    // For MVP1, we're storing basic persona-like fields (who, company, coreGoal)
-    const analysisData = {
-      personName: result.analysis!.personName,
-      title: result.analysis!.title,
-      company: result.analysis!.company,
-      coreGoal: result.analysis!.coreGoal,
-    };
+    const analysisData = result.analysis!;
 
+    // Save to database with full BD Intel scores
     const savedAnalysis = await prisma.contact_analyses.upsert({
       where: { contactId },
       create: {
         contactId,
-        finalSummary: JSON.stringify(analysisData), // Store basic info in finalSummary for MVP1
-        // MVP2 fields left null for now
+        fitScore: analysisData.fitScore,
+        painAlignmentScore: analysisData.painAlignmentScore,
+        workflowFitScore: analysisData.workflowFitScore,
+        urgencyScore: analysisData.urgencyScore,
+        adoptionBarrierScore: analysisData.adoptionBarrierScore,
+        risks: analysisData.risks as any,
+        opportunities: analysisData.opportunities as any,
+        recommendedTalkTrack: analysisData.recommendedTalkTrack,
+        recommendedSequence: analysisData.recommendedSequence,
+        recommendedLeadSource: analysisData.recommendedLeadSource,
+        finalSummary: analysisData.finalSummary,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
       update: {
-        finalSummary: JSON.stringify(analysisData),
+        fitScore: analysisData.fitScore,
+        painAlignmentScore: analysisData.painAlignmentScore,
+        workflowFitScore: analysisData.workflowFitScore,
+        urgencyScore: analysisData.urgencyScore,
+        adoptionBarrierScore: analysisData.adoptionBarrierScore,
+        risks: analysisData.risks as any,
+        opportunities: analysisData.opportunities as any,
+        recommendedTalkTrack: analysisData.recommendedTalkTrack,
+        recommendedSequence: analysisData.recommendedSequence,
+        recommendedLeadSource: analysisData.recommendedLeadSource,
+        finalSummary: analysisData.finalSummary,
         updatedAt: new Date(),
       },
     });
 
-    // Return the analysis data (not the DB record)
+    // Return the analysis data
     return NextResponse.json({
       success: true,
-      analysis: analysisData,
+      analysis: {
+        fitScore: savedAnalysis.fitScore,
+        painAlignmentScore: savedAnalysis.painAlignmentScore,
+        workflowFitScore: savedAnalysis.workflowFitScore,
+        urgencyScore: savedAnalysis.urgencyScore,
+        adoptionBarrierScore: savedAnalysis.adoptionBarrierScore,
+        risks: savedAnalysis.risks as string[] | null,
+        opportunities: savedAnalysis.opportunities as string[] | null,
+        recommendedTalkTrack: savedAnalysis.recommendedTalkTrack,
+        recommendedSequence: savedAnalysis.recommendedSequence,
+        recommendedLeadSource: savedAnalysis.recommendedLeadSource,
+        finalSummary: savedAnalysis.finalSummary,
+      },
     });
 
   } catch (error: any) {
@@ -153,9 +181,22 @@ export async function GET(
       );
     }
 
+    // Return analysis in expected format
     return NextResponse.json({
       success: true,
-      analysis,
+      analysis: {
+        fitScore: analysis.fitScore,
+        painAlignmentScore: analysis.painAlignmentScore,
+        workflowFitScore: analysis.workflowFitScore,
+        urgencyScore: analysis.urgencyScore,
+        adoptionBarrierScore: analysis.adoptionBarrierScore,
+        risks: analysis.risks as string[] | null,
+        opportunities: analysis.opportunities as string[] | null,
+        recommendedTalkTrack: analysis.recommendedTalkTrack,
+        recommendedSequence: analysis.recommendedSequence,
+        recommendedLeadSource: analysis.recommendedLeadSource,
+        finalSummary: analysis.finalSummary,
+      },
     });
   } catch (error: any) {
     console.error('❌ Get contact analysis error:', error);
