@@ -1,27 +1,29 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { validateHydration } from '@/lib/templateVariables';
 import { 
   hydrateTemplateFromDatabase,
   extractVariableNames,
+  validateHydration,
 } from '@/lib/services/variableMapperService';
 
 /**
  * POST /api/template/hydrate-with-contact
  * 
- * Hydrates a template with contact data by resolving variables from the database.
+ * API endpoint wrapper for template hydration.
  * 
- * Uses variable mapper service to:
- * 1. Extract variables from template (e.g., {{firstName}})
- * 2. Query database based on contactId
- * 3. Map contact fields to variables
- * 4. Replace variables in template
+ * This is NOT a separate service - it's a thin API wrapper that:
+ * 1. Fetches the template from database
+ * 2. Delegates to variableMapperService (the universal variable resolution service)
+ * 3. Returns hydrated template with validation
+ * 
+ * The actual variable resolution logic is in: lib/services/variableMapperService.js
  * 
  * Request body:
  * {
  *   "templateId": "uuid",
- *   "contactId": "uuid", // Optional but recommended for variable resolution
+ *   "contactId": "uuid", // Optional - variable mapper will infer from 'to' field if missing
+ *   "to": "email@example.com", // Optional - used as fallback if contactId is invalid
  *   "metadata": {} // Optional metadata for computed variables (timeHorizon, etc.)
  * }
  * 
@@ -50,6 +52,7 @@ export async function POST(request) {
     const { 
       templateId, 
       contactId, 
+      to, // Optional: recipient email field (can be "Name <email>" or just "email") - used as fallback if contactId is invalid
       metadata = {} // Additional context like desiredOutcome, timeHorizon, etc.
     } = body ?? {};
 
@@ -79,8 +82,11 @@ export async function POST(request) {
     }
 
     // Build context for variable resolution
+    // Note: If contactId is invalid, variable mapper will try to infer from 'to' field if provided
     const context = {
-      contactId,
+      contactId: contactId || undefined,
+      contactEmail: undefined, // Will be inferred from 'to' if contactId is missing/invalid
+      to: to || undefined, // Pass 'to' field so variable mapper can extract email if needed
       metadata,
     };
 

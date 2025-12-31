@@ -70,13 +70,13 @@ export async function POST(request) {
       hasTemplateId: !!templateId,
     });
     
-    // Step 3.5: Handle template hydration if templateId is provided
-    // Uses variable mapper service to resolve variables from database
-    let finalSubject = subject;
-    let finalBody = emailBody;
+    // Step 3.5: Handle template content if templateId is provided
+    // If template is selected, use template's subject/body as the source content
+    let sourceSubject = subject;
+    let sourceBody = emailBody;
     
     if (templateId) {
-      console.log('📧 Template ID provided, hydrating template with variable mapper service...');
+      console.log('📧 Template ID provided, fetching template content...');
       
       // Fetch template
       const template = await prisma.templates.findUnique({
@@ -91,29 +91,41 @@ export async function POST(request) {
         );
       }
       
-      // Build context for variable resolution
-      // Variable mapper service will query database based on contactId
-      const context = {
-        contactId: contactId || undefined,
-        ownerId: owner.id,
-      };
+      // Use template content as source (body field is single source of truth)
+      sourceSubject = template.subject || subject;
+      sourceBody = template.body || emailBody;
       
-      // Hydrate template using variable mapper service
-      // This automatically queries database and maps contact fields to variables
-      // Template becomes part of the payload JSON (not assigned separately)
-      finalSubject = await hydrateTemplateFromDatabase(template.subject, context, {});
-      finalBody = await hydrateTemplateFromDatabase(template.body, context, {});
-      
-      console.log('✅ Template hydrated via variable mapper:', {
-        originalSubjectLength: template.subject.length,
-        originalBodyLength: template.body.length,
-        hydratedSubjectLength: finalSubject.length,
-        hydratedBodyLength: finalBody.length,
-        contactId: contactId || 'none',
+      console.log('✅ Template content loaded:', {
+        subjectLength: sourceSubject.length,
+        bodyLength: sourceBody.length,
       });
     }
     
-    // Step 3.6: Append signature to body if available
+    // Step 3.6: ALWAYS hydrate variables in content (regardless of template or manual entry)
+    // Body field is single source of truth - variables get resolved from database
+    // This works whether content came from template or was manually typed
+    const context = {
+      contactId: contactId || undefined,
+      contactEmail: undefined, // Will be inferred from 'to' if contactId is missing
+      to: to, // Pass 'to' field so variable mapper can extract email if needed
+      ownerId: owner.id,
+    };
+    
+    // Hydrate variables in subject and body using variable mapper service
+    // This is universal - works on ANY content, not just templates
+    const finalSubject = await hydrateTemplateFromDatabase(sourceSubject, context, {});
+    const finalBody = await hydrateTemplateFromDatabase(sourceBody, context, {});
+    
+    console.log('✅ Variables hydrated in content:', {
+      originalSubjectLength: sourceSubject.length,
+      originalBodyLength: sourceBody.length,
+      hydratedSubjectLength: finalSubject.length,
+      hydratedBodyLength: finalBody.length,
+      contactId: contactId || 'none',
+      hasTemplate: !!templateId,
+    });
+    
+    // Step 3.7: Append signature to body if available
     // Fetch owner's signature (default or specified one)
     let signature = null;
     if (signatureId) {

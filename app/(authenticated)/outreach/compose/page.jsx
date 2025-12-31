@@ -288,70 +288,52 @@ function ComposeContent() {
     setPreviewData(null);
 
     try {
-      // Hydrate template directly (like sandbox) - NO requestId
+      // Universal variable hydration - works on ANY content (template or manual)
+      // Body field is single source of truth - variables get resolved from database
       let hydratedSubject = subject || '';
       let hydratedBody = body || '';
       
-      // Always hydrate variables if contact is selected (even without template)
-      if (contactId) {
-        if (selectedTemplateId) {
-          // Use template hydration API if template is selected
-          const hydrateResponse = await api.post('/api/template/hydrate-with-contact', {
-            templateId: selectedTemplateId,
-            contactId: contactId,
-            metadata: {},
-          });
-          
-          if (hydrateResponse.data?.success) {
-            hydratedSubject = hydrateResponse.data.hydratedSubject || subject;
-            hydratedBody = hydrateResponse.data.hydratedBody || body;
-          }
-        } else {
-          // No template selected, but contact exists - hydrate manually entered variables
-          // Check if there are variables in subject or body
-          const subjectVars = extractVariableNames(subject || '');
-          const bodyVars = extractVariableNames(body || '');
-          
-          if (subjectVars.length > 0 || bodyVars.length > 0) {
-            // Fetch contact data and hydrate variables manually
-            try {
-              const contactResponse = await api.get(`/api/contacts/${contactId}`);
-              if (contactResponse.data?.success && contactResponse.data?.contact) {
-                const contact = contactResponse.data.contact;
-                
-                // Hydrate subject
-                if (subjectVars.length > 0) {
-                  hydratedSubject = subject || '';
-                  subjectVars.forEach(varName => {
-                    const varDef = VariableCatalogue[varName];
-                    if (varDef && varDef.source === 'CONTACT') {
-                      const value = contact[varDef.dbField] || contact[varName] || '';
-                      hydratedSubject = hydratedSubject.replace(
-                        new RegExp(`\\{\\{${varName}\\}\\}`, 'g'),
-                        value
-                      );
-                    }
-                  });
-                }
-                
-                // Hydrate body
-                if (bodyVars.length > 0) {
-                  hydratedBody = body || '';
-                  bodyVars.forEach(varName => {
-                    const varDef = VariableCatalogue[varName];
-                    if (varDef && varDef.source === 'CONTACT') {
-                      const value = contact[varDef.dbField] || contact[varName] || '';
-                      hydratedBody = hydratedBody.replace(
-                        new RegExp(`\\{\\{${varName}\\}\\}`, 'g'),
-                        value
-                      );
-                    }
-                  });
-                }
-              }
-            } catch (err) {
-              console.warn('Failed to fetch contact for variable hydration:', err);
+      // Always hydrate variables if we have content and contact info
+      // This works whether content came from template or was manually typed
+      if ((subject || body) && (contactId || to)) {
+        // Use universal variable hydration API
+        // It doesn't care if content came from template or was manually typed
+        
+        // Hydrate subject if it has content
+        if (subject) {
+          try {
+            const subjectResponse = await api.post('/api/variables/hydrate', {
+              content: subject,
+              contactId: contactId || undefined,
+              to: to || undefined,
+              metadata: {},
+            });
+            
+            if (subjectResponse.data?.success) {
+              hydratedSubject = subjectResponse.data.hydratedContent || subject;
             }
+          } catch (err) {
+            console.warn('Failed to hydrate subject variables:', err);
+            // Keep original subject if hydration fails
+          }
+        }
+        
+        // Hydrate body if it has content
+        if (body) {
+          try {
+            const bodyResponse = await api.post('/api/variables/hydrate', {
+              content: body,
+              contactId: contactId || undefined,
+              to: to || undefined,
+              metadata: {},
+            });
+            
+            if (bodyResponse.data?.success) {
+              hydratedBody = bodyResponse.data.hydratedContent || body;
+            }
+          } catch (err) {
+            console.warn('Failed to hydrate body variables:', err);
+            // Keep original body if hydration fails
           }
         }
       }
