@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Building2, Check, Sparkles, Search, ExternalLink, X } from 'lucide-react';
+import { Building2, Check, Sparkles, ExternalLink, X, Zap } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import api from '@/lib/api';
@@ -24,9 +24,9 @@ function CompanyHubPageContent() {
     }
   }, []);
   
-  // Search state
-  const [companySearch, setCompanySearch] = useState('');
-  const [lookingUp, setLookingUp] = useState(false);
+  // Input state
+  const [companyInput, setCompanyInput] = useState('');
+  const [hydrating, setHydrating] = useState(false);
   const [company, setCompany] = useState(null);
   const [source, setSource] = useState(null); // 'database' | 'apollo'
   
@@ -39,44 +39,36 @@ function CompanyHubPageContent() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  // Lookup company when user stops typing
-  useEffect(() => {
-    if (!companyHQId || !ownerHydrated) return;
-    
-    if (companySearch.length < 2) {
-      setCompany(null);
-      setSource(null);
+  const handleHydrateCompany = async () => {
+    if (!companyHQId || !ownerHydrated || !companyInput.trim()) {
+      setError('Please enter a company name or domain');
       return;
     }
 
-    const timeoutId = setTimeout(async () => {
-      setLookingUp(true);
-      setError(null);
-      
-      try {
-        const response = await api.post('/api/companies/lookup', {
-          companyHQId,
-          query: companySearch.trim(),
-        });
+    setHydrating(true);
+    setError(null);
+    setCompany(null);
+    setSource(null);
+    
+    try {
+      const response = await api.post('/api/companies/lookup', {
+        companyHQId,
+        query: companyInput.trim(),
+      });
 
-        if (response.data?.success && response.data.company) {
-          setCompany(response.data.company);
-          setSource(response.data.source); // 'database' or 'apollo'
-        } else {
-          setCompany(null);
-          setError(response.data?.error || 'Company not found');
-        }
-      } catch (err) {
-        console.error('Failed to lookup company:', err);
-        setCompany(null);
-        setError(err.response?.data?.error || err.message || 'Failed to lookup company');
-      } finally {
-        setLookingUp(false);
+      if (response.data?.success && response.data.company) {
+        setCompany(response.data.company);
+        setSource(response.data.source); // 'database' or 'apollo'
+      } else {
+        setError(response.data?.error || 'Company not found');
       }
-    }, 500); // Slightly longer delay to avoid too many API calls
-
-    return () => clearTimeout(timeoutId);
-  }, [companySearch, companyHQId, ownerHydrated]);
+    } catch (err) {
+      console.error('Failed to hydrate company:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to hydrate company');
+    } finally {
+      setHydrating(false);
+    }
+  };
 
   const handleContactSelect = (contact, company) => {
     setSelectedContactId(contact?.id || null);
@@ -106,7 +98,7 @@ function CompanyHubPageContent() {
     setSuccess(false);
     setCompany(null);
     setSource(null);
-    setCompanySearch('');
+    setCompanyInput('');
     setSelectedContactId(null);
     setSelectedContact(null);
     setError(null);
@@ -135,7 +127,7 @@ function CompanyHubPageContent() {
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="🏢 Company Hub"
-          subtitle="Look up company details from database or Apollo"
+          subtitle="Give us a company and we'll hydrate it. Optionally associate a contact."
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
         />
@@ -161,7 +153,7 @@ function CompanyHubPageContent() {
                   onClick={handleReset}
                   className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
                 >
-                  Look Up Another Company
+                  Hydrate Another Company
                 </button>
               </div>
             </div>
@@ -300,31 +292,49 @@ function CompanyHubPageContent() {
             )}
           </div>
         ) : (
-          /* Search View */
+          /* Input View */
           <div className="rounded-2xl bg-white p-8 shadow-lg">
             <div className="mb-6">
-              <label htmlFor="companySearch" className="block text-sm font-semibold text-gray-700 mb-2">
-                Look Up Company
+              <label htmlFor="companyInput" className="block text-sm font-semibold text-gray-700 mb-2">
+                Company Name or Domain
               </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <div className="flex gap-3">
                 <input
                   type="text"
-                  id="companySearch"
-                  value={companySearch}
-                  onChange={(e) => setCompanySearch(e.target.value)}
-                  className="w-full pl-10 pr-10 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Type company name or website (e.g., 'Acme Corp' or 'acme.com')..."
+                  id="companyInput"
+                  value={companyInput}
+                  onChange={(e) => setCompanyInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !hydrating && companyInput.trim()) {
+                      handleHydrateCompany();
+                    }
+                  }}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 'Acme Corp' or 'acme.com'"
                   autoFocus
+                  disabled={hydrating}
                 />
-                {lookingUp && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={handleHydrateCompany}
+                  disabled={hydrating || !companyInput.trim()}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {hydrating ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Hydrating...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-5 w-5" />
+                      Hydrate Company
+                    </>
+                  )}
+                </button>
               </div>
               <p className="mt-2 text-sm text-gray-500">
-                Searches database first, then Apollo if not found. Saves API calls automatically.
+                We'll search the database first, then enrich from Apollo if needed.
               </p>
             </div>
 
