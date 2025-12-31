@@ -286,6 +286,7 @@ model companies {
   stabilityScore        Int?
   company_hqs           company_hqs     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   contacts              Contact[]
+  invoices              invoices[]
   proposals             proposals[]
   work_packages         work_packages[]
 
@@ -310,6 +311,7 @@ model company_hqs {
   companyAnnualRev                              String?
   yearsInBusiness                               String?
   tier                                          String?
+  stripeCustomerId                              String?                         @unique // Stripe customer ID (cus_...) - billing identity
   assessments                                   assessments[]
   blogs                                         blogs[]
   campaigns                                     campaigns[]
@@ -324,15 +326,21 @@ model company_hqs {
   deliverable_templates                         deliverable_templates[]
   domain_registry                               domain_registry?
   email_sequences                               email_sequences[]
+  invoices                                      invoices[]
+  invoice_settings                              invoice_settings?
+  invoice_templates                             invoice_templates[]
   landing_pages                                 landing_pages[]
   personas                                      personas[]
   phase_templates                               phase_templates[]
+  platform_accesses                             platform_accesses[]
   presentations                                 presentations[]
   products                                      products[]
   proposals                                     proposals[]
   template_relationship_helpers                 template_relationship_helpers[]
   templates                                     templates[]
   work_packages                                 work_packages[]
+
+  @@index([stripeCustomerId])
 }
 
 model company_memberships {
@@ -474,6 +482,7 @@ model Contact {
   companies                                                 companies?                @relation(fields: [contactCompanyId], references: [id])
   contact_lists                                             contact_lists?            @relation(fields: [contactListId], references: [id])
   company_hqs_contacts_crmIdTocompany_hqs                   company_hqs               @relation("contacts_crmIdTocompany_hqs", fields: [crmId], references: [id])
+  invoices                                                  invoices[]
   invite_tokens                                             invite_tokens[]
   pipelines                                                 pipelines?
   proposals                                                 proposals[]
@@ -769,38 +778,105 @@ model invoice_template_milestones {
 
 model invoice_templates {
   id                          String                        @id @default(cuid())
+  companyHQId                 String
   name                        String
   notes                       String?
   createdAt                   DateTime                      @default(now())
   updatedAt                   DateTime                      @updatedAt
   invoice_template_milestones invoice_template_milestones[]
+  company_hqs                 company_hqs                   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@unique([companyHQId, name])
+  @@index([companyHQId])
+}
+
+model invoice_settings {
+  id                          String      @id @default(cuid())
+  companyHQId                 String      @unique
+  invoicePrefix               String?
+  invoiceNumberFormat         String?
+  defaultCurrency             String      @default("USD")
+  defaultPaymentTerms         String?
+  defaultNotes                String?
+  taxId                       String?
+  billingAddress              String?
+  billingEmail                String?
+  autoGenerateNumber          Boolean     @default(true)
+  nextInvoiceNumber           Int         @default(1)
+  platformFeeAmount           Int?
+  platformFeeDescription      String?
+  monthlyRecurringAmount      Int?
+  monthlyRecurringDescription String?
+  createdAt                   DateTime    @default(now())
+  updatedAt                   DateTime    @updatedAt
+  company_hqs                 company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@index([companyHQId])
 }
 
 model invoices {
-  id                      String               @id @default(cuid())
-  workPackageId           String
-  invoiceName             String
-  invoiceDescription      String?
-  totalExpected           Int                  @default(0)
-  totalReceived           Int                  @default(0)
-  status                  String               @default("pending")
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  invoiceNumber           String?
-  amount                  Float?
-  currency                String               @default("USD")
+  id String @id @default(cuid())
+
+  // Company/Platform Scope
+  companyHQId String
+
+  // Invoice Type & Classification
+  invoiceType        InvoiceType
+  invoiceName        String
+  invoiceDescription String?
+  invoiceNumber      String?
+
+  // Legacy Work Package Link (for migrated invoices)
+  workPackageId String?
+
+  // Client/Contact Information
+  contactId String?
+  companyId String?
+
+  // Amounts & Currency
+  totalExpected Int    @default(0)
+  totalReceived Int    @default(0)
+  currency      String @default("USD")
+  amount        Float?
+
+  // Status
+  status InvoiceStatus @default(NOT_PAID)
+
+  // Recurring Invoice Fields (for MONTHLY_RECURRING type)
+  isRecurring        Boolean   @default(false)
+  recurringFrequency String?
+  nextBillingDate    DateTime?
+  lastBilledDate     DateTime?
+
+  // Payment Tracking
   paidAt                  DateTime?
   paidByContactId         String?
   stripeCheckoutSessionId String?
   stripePaymentIntentId   String?
   stripeCustomerId        String?
-  invoice_milestones      invoice_milestones[]
-  work_packages           work_packages        @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
-  payments                payments[]
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  dueDate   DateTime?
+
+  // Relations
+  invoice_milestones invoice_milestones[]
+  work_packages      work_packages?       @relation(fields: [workPackageId], references: [id], onDelete: SetNull)
+  company_hqs        company_hqs          @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  contacts           Contact?             @relation(fields: [contactId], references: [id])
+  companies          companies?           @relation(fields: [companyId], references: [id])
+  payments           payments[]
 
   @@index([status])
-  @@index([stripeCustomerId])
+  @@index([invoiceType])
+  @@index([companyHQId])
   @@index([workPackageId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([stripeCustomerId])
+  @@index([isRecurring])
+  @@index([nextBillingDate])
 }
 
 model landing_pages {
@@ -1258,6 +1334,44 @@ model work_packages {
   @@index([workPackageOwnerId])
 }
 
+model plans {
+  id                String              @id @default(cuid())
+  name              String // e.g., "Gold Tier – Annual"
+  description       String?
+  interval          PlanInterval? // "month" | "year" | null (for one-time)
+  amountCents       Int // Price in cents
+  currency          String              @default("usd")
+  stripeProductId   String? // prod_...
+  stripePriceId     String?             @unique // price_... (1:1 with Plan)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  platform_accesses platform_accesses[]
+
+  @@index([stripeProductId])
+  @@index([stripePriceId])
+}
+
+model platform_accesses {
+  id                   String               @id @default(cuid())
+  name                 String? // Optional, usually mirrors Plan.name
+  companyId            String // FK → CompanyHQ.id
+  planId               String // FK → Plan.id
+  status               PlatformAccessStatus @default(ACTIVE)
+  stripeSubscriptionId String?              @unique // sub_...
+  startedAt            DateTime             @default(now())
+  endedAt              DateTime? // Renamed from endsAt to match spec
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  company_hqs          company_hqs          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plans                plans                @relation(fields: [planId], references: [id])
+
+  @@unique([companyId, planId])
+  @@index([companyId])
+  @@index([planId])
+  @@index([status])
+  @@index([stripeSubscriptionId])
+}
+
 enum BuyerPerson {
   BUSINESS_OWNER
   DIRECTOR_VP
@@ -1395,6 +1509,30 @@ enum WorkPackageItemStatus {
   CHANGES_NEEDED
   CHANGES_IN_PROGRESS
   APPROVED
+}
+
+enum InvoiceStatus {
+  NOT_PAID
+  PAID
+  PARTIAL
+}
+
+enum InvoiceType {
+  PLATFORM_FEE
+  MONTHLY_RECURRING
+  CUSTOM
+  WORK_PACKAGE
+}
+
+enum PlanInterval {
+  MONTH
+  YEAR
+}
+
+enum PlatformAccessStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
 }
 
 enum WorkPackageStatus {
