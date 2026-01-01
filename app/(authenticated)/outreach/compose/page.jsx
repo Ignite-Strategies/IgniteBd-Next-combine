@@ -7,6 +7,8 @@ import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
 import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
@@ -67,8 +69,16 @@ function ComposeContent() {
       });
     } else {
       console.warn('⚠️ STEP 1: No sender email found in localStorage');
+      console.warn('⚠️ Owner object:', owner ? {
+        id: owner.id,
+        email: owner.email,
+        hasSendgridVerifiedEmail: !!owner.sendgridVerifiedEmail,
+        sendgridVerifiedEmail: owner.sendgridVerifiedEmail,
+        allKeys: Object.keys(owner),
+      } : 'null');
+      console.warn('⚠️ If sendgridVerifiedEmail is missing, owner object may need rehydration from /api/owner/hydrate');
     }
-  }, [senderEmail, senderName, hasVerifiedSender]);
+  }, [senderEmail, senderName, hasVerifiedSender, owner]);
   
   // Form state
   const [selectedContact, setSelectedContact] = useState(null);
@@ -133,37 +143,61 @@ function ComposeContent() {
   }, [companyHQId]);
 
   // STEP 2: Load templates (sequential loading) - scoped from companyHQId params
+  // Wait for Firebase auth to be ready (onAuthStateChanged is Firebase's auth listener)
   useEffect(() => {
     if (!companyHQId) {
       console.log('📧 STEP 2: Templates - Waiting for companyHQId...', { companyHQId });
       return;
     }
     
-    console.log('📧 STEP 2: Templates - Loading for companyHQId:', companyHQId);
-    setLoadingTemplates(true);
-    setTemplatesError(false);
-    
-    fetch(`/api/templates?companyHQId=${companyHQId}`)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
-        if (data?.success) {
-          console.log('✅ STEP 2: Templates - Loaded', data.templates?.length || 0, 'templates');
-          setTemplates(data.templates || []);
+    // Wait for Firebase auth to be ready before making API call
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        console.log('📧 STEP 2: Templates - Waiting for Firebase auth...');
+        return;
+      }
+      
+      console.log('📧 STEP 2: Templates - Loading for companyHQId:', companyHQId);
+      setLoadingTemplates(true);
+      setTemplatesError(false);
+      
+      try {
+        // Use api.get() - axios interceptor automatically adds auth token
+        const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
+        console.log('📦 STEP 2: Templates - Full response:', {
+          status: response.status,
+          data: response.data,
+          hasSuccess: !!response.data?.success,
+          templatesCount: response.data?.templates?.length || 0,
+        });
+        
+        if (response.data?.success) {
+          const templates = response.data.templates || [];
+          console.log('✅ STEP 2: Templates - Loaded', templates.length, 'templates');
+          setTemplates(templates);
+          setTemplatesError(false);
         } else {
-          console.warn('⚠️ STEP 2: Templates - API response not successful');
+          console.warn('⚠️ STEP 2: Templates - API response not successful:', response.data);
           setTemplates([]);
           setTemplatesError(true);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error('❌ STEP 2: Templates - Failed to load:', err);
+        console.error('❌ Error details:', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+        });
         setTemplates([]);
         setTemplatesError(true);
-      })
-      .finally(() => {
+      } finally {
         setLoadingTemplates(false);
         console.log('✅ STEP 2: Templates - Loading complete');
-      });
+      }
+    });
+    
+    return () => unsubscribe();
   }, [companyHQId]);
 
   // Handle contactId from URL params (when navigating from success modal)
@@ -894,7 +928,7 @@ function ComposeContent() {
                     You can still compose manually
                   </p>
                 </div>
-              ) : templates.length === 0 ? (
+              ) : templates.length === 0 && !loadingTemplates ? (
                 <div className="text-center py-8">
                   <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-500">No templates available</p>
