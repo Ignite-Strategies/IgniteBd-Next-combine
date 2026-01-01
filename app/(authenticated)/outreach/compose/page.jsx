@@ -24,6 +24,7 @@ function ComposeContent() {
   useEffect(() => {
     if (hasRedirectedRef.current) return;
     if (urlCompanyHQId) {
+      console.log('📧 Compose: companyHQId from URL:', urlCompanyHQId);
       setCompanyHQId(urlCompanyHQId);
       return;
     }
@@ -32,13 +33,17 @@ function ComposeContent() {
     if (typeof window === 'undefined') return;
     
     const storedCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    console.log('📧 Compose: Checking localStorage for companyHQId:', storedCompanyHQId);
     if (storedCompanyHQId) {
       hasRedirectedRef.current = true;
+      console.log('✅ Compose: Found companyHQId in localStorage, redirecting with:', storedCompanyHQId);
       // Preserve all existing search params and add companyHQId
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.set('companyHQId', storedCompanyHQId);
       router.replace(currentUrl.pathname + currentUrl.search);
       setCompanyHQId(storedCompanyHQId);
+    } else {
+      console.warn('⚠️ Compose: No companyHQId found in URL or localStorage');
     }
   }, [urlCompanyHQId, router]);
   
@@ -47,8 +52,12 @@ function ComposeContent() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedOwnerId = localStorage.getItem('ownerId');
+    console.log('📧 Compose: Reading ownerId from localStorage:', storedOwnerId);
     if (storedOwnerId) {
       setOwnerId(storedOwnerId);
+      console.log('✅ Compose: Set ownerId:', storedOwnerId);
+    } else {
+      console.warn('⚠️ Compose: No ownerId found in localStorage');
     }
   }, []);
   
@@ -132,19 +141,25 @@ function ComposeContent() {
 
   // Load templates - only needs companyHQId (auth handled globally via axios interceptor)
   useEffect(() => {
-    if (!companyHQId) return;
+    if (!companyHQId) {
+      console.log('📧 Templates: Waiting for companyHQId...', { companyHQId });
+      return;
+    }
 
+    console.log('📧 Templates: Loading templates for companyHQId:', companyHQId);
     const loadTemplates = async () => {
       setLoadingTemplates(true);
       try {
         const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
         if (response.data?.success) {
+          console.log('✅ Templates: Loaded', response.data.templates?.length || 0, 'templates');
           setTemplates(response.data.templates || []);
         } else {
-          console.warn('Templates API response not successful:', response.data);
+          console.warn('⚠️ Templates: API response not successful:', response.data);
+          setTemplates([]);
         }
       } catch (err) {
-        console.error('Failed to load templates:', err);
+        console.error('❌ Templates: Failed to load templates:', err);
         setTemplates([]); // Clear templates on error
       } finally {
         setLoadingTemplates(false);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2, Plus, ChevronDown, X } from 'lucide-react';
 import api from '@/lib/api';
@@ -29,6 +29,7 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
   // Auth handled globally via axios interceptor
   useEffect(() => {
     if (!ownerId) {
+      console.log('📧 Sender: Waiting for ownerId...', { ownerId });
       setSenderEmail(null);
       setSenderName(null);
       setLoading(false);
@@ -39,8 +40,9 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
       return;
     }
 
+    console.log('📧 Sender: Loading sender for ownerId:', ownerId);
     loadSenderStatus();
-  }, [ownerId]);
+  }, [ownerId, loadSenderStatus]);
 
   // Notify parent when sender state changes
   useEffect(() => {
@@ -50,13 +52,15 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [senderEmail, senderName]); // Notify parent of sender changes
 
-  const loadSenderStatus = async () => {
+  const loadSenderStatus = useCallback(async () => {
     if (!ownerId) {
+      console.log('📧 Sender: loadSenderStatus called but ownerId is missing');
       setLoading(false);
       return;
     }
 
     try {
+      console.log('📧 Sender: Calling /api/outreach/verified-senders for ownerId:', ownerId);
       setLoading(true);
       setError(null);
       
@@ -67,13 +71,55 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
         const email = response.data.verifiedEmail;
         const name = response.data.verifiedName;
         
+        console.log('✅ Sender: API response successful', { email, name });
+        
         if (email) {
+          console.log('✅ Sender: Found verified sender in DB:', email);
           setSenderEmail(email);
           setSenderName(name);
         } else {
-          // No sender found - clear state
-          setSenderEmail(null);
-          setSenderName(null);
+          console.log('⚠️ Sender: No sender in DB, trying to auto-select from SendGrid...');
+          // No sender found in DB - try to auto-select from SendGrid if only one available
+          try {
+            const findResponse = await api.post('/api/outreach/verified-senders/find-or-create', {});
+            
+            if (findResponse.data?.success) {
+              // If only one sender found, auto-select it
+              if (findResponse.data.action === 'found' && findResponse.data.sender) {
+                const sender = findResponse.data.sender;
+                setSenderEmail(sender.email);
+                setSenderName(sender.name);
+                // Also save it to DB for future loads
+                await api.put('/api/outreach/verified-senders', {
+                  email: sender.email,
+                  name: sender.name,
+                });
+              } else if (findResponse.data.action === 'select' && findResponse.data.senders?.length === 1) {
+                // Only one sender available - auto-select it
+                const sender = findResponse.data.senders[0];
+                setSenderEmail(sender.email);
+                setSenderName(sender.name);
+                // Also save it to DB for future loads
+                await api.put('/api/outreach/verified-senders', {
+                  email: sender.email,
+                  name: sender.name,
+                });
+              } else {
+                // Multiple senders or none - clear state (user will need to select)
+                setSenderEmail(null);
+                setSenderName(null);
+              }
+            } else {
+              // No sender found - clear state
+              setSenderEmail(null);
+              setSenderName(null);
+            }
+          } catch (findErr) {
+            console.warn('Failed to auto-select sender:', findErr);
+            // No sender found - clear state
+            setSenderEmail(null);
+            setSenderName(null);
+          }
         }
       } else {
         // API returned error - clear sender state
@@ -81,9 +127,10 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
         setSenderName(null);
       }
     } catch (err) {
-      console.error('Failed to load sender status:', err);
+      console.error('❌ Sender: Failed to load sender status:', err);
       // On auth errors (401), clear sender state
       if (err.response?.status === 401) {
+        console.error('❌ Sender: Authentication failed (401)');
         setSenderEmail(null);
         setSenderName(null);
       }
@@ -91,7 +138,7 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [ownerId]);
 
   const loadAvailableSenders = async () => {
     try {
