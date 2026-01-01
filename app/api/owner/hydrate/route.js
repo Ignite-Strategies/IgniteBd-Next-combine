@@ -33,27 +33,10 @@ export async function GET(request) {
 
     console.log('🚀 OWNER HYDRATE: Finding Owner by Firebase ID:', firebaseId);
 
-    // Find owner by firebaseId
+    // Find owner by firebaseId - fetch whole object
     const owner = await prisma.owners.findUnique({
       where: { firebaseId },
-      select: {
-        id: true,
-        firebaseId: true,
-        firstName: true,
-        lastName: true,
-        name: true,
-        email: true,
-        photoURL: true,
-        createdAt: true,
-        updatedAt: true,
-        // Microsoft OAuth fields (for connection status check only - NOT returned to frontend)
-        microsoftAccessToken: true,
-        microsoftRefreshToken: true,
-        microsoftExpiresAt: true,
-        microsoftEmail: true,
-        microsoftDisplayName: true,
-        microsoftTenantId: true,
-      },
+      // No select - fetch all fields, we'll filter sensitive data before returning
     });
 
     if (!owner) {

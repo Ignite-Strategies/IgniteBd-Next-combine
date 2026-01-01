@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, Mail, Loader2, CheckCircle2, Plus, X, Info, ChevronDown, ChevronUp, Eye, Code, Users, TrendingUp } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
-import SenderIdentityPanel from '@/components/SenderIdentityPanel.jsx';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
@@ -47,19 +46,29 @@ function ComposeContent() {
     }
   }, [urlCompanyHQId, router]);
   
-  // Direct read from localStorage for ownerId - needed for payload (not auth)
-  const [ownerId, setOwnerId] = useState(null);
+  // STEP 1: Load sender info FIRST (from localStorage - no API calls)
+  // This happens synchronously on page load
+  const owner = typeof window !== 'undefined' 
+    ? JSON.parse(localStorage.getItem('owner') || 'null')
+    : null;
+  
+  // Extract sender info from owner (no API calls) - read from sendgridVerifiedEmail
+  const senderEmail = owner?.sendgridVerifiedEmail || null;
+  const senderName = owner?.sendgridVerifiedName || null;
+  const hasVerifiedSender = !!senderEmail;
+  
+  // Log sender info (first thing loaded)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const storedOwnerId = localStorage.getItem('ownerId');
-    console.log('📧 Compose: Reading ownerId from localStorage:', storedOwnerId);
-    if (storedOwnerId) {
-      setOwnerId(storedOwnerId);
-      console.log('✅ Compose: Set ownerId:', storedOwnerId);
+    if (senderEmail) {
+      console.log('✅ STEP 1: Sender info loaded from localStorage:', {
+        email: senderEmail,
+        name: senderName,
+        hasVerifiedSender,
+      });
     } else {
-      console.warn('⚠️ Compose: No ownerId found in localStorage');
+      console.warn('⚠️ STEP 1: No sender email found in localStorage');
     }
-  }, []);
+  }, [senderEmail, senderName, hasVerifiedSender]);
   
   // Form state
   const [selectedContact, setSelectedContact] = useState(null);
@@ -72,6 +81,7 @@ function ComposeContent() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [templatesError, setTemplatesError] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateVariables, setTemplateVariables] = useState([]);
   // Always show variables - no need for state since it's always visible
@@ -91,11 +101,6 @@ function ComposeContent() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Verified sender state - managed by SenderIdentityPanel, we just track it for validation
-  const [hasVerifiedSender, setHasVerifiedSender] = useState(false);
-  const [senderEmail, setSenderEmail] = useState(null);
-  const [senderName, setSenderName] = useState(null);
   
   // Quick contact creation modal
   const [showQuickContactModal, setShowQuickContactModal] = useState(false);
@@ -127,70 +132,51 @@ function ComposeContent() {
     }
   }, [companyHQId]);
 
-  // Reset sender state if ownerId is missing (for payload, not auth)
-  useEffect(() => {
-    if (!ownerId) {
-      setHasVerifiedSender(false);
-      setSenderEmail(null);
-      setSenderName(null);
-      setError(null);
-      setSuccess(false);
-      // Don't clear form fields - let user keep their work
-    }
-  }, [ownerId]);
-
-  // Load templates - only needs companyHQId (auth handled globally via axios interceptor)
+  // STEP 2: Load templates (sequential loading) - scoped from companyHQId params
   useEffect(() => {
     if (!companyHQId) {
-      console.log('📧 Templates: Waiting for companyHQId...', { companyHQId });
+      console.log('📧 STEP 2: Templates - Waiting for companyHQId...', { companyHQId });
       return;
     }
-
-    console.log('📧 Templates: Loading templates for companyHQId:', companyHQId);
-    const loadTemplates = async () => {
-      setLoadingTemplates(true);
-      try {
-        const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
-        if (response.data?.success) {
-          console.log('✅ Templates: Loaded', response.data.templates?.length || 0, 'templates');
-          setTemplates(response.data.templates || []);
+    
+    console.log('📧 STEP 2: Templates - Loading for companyHQId:', companyHQId);
+    setLoadingTemplates(true);
+    setTemplatesError(false);
+    
+    fetch(`/api/templates?companyHQId=${companyHQId}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        if (data?.success) {
+          console.log('✅ STEP 2: Templates - Loaded', data.templates?.length || 0, 'templates');
+          setTemplates(data.templates || []);
         } else {
-          console.warn('⚠️ Templates: API response not successful:', response.data);
+          console.warn('⚠️ STEP 2: Templates - API response not successful');
           setTemplates([]);
+          setTemplatesError(true);
         }
-      } catch (err) {
-        console.error('❌ Templates: Failed to load templates:', err);
-        setTemplates([]); // Clear templates on error
-      } finally {
+      })
+      .catch((err) => {
+        console.error('❌ STEP 2: Templates - Failed to load:', err);
+        setTemplates([]);
+        setTemplatesError(true);
+      })
+      .finally(() => {
         setLoadingTemplates(false);
-      }
-    };
-
-    loadTemplates();
+        console.log('✅ STEP 2: Templates - Loading complete');
+      });
   }, [companyHQId]);
 
   // Handle contactId from URL params (when navigating from success modal)
+  // Note: ContactSelector will handle loading this contact when it mounts
   useEffect(() => {
-    if (!ownerId) return;
-    
     const urlContactId = searchParams?.get('contactId');
     if (urlContactId && urlContactId !== contactId) {
-      // Fetch contact and select it
-      const fetchAndSelectContact = async () => {
-        try {
-          const response = await api.get(`/api/contacts/${urlContactId}`);
-          if (response.data?.success && response.data?.contact) {
-            const contact = response.data.contact;
-            handleContactSelect(contact, null);
-          }
-        } catch (err) {
-          console.error('Failed to load contact from URL:', err);
-        }
-      };
-      fetchAndSelectContact();
+      // ContactSelector will handle loading this contact
+      // Just set the contactId so ContactSelector knows to load it
+      setContactId(urlContactId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, ownerId]);
+  }, [searchParams]);
   
   // Quick contact creation
   const handleQuickSaveContact = async () => {
@@ -288,11 +274,6 @@ function ComposeContent() {
       return;
     }
 
-    if (!ownerId) {
-      setPreviewError('Authentication required. Please sign in and try again.');
-      return;
-    }
-
     if (!hasVerifiedSender || !senderEmail) {
       setPreviewError('Please verify your sender email before previewing.');
       return;
@@ -304,6 +285,7 @@ function ComposeContent() {
 
     try {
       // Hydrate variables - works for both template and manual content
+      // Uses variableMapperService (extractVariableNames)
       let hydratedSubject = subject || '';
       let hydratedBody = body || '';
       
@@ -448,12 +430,6 @@ function ComposeContent() {
       return;
     }
 
-    // Auth check - ensure user is authenticated
-    if (!ownerId) {
-      setError('Authentication required. Please sign in and try again.');
-      return;
-    }
-
     // Check for verified sender
     if (!hasVerifiedSender || !senderEmail) {
       setError('Please verify your sender email before sending. Click "Add" next to From field.');
@@ -555,20 +531,32 @@ function ComposeContent() {
             )}
 
               <form onSubmit={handleBuildAndPreview} className="space-y-4">
-              {/* Sender Identity - SenderIdentityPanel handles all sender logic */}
+              {/* Sender Identity - Read from localStorage (no API calls) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   From
                 </label>
-                <SenderIdentityPanel 
-                  ownerId={ownerId}
-                  onSenderChange={(hasSender, email, name) => {
-                    // Callback to track if sender is verified
-                    setHasVerifiedSender(hasSender);
-                    setSenderEmail(email);
-                    setSenderName(name);
-                  }}
-                />
+                {!hasVerifiedSender ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-sm font-medium text-amber-900 mb-2">
+                      Sender email not configured
+                    </p>
+                    <a
+                      href="/outreach/sender-verify"
+                      className="text-xs text-amber-700 hover:text-amber-900 underline"
+                    >
+                      Verify sender email →
+                    </a>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                    <span className="text-gray-900 font-medium">
+                      {senderName || senderEmail}
+                    </span>
+                    <span className="text-gray-500">&lt;{senderEmail}&gt;</span>
+                  </div>
+                )}
               </div>
               
               {/* Contact Selector */}
@@ -847,7 +835,7 @@ function ComposeContent() {
                 <button
                   type="button"
                   onClick={handlePreview}
-                  disabled={previewLoading || sending || !ownerId || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
+                  disabled={previewLoading || sending || !hasVerifiedSender || !senderEmail || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
                   className="inline-flex items-center gap-2 rounded-md bg-gray-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {previewLoading ? (
@@ -864,7 +852,7 @@ function ComposeContent() {
                 </button>
                 <button
                   type="submit"
-                  disabled={sending || !ownerId || !hasVerifiedSender || !senderEmail || (!to || (!subject && !selectedTemplateId) || (!body && !selectedTemplateId))}
+                  disabled={sending || !hasVerifiedSender || !senderEmail || !to || !subject || !body}
                   className="inline-flex items-center gap-2 rounded-md bg-red-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sending ? (
@@ -897,6 +885,14 @@ function ComposeContent() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
                   <span className="ml-2 text-sm text-gray-600">Loading templates...</span>
+                </div>
+              ) : templatesError ? (
+                <div className="text-center py-8">
+                  <Mail className="h-8 w-8 text-amber-300 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-amber-900">Failed to load templates</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    You can still compose manually
+                  </p>
                 </div>
               ) : templates.length === 0 ? (
                 <div className="text-center py-8">

@@ -36,90 +36,96 @@ export default function ContactSelector({
   // Use prop companyHQId (from URL params) - REQUIRED
   const companyHQId = propCompanyHQId;
   const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContactId, setSelectedContactId] = useState(contactId || null);
 
-  // Debug: Log companyId and companyHQId props
-  useEffect(() => {
-    console.log('🔍 ContactSelector props:', {
-      companyId,
-      companyHQId: propCompanyHQId,
-    });
-  }, [companyId, propCompanyHQId]);
+  // Handle contact selection (defined before use in useEffect)
+  const handleSelectContact = (contact) => {
+    setSelectedContactId(contact.id);
+    const displayName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '';
+    setContactSearch(displayName);
+    
+    // Call callback - support both onContactSelect and onContactChange
+    if (onContactSelect) {
+      const company = contact.contactCompany || null;
+      onContactSelect(contact, company);
+    }
+    if (onContactChange) {
+      onContactChange(contact);
+    }
+  };
 
-  // Fetch contacts from API - ownerId needed for payload
-  // Auth handled globally via axios interceptor
+  // Load specific contact from URL param (if contactId provided)
   useEffect(() => {
-    const fetchContacts = async () => {
-      if (typeof window === 'undefined') return;
-      
-      // Wait for ownerId (for payload, not auth)
-      if (!ownerId || !ownerHydrated) {
-        return;
-      }
-      
-      // Use prop companyHQId (from URL params) - REQUIRED
-      const finalCompanyHQId = companyHQId;
-      
-      if (!finalCompanyHQId) {
-        // No companyHQId - required prop
-        console.warn('ContactSelector: No companyHQId available (required prop)');
-        setLoading(false);
-        return;
-      }
-
+    if (!contactId || !companyHQId || !ownerId || !ownerHydrated) return;
+    
+    // Fetch this specific contact
+    const fetchContact = async () => {
       try {
         setLoading(true);
-        
-        console.log('🔍 ContactSelector: Fetching contacts from API', {
-          companyHQId: finalCompanyHQId,
+        const response = await api.get(`/api/contacts/${contactId}`);
+        if (response.data?.success && response.data.contact) {
+          const contact = response.data.contact;
+          setContacts([contact]); // Set as single contact in array
+          handleSelectContact(contact);
+        }
+      } catch (err) {
+        console.error('Failed to load contact from URL:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchContact();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactId, companyHQId, ownerId, ownerHydrated]);
+
+  // STEP 3: Load contacts - ONLY when user types (debounced, scoped from companyHQId params)
+  useEffect(() => {
+    if (!companyHQId || !ownerId || !ownerHydrated) return;
+    
+    // Don't fetch if search is too short or empty
+    if (!contactSearch || contactSearch.trim().length < 2) {
+      setContacts([]);
+      return;
+    }
+    
+    // Debounce search - wait 300ms after user stops typing
+    const timeoutId = setTimeout(async () => {
+      try {
+        setLoading(true);
+        console.log('🔍 STEP 3: Contacts - Loading (user typed)', {
+          companyHQId,
+          search: contactSearch,
           companyId: companyId,
-          hasCompanyIdFilter: !!companyId
         });
         
-        // NO localStorage - always fetch from API
-        let apiUrl = `/api/contacts?companyHQId=${finalCompanyHQId}`;
+        // Fetch all contacts for companyHQ (scoped from params)
+        // Client-side filtering happens in availableContacts useMemo
+        let apiUrl = `/api/contacts?companyHQId=${companyHQId}`;
         if (companyId) {
           apiUrl += `&companyId=${encodeURIComponent(companyId)}`;
         }
         
         const response = await api.get(apiUrl);
         if (response.data?.success && response.data.contacts) {
-          let fetched = response.data.contacts;
-          console.log('✅ ContactSelector: Received', fetched.length, 'contacts from API', 
-            companyId ? `(filtered by companyId: ${companyId})` : '(all contacts)');
-          
-          // API now filters by companyId server-side, so no client-side filtering needed
-          // But log the results for debugging
-          if (companyId && fetched.length === 0) {
-            console.warn('⚠️⚠️⚠️ NO CONTACTS FOUND for companyId:', companyId);
-            console.warn('⚠️ This means no contacts have contactCompanyId matching:', companyId);
-          } else if (companyId && fetched.length > 0) {
-            console.log('✅ Found', fetched.length, 'contacts for companyId:', companyId);
-            console.log('📋 Contacts:', fetched.slice(0, 5).map(c => ({
-              name: `${c.firstName} ${c.lastName}`,
-              email: c.email,
-              contactCompanyId: c.contactCompanyId
-            })));
-          }
-          
+          const fetched = response.data.contacts;
+          console.log('✅ STEP 3: Contacts - Loaded', fetched.length, 'contacts (will filter client-side)');
           setContacts(fetched);
-          // NO localStorage - API only
         } else {
-          console.warn('API response missing contacts:', response.data);
           setContacts([]);
         }
       } catch (err) {
-        console.error('Error fetching contacts:', err);
+        console.error('❌ STEP 3: Contacts - Error loading:', err);
         setContacts([]);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchContacts();
-  }, [companyHQId, companyId, ownerId, ownerHydrated]); // Wait for ownerId before fetching
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [contactSearch, companyHQId, companyId, ownerId, ownerHydrated]);
 
   // Initialize from props only
   useEffect(() => {
@@ -210,22 +216,6 @@ export default function ContactSelector({
     
     return filtered;
   }, [contacts, contactSearch, selectedContactId, selectedContactObj]);
-
-  // Handle contact selection
-  const handleSelectContact = (contact) => {
-    setSelectedContactId(contact.id);
-    const displayName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '';
-    setContactSearch(displayName);
-    
-    // Call callback - support both onContactSelect and onContactChange
-    if (onContactSelect) {
-      const company = contact.contactCompany || null;
-      onContactSelect(contact, company);
-    }
-    if (onContactChange) {
-      onContactChange(contact);
-    }
-  };
 
   return (
     <div className={`relative ${className}`}>
