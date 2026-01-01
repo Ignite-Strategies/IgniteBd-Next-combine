@@ -7,8 +7,6 @@ import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
 import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
@@ -143,30 +141,26 @@ function ComposeContent() {
   }, [companyHQId]);
 
   // STEP 2: Load templates (sequential loading) - scoped from companyHQId params
-  // Wait for Firebase auth to be ready (onAuthStateChanged is Firebase's auth listener)
+  // Trust axios interceptor to handle auth - no auth waiting in page
   useEffect(() => {
     if (!companyHQId) {
       console.log('📧 STEP 2: Templates - Waiting for companyHQId...', { companyHQId });
       return;
     }
     
-    // Wait for Firebase auth to be ready before making API call
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        console.log('📧 STEP 2: Templates - Waiting for Firebase auth...');
-        return;
-      }
-      
-      console.log('📧 STEP 2: Templates - Loading for companyHQId:', companyHQId);
-      setLoadingTemplates(true);
-      setTemplatesError(false);
-      
-      try {
-        // Use api.get() - axios interceptor automatically adds auth token
-        const response = await api.get(`/api/templates?companyHQId=${companyHQId}`);
-        console.log('📦 STEP 2: Templates - Full response:', {
+    let cancelled = false;
+    
+    console.log('📧 Fetching templates for company:', companyHQId);
+    setLoadingTemplates(true);
+    setTemplatesError(false);
+    
+    api
+      .get(`/api/templates?companyHQId=${companyHQId}`)
+      .then((response) => {
+        if (cancelled) return;
+        
+        console.log('📦 STEP 2: Templates - API response received:', {
           status: response.status,
-          data: response.data,
           hasSuccess: !!response.data?.success,
           templatesCount: response.data?.templates?.length || 0,
         });
@@ -181,23 +175,28 @@ function ComposeContent() {
           setTemplates([]);
           setTemplatesError(true);
         }
-      } catch (err) {
-        console.error('❌ STEP 2: Templates - Failed to load:', err);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        
+        console.error('❌ STEP 2: Templates - API call failed:', err);
         console.error('❌ Error details:', {
           message: err.message,
           response: err.response?.data,
           status: err.response?.status,
-          statusText: err.response?.statusText,
         });
         setTemplates([]);
         setTemplatesError(true);
-      } finally {
+      })
+      .finally(() => {
+        if (cancelled) return;
         setLoadingTemplates(false);
         console.log('✅ STEP 2: Templates - Loading complete');
-      }
-    });
+      });
     
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+    };
   }, [companyHQId]);
 
   // Handle contactId from URL params (when navigating from success modal)
