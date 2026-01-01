@@ -25,33 +25,7 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
   const [changingSender, setChangingSender] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load sender status - ownerId needed for payload
-  // Auth handled globally via axios interceptor
-  useEffect(() => {
-    if (!ownerId) {
-      console.log('📧 Sender: Waiting for ownerId...', { ownerId });
-      setSenderEmail(null);
-      setSenderName(null);
-      setLoading(false);
-      setError(null);
-      if (onSenderChange) {
-        onSenderChange(false, null, null);
-      }
-      return;
-    }
-
-    console.log('📧 Sender: Loading sender for ownerId:', ownerId);
-    loadSenderStatus();
-  }, [ownerId, loadSenderStatus]);
-
-  // Notify parent when sender state changes
-  useEffect(() => {
-    if (onSenderChange) {
-      onSenderChange(!!senderEmail, senderEmail, senderName);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [senderEmail, senderName]); // Notify parent of sender changes
-
+  // Define loadSenderStatus BEFORE useEffect that uses it (to avoid initialization error)
   const loadSenderStatus = useCallback(async () => {
     if (!ownerId) {
       console.log('📧 Sender: loadSenderStatus called but ownerId is missing');
@@ -139,6 +113,33 @@ export default function SenderIdentityPanel({ ownerId, onSenderChange }) {
       setLoading(false);
     }
   }, [ownerId]);
+
+  // Load sender status - ownerId needed for payload
+  // Auth handled globally via axios interceptor
+  useEffect(() => {
+    if (!ownerId) {
+      console.log('📧 Sender: Waiting for ownerId...', { ownerId });
+      setSenderEmail(null);
+      setSenderName(null);
+      setLoading(false);
+      setError(null);
+      if (onSenderChange) {
+        onSenderChange(false, null, null);
+      }
+      return;
+    }
+
+    console.log('📧 Sender: Loading sender for ownerId:', ownerId);
+    loadSenderStatus();
+  }, [ownerId, loadSenderStatus]);
+
+  // Notify parent when sender state changes
+  useEffect(() => {
+    if (onSenderChange) {
+      onSenderChange(!!senderEmail, senderEmail, senderName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [senderEmail, senderName]); // Notify parent of sender changes
 
   const loadAvailableSenders = async () => {
     try {
