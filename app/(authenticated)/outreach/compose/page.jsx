@@ -7,7 +7,7 @@ import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
-import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableMapperService';
+import { VariableCatalogue, extractVariableNames } from '@/lib/services/variableCatalogue';
 import { formatContactEmail, formatEmailWithName, parseEmailString } from '@/lib/utils/emailFormat';
 
 function ComposeContent() {
@@ -761,7 +761,7 @@ function ComposeContent() {
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {templateVariables.map((varName) => {
-                          const varDef = VariableCatalogue[varName];
+                          const varDef = VariableCatalogue?.[varName];
                           return (
                             <button
                               key={varName}
@@ -817,7 +817,7 @@ function ComposeContent() {
                         Available variables you can use (click to insert):
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {Object.entries(VariableCatalogue).map(([key, def]) => (
+                        {VariableCatalogue && Object.entries(VariableCatalogue).map(([key, def]) => (
                           <button
                             key={key}
                             type="button"
