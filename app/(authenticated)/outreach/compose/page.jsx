@@ -141,7 +141,7 @@ function ComposeContent() {
   }, [companyHQId]);
 
   // STEP 2: Load templates (sequential loading) - scoped from companyHQId params
-  // Trust axios interceptor to handle auth - no auth waiting in page
+  // Axios interceptor handles auth - no retry logic needed
   useEffect(() => {
     if (!companyHQId) {
       console.log('📧 STEP 2: Templates - Waiting for companyHQId...', { companyHQId });
@@ -179,11 +179,10 @@ function ComposeContent() {
       .catch((err) => {
         if (cancelled) return;
         
-        console.error('❌ STEP 2: Templates - API call failed:', err);
-        console.error('❌ Error details:', {
+        console.error('❌ STEP 2: Templates - API call failed:', {
+          status: err.response?.status,
           message: err.message,
           response: err.response?.data,
-          status: err.response?.status,
         });
         setTemplates([]);
         setTemplatesError(true);
