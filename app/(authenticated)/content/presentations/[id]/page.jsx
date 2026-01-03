@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -11,7 +11,7 @@ import api from '@/lib/api';
 // 🎯 LOCAL-FIRST FLAG: API fallback is optional and explicit only
 const ENABLE_PRESENTATION_API_FALLBACK = true;
 
-export default function PresentationPage() {
+function PresentationPageContent() {
   // 1. Constants / params / flags
   const params = useParams();
   const router = useRouter();
@@ -733,5 +733,21 @@ export default function PresentationPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PresentationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="rounded-2xl bg-white p-8 text-center shadow">
+            <p className="text-sm font-semibold text-gray-600">Loading presentation...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <PresentationPageContent />
+    </Suspense>
   );
 }

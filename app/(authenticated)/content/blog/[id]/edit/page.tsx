@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Save, ArrowLeft, Trash2, Download, ExternalLink, Copy, Check } from 'lucide-react';
 import api from '@/lib/api';
 
-export default function BlogEditorPage() {
+function BlogEditorPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -475,3 +475,18 @@ export default function BlogEditorPage() {
   );
 }
 
+export default function BlogEditorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="rounded-2xl bg-white p-8 text-center shadow">
+            <p className="text-sm font-semibold text-gray-600">Loading blog...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <BlogEditorPageContent />
+    </Suspense>
+  );
+}

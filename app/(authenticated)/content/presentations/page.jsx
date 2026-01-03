@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Plus, Presentation, ArrowRight, RefreshCw } from 'lucide-react';
@@ -9,7 +9,7 @@ import api from '@/lib/api';
 // 🎯 LOCAL-FIRST FLAG: API sync is optional and explicit only
 const ENABLE_PRESENTATION_API_SYNC = true;
 
-export default function PresentationsPage() {
+function PresentationsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -280,5 +280,22 @@ export default function PresentationsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PresentationsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <PresentationsPageContent />
+    </Suspense>
   );
 }
