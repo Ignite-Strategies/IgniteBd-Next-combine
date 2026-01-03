@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { FileText, Plus, Edit2, Eye, RefreshCw, Trash2, UserCircle, Lightbulb, FileStack, PenTool, Download, ExternalLink, Copy, Check } from 'lucide-react';
@@ -11,6 +11,13 @@ const ENABLE_BLOG_API_SYNC = true;
 
 export default function BlogPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Read companyHQId from URL params, with fallback to localStorage
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+  const [companyHQId, setCompanyHQId] = useState(urlCompanyHQId);
+  const hasRedirectedRef = useRef(false);
+  
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -18,15 +25,39 @@ export default function BlogPage() {
   const [exportingBlogId, setExportingBlogId] = useState(null);
   const [copiedBlogId, setCopiedBlogId] = useState<string | null>(null);
 
-  const [companyHQId, setCompanyHQId] = useState('');
+  // Fallback: If not in URL, check localStorage and redirect (preserving all existing params)
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    if (urlCompanyHQId) {
+      console.log('📝 Blog: companyHQId from URL:', urlCompanyHQId);
+      setCompanyHQId(urlCompanyHQId);
+      return;
+    }
+    
+    // No companyHQId in URL - check localStorage
+    if (typeof window === 'undefined') return;
+    
+    const storedCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    console.log('📝 Blog: Checking localStorage for companyHQId:', storedCompanyHQId);
+    if (storedCompanyHQId) {
+      hasRedirectedRef.current = true;
+      console.log('✅ Blog: Found companyHQId in localStorage, redirecting with:', storedCompanyHQId);
+      // Preserve all existing search params and add companyHQId
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('companyHQId', storedCompanyHQId);
+      router.replace(currentUrl.pathname + currentUrl.search);
+      setCompanyHQId(storedCompanyHQId);
+    } else {
+      console.warn('⚠️ Blog: No companyHQId found in URL or localStorage');
+    }
+  }, [urlCompanyHQId, router]);
 
   // 🎯 LOCAL-FIRST: Load ONLY from localStorage on mount - NO API CALLS
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Get companyHQId (for syncing button only - not required for display)
-    const id = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-    setCompanyHQId(id);
+    // Use companyHQId from state (which comes from URL params)
+    const id = companyHQId || localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
 
     // 🎯 LOCAL-FIRST: Load from localStorage - localStorage is authoritative
     try {
@@ -103,7 +134,7 @@ export default function BlogPage() {
     }
     
     setLoading(false);
-  }, []);
+  }, [companyHQId]);
 
   // 🎯 LOCAL-FIRST: API sync is explicit and optional - only called by user clicking Sync button
   const handleSync = async () => {

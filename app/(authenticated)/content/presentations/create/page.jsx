@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { Building2, RefreshCw, ArrowRight } from 'lucide-react';
@@ -9,18 +9,53 @@ import api from '@/lib/api';
 function CreatePresentationPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const companyHQId = searchParams?.get('companyHQId') || '';
+  
+  // Read companyHQId from URL params, with fallback to localStorage
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+  const [companyHQId, setCompanyHQId] = useState(urlCompanyHQId);
+  const hasRedirectedRef = useRef(false);
   
   // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
   const [companyHQ, setCompanyHQ] = useState(null);
+  
+  // Fallback: If not in URL, check localStorage and redirect
   useEffect(() => {
-    if (typeof window === 'undefined' || !companyHQId) return;
-    const stored = localStorage.getItem('companyHQ');
-    if (stored) {
-      try {
-        setCompanyHQ(JSON.parse(stored));
-      } catch (e) {
-        console.warn('Failed to parse companyHQ', e);
+    if (hasRedirectedRef.current) return;
+    if (urlCompanyHQId) {
+      setCompanyHQId(urlCompanyHQId);
+      return;
+    }
+    
+    if (typeof window === 'undefined') return;
+    
+    const storedCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    if (storedCompanyHQId) {
+      hasRedirectedRef.current = true;
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('companyHQId', storedCompanyHQId);
+      router.replace(currentUrl.pathname + currentUrl.search);
+      setCompanyHQId(storedCompanyHQId);
+    }
+  }, [urlCompanyHQId, router]);
+  
+  // Load ownerId and companyHQ from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const storedOwnerId = localStorage.getItem('ownerId');
+    if (storedOwnerId) {
+      setOwnerId(storedOwnerId);
+    }
+    
+    if (companyHQId) {
+      const stored = localStorage.getItem('companyHQ');
+      if (stored) {
+        try {
+          setCompanyHQ(JSON.parse(stored));
+        } catch (e) {
+          console.warn('Failed to parse companyHQ', e);
+        }
       }
     }
   }, [companyHQId]);
@@ -50,7 +85,7 @@ function CreatePresentationPageContent() {
     }
 
     // Redirect to AI builder (no ID - it's a new presentation)
-    router.push('/content/presentations/ai');
+    router.push(`/content/presentations/ai${companyHQId ? `?companyHQId=${companyHQId}` : ''}`);
   };
 
   return (

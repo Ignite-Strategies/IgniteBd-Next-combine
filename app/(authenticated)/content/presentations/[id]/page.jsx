@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -15,7 +15,33 @@ export default function PresentationPage() {
   // 1. Constants / params / flags
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const presentationId = params.id;
+  
+  // Read companyHQId from URL params, with fallback to localStorage
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+  const [companyHQId, setCompanyHQId] = useState(urlCompanyHQId);
+  const hasRedirectedRef = useRef(false);
+  
+  // Fallback: If not in URL, check localStorage and redirect
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    if (urlCompanyHQId) {
+      setCompanyHQId(urlCompanyHQId);
+      return;
+    }
+    
+    if (typeof window === 'undefined') return;
+    
+    const storedCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    if (storedCompanyHQId) {
+      hasRedirectedRef.current = true;
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('companyHQId', storedCompanyHQId);
+      router.replace(currentUrl.pathname + currentUrl.search);
+      setCompanyHQId(storedCompanyHQId);
+    }
+  }, [urlCompanyHQId, router]);
 
   // 2. State declarations
   const [title, setTitle] = useState('');
@@ -108,11 +134,11 @@ export default function PresentationPage() {
       let presentation = null;
       
       if (typeof window !== 'undefined') {
-        const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+        const id = companyHQId || localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
         
-        // Try presentations_${companyHQId} first
-        if (companyHQId) {
-          const cachedKey = `presentations_${companyHQId}`;
+        // Try presentations_${id} first
+        if (id) {
+          const cachedKey = `presentations_${id}`;
           const cached = localStorage.getItem(cachedKey);
           if (cached) {
             try {
@@ -130,8 +156,8 @@ export default function PresentationPage() {
         }
         
         // Try hydration data as fallback
-        if (!presentation && companyHQId) {
-          const hydrationKey = `companyHydration_${companyHQId}`;
+        if (!presentation && id) {
+          const hydrationKey = `companyHydration_${id}`;
           const hydrationData = localStorage.getItem(hydrationKey);
           if (hydrationData) {
             try {
@@ -173,10 +199,10 @@ export default function PresentationPage() {
         
         // 🎯 LOCAL-FIRST: Save to localStorage for future use
         if (typeof window !== 'undefined' && presentation) {
-          const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-          if (companyHQId) {
+          const saveId = companyHQId || localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+          if (saveId) {
             try {
-              const cachedKey = `presentations_${companyHQId}`;
+              const cachedKey = `presentations_${saveId}`;
               const cached = localStorage.getItem(cachedKey);
               const presentations = cached ? JSON.parse(cached) : [];
               const existingIndex = presentations.findIndex(p => p.id === presentation.id);
@@ -388,10 +414,10 @@ export default function PresentationPage() {
         
         // 🎯 LOCAL-FIRST: Save to localStorage (authoritative source)
         if (typeof window !== 'undefined') {
-          const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-          if (companyHQId) {
+          const saveId = companyHQId || localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+          if (saveId) {
             try {
-              const cachedKey = `presentations_${companyHQId}`;
+              const cachedKey = `presentations_${saveId}`;
               const cached = localStorage.getItem(cachedKey);
               const presentations = cached ? JSON.parse(cached) : [];
               const existingIndex = presentations.findIndex(p => p.id === savedPresentation.id);

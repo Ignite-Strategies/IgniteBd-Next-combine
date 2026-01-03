@@ -1,14 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Save, ArrowLeft, Trash2, Download, ExternalLink, Copy, Check } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function BlogEditorPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const blogId = params.id;
+  
+  // Read companyHQId from URL params, with fallback to localStorage
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+  const [companyHQId, setCompanyHQId] = useState(urlCompanyHQId);
+  const hasRedirectedRef = useRef(false);
+  
+  // Fallback: If not in URL, check localStorage and redirect
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    if (urlCompanyHQId) {
+      setCompanyHQId(urlCompanyHQId);
+      return;
+    }
+    
+    if (typeof window === 'undefined') return;
+    
+    const storedCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    if (storedCompanyHQId) {
+      hasRedirectedRef.current = true;
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('companyHQId', storedCompanyHQId);
+      router.replace(currentUrl.pathname + currentUrl.search);
+      setCompanyHQId(storedCompanyHQId);
+    }
+  }, [urlCompanyHQId, router]);
 
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
@@ -41,14 +67,14 @@ export default function BlogEditorPage() {
       
       // 🎯 LOCAL-FIRST: Try to load from localStorage first
       let blog = null;
-      const companyHQId = typeof window !== 'undefined' 
+      const id = companyHQId || (typeof window !== 'undefined' 
         ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
-        : '';
+        : '');
       
-      if (typeof window !== 'undefined' && companyHQId) {
-        // First try: blogs_${companyHQId}
+      if (typeof window !== 'undefined' && id) {
+        // First try: blogs_${id}
         try {
-          const stored = localStorage.getItem(`blogs_${companyHQId}`);
+          const stored = localStorage.getItem(`blogs_${id}`);
           if (stored) {
             const blogs = JSON.parse(stored);
             blog = Array.isArray(blogs) ? blogs.find(b => b.id === blogId) : null;
@@ -60,10 +86,10 @@ export default function BlogEditorPage() {
           console.warn('[LOCAL-FIRST] Failed to parse blogs from localStorage:', e);
         }
         
-        // Second try: companyHydration_${companyHQId}
+        // Second try: companyHydration_${id}
         if (!blog) {
           try {
-            const hydrationKey = `companyHydration_${companyHQId}`;
+            const hydrationKey = `companyHydration_${id}`;
             const hydrationData = localStorage.getItem(hydrationKey);
             if (hydrationData) {
               const parsed = JSON.parse(hydrationData);

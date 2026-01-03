@@ -1,31 +1,73 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { FileText } from 'lucide-react';
 
 export default function BlogBuildWritePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Read companyHQId from URL params, with fallback to localStorage
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+  const [companyHQId, setCompanyHQId] = useState(urlCompanyHQId);
+  const hasRedirectedRef = useRef(false);
+  
+  // Direct read from localStorage - NO HOOKS
+  const [ownerId, setOwnerId] = useState(null);
+  
+  // Fallback: If not in URL, check localStorage and redirect
+  useEffect(() => {
+    if (hasRedirectedRef.current) return;
+    if (urlCompanyHQId) {
+      setCompanyHQId(urlCompanyHQId);
+      return;
+    }
+    
+    if (typeof window === 'undefined') return;
+    
+    const storedCompanyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId');
+    if (storedCompanyHQId) {
+      hasRedirectedRef.current = true;
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('companyHQId', storedCompanyHQId);
+      router.replace(currentUrl.pathname + currentUrl.search);
+      setCompanyHQId(storedCompanyHQId);
+    }
+  }, [urlCompanyHQId, router]);
+  
+  // Load ownerId from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedOwnerId = localStorage.getItem('ownerId');
+    if (storedOwnerId) {
+      setOwnerId(storedOwnerId);
+    }
+  }, []);
+  
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
+    if (!companyHQId) {
+      alert('Company ID not found. Please refresh the page.');
+      return;
+    }
+    
     try {
       setCreating(true);
       
-      const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
-      
-      // Create empty blog
+      // Create empty blog - scoped to companyHQ
       const createResponse = await api.post('/api/content/blog', {
         companyHQId,
         title: 'Untitled Blog',
         subtitle: '',
-        content: {}, // Empty content object
+        blogText: '', // Empty content
       });
 
       if (createResponse.data?.success) {
-        router.push(`/content/blog/${createResponse.data.blog.id}`);
+        router.push(`/content/blog/${createResponse.data.blog.id}?companyHQId=${companyHQId}`);
       } else {
         throw new Error('Failed to create blog');
       }
