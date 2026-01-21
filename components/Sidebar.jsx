@@ -88,7 +88,7 @@ function Sidebar() {
       name: 'Attract',
       items: [
         { key: 'content', label: 'Content', href: '/content', icon: FileText },
-        { key: 'events', label: 'Events', href: '/events/picker', icon: Calendar },
+        { key: 'events', label: 'Events', href: '/events', icon: Calendar },
       ],
     },
     {
