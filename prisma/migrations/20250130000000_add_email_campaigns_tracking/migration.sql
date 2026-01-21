@@ -195,3 +195,5 @@ ALTER TABLE "sequence_steps" ADD CONSTRAINT "sequence_steps_sequence_id_fkey" FO
 -- AddForeignKey
 ALTER TABLE "email_events" ADD CONSTRAINT "email_events_email_activity_id_fkey" FOREIGN KEY ("email_activity_id") REFERENCES "email_activities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+

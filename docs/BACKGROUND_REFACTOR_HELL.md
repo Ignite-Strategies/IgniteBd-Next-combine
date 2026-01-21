@@ -143,3 +143,5 @@ For now, MVP1 = **global navbar, auth-based only**.
 **TL;DR:** Navbar is now global and auth-based only. No pathname checking. Shows on every authenticated page. Simple and reliable.
 
 
+
+
