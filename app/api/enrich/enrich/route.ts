@@ -59,8 +59,31 @@ export async function POST(request: Request) {
       // Enrich by linkedinUrl only
       const apolloResponse = await enrichPerson({ linkedinUrl });
       rawApolloResponse = apolloResponse; // Store raw response
+      
+      // Log raw Apollo response for debugging
+      console.log('📋 Raw Apollo response:', JSON.stringify(apolloResponse, null, 2));
+      console.log('📋 Apollo person object:', apolloResponse?.person ? {
+        hasEmail: !!apolloResponse.person.email,
+        email: apolloResponse.person.email,
+        firstName: apolloResponse.person.first_name,
+        lastName: apolloResponse.person.last_name,
+        allKeys: Object.keys(apolloResponse.person),
+      } : 'No person object');
+      
       enrichedData = normalizeApolloResponse(apolloResponse);
-      console.log('✅ Enrichment successful');
+      
+      // Warn if email is missing after normalization
+      if (!enrichedData.email) {
+        console.warn('⚠️ WARNING: Apollo enrichment did not return an email for LinkedIn profile:', linkedinUrl);
+        console.warn('⚠️ This contact cannot be saved without an email address');
+      }
+      
+      console.log('✅ Enrichment successful', {
+        hasEmail: !!enrichedData.email,
+        email: enrichedData.email,
+        firstName: enrichedData.firstName,
+        lastName: enrichedData.lastName,
+      });
     } catch (error: any) {
       console.error('❌ Apollo enrichment error:', error);
       console.error('Error details:', {

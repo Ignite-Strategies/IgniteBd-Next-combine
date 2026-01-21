@@ -306,7 +306,7 @@ function PersonasPageContent() {
                   <h3 className="text-lg font-bold text-gray-900">Build from LinkedIn</h3>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Discover contacts from LinkedIn and generate persona from enriched data
+                  Enrich contacts with LinkedIn and generate persona from enriched data
                 </p>
               </div>
 

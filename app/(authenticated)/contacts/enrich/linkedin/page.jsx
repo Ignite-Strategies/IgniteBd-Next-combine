@@ -114,15 +114,22 @@ function LinkedInEnrichContent() {
         const enrichedProfile = response.data.enrichedProfile || {};
         const rawApolloResponse = response.data.rawApolloResponse;
         
-        console.log('✅ Apollo enrichment successful:', {
-          enrichedProfile,
-          hasRawResponse: !!rawApolloResponse,
-          firstName: enrichedProfile.firstName,
-          lastName: enrichedProfile.lastName,
-          email: enrichedProfile.email,
-          title: enrichedProfile.title,
-          companyName: enrichedProfile.companyName,
-        });
+      console.log('✅ Apollo enrichment successful:', {
+        enrichedProfile,
+        hasRawResponse: !!rawApolloResponse,
+        firstName: enrichedProfile.firstName,
+        lastName: enrichedProfile.lastName,
+        email: enrichedProfile.email,
+        hasEmail: !!enrichedProfile.email,
+        title: enrichedProfile.title,
+        companyName: enrichedProfile.companyName,
+      });
+      
+      // Warn user if email is missing
+      if (!enrichedProfile.email) {
+        console.warn('⚠️ WARNING: Apollo did not return an email for this contact');
+        console.warn('⚠️ Raw Apollo response:', rawApolloResponse);
+      }
 
         // Set enrichment data - enrichedProfile IS the normalized contact data
         const enrichmentDataToSet = {
@@ -158,6 +165,12 @@ function LinkedInEnrichContent() {
 
     if (!companyHQId) {
       alert('Company context required. Please refresh the page with a companyHQId parameter.');
+      return;
+    }
+
+    // Check if email is missing before attempting to save
+    if (!enrichmentData.normalizedContact?.email) {
+      alert('Email is required to save this contact. Apollo did not return an email address for this LinkedIn profile. Please try enriching again or manually add an email address.');
       return;
     }
 

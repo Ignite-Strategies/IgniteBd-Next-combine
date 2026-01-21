@@ -31,7 +31,7 @@ function LoadUpPageContent() {
     },
     {
       id: 'discover-linkedin',
-      title: 'Discover from LinkedIn',
+      title: 'Enrich with LinkedIn',
       description: 'Find people in your network and add them as contacts',
       route: companyHQId ? `/contacts/enrich/linkedin?companyHQId=${companyHQId}` : '/contacts/enrich/linkedin',
       icon: Sparkles,
@@ -190,6 +190,7 @@ export default function LoadUpPage() {
     </Suspense>
   );
 }
+
 
 
 

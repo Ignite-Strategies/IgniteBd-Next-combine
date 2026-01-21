@@ -67,8 +67,8 @@ function PreferencesPageContent() {
       if (stored) {
         router.replace(`/events/preferences?companyHQId=${stored}`);
       } else {
-        // If no companyHQId available, redirect back to events page
-        router.push('/events');
+        // If no companyHQId available, redirect back to events picker page
+        router.push('/events/picker');
       }
     }
   }, [companyHQId, router]);

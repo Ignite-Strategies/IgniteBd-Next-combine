@@ -36,7 +36,8 @@ function OutreachLayoutContent({ children }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const cached = window.localStorage.getItem('outreachCampaigns');
+    // Use standard 'campaigns' key to match campaigns page
+    const cached = window.localStorage.getItem('campaigns');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -45,7 +46,7 @@ function OutreachLayoutContent({ children }) {
           setHydrated(true);
         }
       } catch (error) {
-        console.warn('Unable to parse cached outreach campaigns', error);
+        console.warn('Unable to parse cached campaigns', error);
       }
     }
   }, []);
@@ -53,17 +54,19 @@ function OutreachLayoutContent({ children }) {
   const refreshCampaigns = useCallback(async () => {
     try {
       setHydrating(true);
-      const response = await api.get('/api/outreach/campaigns');
+      // Fix: Use correct endpoint /api/campaigns instead of /api/outreach/campaigns
+      const response = await api.get('/api/campaigns');
       const data = Array.isArray(response.data?.campaigns)
         ? response.data.campaigns
         : [];
       setCampaigns(data);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('outreachCampaigns', JSON.stringify(data));
+        // Use standard 'campaigns' key to match campaigns page
+        window.localStorage.setItem('campaigns', JSON.stringify(data));
       }
       setHydrated(true);
     } catch (error) {
-      console.warn('Outreach campaigns API unavailable.', error);
+      console.warn('Campaigns API unavailable.', error);
       setHydrated(true);
     } finally {
       setHydrating(false);

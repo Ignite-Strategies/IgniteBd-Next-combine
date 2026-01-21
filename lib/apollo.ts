@@ -105,9 +105,32 @@ export function normalizeApolloResponse(apolloData: ApolloPersonMatchResponse): 
 
   const normalized: NormalizedContactData = {};
 
-  // Email
+  // Email - check multiple possible fields
+  // Apollo may return email in different structures
   if (person.email) {
     normalized.email = person.email;
+  } else if ((person as any).emails && Array.isArray((person as any).emails) && (person as any).emails.length > 0) {
+    // Check for emails array (some Apollo responses use this)
+    normalized.email = (person as any).emails[0].email || (person as any).emails[0];
+  } else if ((person as any).email_status === 'unavailable' || (person as any).email_status === 'not_found') {
+    // Apollo explicitly marked email as unavailable
+    console.warn('⚠️ Apollo marked email as unavailable for:', {
+      firstName: person?.first_name,
+      lastName: person?.last_name,
+      linkedinUrl: person?.linkedin_url,
+      emailStatus: (person as any).email_status,
+    });
+  } else {
+    // Log warning if email is missing - Apollo should return it
+    console.warn('⚠️ Apollo response missing email field:', {
+      hasPerson: !!person,
+      personKeys: person ? Object.keys(person) : [],
+      firstName: person?.first_name,
+      lastName: person?.last_name,
+      linkedinUrl: person?.linkedin_url,
+      // Log full person object structure for debugging
+      personStructure: JSON.stringify(person, null, 2).substring(0, 500),
+    });
   }
 
   // Name fields

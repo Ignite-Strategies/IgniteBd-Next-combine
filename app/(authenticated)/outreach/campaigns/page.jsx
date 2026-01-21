@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Mail, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -19,6 +19,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
   const [hydrating, setHydrating] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const syncInitiatedRef = useRef(false); // Prevent multiple sync calls
 
   // Load from localStorage immediately (no blocking)
   useEffect(() => {
@@ -39,9 +40,11 @@ export default function CampaignsPage() {
   }, []);
 
   // Sync from API if owner is hydrated and we haven't synced yet
-  const syncCampaigns = async () => {
-    if (!ownerId || hydrating) return;
+  // Fix: Memoize with useCallback and remove hydrating from deps to prevent infinite loops
+  const syncCampaigns = useCallback(async () => {
+    if (!ownerId || syncInitiatedRef.current) return;
     
+    syncInitiatedRef.current = true;
     setHydrating(true);
     try {
       // Load campaigns by owner_id (companyHQId is optional filter)
@@ -59,14 +62,21 @@ export default function CampaignsPage() {
     } finally {
       setHydrating(false);
     }
-  };
+  }, [ownerId]);
+
+  // Reset sync ref and hydrated state when ownerId changes (allows sync for new owner)
+  useEffect(() => {
+    syncInitiatedRef.current = false;
+    setHydrated(false);
+  }, [ownerId]);
 
   // Auto-sync when ownerId is available (only once)
+  // Fix: Use ref guard to prevent infinite loops
   useEffect(() => {
-    if (ownerId && !hydrated && !hydrating) {
+    if (ownerId && !hydrated && !syncInitiatedRef.current) {
       syncCampaigns();
     }
-  }, [ownerId, hydrated, hydrating]);
+  }, [ownerId, hydrated, syncCampaigns]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
