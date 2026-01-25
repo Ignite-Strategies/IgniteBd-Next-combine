@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await verifyFirebaseToken(request);
@@ -21,7 +21,7 @@ export async function GET(
   }
 
   try {
-    const { id: companyId } = params;
+    const { id: companyId } = await params;
 
     const company = await prisma.company_hqs.findUnique({
       where: { id: companyId },
