@@ -43,7 +43,7 @@ function LoadUpPageContent() {
     {
       id: 'import-microsoft',
       title: 'Import from Microsoft',
-      description: 'Extract contacts from Outlook',
+      description: 'Import from Outlook emails or Microsoft Contacts address book',
       route: companyHQId ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}` : '/contacts/ingest/microsoft',
       icon: Mail,
       containerClasses:

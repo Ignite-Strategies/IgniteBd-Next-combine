@@ -13,6 +13,40 @@ function MicrosoftEmailIngestContent() {
   // Direct read from localStorage for ownerId and owner - NO HOOKS
   const [ownerId, setOwnerId] = useState(null);
   const [owner, setOwner] = useState(null);
+  const [refreshingOwner, setRefreshingOwner] = useState(false);
+  
+  // Check for OAuth callback success/error and refresh owner data
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const success = searchParams?.get('success');
+    const error = searchParams?.get('error');
+    
+    // If OAuth just completed, refresh owner data from server
+    if (success === '1' || error) {
+      const refreshOwnerData = async () => {
+        setRefreshingOwner(true);
+        try {
+          const response = await api.get('/api/owner/hydrate');
+          if (response.data?.owner) {
+            const freshOwner = response.data.owner;
+            setOwner(freshOwner);
+            // Update localStorage
+            localStorage.setItem('owner', JSON.stringify(freshOwner));
+            // Clear query params from URL
+            router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}` : ''));
+          }
+        } catch (err) {
+          console.error('Failed to refresh owner data:', err);
+        } finally {
+          setRefreshingOwner(false);
+        }
+      };
+      refreshOwnerData();
+    }
+  }, [searchParams, router, companyHQId]);
+  
+  // Initial load from localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedOwnerId = localStorage.getItem('ownerId');
@@ -171,15 +205,46 @@ function MicrosoftEmailIngestContent() {
             <h1 className="text-3xl font-bold">Import Contacts from Microsoft</h1>
           </div>
           <p className="text-gray-600">
-            Import contacts from your Outlook email or Microsoft Contacts address book
+            Choose how to import: extract contacts from people you've emailed, or import directly from your Microsoft Contacts address book
           </p>
         </div>
+
+        {/* Success Message */}
+        {searchParams?.get('success') === '1' && !refreshingOwner && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <CheckCircle2 className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-green-800 mb-1">Successfully Connected!</h3>
+                <p className="text-sm text-green-700">Your Microsoft account has been connected. Choose an import source below.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {searchParams?.get('error') && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-red-800 mb-1">Connection Failed</h3>
+                <p className="text-sm text-red-700">{decodeURIComponent(searchParams.get('error'))}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Microsoft Connection Status */}
         <div className="bg-white p-6 rounded-lg shadow border mb-6">
           <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
           
-          {isMicrosoftConnected ? (
+          {refreshingOwner ? (
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+              <span className="text-gray-700">Refreshing connection status...</span>
+            </div>
+          ) : isMicrosoftConnected ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -195,11 +260,12 @@ function MicrosoftEmailIngestContent() {
           ) : (
             <div>
               <p className="text-gray-600 mb-4">
-                Connect your Microsoft account to import contacts from Outlook.
+                Connect your Microsoft account to import contacts from Outlook emails or your Microsoft Contacts address book.
               </p>
               <button
                 onClick={handleConnect}
-                className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 font-medium"
+                disabled={refreshingOwner}
+                className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Connect Microsoft
               </button>
@@ -226,8 +292,7 @@ function MicrosoftEmailIngestContent() {
                   </div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Scan your recent Outlook emails to find people you've been in contact with. 
-                  Shows message count and last contact date.
+                  <strong>From Email Messages:</strong> Scans your recent Outlook emails (up to 200 messages) to extract unique contacts from people you've emailed. Automatically filters out automated emails and business services. Shows message count and last contact date.
                 </p>
               </button>
 
@@ -245,8 +310,7 @@ function MicrosoftEmailIngestContent() {
                   </div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Import contacts directly from your Microsoft Contacts address book. 
-                  Includes company names and job titles when available.
+                  <strong>From Contacts Address Book:</strong> Imports contacts directly from your Microsoft Contacts (saved in your address book). Includes company names and job titles when available. Shows which contacts already exist in your database.
                 </p>
               </button>
             </div>
