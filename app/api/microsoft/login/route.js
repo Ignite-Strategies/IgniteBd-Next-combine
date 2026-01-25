@@ -32,22 +32,26 @@ export async function GET(request) {
   try {
     // Get ownerId from query params (required - passed from frontend)
     const ownerId = request.nextUrl.searchParams.get('ownerId');
+    // Get companyHQId from query params (optional - preserve context)
+    const companyHQId = request.nextUrl.searchParams.get('companyHQId');
     
     if (!ownerId) {
       const appUrl = process.env.APP_URL || 
         (request.nextUrl.origin || 'https://app.ignitegrowth.biz');
       return NextResponse.redirect(
-        `${appUrl}/contacts/ingest/microsoft?error=ownerId_required`
+        `${appUrl}/contacts/ingest/microsoft?error=ownerId_required${companyHQId ? `&companyHQId=${companyHQId}` : ''}`
       );
     }
     
     // Get OAuth configuration
     const clientId = getMicrosoftClientId();
     
-    // Generate state payload with ownerId, nonce, and timestamp
+    // Generate state payload with ownerId, companyHQId (if provided), nonce, and timestamp
     // OAuth state carries owner context - NEVER send ownerId as query param
+    // But we CAN include companyHQId in state to preserve it through OAuth flow
     const stateData = {
       ownerId,
+      companyHQId: companyHQId || null, // Preserve companyHQId through OAuth flow
       nonce: crypto.randomUUID(),
       ts: Date.now(),
     };

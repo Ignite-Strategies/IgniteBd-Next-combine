@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Mail, RefreshCw, CheckCircle2, AlertCircle, ArrowLeft, Check, Users, Download } from 'lucide-react';
@@ -10,59 +10,51 @@ function MicrosoftEmailIngestContent() {
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
   
-  // Direct read from localStorage for ownerId and owner - NO HOOKS
+  // Get ownerId from localStorage (needed for connect button)
   const [ownerId, setOwnerId] = useState(null);
-  const [owner, setOwner] = useState(null);
-  const [refreshingOwner, setRefreshingOwner] = useState(false);
   
-  // Check for OAuth callback success/error and refresh owner data
+  // Simple connection status - just check if token exists
+  const [isConnected, setIsConnected] = useState(false);
+  const [checkingConnection, setCheckingConnection] = useState(true);
+  const [connectionError, setConnectionError] = useState(null);
+  
+  // Simple API check on page load - just look for token
+  const checkConnection = useCallback(async () => {
+    setCheckingConnection(true);
+    try {
+      const response = await api.get('/api/microsoft/status');
+      setIsConnected(response.data.connected || false);
+      setConnectionError(null);
+    } catch (error) {
+      console.error('Failed to check connection:', error);
+      setIsConnected(false);
+    } finally {
+      setCheckingConnection(false);
+    }
+  }, []);
+  
+  // Initialize and check connection on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedOwnerId = localStorage.getItem('ownerId');
+    if (storedOwnerId) setOwnerId(storedOwnerId);
+    checkConnection();
+  }, [checkConnection]);
+  
+  // Handle OAuth callback - refresh connection status
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const success = searchParams?.get('success');
     const error = searchParams?.get('error');
     
-    // If OAuth just completed, refresh owner data from server
+    // If OAuth just completed, refresh connection and clear query params
     if (success === '1' || error) {
-      const refreshOwnerData = async () => {
-        setRefreshingOwner(true);
-        try {
-          const response = await api.get('/api/owner/hydrate');
-          if (response.data?.owner) {
-            const freshOwner = response.data.owner;
-            setOwner(freshOwner);
-            // Update localStorage
-            localStorage.setItem('owner', JSON.stringify(freshOwner));
-            // Clear query params from URL
-            router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}` : ''));
-          }
-        } catch (err) {
-          console.error('Failed to refresh owner data:', err);
-        } finally {
-          setRefreshingOwner(false);
-        }
-      };
-      refreshOwnerData();
+      checkConnection();
+      router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}` : ''));
+      setConnectionError(null);
     }
-  }, [searchParams, router, companyHQId]);
-  
-  // Initial load from localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const storedOwnerId = localStorage.getItem('ownerId');
-    const storedOwner = localStorage.getItem('owner');
-    if (storedOwnerId) setOwnerId(storedOwnerId);
-    if (storedOwner) {
-      try {
-        setOwner(JSON.parse(storedOwner));
-      } catch (e) {
-        console.warn('Failed to parse owner', e);
-      }
-    }
-  }, []);
-  
-  const isMicrosoftConnected = owner?.microsoftAccessToken ? true : false;
-  const microsoftEmail = owner?.microsoftEmail || null;
+  }, [searchParams, router, companyHQId, checkConnection]);
   
   const [source, setSource] = useState(null); // null = landing page, 'email' or 'contacts'
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -74,38 +66,60 @@ function MicrosoftEmailIngestContent() {
 
   // Don't auto-load - user selects source first
 
-  // Load preview function
-  async function handleLoadPreview(selectedSource) {
+  // Load preview function - THIS IS WHERE WE DISCOVER IF CONNECTED
+  const handleLoadPreview = useCallback(async (selectedSource) => {
     const sourceToUse = selectedSource || source;
     if (!sourceToUse) return;
     
     setPreviewLoading(true);
     setHasLoadedOnce(true);
+    setConnectionError(null);
+    
     try {
       const endpoint = sourceToUse === 'email' 
         ? '/api/microsoft/email-contacts/preview'
         : '/api/microsoft/contacts/preview';
       const response = await api.get(endpoint);
+      
       if (response.data?.success) {
         setPreview(response.data);
         setSelectedIds(new Set());
         setSaveResult(null);
+        // If we got here, we're connected! Store connection info
+        setConnectionInfo({
+          connected: true,
+          source: sourceToUse,
+        });
       } else {
         setPreview(null);
       }
     } catch (error) {
       console.error('Failed to load preview:', error);
+      
+      // If 401, they need to connect - THIS IS HOW WE KNOW THEY'RE NOT CONNECTED
+      if (error.response?.status === 401) {
+        setConnectionError({
+          type: 'not_connected',
+          message: 'Microsoft account not connected. Please connect your account first.',
+        });
+        setConnectionInfo({ connected: false });
+      } else {
+        setConnectionError({
+          type: 'api_error',
+          message: error.response?.data?.error || error.message || 'Failed to load contacts',
+        });
+      }
       setPreview(null);
     } finally {
       setPreviewLoading(false);
     }
-  }
+  }, [source]);
 
   // Select source and load
-  function handleSelectSource(selectedSource) {
+  const handleSelectSource = useCallback((selectedSource) => {
     setSource(selectedSource);
     handleLoadPreview(selectedSource);
-  }
+  }, [handleLoadPreview]);
 
   // Connect button
   function handleConnect() {
@@ -113,7 +127,9 @@ function MicrosoftEmailIngestContent() {
       alert('Please sign in first.');
       return;
     }
-    window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
+    // Preserve companyHQId in OAuth flow
+    const url = `/api/microsoft/login?ownerId=${ownerId}${companyHQId ? `&companyHQId=${companyHQId}` : ''}`;
+    window.location.href = url;
   }
 
   // Disconnect button
@@ -193,13 +209,40 @@ function MicrosoftEmailIngestContent() {
       <div className="mx-auto max-w-4xl px-6">
         {/* Header */}
         <div className="mb-6">
-          <button
-            onClick={() => router.push('/people')}
-            className="mb-4 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to People Hub
-          </button>
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => router.push('/people')}
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to People Hub
+            </button>
+            
+            {/* Connection Status & Connect Button - Top Right */}
+            <div className="flex items-center gap-3">
+              {checkingConnection ? (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Checking...</span>
+                </div>
+              ) : isConnected ? (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Connected</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleConnect}
+                  disabled={!ownerId}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  <Mail className="h-4 w-4" />
+                  Connect to Microsoft
+                </button>
+              )}
+            </div>
+          </div>
+          
           <div className="flex items-center gap-3 mb-2">
             <Mail className="h-8 w-8 text-blue-600" />
             <h1 className="text-3xl font-bold">Import Contacts from Microsoft</h1>
@@ -209,8 +252,8 @@ function MicrosoftEmailIngestContent() {
           </p>
         </div>
 
-        {/* Success Message */}
-        {searchParams?.get('success') === '1' && !refreshingOwner && (
+        {/* Success Message from OAuth */}
+        {searchParams?.get('success') === '1' && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-start">
               <CheckCircle2 className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
@@ -222,7 +265,7 @@ function MicrosoftEmailIngestContent() {
           </div>
         )}
 
-        {/* Error Message */}
+        {/* Error Message from OAuth */}
         {searchParams?.get('error') && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-start">
@@ -235,52 +278,44 @@ function MicrosoftEmailIngestContent() {
           </div>
         )}
 
-        {/* Microsoft Connection Status */}
-        <div className="bg-white p-6 rounded-lg shadow border mb-6">
-          <h2 className="text-lg font-semibold mb-4">Microsoft Account</h2>
-          
-          {refreshingOwner ? (
-            <div className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-              <span className="text-gray-700">Refreshing connection status...</span>
-            </div>
-          ) : isMicrosoftConnected ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <span className="text-gray-700">Connected{microsoftEmail ? ` as ${microsoftEmail}` : ''}</span>
+        {/* Connection Error from API call */}
+        {connectionError && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start flex-1">
+                <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-yellow-800 mb-1">
+                    {connectionError.type === 'not_connected' ? 'Connection Required' : 'Error'}
+                  </h3>
+                  <p className="text-sm text-yellow-700">{connectionError.message}</p>
+                </div>
               </div>
-              <button
-                onClick={handleDisconnect}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Disconnect
-              </button>
+              {connectionError.type === 'not_connected' && (
+                <button
+                  onClick={handleConnect}
+                  disabled={!ownerId}
+                  className="ml-4 text-sm px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+                >
+                  Connect Now
+                </button>
+              )}
             </div>
-          ) : (
-            <div>
-              <p className="text-gray-600 mb-4">
-                Connect your Microsoft account to import contacts from Outlook emails or your Microsoft Contacts address book.
-              </p>
-              <button
-                onClick={handleConnect}
-                disabled={refreshingOwner}
-                className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Connect Microsoft
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Landing Page - Source Selection */}
-        {isMicrosoftConnected && !source && !preview && (
+        {/* Landing Page - Source Selection - ALWAYS SHOW (no blocking!) */}
+        {!source && !preview && (
           <div className="bg-white p-8 rounded-lg shadow border mb-6">
             <h2 className="text-xl font-semibold mb-6 text-center">Choose Import Source</h2>
+            <p className="text-center text-sm text-gray-600 mb-6">
+              Select how you want to import contacts. We'll check your connection when you click.
+            </p>
             <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
               <button
                 onClick={() => handleSelectSource('email')}
-                className="group p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
+                disabled={previewLoading}
+                className="group p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-4 mb-4">
                   <div className="h-12 w-12 rounded-lg bg-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -298,7 +333,8 @@ function MicrosoftEmailIngestContent() {
 
               <button
                 onClick={() => handleSelectSource('contacts')}
-                className="group p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
+                disabled={previewLoading}
+                className="group p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-4 mb-4">
                   <div className="h-12 w-12 rounded-lg bg-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -318,7 +354,7 @@ function MicrosoftEmailIngestContent() {
         )}
 
         {/* Loading State */}
-        {isMicrosoftConnected && previewLoading && !preview && (
+        {previewLoading && !preview && (
           <div className="bg-white p-12 rounded-lg shadow border mb-6">
             <div className="flex flex-col items-center justify-center">
               <RefreshCw className="h-12 w-12 animate-spin text-blue-600 mb-4" />
@@ -370,7 +406,7 @@ function MicrosoftEmailIngestContent() {
         )}
 
         {/* Preview Section */}
-        {isMicrosoftConnected && preview && preview.items && (
+        {preview && preview.items && (
           <div className="bg-white p-6 rounded-lg shadow border mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">

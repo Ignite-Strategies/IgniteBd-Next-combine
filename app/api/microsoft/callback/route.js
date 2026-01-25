@@ -55,27 +55,29 @@ export async function GET(request) {
       );
     }
 
-    // Decode state to extract ownerId
+    // Decode state to extract ownerId and companyHQId
     let ownerId;
+    let companyHQId = null;
     try {
       const stateData = JSON.parse(decodeURIComponent(rawState));
       ownerId = stateData.ownerId;
+      companyHQId = stateData.companyHQId || null; // Extract companyHQId from state
       
       // Validate state timestamp (prevent replay attacks)
       if (stateData.ts && Date.now() - stateData.ts > 10 * 60 * 1000) {
         return NextResponse.redirect(
-          `${appUrl}/contacts/ingest/microsoft?error=state_expired`
+          `${appUrl}/contacts/ingest/microsoft?error=state_expired${companyHQId ? `&companyHQId=${companyHQId}` : ''}`
         );
       }
     } catch (err) {
       return NextResponse.redirect(
-        `${appUrl}/contacts/ingest/microsoft?error=invalid_state`
+        `${appUrl}/contacts/ingest/microsoft?error=invalid_state${companyHQId ? `&companyHQId=${companyHQId}` : ''}`
       );
     }
 
     if (!ownerId) {
       return NextResponse.redirect(
-        `${appUrl}/contacts/ingest/microsoft?error=missing_owner_context`
+        `${appUrl}/contacts/ingest/microsoft?error=missing_owner_context${companyHQId ? `&companyHQId=${companyHQId}` : ''}`
       );
     }
 
@@ -100,13 +102,20 @@ export async function GET(request) {
       },
     });
 
-    // Redirect to frontend with success
-    return NextResponse.redirect(
-      `${appUrl}/contacts/ingest/microsoft?success=1`
-    );
+    // Redirect to frontend with success, preserving companyHQId
+    const redirectUrl = `${appUrl}/contacts/ingest/microsoft?success=1${companyHQId ? `&companyHQId=${companyHQId}` : ''}`;
+    return NextResponse.redirect(redirectUrl);
   } catch (err) {
-    return NextResponse.redirect(
-      `${appUrl}/contacts/ingest/microsoft?error=${encodeURIComponent(err.message || 'oauth_failed')}`
-    );
+    // Try to preserve companyHQId even on error (if we got that far)
+    let companyHQId = null;
+    try {
+      const rawState = request.nextUrl.searchParams.get('state');
+      if (rawState) {
+        const stateData = JSON.parse(decodeURIComponent(rawState));
+        companyHQId = stateData.companyHQId || null;
+      }
+    } catch {}
+    const redirectUrl = `${appUrl}/contacts/ingest/microsoft?error=${encodeURIComponent(err.message || 'oauth_failed')}${companyHQId ? `&companyHQId=${companyHQId}` : ''}`;
+    return NextResponse.redirect(redirectUrl);
   }
 }
