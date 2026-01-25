@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send, Lock, Copy, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Mail, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send, Lock, Copy, Check } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
@@ -59,12 +59,13 @@ function SettingsPageContent() {
       console.error('Failed to refresh owner:', error);
     }
   }, []);
-  const [microsoftAuth, setMicrosoftAuth] = useState(null);
+  const [microsoftStatus, setMicrosoftStatus] = useState(null);
+  const [checkingMicrosoft, setCheckingMicrosoft] = useState(true);
   const [sendGridConfig, setSendGridConfig] = useState(null);
   const [error, setError] = useState(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [becomingSuperAdmin, setBecomingSuperAdmin] = useState(false);
-  const [activeSection, setActiveSection] = useState(null); // 'profile' | 'company' | 'integrations' | null
+  const [activeSection, setActiveSection] = useState(null); // 'profile' | 'company' | null
   const [authInitialized, setAuthInitialized] = useState(false);
   
   // Password reset state
@@ -109,6 +110,18 @@ function SettingsPageContent() {
   const [assigningSender, setAssigningSender] = useState(false);
   const [verifiedSender, setVerifiedSender] = useState(null);
   const [senderError, setSenderError] = useState(null);
+
+  // Helper to get Firebase auth token for platform-manager API calls
+  const getAuthToken = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return null;
+      return await user.getIdToken();
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
+      return null;
+    }
+  };
 
   // Load all owners when verified sender is ready (Step 2)
   useEffect(() => {
@@ -155,19 +168,38 @@ function SettingsPageContent() {
     }
   };
 
-  // Get Microsoft connection status from owner hook (no API call needed)
-  // owner.microsoftAccessToken is the source of truth
-  useEffect(() => {
-    if (owner?.microsoftAccessToken) {
-      setMicrosoftAuth({
-        email: owner.microsoftEmail,
-        displayName: owner.microsoftDisplayName,
-        expiresAt: owner.microsoftExpiresAt,
-      });
-    } else {
-      setMicrosoftAuth(null);
+  // Check Microsoft connection status via API (source of truth)
+  const checkMicrosoftStatus = useCallback(async () => {
+    setCheckingMicrosoft(true);
+    try {
+      const response = await api.get('/api/microsoft/status');
+      setMicrosoftStatus(response.data);
+    } catch (error) {
+      console.error('Failed to check Microsoft status:', error);
+      setMicrosoftStatus({ connected: false });
+    } finally {
+      setCheckingMicrosoft(false);
     }
-  }, [owner]);
+  }, []);
+
+  // Check Microsoft status on mount and after OAuth callback
+  useEffect(() => {
+    if (authInitialized) {
+      checkMicrosoftStatus();
+    }
+  }, [authInitialized, checkMicrosoftStatus]);
+
+  // Check for OAuth callback (success=1 or error param)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const success = searchParams?.get('success');
+    const error = searchParams?.get('error');
+    if (success === '1' || error) {
+      checkMicrosoftStatus();
+      // Clear query params
+      router.replace('/settings');
+    }
+  }, [searchParams, router, checkMicrosoftStatus]);
 
   // Fetch SendGrid configuration (non-blocking)
   const fetchSendGridConfig = useCallback(async () => {
@@ -366,12 +398,7 @@ function SettingsPageContent() {
     }
   };
 
-  // Check if token is expired
-  const isTokenExpired = microsoftAuth?.expiresAt
-    ? new Date(microsoftAuth.expiresAt) < new Date()
-    : false;
-
-  const isConnected = microsoftAuth && !isTokenExpired;
+  const isMicrosoftConnected = microsoftStatus?.connected || false;
 
   // Check if user can become SuperAdmin
   // Phase 1: No email restriction - any logged-in owner can become SuperAdmin
@@ -459,8 +486,8 @@ function SettingsPageContent() {
               Back to Settings
             </button>
             <PageHeader
-              title={activeSection === 'profile' ? 'Update Profile' : activeSection === 'company' ? 'Update Company' : 'Integrations'}
-              subtitle={activeSection === 'profile' ? 'Update your personal information' : activeSection === 'company' ? 'Manage your company profile' : 'Connect your accounts'}
+              title={activeSection === 'profile' ? 'Update Profile' : 'Update Company'}
+              subtitle={activeSection === 'profile' ? 'Update your personal information' : 'Manage your company profile'}
             />
           </div>
 
@@ -839,156 +866,6 @@ function SettingsPageContent() {
             </div>
           )}
 
-          {/* Integrations View */}
-          {activeSection === 'integrations' && (
-            <div className="space-y-6">
-              {/* SendGrid Email Integration */}
-              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="p-6">
-                  <div className="flex items-start space-x-6">
-                    {/* SendGrid Logo/Icon */}
-                    <div className="flex-shrink-0">
-                      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-blue-50 border border-blue-200">
-                        <Mail className="h-12 w-12 text-blue-600" />
-                      </div>
-                    </div>
-                    
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        Email Sending (SendGrid)
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Send outreach emails via SendGrid. No OAuth required - just configure your API key.
-                      </p>
-                      
-                      <div className="space-y-3">
-                        {sendGridConfig ? (
-                          <div className={`p-3 border rounded-lg ${
-                            sendGridConfig.configured 
-                              ? 'bg-green-50 border-green-200' 
-                              : 'bg-yellow-50 border-yellow-200'
-                          }`}>
-                            <p className={`text-sm font-medium mb-1 ${
-                              sendGridConfig.configured 
-                                ? 'text-green-900' 
-                                : 'text-yellow-900'
-                            }`}>
-                              Status: {sendGridConfig.configured ? 'Configured' : 'Not Configured'}
-                            </p>
-                            {sendGridConfig.configured ? (
-                              <p className="text-xs text-green-700">
-                                Emails will be sent from: {sendGridConfig.fromName} &lt;{sendGridConfig.fromEmail}&gt;
-                              </p>
-                            ) : (
-                              <p className="text-xs text-yellow-700">
-                                Configure SENDGRID_API_KEY in your environment variables to enable email sending.
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                            <p className="text-sm font-medium text-gray-900 mb-1">
-                              Loading configuration...
-                            </p>
-                          </div>
-                        )}
-                        <div className="text-xs text-gray-500 space-y-1">
-                          <p>• Configure SENDGRID_API_KEY in your environment variables</p>
-                          <p>• Set SENDGRID_FROM_EMAIL and SENDGRID_FROM_NAME for sender info</p>
-                          <p>• No user authentication required - works immediately</p>
-                          <p>• Better for outreach campaigns than personal email APIs</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Microsoft Outlook Integration (Optional) */}
-              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="p-6">
-                  <div className="flex items-start space-x-6">
-                    {/* Microsoft Logo */}
-                    <div className="flex-shrink-0">
-                      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-gray-50 border border-gray-200">
-                        <svg className="h-12 w-12" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <rect x="0" y="0" width="10.5" height="10.5" fill="#F25022"/>
-                          <rect x="12.5" y="0" width="10.5" height="10.5" fill="#7FBA00"/>
-                          <rect x="0" y="12.5" width="10.5" height="10.5" fill="#00A4EF"/>
-                          <rect x="12.5" y="12.5" width="10.5" height="10.5" fill="#FFB900"/>
-                        </svg>
-                      </div>
-                    </div>
-                    
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        Microsoft Outlook (Optional)
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Connect your Microsoft account to sync contacts and send emails from your Outlook inbox.
-                      </p>
-                      
-                      {isConnected ? (
-                        <div className="space-y-4">
-                          <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-green-900">
-                                Connected
-                              </p>
-                              <p className="text-xs text-green-700">
-                                {microsoftAuth.displayName || microsoftAuth.email || 'Microsoft account connected'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex space-x-3">
-                            <button
-                              onClick={() => router.push('/settings/integrations')}
-                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            >
-                              Manage Connection
-                            </button>
-                            <button
-                              onClick={handleConnectMicrosoft}
-                              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            >
-                              Reauthorize
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <button
-                            onClick={handleConnectMicrosoft}
-                            className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm"
-                          >
-                            <svg className="h-5 w-5 mr-2" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <rect x="0" y="0" width="10.5" height="10.5" fill="#F25022"/>
-                              <rect x="12.5" y="0" width="10.5" height="10.5" fill="#7FBA00"/>
-                              <rect x="0" y="12.5" width="10.5" height="10.5" fill="#00A4EF"/>
-                              <rect x="12.5" y="12.5" width="10.5" height="10.5" fill="#FFB900"/>
-                            </svg>
-                            Connect with Microsoft
-                            <ArrowRight className="h-5 w-5 ml-2" />
-                          </button>
-                          <p className="text-xs text-gray-500 text-center">
-                            Optional: Connect to sync contacts and send from your Outlook inbox
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Future integrations */}
-              <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                <Plug2 className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm font-medium text-gray-600 mb-1">More integrations coming soon</p>
-                <p className="text-xs text-gray-500">We're working on adding more integrations to enhance your workflow</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -1058,34 +935,68 @@ function SettingsPageContent() {
             </div>
           </button>
 
-          {/* Integrations Card */}
-          <button
-            onClick={() => setActiveSection('integrations')}
-            className="group relative rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:border-purple-300 hover:shadow-md transition-all text-left md:col-span-2"
-          >
+          {/* Connect Microsoft Card - Simple and Direct */}
+          <div className="group relative rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:border-blue-300 hover:shadow-md transition-all text-left md:col-span-2">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-50 group-hover:bg-purple-100 transition-colors mb-4">
-                  <Plug2 className="h-6 w-6 text-purple-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Integrations
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Connect your accounts to enhance your workflow
-                </p>
-                {isConnected && (
-                  <div className="flex items-center mt-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 mr-1" />
-                    <p className="text-xs text-gray-400">
-                      Microsoft Outlook connected
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors">
+                    <svg className="h-6 w-6" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="0" y="0" width="10.5" height="10.5" fill="#F25022"/>
+                      <rect x="12.5" y="0" width="10.5" height="10.5" fill="#7FBA00"/>
+                      <rect x="0" y="12.5" width="10.5" height="10.5" fill="#00A4EF"/>
+                      <rect x="12.5" y="12.5" width="10.5" height="10.5" fill="#FFB900"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      Connect Microsoft
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Import contacts from Outlook emails or Microsoft Contacts
                     </p>
                   </div>
+                </div>
+                
+                {checkingMicrosoft ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Checking connection...
+                  </div>
+                ) : isMicrosoftConnected ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      <div>
+                        <p className="text-sm font-medium text-green-900">
+                          Connected
+                        </p>
+                        {microsoftStatus?.displayName || microsoftStatus?.email ? (
+                          <p className="text-xs text-gray-500">
+                            {microsoftStatus.displayName || microsoftStatus.email}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleConnectMicrosoft}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Reconnect
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConnectMicrosoft}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Connect to Microsoft
+                  </button>
                 )}
               </div>
-              <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
             </div>
-          </button>
+          </div>
 
           {/* Platform Admin Tools - Only show if can become SuperAdmin or is SuperAdmin */}
           {canBecomeSuperAdmin && (
