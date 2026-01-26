@@ -17,10 +17,11 @@ import {
   FileCode,
   Plus,
   Mail,
+  ArrowRight,
 } from 'lucide-react';
 
 // Content Components
-function OrientationContent() {
+function OrientationContent({ onNavigateToContactManagement }) {
   return (
     <div className="space-y-8">
       <div>
@@ -298,6 +299,17 @@ function OrientationContent() {
           </div>
         </div>
       </div>
+
+      {/* Next Steps Link */}
+      <div className="mt-8 pt-6 border-t border-gray-200">
+        <button
+          onClick={onNavigateToContactManagement}
+          className="group flex items-center gap-3 w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-md hover:shadow-lg"
+        >
+          <span>Learn More About Contact Management</span>
+          <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -407,6 +419,12 @@ export default function TutorialPage() {
   );
   const ContentComponent = currentSection?.component;
 
+  // Navigation handler for Orientation content
+  const handleNavigateToContactManagement = () => {
+    setSelectedTopic('contact-management');
+    setSelectedSection('how-to-ingest');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -480,7 +498,11 @@ export default function TutorialPage() {
           <div className="max-w-4xl">
             {ContentComponent && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-                <ContentComponent />
+                {selectedSection === 'welcome' ? (
+                  <ContentComponent onNavigateToContactManagement={handleNavigateToContactManagement} />
+                ) : (
+                  <ContentComponent />
+                )}
               </div>
             )}
           </div>
