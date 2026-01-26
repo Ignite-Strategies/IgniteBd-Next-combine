@@ -868,10 +868,9 @@ export default function ContactDetailPage({ params }) {
             )}
           </section>
 
-          {/* Contact Outlook Section - Only show if contact has enrichment data */}
-          {/* This is a "clue" during enrichment, not a persistent thing on all contacts */}
-          {(contact.enrichmentSource || contact.enrichmentRedisKey || 
-            contact.seniorityScore !== null || contact.buyingPowerScore !== null) && (
+          {/* Contact Outlook Section - Only show if contact has FULL intelligence enrichment */}
+          {/* Only show if we have actual intelligence data (scores, summaries), not just basic enrichment */}
+          {isEnriched && (
             <ContactOutlook 
               contact={contact} 
               onViewRawJSON={(json) => {
