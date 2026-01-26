@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Mail, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send, Lock, Copy, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Mail, ArrowRight, User, Building2, Save, ChevronRight, Shield, Search, Send, Lock, Copy, Check, CreditCard } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
@@ -932,6 +932,27 @@ function SettingsPageContent() {
                 )}
               </div>
               <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+            </div>
+          </button>
+
+          {/* Billing Card */}
+          <button
+            onClick={() => router.push(`/settings/billing${companyHQId ? `?companyHQId=${companyHQId}` : ''}`)}
+            className="group relative rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:border-green-300 hover:shadow-md transition-all text-left"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-50 group-hover:bg-green-100 transition-colors mb-4">
+                  <CreditCard className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Billing
+                </h3>
+                <p className="text-sm text-gray-500">
+                  View your plan and manage payments
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-green-600 transition-colors" />
             </div>
           </button>
 

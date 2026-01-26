@@ -94,7 +94,7 @@ export async function POST(request: Request) {
 
 /**
  * Handle checkout.session.completed
- * If one-time payment: Create or update PlatformAccess, set status = ACTIVE, no subscription ID
+ * Update company_hqs directly with payment status
  */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   try {
@@ -106,34 +106,22 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       return;
     }
 
-    // Check if this is a one-time payment (no subscription)
-    if (!session.subscription) {
-      // One-time payment: Create or update PlatformAccess
-      await prisma.platform_accesses.upsert({
-        where: {
-          companyId_planId: {
-            companyId: companyHQId,
-            planId: planId,
-          },
-        },
-        create: {
-          companyId: companyHQId,
-          planId: planId,
-          status: 'ACTIVE',
-          stripeSubscriptionId: null, // No subscription for one-time
-          startedAt: new Date(),
-        },
-        update: {
-          status: 'ACTIVE',
-          startedAt: new Date(),
-          endedAt: null,
-        },
-      });
+    // Update company_hqs directly
+    await prisma.company_hqs.update({
+      where: { id: companyHQId },
+      data: {
+        planStatus: 'ACTIVE',
+        planId: planId, // Ensure planId is set
+        stripeSubscriptionId: session.subscription as string | null, // Set if subscription, null if one-time
+        planStartedAt: new Date(),
+        planEndedAt: null,
+      },
+    });
 
-      console.log(`✅ One-time payment completed: PlatformAccess ACTIVE for company ${companyHQId}, plan ${planId}`);
+    if (session.subscription) {
+      console.log(`✅ Subscription checkout completed: Company ${companyHQId} set to ACTIVE with subscription ${session.subscription}`);
     } else {
-      // Subscription payment: handled by invoice.paid
-      console.log(`ℹ️ Subscription checkout completed: Will be handled by invoice.paid event`);
+      console.log(`✅ One-time payment completed: Company ${companyHQId} set to ACTIVE`);
     }
   } catch (error) {
     console.error('❌ Error handling checkout.session.completed:', error);
@@ -143,7 +131,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
 /**
  * Handle invoice.paid
- * Lookup stripeSubscriptionId, set PlatformAccess.status = ACTIVE
+ * Update company_hqs by stripeSubscriptionId, set planStatus = ACTIVE
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   try {
@@ -154,23 +142,23 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
       return;
     }
 
-    // Find PlatformAccess by subscription ID
-    const platformAccess = await prisma.platform_accesses.findUnique({
+    // Find company by subscription ID
+    const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscriptionId },
     });
 
-    if (platformAccess) {
-      await prisma.platform_accesses.update({
-        where: { id: platformAccess.id },
+    if (company) {
+      await prisma.company_hqs.update({
+        where: { id: company.id },
         data: {
-          status: 'ACTIVE',
-          endedAt: null,
+          planStatus: 'ACTIVE',
+          planEndedAt: null,
         },
       });
 
-      console.log(`✅ Invoice paid: PlatformAccess ${platformAccess.id} set to ACTIVE`);
+      console.log(`✅ Invoice paid: Company ${company.id} set to ACTIVE`);
     } else {
-      console.warn(`⚠️ invoice.paid: PlatformAccess not found for subscription ${subscriptionId}`);
+      console.warn(`⚠️ invoice.paid: Company not found for subscription ${subscriptionId}`);
     }
   } catch (error) {
     console.error('❌ Error handling invoice.paid:', error);
@@ -180,7 +168,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
 /**
  * Handle invoice.payment_failed
- * Set PlatformAccess.status = PAST_DUE
+ * Update company_hqs by stripeSubscriptionId, set planStatus = PAST_DUE
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   try {
@@ -191,21 +179,21 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
       return;
     }
 
-    const platformAccess = await prisma.platform_accesses.findUnique({
+    const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscriptionId },
     });
 
-    if (platformAccess) {
-      await prisma.platform_accesses.update({
-        where: { id: platformAccess.id },
+    if (company) {
+      await prisma.company_hqs.update({
+        where: { id: company.id },
         data: {
-          status: 'PAST_DUE',
+          planStatus: 'PAST_DUE',
         },
       });
 
-      console.log(`⚠️ Payment failed: PlatformAccess ${platformAccess.id} set to PAST_DUE`);
+      console.log(`⚠️ Payment failed: Company ${company.id} set to PAST_DUE`);
     } else {
-      console.warn(`⚠️ invoice.payment_failed: PlatformAccess not found for subscription ${subscriptionId}`);
+      console.warn(`⚠️ invoice.payment_failed: Company not found for subscription ${subscriptionId}`);
     }
   } catch (error) {
     console.error('❌ Error handling invoice.payment_failed:', error);
@@ -215,15 +203,15 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
 /**
  * Handle customer.subscription.updated
- * Update PlatformAccess if needed (e.g., plan change)
+ * Update company_hqs status based on subscription status
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   try {
-    const platformAccess = await prisma.platform_accesses.findUnique({
+    const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscription.id },
     });
 
-    if (platformAccess) {
+    if (company) {
       // Update status based on subscription status
       let status: 'ACTIVE' | 'PAST_DUE' | 'CANCELED' = 'ACTIVE';
 
@@ -231,27 +219,27 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
         status = 'PAST_DUE';
       } else if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
         status = 'CANCELED';
-        await prisma.platform_accesses.update({
-          where: { id: platformAccess.id },
+        await prisma.company_hqs.update({
+          where: { id: company.id },
           data: {
-            status: 'CANCELED',
-            endedAt: new Date(),
+            planStatus: 'CANCELED',
+            planEndedAt: new Date(),
           },
         });
-        console.log(`✅ Subscription updated: PlatformAccess ${platformAccess.id} set to CANCELED`);
+        console.log(`✅ Subscription updated: Company ${company.id} set to CANCELED`);
         return;
       }
 
-      await prisma.platform_accesses.update({
-        where: { id: platformAccess.id },
+      await prisma.company_hqs.update({
+        where: { id: company.id },
         data: {
-          status,
+          planStatus: status,
         },
       });
 
-      console.log(`✅ Subscription updated: PlatformAccess ${platformAccess.id} set to ${status}`);
+      console.log(`✅ Subscription updated: Company ${company.id} set to ${status}`);
     } else {
-      console.warn(`⚠️ customer.subscription.updated: PlatformAccess not found for subscription ${subscription.id}`);
+      console.warn(`⚠️ customer.subscription.updated: Company not found for subscription ${subscription.id}`);
     }
   } catch (error) {
     console.error('❌ Error handling customer.subscription.updated:', error);
@@ -261,26 +249,26 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
 /**
  * Handle customer.subscription.deleted
- * Set PlatformAccess.status = CANCELED, set endedAt = now()
+ * Update company_hqs: set planStatus = CANCELED, planEndedAt = now()
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   try {
-    const platformAccess = await prisma.platform_accesses.findUnique({
+    const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscription.id },
     });
 
-    if (platformAccess) {
-      await prisma.platform_accesses.update({
-        where: { id: platformAccess.id },
+    if (company) {
+      await prisma.company_hqs.update({
+        where: { id: company.id },
         data: {
-          status: 'CANCELED',
-          endedAt: new Date(),
+          planStatus: 'CANCELED',
+          planEndedAt: new Date(),
         },
       });
 
-      console.log(`✅ Subscription deleted: PlatformAccess ${platformAccess.id} set to CANCELED`);
+      console.log(`✅ Subscription deleted: Company ${company.id} set to CANCELED`);
     } else {
-      console.warn(`⚠️ customer.subscription.deleted: PlatformAccess not found for subscription ${subscription.id}`);
+      console.warn(`⚠️ customer.subscription.deleted: Company not found for subscription ${subscription.id}`);
     }
   } catch (error) {
     console.error('❌ Error handling customer.subscription.deleted:', error);

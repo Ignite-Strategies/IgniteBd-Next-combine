@@ -4,12 +4,6 @@
 			"path": "."
 		},
 		{
-			"path": "../ignitestrategescrm-frontend"
-		},
-		{
-			"path": "../eventscrm-backend"
-		},
-		{
 			"path": "../Ignite-platform-manager"
 		}
 	]
