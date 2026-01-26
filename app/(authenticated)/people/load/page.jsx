@@ -14,45 +14,14 @@ function LoadUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId');
-  const [microsoftConnected, setMicrosoftConnected] = useState(false);
-  const [connectionChecked, setConnectionChecked] = useState(false);
-  
-  // Get Microsoft connection status once on mount (from owner/hydrate)
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const response = await api.get('/api/owner/hydrate');
-        if (response.data?.success && response.data?.owner) {
-          const connected = response.data.owner.microsoftConnected || false;
-          setMicrosoftConnected(connected);
-        }
-      } catch (error) {
-        console.error('Failed to check Microsoft connection:', error);
-        setMicrosoftConnected(false);
-      } finally {
-        setConnectionChecked(true);
-      }
-    };
-    checkConnection();
-  }, []);
-
-  // Handle Microsoft import click - build route with current connection status
-  const handleMicrosoftImport = () => {
-    const baseRoute = companyHQId 
-      ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}`
-      : '/contacts/ingest/microsoft';
-    const route = connectionChecked 
-      ? `${baseRoute}&microsoftConnected=${microsoftConnected}`
-      : baseRoute;
-    router.push(route);
-  };
-
   const LOAD_OPTIONS = [
     {
       id: 'import-microsoft',
       title: 'Import from Microsoft',
       description: 'Import from Outlook emails or Microsoft Contacts address book',
-      onClick: handleMicrosoftImport,
+      route: companyHQId 
+        ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}`
+        : '/contacts/ingest/microsoft',
       icon: Mail,
       containerClasses:
         'from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-400',
@@ -93,7 +62,7 @@ function LoadUpPageContent() {
                 <button
                   key={option.id}
                   type="button"
-                  onClick={option.onClick || (() => router.push(option.route))}
+                  onClick={() => router.push(option.route)}
                   className={`group rounded-xl border-2 bg-gradient-to-br p-6 text-left transition ${option.containerClasses}`}
                 >
                   <div className="mb-4 flex items-center">

@@ -13,21 +13,30 @@ function MicrosoftEmailIngestContent() {
   // Get ownerId from localStorage (needed for connect button)
   const [ownerId, setOwnerId] = useState(null);
   
-  // Connection status from URL param (set by previous page) or default to false
-  // Trust the previous page - no API call on mount
+  // Connection status - check once on mount from owner/hydrate
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   
-  // Initialize ownerId and connection status from URL on mount
+  // Initialize ownerId and check connection status on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedOwnerId = localStorage.getItem('ownerId');
     if (storedOwnerId) setOwnerId(storedOwnerId);
     
-    // Read connection status from URL param
-    const microsoftConnected = searchParams?.get('microsoftConnected') === 'true';
-    setIsConnected(microsoftConnected);
-  }, [searchParams]);
+    // Check connection status from owner/hydrate (one API call)
+    const checkConnection = async () => {
+      try {
+        const response = await api.get('/api/owner/hydrate');
+        if (response.data?.success && response.data?.owner) {
+          setIsConnected(response.data.owner.microsoftConnected || false);
+        }
+      } catch (error) {
+        console.error('Failed to check Microsoft connection:', error);
+        setIsConnected(false);
+      }
+    };
+    checkConnection();
+  }, []);
   
   // Handle OAuth callback - set connection status
   useEffect(() => {
@@ -36,11 +45,22 @@ function MicrosoftEmailIngestContent() {
     const success = searchParams?.get('success');
     const error = searchParams?.get('error');
     
-    // If OAuth just completed successfully, we're connected
+    // If OAuth just completed successfully, refresh connection status
     if (success === '1') {
-      setIsConnected(true);
+      // Re-check connection status after OAuth
+      const checkConnection = async () => {
+        try {
+          const response = await api.get('/api/owner/hydrate');
+          if (response.data?.success && response.data?.owner) {
+            setIsConnected(response.data.owner.microsoftConnected || false);
+          }
+        } catch (error) {
+          console.error('Failed to check Microsoft connection:', error);
+        }
+      };
+      checkConnection();
       setConnectionError(null);
-      router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}&microsoftConnected=true` : '?microsoftConnected=true'));
+      router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}` : ''));
     } else if (error) {
       setIsConnected(false);
       router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}` : ''));
