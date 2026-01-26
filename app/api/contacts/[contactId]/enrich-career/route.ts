@@ -7,7 +7,7 @@ import { calculateCareerStats, generateCareerTimeline } from '@/lib/intelligence
 import { inferWhatTheyreLookingFor, inferCareerMomentum } from '@/lib/utils/contactExtraction';
 
 /**
- * POST /api/contacts/[id]/enrich-career
+ * POST /api/contacts/[contactId]/enrich-career
  * 
  * Career-focused enrichment for existing contact
  * Extracts: career timeline, tenure, career signals, "what they're looking for"
@@ -15,7 +15,7 @@ import { inferWhatTheyreLookingFor, inferCareerMomentum } from '@/lib/utils/cont
  */
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ contactId: string }> }
 ) {
   let firebaseUser;
   try {
@@ -28,7 +28,8 @@ export async function POST(
   }
 
   try {
-    const contactId = params.id;
+    const resolvedParams = await params;
+    const contactId = resolvedParams.contactId;
     const body = await request.json();
     const { companyHQId, linkedinUrl, email } = body;
 
