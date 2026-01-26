@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { EventPickerPageContent } from './picker/page';
+import EventPickerPage from './picker/page';
 import { Loader2 } from 'lucide-react';
 
 export default function EventsPage() {
@@ -16,7 +16,7 @@ export default function EventsPage() {
         </div>
       </div>
     }>
-      <EventPickerPageContent />
+      <EventPickerPage />
     </Suspense>
   );
 }
