@@ -322,15 +322,15 @@ model company_hqs {
   yearsInBusiness                               String?
   tier                                          String?
   stripeCustomerId                              String?                         @unique // Stripe customer ID (cus_...) - billing identity
-  platformId                                    String // Top-level platform container
-  platform                                      platform                        @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  platformId                                    String? // Top-level platform container (temporarily optional for migration)
+  platform                                      platform?                        @relation(fields: [platformId], references: [id], onDelete: Cascade)
   // Plan & Access (consolidated)
-  planId                                        String // FK → Plan.id (REQUIRED - company must have a plan)
+  planId                                        String? // FK → Plan.id (temporarily optional for migration)
   planStatus                                    PlatformAccessStatus? // ACTIVE, PAST_DUE, CANCELED
   stripeSubscriptionId                          String?                         @unique // Stripe subscription ID (sub_...)
   planStartedAt                                 DateTime? // When plan access started
   planEndedAt                                   DateTime? // When plan access ends
-  plans                                         plans                           @relation(fields: [planId], references: [id])
+  plans                                         plans?                          @relation(fields: [planId], references: [id])
   assessments                                   assessments[]
   blogs                                         blogs[]
   campaigns                                     campaigns[]
