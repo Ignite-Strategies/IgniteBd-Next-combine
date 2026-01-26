@@ -446,6 +446,7 @@ model Contact {
   country                                                   String?
   companyName                                               String?
   companyDomain                                             String?
+  positionType                                              String?  // "VP", "Director", "Manager", etc.
   contactCompanyId                                          String?
   howMet                                                    String?
   notes                                                     String?
@@ -470,8 +471,10 @@ model Contact {
   buyingPowerScore                                          Int?
   buyingTriggers                                            String[]                  @default([])
   careerMomentumScore                                       Int?
+  careerMomentum                                            String?  // "high" | "medium" | "low" (inferred from signals)
   careerProgression                                         String?
   careerStabilityScore                                      Int?
+  whatTheyreLookingFor                                      String?  // Inferred: "growth", "stability", "opportunity", etc.
   careerTimeline                                            Json?
   companyId                                                 String?
   companyIndustry                                           String?

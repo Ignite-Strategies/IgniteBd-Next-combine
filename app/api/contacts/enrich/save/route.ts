@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       companyId, 
       previewId, 
       skipIntelligence, 
+      skipCompanyCreation, // NEW: Skip company creation/update for basic saves
       companyHQId,
       // Also accept inference fields directly if available
       profileSummary,
@@ -429,7 +430,11 @@ export async function POST(request: Request) {
 
     // ============================================
     // STEP 2: Update Company with enrichment data (if exists)
+    // SKIP if skipCompanyCreation is true (basic save - just want contact info)
     // ============================================
+    if (skipCompanyCreation) {
+      console.log('⏭️ Skipping company creation/update (basic save mode)');
+    } else {
     // Use contactCompanyId (FK) as primary, fallback to companyId param or enrichment companyId field
     let finalCompanyId = companyId || updatedContact.contactCompanyId || updatedContact.companyId || null;
     
@@ -686,6 +691,7 @@ export async function POST(request: Request) {
       
       console.log(`✅ STEP 2: Created new company from enrichment data (no domain) and linked to contact: ${newCompanyId}`);
     }
+    } // End of skipCompanyCreation check
 
     // Pipeline is NOT part of enrichment - it's a separate concern
     // Don't create/update pipeline during enrichment

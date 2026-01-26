@@ -125,6 +125,8 @@ export default function ContactDetailPage({ params }) {
 
   const [enriching, setEnriching] = useState(false);
   const [enrichError, setEnrichError] = useState('');
+  const [enrichingCareer, setEnrichingCareer] = useState(false);
+  const [careerEnrichError, setCareerEnrichError] = useState('');
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [rawJSON, setRawJSON] = useState(null);
   const [editingCompany, setEditingCompany] = useState(false);
@@ -192,6 +194,45 @@ export default function ContactDetailPage({ params }) {
   }, [contact]);
 
   const [showEnrichSuccessModal, setShowEnrichSuccessModal] = useState(false);
+
+  const handleEnrichCareer = async () => {
+    if (!contactId || (!contact?.linkedinUrl && !contact?.email)) {
+      setCareerEnrichError('Contact must have a LinkedIn URL or email address');
+      return;
+    }
+    
+    setEnrichingCareer(true);
+    setCareerEnrichError('');
+    
+    try {
+      const response = await api.post(`/api/contacts/${contactId}/enrich-career`, {
+        companyHQId,
+        linkedinUrl: contact.linkedinUrl,
+        email: contact.email,
+      });
+      
+      if (response.data?.success) {
+        // Refresh contact data
+        const refreshResponse = await api.get(`/api/contacts/${contactId}`);
+        if (refreshResponse.data?.success && refreshResponse.data.contact) {
+          setContact(refreshResponse.data.contact);
+          setNotesText(refreshResponse.data.contact.notes || '');
+          if (refreshContacts) {
+            refreshContacts();
+          }
+        }
+        alert('Career history enriched successfully!');
+      } else {
+        throw new Error(response.data?.error || 'Career enrichment failed');
+      }
+    } catch (err: any) {
+      console.error('Career enrichment error:', err);
+      const errorMessage = err?.response?.data?.error || err?.message || 'Failed to enrich career history';
+      setCareerEnrichError(errorMessage);
+    } finally {
+      setEnrichingCareer(false);
+    }
+  };
 
   const handleEnrichContact = async () => {
     if (!contactId || !contact?.email) {
@@ -458,6 +499,26 @@ export default function ContactDetailPage({ params }) {
         </div>
 
         <div className="space-y-6">
+          {/* Career Enrichment Error */}
+          {careerEnrichError && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-red-800 mb-1">
+                    Career Enrichment failed
+                  </h3>
+                  <p className="text-sm text-red-700">{careerEnrichError}</p>
+                </div>
+                <button
+                  onClick={() => setCareerEnrichError('')}
+                  className="text-red-400 hover:text-red-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          
           {/* Enrichment Error */}
           {enrichError && (
             <div className="rounded-xl border-2 border-red-200 bg-red-50 p-4">
@@ -535,6 +596,24 @@ export default function ContactDetailPage({ params }) {
                         Details
                       </button>
                     )}
+                    <button
+                      onClick={handleEnrichCareer}
+                      disabled={enrichingCareer || (!contact?.linkedinUrl && !contact?.email)}
+                      className="flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Get Full Career History"
+                    >
+                      {enrichingCareer ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Get Full Career History
+                        </>
+                      )}
+                    </button>
                   </>
                 ) : (
                   // Show "Enrich Contact" as primary, other actions as secondary if not enriched
