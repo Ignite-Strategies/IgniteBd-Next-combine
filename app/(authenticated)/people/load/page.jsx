@@ -8,16 +8,29 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useOwner } from '@/hooks/useOwner';
+import api from '@/lib/api';
 
 function LoadUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId');
-  const { owner } = useOwner();
+  const [microsoftConnected, setMicrosoftConnected] = useState(false);
   
-  // Get Microsoft connection status from owner (already hydrated)
-  const microsoftConnected = owner?.microsoftConnected || false;
+  // Get Microsoft connection status once on mount (from owner/hydrate)
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await api.get('/api/owner/hydrate');
+        if (response.data?.success && response.data?.owner) {
+          setMicrosoftConnected(response.data.owner.microsoftConnected || false);
+        }
+      } catch (error) {
+        console.error('Failed to check Microsoft connection:', error);
+        setMicrosoftConnected(false);
+      }
+    };
+    checkConnection();
+  }, []);
 
   const LOAD_OPTIONS = [
     {
