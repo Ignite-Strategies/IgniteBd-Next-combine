@@ -323,7 +323,7 @@ function OrientationContent({ onNavigateToContactManagement }) {
   );
 }
 
-function HowToIngestContent() {
+function HowToIngestContent({ onNavigateToManagingContacts }) {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -710,6 +710,16 @@ function HowToIngestContent() {
           </div>
         </div>
 
+        {/* Next Steps Link */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <button
+            onClick={onNavigateToManagingContacts}
+            className="group flex items-center gap-3 w-full md:w-auto px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-md hover:shadow-lg"
+          >
+            <span>See How to Manage Contacts</span>
+            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1029,10 +1039,15 @@ export default function TutorialPage() {
   );
   const ContentComponent = currentSection?.component;
 
-  // Navigation handler for Orientation content
+  // Navigation handlers
   const handleNavigateToContactManagement = () => {
     setSelectedTopic('contact-management');
     setSelectedSection('how-to-ingest');
+  };
+
+  const handleNavigateToManagingContacts = () => {
+    setSelectedTopic('managing-contacts');
+    setSelectedSection('overview');
   };
 
   return (
@@ -1110,6 +1125,8 @@ export default function TutorialPage() {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
                 {selectedSection === 'welcome' ? (
                   <ContentComponent onNavigateToContactManagement={handleNavigateToContactManagement} />
+                ) : selectedSection === 'how-to-ingest' ? (
+                  <ContentComponent onNavigateToManagingContacts={handleNavigateToManagingContacts} />
                 ) : (
                   <ContentComponent />
                 )}
