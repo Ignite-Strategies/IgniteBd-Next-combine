@@ -225,7 +225,7 @@ export default function ContactDetailPage({ params }) {
       } else {
         throw new Error(response.data?.error || 'Career enrichment failed');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Career enrichment error:', err);
       const errorMessage = err?.response?.data?.error || err?.message || 'Failed to enrich career history';
       setCareerEnrichError(errorMessage);
