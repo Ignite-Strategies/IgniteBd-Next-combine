@@ -21,6 +21,12 @@ import {
   Sparkles,
   FileSpreadsheet,
   User,
+  Upload,
+  List,
+  Edit2,
+  Trash2,
+  Phone,
+  Save,
 } from 'lucide-react';
 
 // Content Components
@@ -605,27 +611,62 @@ function HowToIngestContent() {
             LinkedIn Enrichment
           </h3>
           <p className="text-gray-700 mb-4">
-            No account connection needed! Simply copy and paste a LinkedIn profile URL or search results
-            page URL, and the system will extract contact information automatically.
+            No account connection needed! Here's how it works step by step:
           </p>
-          <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-6 max-w-md">
-            <div className="mb-4 flex items-center">
-              <div className="mr-3 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-[#0077B5]">
-                <div className="w-7 h-7 bg-white rounded-sm flex items-center justify-center">
-                  <span className="text-[#0077B5] font-bold text-xs leading-none">in</span>
+
+          {/* Step-by-step LinkedIn Flow */}
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">Step 1: Paste the LinkedIn URL</h4>
+              <p className="text-sm text-gray-700 mb-3">
+                Copy and paste a LinkedIn profile URL or search results page URL into the input field.
+              </p>
+              <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value="https://linkedin.com/in/john-doe"
+                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+                    disabled
+                  />
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium">
+                    Get Contact Info
+                  </button>
                 </div>
               </div>
-              <div className="flex-1">
-                <h4 className="text-lg font-semibold text-gray-900">Enrich with LinkedIn</h4>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">Step 2: Review Extracted Information</h4>
+              <p className="text-sm text-gray-700 mb-3">
+                The system will extract the contact's name, email, title, company, and other information.
+                Review the information to confirm it's correct.
+              </p>
+              <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+                <div className="mb-4">
+                  <h5 className="font-semibold text-gray-900 mb-3">Contact Info</h5>
+                  <div className="space-y-2">
+                    <p className="font-semibold text-gray-900 text-lg">John Doe</p>
+                    <p className="text-sm text-gray-700"><strong>Title:</strong> VP of Sales</p>
+                    <p className="text-sm text-gray-700"><strong>Email:</strong> john.doe@example.com</p>
+                    <p className="text-sm text-gray-700"><strong>Company:</strong> Acme Corp</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <p className="text-sm text-gray-700 mb-3">
-              Find people in your network and add them as contacts
-            </p>
-            <div className="bg-white rounded p-3 text-xs text-gray-600">
-              <strong>Example URLs:</strong><br />
-              • https://linkedin.com/in/john-doe<br />
-              • https://linkedin.com/search/results/people/?keywords=sales
+
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">Step 3: Save the Contact</h4>
+              <p className="text-sm text-gray-700 mb-3">
+                Once you've confirmed the information is correct, click the <strong>"Save Contact"</strong> button
+                to add them to your database.
+              </p>
+              <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+                <button className="w-full bg-green-600 text-white px-6 py-4 rounded-lg flex items-center justify-center gap-2 font-semibold">
+                  <Save className="h-5 w-5" />
+                  Save Contact
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -669,15 +710,271 @@ function HowToIngestContent() {
           </div>
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+function ManagingContactsContent() {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">
+        Managing Your Contacts
+      </h2>
+
+      <div className="space-y-6">
         <div>
           <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            Where Your Contacts Are Saved
+            Accessing Your Contacts
           </h3>
           <p className="text-gray-700 mb-4">
             After importing your contacts, you can view and manage them by going
-            back to <strong>"People"</strong> and hitting <strong>"Manage"</strong>. This will show you all your
-            imported contacts in one place.
+            back to <strong>"People"</strong> and clicking the <strong>"Manage"</strong> button.
+            This will show you all your imported contacts in one place.
           </p>
+
+          {/* Visual People Hub with Manage button */}
+          <div className="mt-4 bg-white border-2 border-gray-200 rounded-lg p-6">
+            <div className="mb-4">
+              <h4 className="text-lg font-semibold text-gray-900 mb-2">👥 People Hub</h4>
+              <p className="text-sm text-gray-600 mb-4">Manage your contacts and prepare for outreach.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+                <div className="flex items-center gap-3 mb-2">
+                  <Upload className="h-6 w-6 text-blue-600" />
+                  <h5 className="font-semibold text-gray-900">Load Up</h5>
+                </div>
+                <p className="text-sm text-gray-700">Get people into Ignite BD</p>
+              </div>
+              <div className="p-4 border-2 border-green-200 rounded-lg bg-green-50 border-green-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="h-6 w-6 text-green-600" />
+                  <h5 className="font-semibold text-gray-900">Manage</h5>
+                </div>
+                <p className="text-sm text-gray-700">View all contacts and filter by deal stage</p>
+              </div>
+              <div className="p-4 border-2 border-purple-200 rounded-lg bg-purple-50">
+                <div className="flex items-center gap-3 mb-2">
+                  <List className="h-6 w-6 text-purple-600" />
+                  <h5 className="font-semibold text-gray-900">Outreach Prep</h5>
+                </div>
+                <p className="text-sm text-gray-700">Build or select contact lists for outreach</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            The Contacts List
+          </h3>
+          <p className="text-gray-700 mb-4">
+            The Manage page shows all your contacts in a searchable, filterable list. You can
+            search by name, email, or company, and filter by pipeline stage.
+          </p>
+
+          {/* Visual Contacts List */}
+          <div className="mt-4 bg-white border-2 border-gray-200 rounded-lg p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900">👥 All Contacts</h4>
+                <p className="text-sm text-gray-600">12 contacts • 10 total</p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Search contacts..."
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                  disabled
+                />
+                <select className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" disabled>
+                  <option>All Pipelines</option>
+                  <option>Prospect</option>
+                  <option>Client</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Contact List Items */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 text-blue-600" />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">John Doe</div>
+                  <div className="text-sm text-gray-500">john.doe@example.com</div>
+                </div>
+                <div className="text-sm text-gray-600">Acme Corp</div>
+                <span className="rounded-full bg-blue-100 text-blue-800 px-2 py-1 text-xs font-semibold">
+                  Prospect
+                </span>
+              </div>
+              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 text-blue-600" />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">Jane Smith</div>
+                  <div className="text-sm text-gray-500">jane@company.com</div>
+                </div>
+                <div className="text-sm text-gray-600">Tech Solutions</div>
+                <span className="rounded-full bg-green-100 text-green-800 px-2 py-1 text-xs font-semibold">
+                  Client
+                </span>
+              </div>
+              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 text-blue-600" />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">Bob Johnson</div>
+                  <div className="text-sm text-gray-500">bob@client.com</div>
+                </div>
+                <div className="text-sm text-gray-600">Global Inc</div>
+                <span className="rounded-full bg-blue-100 text-blue-800 px-2 py-1 text-xs font-semibold">
+                  Prospect
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Contact Detail View
+          </h3>
+          <p className="text-gray-700 mb-4">
+            Click on any contact to view their full profile. Here you can see all their information,
+            add notes, associate them with a company, and view their pipeline status.
+          </p>
+
+          {/* Visual Contact Detail */}
+          <div className="mt-4 bg-white border-2 border-gray-200 rounded-lg p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-2xl font-bold text-gray-900">John Doe</h4>
+                <p className="text-sm text-gray-600">Full profile, pipeline status, and relationship notes.</p>
+              </div>
+              <button className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg">
+                ← Back
+              </button>
+            </div>
+
+            {/* Contact Info */}
+            <div className="mb-6 space-y-3">
+              <div className="flex items-center gap-3">
+                <Mail className="h-5 w-5 text-gray-400" />
+                <span className="text-gray-700">john.doe@example.com</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Phone className="h-5 w-5 text-gray-400" />
+                <span className="text-gray-700">(555) 123-4567</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-gray-400" />
+                <span className="text-gray-700">Acme Corp</span>
+                <button className="text-sm text-blue-600 hover:underline">Change</button>
+              </div>
+            </div>
+
+            {/* Pipeline Status */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-600">
+                  Prospect
+                </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600">
+                  Initial Contact
+                </span>
+                <button className="text-gray-400 hover:text-gray-600">
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Notes Section */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h5 className="text-lg font-semibold text-gray-900">Notes</h5>
+                <button className="text-gray-400 hover:text-gray-600">
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg p-3 text-sm"
+                  rows="4"
+                  placeholder="Add notes from meetings, emails, and relationship updates."
+                  disabled
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+                    Save
+                  </button>
+                  <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Company Association */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h5 className="text-lg font-semibold text-gray-900">Company</h5>
+                <button className="text-sm text-blue-600 hover:underline">Associate Company</button>
+              </div>
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-gray-400" />
+                  <div>
+                    <div className="font-medium text-gray-900">Acme Corp</div>
+                    <div className="text-sm text-gray-600">Technology • 50-100 employees</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Key Management Actions
+          </h3>
+          <p className="text-gray-700 mb-4">
+            From the contact detail page, you have three main ways to work with your contacts:
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+              <div className="flex items-center gap-3 mb-2">
+                <Edit2 className="h-6 w-6 text-blue-600" />
+                <h4 className="font-semibold text-gray-900">Add Notes</h4>
+              </div>
+              <p className="text-sm text-gray-700">
+                Click the edit icon next to Notes to add relationship updates, meeting notes,
+                or any important information about your interactions.
+              </p>
+            </div>
+
+            <div className="p-4 border-2 border-green-200 rounded-lg bg-green-50">
+              <div className="flex items-center gap-3 mb-2">
+                <Building2 className="h-6 w-6 text-green-600" />
+                <h4 className="font-semibold text-gray-900">Associate Company</h4>
+              </div>
+              <p className="text-sm text-gray-700">
+                Link the contact to a company in your database. This helps organize contacts
+                and provides company-level insights.
+              </p>
+            </div>
+
+            <div className="p-4 border-2 border-purple-200 rounded-lg bg-purple-50">
+              <div className="flex items-center gap-3 mb-2">
+                <GitBranch className="h-6 w-6 text-purple-600" />
+                <h4 className="font-semibold text-gray-900">View Pipeline</h4>
+              </div>
+              <p className="text-sm text-gray-700">
+                See where this contact is in your sales process. Edit the pipeline and stage
+                to track their progress through your funnel.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -704,6 +1001,17 @@ const TUTORIAL_TOPICS = [
         id: 'how-to-ingest',
         title: 'How to Ingest',
         component: HowToIngestContent,
+      },
+    ],
+  },
+  {
+    id: 'managing-contacts',
+    title: 'Managing Contacts',
+    sections: [
+      {
+        id: 'overview',
+        title: 'Overview',
+        component: ManagingContactsContent,
       },
     ],
   },
