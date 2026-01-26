@@ -419,13 +419,19 @@ function HowToIngestContent() {
             Look for the <strong>"Connect to Microsoft"</strong> button in the top right corner of the page.
           </p>
 
-          {/* Visual Connect Button */}
+          {/* Visual Connect Button with Microsoft Logo */}
           <div className="mt-4 mb-6 bg-white border-2 border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="text-sm text-gray-500">Top Right Corner</div>
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm">
-                <Mail className="h-4 w-4" />
-                Connect to Microsoft
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors">
+                {/* Microsoft Logo - Four Colored Squares */}
+                <div className="flex gap-0.5">
+                  <div className="w-3 h-3 bg-[#F25022]"></div>
+                  <div className="w-3 h-3 bg-[#7FBA00]"></div>
+                  <div className="w-3 h-3 bg-[#00A4EF]"></div>
+                  <div className="w-3 h-3 bg-[#FFB900]"></div>
+                </div>
+                <span className="text-gray-900">Connect to Microsoft</span>
               </button>
             </div>
             <p className="text-sm text-gray-600">
@@ -444,13 +450,20 @@ function HowToIngestContent() {
             you can import contacts from Microsoft:
           </p>
 
-          {/* Visual Two Cards */}
+          {/* Visual Two Cards with Microsoft Branding */}
           <div className="mt-4 grid md:grid-cols-2 gap-6 max-w-3xl">
             {/* From Email Card */}
             <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all">
               <div className="flex items-center gap-4 mb-4">
-                <div className="h-12 w-12 rounded-lg bg-blue-500 flex items-center justify-center">
-                  <Mail className="h-6 w-6 text-white" />
+                {/* Microsoft Logo + Mail Icon */}
+                <div className="relative h-12 w-12 rounded-lg bg-white border-2 border-gray-200 flex items-center justify-center">
+                  <div className="absolute top-0 left-0 flex gap-0.5 p-0.5">
+                    <div className="w-2 h-2 bg-[#F25022]"></div>
+                    <div className="w-2 h-2 bg-[#7FBA00]"></div>
+                    <div className="w-2 h-2 bg-[#00A4EF]"></div>
+                    <div className="w-2 h-2 bg-[#FFB900]"></div>
+                  </div>
+                  <Mail className="h-6 w-6 text-blue-600 relative z-10" />
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900">Ingest from Emails</h4>
@@ -467,8 +480,15 @@ function HowToIngestContent() {
             {/* From Contacts Card */}
             <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all">
               <div className="flex items-center gap-4 mb-4">
-                <div className="h-12 w-12 rounded-lg bg-purple-500 flex items-center justify-center">
-                  <Users className="h-6 w-6 text-white" />
+                {/* Microsoft Logo + Users Icon */}
+                <div className="relative h-12 w-12 rounded-lg bg-white border-2 border-gray-200 flex items-center justify-center">
+                  <div className="absolute top-0 left-0 flex gap-0.5 p-0.5">
+                    <div className="w-2 h-2 bg-[#F25022]"></div>
+                    <div className="w-2 h-2 bg-[#7FBA00]"></div>
+                    <div className="w-2 h-2 bg-[#00A4EF]"></div>
+                    <div className="w-2 h-2 bg-[#FFB900]"></div>
+                  </div>
+                  <Users className="h-6 w-6 text-purple-600 relative z-10" />
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900">Ingest from Contacts</h4>
