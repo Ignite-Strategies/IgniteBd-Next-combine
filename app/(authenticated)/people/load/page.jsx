@@ -15,6 +15,7 @@ function LoadUpPageContent() {
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId');
   const [microsoftConnected, setMicrosoftConnected] = useState(false);
+  const [connectionChecked, setConnectionChecked] = useState(false);
   
   // Get Microsoft connection status once on mount (from owner/hydrate)
   useEffect(() => {
@@ -22,24 +23,35 @@ function LoadUpPageContent() {
       try {
         const response = await api.get('/api/owner/hydrate');
         if (response.data?.success && response.data?.owner) {
-          setMicrosoftConnected(response.data.owner.microsoftConnected || false);
+          const connected = response.data.owner.microsoftConnected || false;
+          setMicrosoftConnected(connected);
         }
       } catch (error) {
         console.error('Failed to check Microsoft connection:', error);
         setMicrosoftConnected(false);
+      } finally {
+        setConnectionChecked(true);
       }
     };
     checkConnection();
   }, []);
+
+  // Build route with connection status (only after we've checked)
+  const getMicrosoftRoute = () => {
+    const baseRoute = companyHQId 
+      ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}`
+      : '/contacts/ingest/microsoft';
+    return connectionChecked 
+      ? `${baseRoute}&microsoftConnected=${microsoftConnected}`
+      : baseRoute;
+  };
 
   const LOAD_OPTIONS = [
     {
       id: 'import-microsoft',
       title: 'Import from Microsoft',
       description: 'Import from Outlook emails or Microsoft Contacts address book',
-      route: companyHQId 
-        ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}&microsoftConnected=${microsoftConnected}`
-        : `/contacts/ingest/microsoft?microsoftConnected=${microsoftConnected}`,
+      route: getMicrosoftRoute(),
       icon: Mail,
       containerClasses:
         'from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-400',

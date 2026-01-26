@@ -15,16 +15,19 @@ function MicrosoftEmailIngestContent() {
   
   // Connection status from URL param (set by previous page) or default to false
   // Trust the previous page - no API call on mount
-  const isConnectedFromUrl = searchParams?.get('microsoftConnected') === 'true';
-  const [isConnected, setIsConnected] = useState(isConnectedFromUrl);
+  const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   
-  // Initialize ownerId on mount
+  // Initialize ownerId and connection status from URL on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedOwnerId = localStorage.getItem('ownerId');
     if (storedOwnerId) setOwnerId(storedOwnerId);
-  }, []);
+    
+    // Read connection status from URL param
+    const microsoftConnected = searchParams?.get('microsoftConnected') === 'true';
+    setIsConnected(microsoftConnected);
+  }, [searchParams]);
   
   // Handle OAuth callback - set connection status
   useEffect(() => {
