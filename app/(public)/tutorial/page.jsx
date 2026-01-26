@@ -37,10 +37,9 @@ function OrientationContent() {
         <h3 className="text-xl font-semibold text-gray-800">
           The Dashboard
         </h3>
-        <p className="text-gray-700">
-          The Dashboard shows quick actions and metrics to help you get started quickly.
-          You'll see your number of contacts (note: this metric is currently being updated
-          to be company-scoped rather than owner-scoped for better accuracy).
+        <p className="text-gray-700 mb-4">
+          The Dashboard is your command center for business development. It provides quick
+          access to your most important actions and key metrics at a glance.
         </p>
 
         {/* Visual Dashboard Representation */}
@@ -56,9 +55,13 @@ function OrientationContent() {
 
           {/* Quick Actions Visual */}
           <div className="mb-6 rounded-xl bg-white p-4 border border-gray-200">
-            <h5 className="text-lg font-semibold text-gray-900 mb-4">
+            <h5 className="text-lg font-semibold text-gray-900 mb-2">
               Quick Actions
             </h5>
+            <p className="text-sm text-gray-600 mb-4">
+              Here in the middle are two user options that we have selected to be your most
+              "go to" actions. <strong>When in doubt, look to the center.</strong>
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-center gap-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500">
@@ -88,9 +91,14 @@ function OrientationContent() {
 
           {/* Metrics Visual */}
           <div className="rounded-xl bg-white p-4 border border-gray-200">
-            <h5 className="text-lg font-semibold text-gray-900 mb-4">
+            <h5 className="text-lg font-semibold text-gray-900 mb-2">
               Dashboard Metrics
             </h5>
+            <p className="text-sm text-gray-600 mb-4">
+              We list your number of contacts so you can set goals and track your progress.
+              As we develop the platform, we will provide more useful metrics based on your
+              personal growth goals.
+            </p>
             <div className="flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-indigo-100">
                 <Users className="h-8 w-8 text-indigo-600" />
@@ -98,6 +106,7 @@ function OrientationContent() {
               <div>
                 <div className="text-sm font-medium text-gray-600">Total Contacts</div>
                 <div className="text-3xl font-bold text-gray-900">1,234</div>
+                <div className="text-xs text-gray-500 mt-1">Company-scoped count</div>
               </div>
             </div>
           </div>
