@@ -38,17 +38,10 @@ async function handleDisconnect(request) {
       );
     }
 
-    // Clear Microsoft auth fields from Owner
-    await prisma.owners.update({
-      where: { id: owner.id },
-      data: {
-        microsoftAccessToken: null,
-        microsoftRefreshToken: null,
-        microsoftExpiresAt: null,
-        microsoftEmail: null,
-        microsoftDisplayName: null,
-        microsoftTenantId: null, // Clear tenant ID as well
-      },
+    // Delete MicrosoftAccount record (new model)
+    // This removes the entire MicrosoftAccount, effectively disconnecting
+    await prisma.microsoftAccount.delete({
+      where: { ownerId: owner.id },
     });
 
     console.log('✅ Microsoft OAuth disconnected for owner:', owner.id);

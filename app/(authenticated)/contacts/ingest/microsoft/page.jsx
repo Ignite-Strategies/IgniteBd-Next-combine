@@ -23,13 +23,11 @@ function MicrosoftEmailIngestContent() {
     const storedOwnerId = localStorage.getItem('ownerId');
     if (storedOwnerId) setOwnerId(storedOwnerId);
     
-    // Check connection status from owner/hydrate (one API call)
+    // Check connection status from Microsoft status endpoint
     const checkConnection = async () => {
       try {
-        const response = await api.get('/api/owner/hydrate');
-        if (response.data?.success && response.data?.owner) {
-          setIsConnected(response.data.owner.microsoftConnected || false);
-        }
+        const response = await api.get('/api/microsoft/status');
+        setIsConnected(response.data?.connected || false);
       } catch (error) {
         console.error('Failed to check Microsoft connection:', error);
         setIsConnected(false);
@@ -50,10 +48,8 @@ function MicrosoftEmailIngestContent() {
       // Re-check connection status after OAuth
       const checkConnection = async () => {
         try {
-          const response = await api.get('/api/owner/hydrate');
-          if (response.data?.success && response.data?.owner) {
-            setIsConnected(response.data.owner.microsoftConnected || false);
-          }
+          const response = await api.get('/api/microsoft/status');
+          setIsConnected(response.data?.connected || false);
         } catch (error) {
           console.error('Failed to check Microsoft connection:', error);
         }
@@ -77,7 +73,8 @@ function MicrosoftEmailIngestContent() {
 
   // Don't auto-load - user selects source first
 
-  // Load preview function - THIS IS WHERE WE DISCOVER IF CONNECTED
+  // Load preview function - Call API directly, no connection check
+  // The API will return 401 if not connected, which we handle below
   const handleLoadPreview = useCallback(async (selectedSource) => {
     const sourceToUse = selectedSource || source;
     if (!sourceToUse) return;
@@ -87,6 +84,8 @@ function MicrosoftEmailIngestContent() {
     setConnectionError(null);
     
     try {
+      // Call API directly - no connection check needed
+      // API will handle authentication and return 401 if not connected
       const endpoint = sourceToUse === 'email' 
         ? '/api/microsoft/email-contacts/preview'
         : '/api/microsoft/contacts/preview';
@@ -96,7 +95,7 @@ function MicrosoftEmailIngestContent() {
         setPreview(response.data);
         setSelectedIds(new Set());
         setSaveResult(null);
-        // If we got here, we're connected! Update connection status
+        // API call succeeded = we're connected! Update status
         setIsConnected(true);
         setConnectionError(null);
       } else {
@@ -105,14 +104,15 @@ function MicrosoftEmailIngestContent() {
     } catch (error) {
       console.error('Failed to load preview:', error);
       
-      // If 401, they need to connect - THIS IS HOW WE KNOW THEY'RE NOT CONNECTED
+      // Handle 401 (not connected) - prompt user to connect
       if (error.response?.status === 401) {
         setConnectionError({
           type: 'not_connected',
-          message: 'Microsoft account not connected. Please connect your account first.',
+          message: 'Connect your Microsoft account to import contacts.',
         });
         setIsConnected(false);
       } else {
+        // Other API errors
         setConnectionError({
           type: 'api_error',
           message: error.response?.data?.error || error.message || 'Failed to load contacts',
@@ -282,26 +282,40 @@ function MicrosoftEmailIngestContent() {
           </div>
         )}
 
-        {/* Connection Error from API call */}
+        {/* Prompt to connect (401) or API error */}
         {connectionError && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start flex-1">
-                <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-yellow-800 mb-1">
-                    {connectionError.type === 'not_connected' ? 'Connection Required' : 'Error'}
+          <div className={`rounded-lg p-4 mb-6 border ${
+            connectionError.type === 'not_connected'
+              ? 'bg-blue-50 border-blue-200'
+              : 'bg-yellow-50 border-yellow-200'
+          }`}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start flex-1 min-w-0">
+                {connectionError.type === 'not_connected' ? (
+                  <Mail className="h-5 w-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className={`text-sm font-semibold mb-1 ${
+                    connectionError.type === 'not_connected' ? 'text-blue-800' : 'text-yellow-800'
+                  }`}>
+                    {connectionError.type === 'not_connected' ? 'Connect to continue' : 'Error'}
                   </h3>
-                  <p className="text-sm text-yellow-700">{connectionError.message}</p>
+                  <p className={`text-sm ${
+                    connectionError.type === 'not_connected' ? 'text-blue-700' : 'text-yellow-700'
+                  }`}>
+                    {connectionError.message}
+                  </p>
                 </div>
               </div>
               {connectionError.type === 'not_connected' && (
                 <button
                   onClick={handleConnect}
                   disabled={!ownerId}
-                  className="ml-4 text-sm px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+                  className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm"
                 >
-                  Connect Now
+                  Connect Microsoft
                 </button>
               )}
             </div>

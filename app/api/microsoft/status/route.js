@@ -43,17 +43,11 @@ export async function GET(request) {
     // Verify Firebase authentication
     const firebaseUser = await verifyFirebaseToken(request);
 
-    // Get Owner record with Microsoft auth fields
+    // Get Owner record to find ownerId
     const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
       select: {
         id: true,
-        microsoftAccessToken: true,
-        microsoftRefreshToken: true,
-        microsoftExpiresAt: true,
-        microsoftEmail: true,
-        microsoftDisplayName: true,
-        microsoftTenantId: true,
       },
     });
 
@@ -82,12 +76,26 @@ export async function GET(request) {
       }, { status: 200 });
     }
 
+    // Get MicrosoftAccount record (new model)
+    const microsoftAccount = await prisma.microsoftAccount.findUnique({
+      where: { ownerId: owner.id },
+      select: {
+        id: true,
+        accessToken: true,
+        refreshToken: true,
+        expiresAt: true,
+        microsoftEmail: true,
+        microsoftDisplayName: true,
+        microsoftTenantId: true,
+      },
+    });
+
     // Detailed token analysis
     const now = new Date();
-    const expiresAt = owner.microsoftExpiresAt ? new Date(owner.microsoftExpiresAt) : null;
+    const expiresAt = microsoftAccount?.expiresAt ? new Date(microsoftAccount.expiresAt) : null;
     
-    const hasAccessToken = !!owner.microsoftAccessToken;
-    const hasRefreshToken = !!owner.microsoftRefreshToken;
+    const hasAccessToken = !!microsoftAccount?.accessToken;
+    const hasRefreshToken = !!microsoftAccount?.refreshToken;
     const hasExpiresAt = !!expiresAt;
     const isExpired = expiresAt ? expiresAt <= now : null;
     const expiresInSeconds = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000)) : null;
@@ -98,13 +106,13 @@ export async function GET(request) {
     // - Refresh token: Can refresh when access token expires
     // 
     // getValidAccessToken() requires BOTH:
-    // - Line 28: Checks for access token (throws if missing)
-    // - Line 70: refreshAccessToken() requires refresh token (throws if missing)
+    // - Checks for access token (throws if missing)
+    // - refreshAccessToken() requires refresh token (throws if missing)
     //
     // So "connected" = We have both tokens (can use now AND refresh later)
     const isConnected = !!(
-      owner.microsoftAccessToken &&  // Can use now
-      owner.microsoftRefreshToken    // Can refresh when expired
+      microsoftAccount?.accessToken &&  // Can use now
+      microsoftAccount?.refreshToken    // Can refresh when expired
     );
 
     // Build diagnostics
@@ -130,9 +138,9 @@ export async function GET(request) {
     // Return comprehensive status
     return NextResponse.json({
       connected: isConnected,
-      email: owner.microsoftEmail || null,
-      displayName: owner.microsoftDisplayName || null,
-      tenantId: owner.microsoftTenantId || null,
+      email: microsoftAccount?.microsoftEmail || null,
+      displayName: microsoftAccount?.microsoftDisplayName || null,
+      tenantId: microsoftAccount?.microsoftTenantId || null,
       tokens: {
         hasAccessToken,
         hasRefreshToken,

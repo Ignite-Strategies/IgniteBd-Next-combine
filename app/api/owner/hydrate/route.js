@@ -104,28 +104,15 @@ export async function GET(request) {
     // Get default CompanyHQ (first one after role-based sorting: OWNER > MANAGER > others)
     const defaultMembership = memberships[0];
 
-    // Compute Microsoft connection status server-side (NO tokens sent to frontend)
-    // Connection is valid if we have refresh token (can always refresh access token)
-    // Access token expiration doesn't matter - we can refresh it automatically
-    const microsoftConnected = !!(
-      owner.microsoftAccessToken &&
-      owner.microsoftRefreshToken
-    );
-    
-    // Debug logging
-    console.log('🔍 Microsoft Connection Check:');
-    console.log(`  Has Access Token: ${!!owner.microsoftAccessToken}`);
-    console.log(`  Has Refresh Token: ${!!owner.microsoftRefreshToken}`);
-    console.log(`  Final Status: ${microsoftConnected ? '✅ CONNECTED' : '❌ NOT CONNECTED'}`);
-
     // Return owner with memberships (NO tokens - only safe data)
-    // Destructure to exclude sensitive token fields
+    // Destructure to exclude sensitive token fields (Microsoft tokens moved to MicrosoftAccount model)
     const {
       microsoftAccessToken,
       microsoftRefreshToken,
       microsoftExpiresAt,
       microsoftTenantId,
       microsoftDisplayName,
+      microsoftEmail,
       ...ownerSafe
     } = owner;
 
@@ -134,9 +121,7 @@ export async function GET(request) {
       companyHQId: defaultMembership?.companyHqId || null,        // Default CompanyHQ (first after role sorting)
       companyHQ: defaultMembership?.company_hqs || null,          // Full CompanyHQ object
       memberships,        // Array of all memberships (sorted by role)
-      // Microsoft connection state (computed server-side, no tokens)
-      microsoftConnected,
-      microsoftEmail: owner.microsoftEmail || null,
+      // NOTE: Microsoft connection status removed - use /api/microsoft/status instead
     };
 
     return NextResponse.json({

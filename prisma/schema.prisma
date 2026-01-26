@@ -23,6 +23,32 @@ model GoogleOAuthToken {
   @@index([ownerId])
 }
 
+model MicrosoftAccount {
+  id                    String    @id @default(cuid())
+  ownerId               String
+  owner                 owners    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  // Microsoft identity (can be different from owner.email!)
+  microsoftEmail        String
+  microsoftDisplayName  String?
+  microsoftTenantId     String?
+  
+  // OAuth tokens
+  accessToken           String
+  refreshToken          String
+  expiresAt             DateTime?
+  
+  // Metadata
+  connectedAt           DateTime  @default(now())
+  lastRefreshedAt       DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@unique([ownerId])  // One Microsoft account per owner
+  @@index([ownerId])
+  @@index([microsoftEmail])
+}
+
 model assessments {
   id                   String       @id @default(cuid())
   ownerId              String
@@ -331,6 +357,7 @@ model company_hqs {
   planStartedAt                                 DateTime? // When plan access started
   planEndedAt                                   DateTime? // When plan access ends
   plans                                         plans?                          @relation(fields: [planId], references: [id])
+  bill_sends                                    bill_sends[]
   assessments                                   assessments[]
   blogs                                         blogs[]
   campaigns                                     campaigns[]
@@ -943,6 +970,7 @@ model owners {
   sendgridVerifiedName                      String?
   tier                                      String?               @default("foundation")
   GoogleOAuthToken                          GoogleOAuthToken[]
+  MicrosoftAccount                          MicrosoftAccount?
   assessments                               assessments[]
   campaigns                                 campaigns[]
   company_hqs_company_hqs_managerIdToowners company_hqs[]         @relation("company_hqs_managerIdToowners")
@@ -1374,6 +1402,41 @@ model plans {
 
   @@index([stripeProductId])
   @@index([stripePriceId])
+}
+
+// One-off billing (ONE_OFF_BILLING.md). Same shape as plans, no interval. Platform push.
+model bills {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  amountCents Int
+  currency    String       @default("usd")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  bill_sends  bill_sends[]
+}
+
+model bill_sends {
+  id                      String         @id @default(cuid())
+  billId                  String
+  companyId               String
+  stripeCheckoutSessionId String?        @unique
+  checkoutUrl             String?
+  status                  BillSendStatus @default(PENDING)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  bills                   bills          @relation(fields: [billId], references: [id], onDelete: Cascade)
+  company_hqs             company_hqs    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@index([companyId])
+  @@index([status])
+}
+
+enum BillSendStatus {
+  PENDING
+  PAID
+  EXPIRED
 }
 
 // PlatformAccess removed - consolidated into company_hqs fields:

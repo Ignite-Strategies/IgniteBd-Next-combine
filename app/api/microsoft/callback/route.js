@@ -88,17 +88,28 @@ export async function GET(request) {
       redirectUri,
     });
 
-    // Save tokens directly to owner record using ownerId from state
-    // No hydration, no Firebase inference, no guessing
-    await prisma.owners.update({
-      where: { id: ownerId },
-      data: {
-        microsoftAccessToken: tokenData.accessToken,
-        microsoftRefreshToken: tokenData.refreshToken,
-        microsoftExpiresAt: tokenData.expiresAt ? new Date(tokenData.expiresAt) : null,
+    // Save tokens to MicrosoftAccount model (new model)
+    // Upsert: create if doesn't exist, update if it does
+    await prisma.microsoftAccount.upsert({
+      where: { ownerId },
+      create: {
+        ownerId,
         microsoftEmail: tokenData.email,
         microsoftDisplayName: tokenData.displayName,
         microsoftTenantId: tokenData.tenantId,
+        accessToken: tokenData.accessToken,
+        refreshToken: tokenData.refreshToken,
+        expiresAt: tokenData.expiresAt ? new Date(tokenData.expiresAt) : null,
+        connectedAt: new Date(),
+      },
+      update: {
+        microsoftEmail: tokenData.email,
+        microsoftDisplayName: tokenData.displayName,
+        microsoftTenantId: tokenData.tenantId,
+        accessToken: tokenData.accessToken,
+        refreshToken: tokenData.refreshToken,
+        expiresAt: tokenData.expiresAt ? new Date(tokenData.expiresAt) : null,
+        lastRefreshedAt: new Date(),
       },
     });
 

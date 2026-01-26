@@ -7,6 +7,21 @@
 
 const { execSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+
+// Load .env.local if it exists (for local development)
+const envLocalPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const envContent = fs.readFileSync(envLocalPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match && !process.env[match[1].trim()]) {
+      const key = match[1].trim();
+      const value = match[2].trim().replace(/^["']|["']$/g, '');
+      process.env[key] = value;
+    }
+  });
+}
 
 // Get environment variables
 const directUrl = process.env.DIRECT_DATABASE_URL;
