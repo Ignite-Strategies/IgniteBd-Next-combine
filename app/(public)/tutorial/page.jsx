@@ -321,6 +321,27 @@ function HowToIngestContent() {
         How to Ingest Contacts
       </h2>
 
+      {/* Quick Action Reminder */}
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg mb-6">
+        <p className="text-blue-900 text-sm mb-3">
+          <strong>Quick Tip:</strong> Remember the <strong>"Upload Contacts"</strong> quick action
+          from your Dashboard? That's one of your go-to options we discussed earlier. You can
+          access contact management either through that dashboard button or via the sidebar navigation.
+        </p>
+        {/* Visual reminder of dashboard quick action */}
+        <div className="mt-3 flex items-center gap-4 rounded-lg border-2 border-blue-200 bg-white p-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
+            <Plus className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900 text-sm">Upload Contacts</div>
+            <div className="text-xs text-gray-600">
+              Quick action from Dashboard
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-6">
         <div>
           <h3 className="text-xl font-semibold text-gray-800 mb-3">
@@ -331,6 +352,62 @@ function HowToIngestContent() {
             navigation. This will take you to the People Hub where you can
             manage all your contacts.
           </p>
+
+          {/* Visual Sidebar with People Icon Highlighted */}
+          <div className="mt-4 w-64 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🔥</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  Ignite BD
+                </span>
+              </div>
+            </div>
+
+            <nav className="p-4 space-y-6">
+              {/* Dashboard */}
+              <div>
+                <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <TrendingUp className="h-5 w-5" />
+                  <span>Growth Dashboard</span>
+                </div>
+              </div>
+
+              {/* Growth Ops */}
+              <div>
+                <h6 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Growth Ops
+                </h6>
+                <ul className="space-y-1">
+                  <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                    <UserCircle className="h-5 w-5" />
+                    <span>Personas</span>
+                  </li>
+                  <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                    <Package className="h-5 w-5" />
+                    <span>Products</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Engage - with People highlighted */}
+              <div>
+                <h6 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Engage
+                </h6>
+                <ul className="space-y-1">
+                  <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium border-2 border-red-300 bg-red-50 text-red-700">
+                    <Users className="h-5 w-5" />
+                    <span>People</span>
+                  </li>
+                  <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                    <MessageSquare className="h-5 w-5" />
+                    <span>Outreach</span>
+                  </li>
+                </ul>
+              </div>
+            </nav>
+          </div>
         </div>
 
         <div>
