@@ -1,9 +1,298 @@
 'use client';
 
 import { useState } from 'react';
-import { Users, ChevronRight, BookOpen } from 'lucide-react';
+import { 
+  Users, 
+  ChevronRight, 
+  BookOpen, 
+  TrendingUp,
+  UserCircle,
+  Package,
+  MessageSquare,
+  GitBranch,
+  Building2,
+  FileText,
+  Calendar,
+  Settings,
+  FileCode,
+  Plus,
+  Mail,
+} from 'lucide-react';
 
 // Content Components
+function OrientationContent() {
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          Welcome to Ignite BD
+        </h2>
+        <p className="text-lg text-gray-700 mb-6">
+          This orientation serves to help you on your journey to growth.
+        </p>
+      </div>
+
+      {/* The Dashboard */}
+      <div className="space-y-4">
+        <h3 className="text-xl font-semibold text-gray-800">
+          The Dashboard
+        </h3>
+        <p className="text-gray-700">
+          The Dashboard shows quick actions and metrics to help you get started quickly.
+          You'll see your number of contacts (note: this metric is currently being updated
+          to be company-scoped rather than owner-scoped for better accuracy).
+        </p>
+
+        {/* Visual Dashboard Representation */}
+        <div className="mt-6 border-2 border-gray-200 rounded-xl bg-white p-6 shadow-lg">
+          <div className="mb-6 rounded-2xl bg-white p-6 border border-gray-200">
+            <h4 className="text-2xl font-bold text-gray-900 mb-2">
+              Your Company Growth Dashboard
+            </h4>
+            <p className="text-gray-600">
+              Your command center for business development
+            </p>
+          </div>
+
+          {/* Quick Actions Visual */}
+          <div className="mb-6 rounded-xl bg-white p-4 border border-gray-200">
+            <h5 className="text-lg font-semibold text-gray-900 mb-4">
+              Quick Actions
+            </h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500">
+                  <Plus className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Upload Contacts</div>
+                  <div className="text-sm text-gray-600">
+                    Choose how to add contacts: CSV, LinkedIn, Microsoft, or manual
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 rounded-lg border-2 border-purple-200 bg-purple-50 p-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500">
+                  <Mail className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900">Send Email</div>
+                  <div className="text-sm text-gray-600">
+                    Compose and send emails to your contacts
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Metrics Visual */}
+          <div className="rounded-xl bg-white p-4 border border-gray-200">
+            <h5 className="text-lg font-semibold text-gray-900 mb-4">
+              Dashboard Metrics
+            </h5>
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-indigo-100">
+                <Users className="h-8 w-8 text-indigo-600" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-600">Total Contacts</div>
+                <div className="text-3xl font-bold text-gray-900">1,234</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Left Side Nav Bar */}
+      <div className="space-y-4">
+        <h3 className="text-xl font-semibold text-gray-800">
+          Left Side Navigation Bar
+        </h3>
+        <p className="text-gray-700">
+          The left side navigation bar contains all the important things you need to do
+          and think about for business development. We've separated functionality into
+          4 distinct categories to help you navigate efficiently.
+        </p>
+
+        {/* Visual Sidebar Representation */}
+        <div className="mt-6 w-64 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔥</span>
+              <span className="text-lg font-semibold text-gray-900">
+                Ignite BD
+              </span>
+            </div>
+          </div>
+
+          {/* Navigation Items */}
+          <nav className="p-4 space-y-6">
+            {/* Dashboard */}
+            <div>
+              <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium border border-red-200 bg-red-50 text-red-700">
+                <TrendingUp className="h-5 w-5" />
+                <span>Growth Dashboard</span>
+              </div>
+            </div>
+
+            {/* Growth Ops */}
+            <div>
+              <h6 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Growth Ops
+              </h6>
+              <ul className="space-y-1">
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <UserCircle className="h-5 w-5" />
+                  <span>Personas</span>
+                </li>
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <Package className="h-5 w-5" />
+                  <span>Products</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Engage */}
+            <div>
+              <h6 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Engage
+              </h6>
+              <ul className="space-y-1">
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <Users className="h-5 w-5" />
+                  <span>People</span>
+                </li>
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <MessageSquare className="h-5 w-5" />
+                  <span>Outreach</span>
+                </li>
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <FileCode className="h-5 w-5" />
+                  <span>Templates</span>
+                </li>
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <GitBranch className="h-5 w-5" />
+                  <span>Pipeline</span>
+                </li>
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <Building2 className="h-5 w-5" />
+                  <span>Company Hub</span>
+                </li>
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <Calendar className="h-5 w-5" />
+                  <span>Meetings</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Attract */}
+            <div>
+              <h6 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Attract
+              </h6>
+              <ul className="space-y-1">
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <FileText className="h-5 w-5" />
+                  <span>Content</span>
+                </li>
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <Calendar className="h-5 w-5" />
+                  <span>Events</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Settings */}
+            <div>
+              <h6 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Settings
+              </h6>
+              <ul className="space-y-1">
+                <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                  <Settings className="h-5 w-5" />
+                  <span>Settings</span>
+                </li>
+              </ul>
+            </div>
+          </nav>
+        </div>
+      </div>
+
+      {/* Four Categories Details */}
+      <div className="space-y-4">
+        <h3 className="text-xl font-semibold text-gray-800">
+          The 4 Distinct Categories
+        </h3>
+        <p className="text-gray-700 mb-4">
+          Here's what each category is designed for:
+        </p>
+
+        <div className="space-y-4">
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+            <h4 className="font-semibold text-blue-900 mb-2">
+              1. Growth Ops
+            </h4>
+            <p className="text-blue-800 text-sm">
+              Foundation and strategy tools. Define your personas, products, and
+              build your BD intelligence. This is where you set up the core elements
+              that drive your business development strategy.
+            </p>
+            <ul className="mt-2 text-sm text-blue-800 list-disc list-inside">
+              <li>Personas - Define your target audience</li>
+              <li>Products - Catalog your offerings</li>
+            </ul>
+          </div>
+
+          <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+            <h4 className="font-semibold text-purple-900 mb-2">
+              2. Engage
+            </h4>
+            <p className="text-purple-800 text-sm">
+              Outreach and engagement tools. Manage your contacts, send emails,
+              create templates, track pipelines, and schedule meetings. This is
+              where you actively engage with prospects and clients.
+            </p>
+            <ul className="mt-2 text-sm text-purple-800 list-disc list-inside">
+              <li>People - Manage contacts and lists</li>
+              <li>Outreach - Email campaigns and messaging</li>
+              <li>Templates - Reusable email templates</li>
+              <li>Pipeline - Deal and opportunity tracking</li>
+              <li>Company Hub - Company information and insights</li>
+              <li>Meetings - Schedule and manage meetings</li>
+            </ul>
+          </div>
+
+          <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+            <h4 className="font-semibold text-green-900 mb-2">
+              3. Attract
+            </h4>
+            <p className="text-green-800 text-sm">
+              Marketing and content tools. Create content, manage events, and
+              attract prospects through valuable resources and experiences.
+            </p>
+            <ul className="mt-2 text-sm text-green-800 list-disc list-inside">
+              <li>Content - Create articles, presentations, and assets</li>
+              <li>Events - Manage conferences, webinars, and networking events</li>
+            </ul>
+          </div>
+
+          <div className="bg-gray-50 border-l-4 border-gray-500 p-4 rounded">
+            <h4 className="font-semibold text-gray-900 mb-2">
+              4. Settings
+            </h4>
+            <p className="text-gray-800 text-sm">
+              Configure your workspace, manage integrations, and customize your
+              Ignite BD experience.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HowToIngestContent() {
   return (
     <div className="space-y-6">
@@ -73,6 +362,17 @@ function HowToIngestContent() {
 }
 
 const TUTORIAL_TOPICS = [
+  {
+    id: 'orientation',
+    title: 'Orientation',
+    sections: [
+      {
+        id: 'welcome',
+        title: 'Welcome & Overview',
+        component: OrientationContent,
+      },
+    ],
+  },
   {
     id: 'contact-management',
     title: 'Contact Management',
