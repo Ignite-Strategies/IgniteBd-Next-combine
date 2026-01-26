@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useEffect, Suspense, useRef, useState } from 'react';
+import { useEffect, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Mail, Users } from 'lucide-react';
+import { Plus, Mail, Users, RefreshCw } from 'lucide-react';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
 
@@ -14,48 +14,87 @@ function GrowthDashboardPageContent() {
   // URL param is source of truth - welcome page sets it, no checking needed
   const missingCompanyKey = !companyHQId;
 
-  // Just read directly from localStorage - no hooks, no checking
   const [companyHQ, setCompanyHQ] = useState(null);
-  const [contacts, setContacts] = useState([]);
+  const [totalContacts, setTotalContacts] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
+  // Fetch company data and metrics from API
   useEffect(() => {
-    if (typeof window === 'undefined' || !companyHQId) return;
-    
-    // Read companyHQ directly from localStorage
-    const stored = localStorage.getItem('companyHQ');
-    if (stored) {
-      try {
-        setCompanyHQ(JSON.parse(stored));
-      } catch (e) {
-        console.warn('Failed to parse companyHQ', e);
-      }
+    if (typeof window === 'undefined' || !companyHQId) {
+      setLoading(false);
+      return;
     }
     
-    // Read contacts directly from localStorage
-    const storedContacts = localStorage.getItem('contacts');
-    if (storedContacts) {
+    const fetchDashboardData = async () => {
       try {
-        const parsed = JSON.parse(storedContacts);
-        // Filter by companyHQId if needed
-        const filtered = Array.isArray(parsed) 
-          ? parsed.filter(c => c.companyHQId === companyHQId)
-          : [];
-        setContacts(filtered);
-      } catch (e) {
-        console.warn('Failed to parse contacts', e);
+        setLoading(true);
+        setError(null);
+
+        // Fetch companyHQ data from localStorage (fallback) or API
+        const stored = localStorage.getItem('companyHQ');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            // Only use if it matches the current companyHQId
+            if (parsed.id === companyHQId) {
+              setCompanyHQ(parsed);
+            }
+          } catch (e) {
+            console.warn('Failed to parse companyHQ from localStorage', e);
+          }
+        }
+
+        // Fetch contacts count from API - company-scoped
+        console.log('📊 Fetching contact metrics for companyHQId:', companyHQId);
+        const contactsResponse = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+        
+        if (contactsResponse.data?.success && Array.isArray(contactsResponse.data.contacts)) {
+          const contacts = contactsResponse.data.contacts;
+          const count = contacts.length;
+          console.log(`✅ Fetched ${count} contacts (company-scoped) for companyHQId: ${companyHQId}`);
+          setTotalContacts(count);
+        } else {
+          console.warn('⚠️ API response missing contacts array:', contactsResponse.data);
+          setTotalContacts(0);
+        }
+      } catch (err) {
+        console.error('❌ Error fetching dashboard metrics:', err);
+        setError(err.message || 'Failed to load metrics');
+        setTotalContacts(0);
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+
+    fetchDashboardData();
   }, [companyHQId]);
 
   const hasCompany = !!companyHQ && !!companyHQId;
   const companyName = companyHQ?.companyName ?? 'Your Company';
 
-  // Calculate total contacts - query based on companyHQId and contacts
-  const totalContacts = useMemo(() => {
-    const contactsArray = Array.isArray(contacts) ? contacts : [];
-    // Filter by companyHQId if needed (contacts should already be filtered by companyHQId from the API)
-    return contactsArray.length;
-  }, [contacts]);
+  // Refresh metrics
+  const refreshMetrics = async () => {
+    if (!companyHQId) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const contactsResponse = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+      
+      if (contactsResponse.data?.success && Array.isArray(contactsResponse.data.contacts)) {
+        const count = contactsResponse.data.contacts.length;
+        setTotalContacts(count);
+        console.log(`✅ Refreshed metrics: ${count} contacts`);
+      }
+    } catch (err) {
+      console.error('❌ Error refreshing metrics:', err);
+      setError(err.message || 'Failed to refresh metrics');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Show error if company key is missing
   if (missingCompanyKey) {
@@ -114,19 +153,44 @@ function GrowthDashboardPageContent() {
         </div>
       </div>
 
-      {/* Dashboard Metric */}
+      {/* Dashboard Metrics */}
       <div className="rounded-xl bg-white p-6 shadow-lg">
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">
-          Dashboard Metrics
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Dashboard Metrics
+          </h3>
+          <button
+            onClick={refreshMetrics}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh metrics"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-indigo-100">
             <Users className="h-8 w-8 text-indigo-600" />
           </div>
-          <div>
+          <div className="flex-1">
             <div className="text-sm font-medium text-gray-600">Total Contacts</div>
-            <div className="text-3xl font-bold text-gray-900">
-              {totalContacts.toLocaleString()}
+            {loading ? (
+              <div className="text-3xl font-bold text-gray-400">...</div>
+            ) : (
+              <div className="text-3xl font-bold text-gray-900">
+                {totalContacts.toLocaleString()}
+              </div>
+            )}
+            <div className="text-xs text-gray-500 mt-1">
+              Company-scoped count
             </div>
           </div>
         </div>
