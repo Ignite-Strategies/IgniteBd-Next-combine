@@ -170,26 +170,25 @@ export default function ContactDetailPage({ params }) {
     );
   }, [contact]);
 
-  // Check if contact is already enriched
+  // Check if contact has FULL intelligence enrichment (not just basic LinkedIn data)
   // Uses useMemo (not useEffect) - automatically recalculates when contact changes
-  // No useEffect needed since this is a derived value from contact state
+  // Only returns true if we have actual intelligence data (scores, summaries), not just basic enrichment metadata
   const isEnriched = useMemo(() => {
     if (!contact) return false;
     
-    // Primary indicators of enrichment (most reliable first):
-    // 1. enrichmentPayload - raw Apollo JSON stored in DB (most reliable)
-    // 2. enrichmentSource - indicates which service enriched this contact
-    // 3. profileSummary - GPT-generated summary from enrichment
-    // 4. Intelligence scores - computed from enrichment data
-    // 5. enrichmentRedisKey - legacy Redis reference (less reliable now)
+    // Only consider "enriched" if we have actual intelligence data:
+    // 1. profileSummary - GPT-generated summary (indicates full intelligence sweep)
+    // 2. Intelligence scores - computed from enrichment data
+    // 3. enrichmentRedisKey - legacy Redis reference (indicates full enrichment flow)
+    
+    // NOTE: enrichmentSource and enrichmentPayload alone are NOT enough
+    // These are set by simple LinkedIn save, but don't indicate full intelligence
     
     return !!(
-      contact.enrichmentPayload || // Raw enrichment JSON (most reliable)
-      contact.enrichmentSource || // Which service enriched (e.g., "apollo")
-      contact.profileSummary || // GPT summary from enrichment
+      contact.profileSummary || // GPT summary from enrichment (most reliable indicator)
       (contact.seniorityScore !== null && contact.seniorityScore !== undefined) || // Intelligence score
       (contact.buyingPowerScore !== null && contact.buyingPowerScore !== undefined) || // Intelligence score
-      contact.enrichmentRedisKey // Legacy Redis key (fallback)
+      contact.enrichmentRedisKey // Legacy Redis key (fallback - indicates full enrichment flow)
     );
   }, [contact]);
 
