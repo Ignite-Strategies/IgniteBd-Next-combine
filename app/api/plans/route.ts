@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { createStripeProductAndPrice } from '@/lib/stripe/plan';
 
 /**
  * POST /api/plans
  * Create a new plan
+ * Creates Stripe product and price immediately (not on checkout)
  */
 export async function POST(request: Request) {
   try {
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create plan
+    // Create plan in database
     const plan = await prisma.plans.create({
       data: {
         name: name.trim(),
@@ -46,10 +48,31 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      plan,
-    });
+    // Create Stripe product and price immediately (not on checkout)
+    try {
+      const { productId, priceId } = await createStripeProductAndPrice(plan.id);
+      
+      // Reload plan to get updated Stripe IDs
+      const updatedPlan = await prisma.plans.findUnique({
+        where: { id: plan.id },
+      });
+
+      return NextResponse.json({
+        success: true,
+        plan: updatedPlan,
+        stripeProductId: productId,
+        stripePriceId: priceId,
+      });
+    } catch (stripeError) {
+      // If Stripe creation fails, still return the plan (Stripe IDs will be null)
+      // They can be created later on first checkout
+      console.error('⚠️ Failed to create Stripe product/price:', stripeError);
+      return NextResponse.json({
+        success: true,
+        plan,
+        warning: 'Plan created but Stripe product/price creation failed. Will be created on first checkout.',
+      });
+    }
   } catch (error) {
     console.error('❌ Create plan error:', error);
     return NextResponse.json(
@@ -79,12 +102,25 @@ export async function GET(request: Request) {
 
   try {
     const plans = await prisma.plans.findMany({
+      include: {
+        _count: {
+          select: {
+            company_hqs: true, // Count companies using this plan
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
+    // Format plans with company count
+    const formattedPlans = plans.map((plan) => ({
+      ...plan,
+      companyCount: plan._count.company_hqs,
+    }));
+
     return NextResponse.json({
       success: true,
-      plans,
+      plans: formattedPlans,
     });
   } catch (error) {
     console.error('❌ Get plans error:', error);
