@@ -35,7 +35,7 @@ interface EventTuner {
   event_tuner_personas?: { personas: Persona }[];
 }
 
-function EventPickerPageContent() {
+export function EventPickerPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
