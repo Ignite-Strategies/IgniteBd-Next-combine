@@ -85,11 +85,9 @@ function MicrosoftEmailIngestContent() {
         setPreview(response.data);
         setSelectedIds(new Set());
         setSaveResult(null);
-        // If we got here, we're connected! Store connection info
-        setConnectionInfo({
-          connected: true,
-          source: sourceToUse,
-        });
+        // If we got here, we're connected! Update connection status
+        setIsConnected(true);
+        setConnectionError(null);
       } else {
         setPreview(null);
       }
@@ -102,7 +100,7 @@ function MicrosoftEmailIngestContent() {
           type: 'not_connected',
           message: 'Microsoft account not connected. Please connect your account first.',
         });
-        setConnectionInfo({ connected: false });
+        setIsConnected(false);
       } else {
         setConnectionError({
           type: 'api_error',
