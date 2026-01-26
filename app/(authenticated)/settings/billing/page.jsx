@@ -14,6 +14,7 @@ function BillingPageContent() {
   const [error, setError] = useState(null);
   const [company, setCompany] = useState(null);
   const [companyHQId, setCompanyHQId] = useState(null);
+  const [pendingBills, setPendingBills] = useState([]);
 
   useEffect(() => {
     // Get companyHQId from localStorage or search params
@@ -56,7 +57,19 @@ function BillingPageContent() {
       }
     };
 
+    const loadPendingBills = async () => {
+      try {
+        const res = await api.get(`/api/bills/pending-for-company?companyId=${companyHQId}`);
+        if (res.data?.success && Array.isArray(res.data.pending)) {
+          setPendingBills(res.data.pending);
+        }
+      } catch (e) {
+        console.warn('Could not load pending one-off bills:', e);
+      }
+    };
+
     loadCompany();
+    loadPendingBills();
   }, [companyHQId]);
 
   const handlePay = async () => {
@@ -181,6 +194,40 @@ function BillingPageContent() {
         {error && (
           <div className="mt-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {/* Outstanding one-off bills (b): pay here if user lost email link */}
+        {companyHQId && pendingBills.length > 0 && (
+          <div className="mt-8 bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Outstanding one-off bills</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              You have pending one-off bills. Pay below if you lost the link from your email.
+            </p>
+            <ul className="space-y-3">
+              {pendingBills.map((b) => (
+                <li
+                  key={b.billSendId}
+                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{b.billName}</p>
+                    <p className="text-sm text-gray-500">
+                      {formatCurrency(b.amountCents, b.currency)}
+                      {b.description && ` · ${b.description}`}
+                    </p>
+                  </div>
+                  <a
+                    href={b.checkoutUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
+                  >
+                    Pay
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
