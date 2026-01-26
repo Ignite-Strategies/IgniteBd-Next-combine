@@ -19,6 +19,8 @@ import {
   Mail,
   ArrowRight,
   Sparkles,
+  FileSpreadsheet,
+  User,
 } from 'lucide-react';
 
 // Content Components
@@ -413,113 +415,202 @@ function HowToIngestContent() {
 
         <div>
           <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            Step 2: Connect to Microsoft
+            Step 2: Choose Your Ingestion Method
           </h3>
-          <p className="text-gray-700 mb-4">
-            Once you're on the Microsoft import page, you'll first need to connect your Microsoft account.
-            Look for the <strong>"Connect to Microsoft"</strong> button in the top right corner of the page.
+          <p className="text-gray-700 mb-6">
+            Here are all the ways you can add contacts to Ignite BD. Each method has its own benefits
+            depending on your needs:
           </p>
 
-          {/* Visual Connect Button with Microsoft Logo */}
-          <div className="mt-4 mb-6 bg-white border-2 border-gray-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm text-gray-500">Top Right Corner</div>
-              <button className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors">
-                {/* Microsoft Logo - Four Colored Squares */}
+          {/* All Methods Overview */}
+          <div className="grid md:grid-cols-2 gap-4 mb-8">
+            {/* Microsoft */}
+            <div className="p-4 border-2 border-indigo-200 rounded-lg bg-indigo-50">
+              <div className="flex items-center gap-3 mb-2">
                 <div className="flex gap-0.5">
                   <div className="w-3 h-3 bg-[#F25022]"></div>
                   <div className="w-3 h-3 bg-[#7FBA00]"></div>
                   <div className="w-3 h-3 bg-[#00A4EF]"></div>
                   <div className="w-3 h-3 bg-[#FFB900]"></div>
                 </div>
-                <span className="text-gray-900">Connect to Microsoft</span>
+                <h4 className="font-semibold text-gray-900">Import from Microsoft</h4>
+              </div>
+              <p className="text-sm text-gray-700">From emails or contacts address book</p>
+            </div>
+
+            {/* LinkedIn */}
+            <div className="p-4 border-2 border-purple-200 rounded-lg bg-purple-50">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-6 h-6 bg-[#0077B5] rounded flex items-center justify-center">
+                  <span className="text-white font-bold text-xs">in</span>
+                </div>
+                <h4 className="font-semibold text-gray-900">Enrich with LinkedIn</h4>
+              </div>
+              <p className="text-sm text-gray-700">Copy and paste LinkedIn URLs</p>
+            </div>
+
+            {/* CSV */}
+            <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+              <div className="flex items-center gap-3 mb-2">
+                <FileSpreadsheet className="h-5 w-5 text-blue-600" />
+                <h4 className="font-semibold text-gray-900">Upload CSV</h4>
+              </div>
+              <p className="text-sm text-gray-700">Bulk import from spreadsheet</p>
+            </div>
+
+            {/* Manual */}
+            <div className="p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex items-center gap-3 mb-2">
+                <User className="h-5 w-5 text-gray-600" />
+                <h4 className="font-semibold text-gray-900">Add Manually</h4>
+              </div>
+              <p className="text-sm text-gray-700">Enter one contact at a time</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Microsoft Details */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Microsoft Import
+          </h3>
+          <p className="text-gray-700 mb-4">
+            First, connect your Microsoft account using the <strong>"Connect to Microsoft"</strong> button
+            in the top right corner. After connecting, you'll see two options:
+          </p>
+
+          {/* Connect Button Visual */}
+          <div className="mb-6 bg-white border-2 border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-gray-500">Top Right Corner</div>
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-300 rounded-lg font-medium text-sm">
+                <div className="flex gap-0.5">
+                  <div className="w-3 h-3 bg-[#F25022]"></div>
+                  <div className="w-3 h-3 bg-[#7FBA00]"></div>
+                  <div className="w-3 h-3 bg-[#00A4EF]"></div>
+                  <div className="w-3 h-3 bg-[#FFB900]"></div>
+                </div>
+                <span>Connect to Microsoft</span>
               </button>
             </div>
-            <p className="text-sm text-gray-600">
-              Click this button to authenticate with your Microsoft account. You'll be redirected
-              to Microsoft's login page, then brought back to continue.
+          </div>
+
+          {/* Two Source Options */}
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="p-4 border-2 border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <Mail className="h-6 w-6 text-blue-600" />
+                <h4 className="font-semibold text-gray-900">From Emails</h4>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Scans your recent Outlook emails (up to 200) to extract unique contacts from people you've emailed.
+              </p>
+            </div>
+
+            <div className="p-4 border-2 border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <Users className="h-6 w-6 text-purple-600" />
+                <h4 className="font-semibold text-gray-900">From Contacts</h4>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Imports directly from your Microsoft Contacts address book with company names and job titles.
+              </p>
+            </div>
+          </div>
+
+          {/* Selection Example */}
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-4">
+            <p className="text-sm text-blue-900 font-semibold mb-2">
+              ⚠️ Important: You Choose What to Save
+            </p>
+            <p className="text-sm text-blue-800">
+              After selecting a source, you'll see a preview list of all available contacts. 
+              <strong> It's up to you to select which contacts are relevant to save.</strong> Use the checkboxes
+              to choose individual contacts or "Select All" to choose everything.
             </p>
           </div>
-        </div>
 
-        <div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            Step 3: Choose Your Import Source
-          </h3>
-          <p className="text-gray-700 mb-4">
-            After connecting, you'll see two cards to choose from. These represent the two ways
-            you can import contacts from Microsoft:
-          </p>
-
-          {/* Visual Two Cards with Microsoft Branding */}
-          <div className="mt-4 grid md:grid-cols-2 gap-6 max-w-3xl">
-            {/* From Email Card */}
-            <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all">
-              <div className="flex items-center gap-4 mb-4">
-                {/* Microsoft Logo + Mail Icon */}
-                <div className="relative h-12 w-12 rounded-lg bg-white border-2 border-gray-200 flex items-center justify-center">
-                  <div className="absolute top-0 left-0 flex gap-0.5 p-0.5">
-                    <div className="w-2 h-2 bg-[#F25022]"></div>
-                    <div className="w-2 h-2 bg-[#7FBA00]"></div>
-                    <div className="w-2 h-2 bg-[#00A4EF]"></div>
-                    <div className="w-2 h-2 bg-[#FFB900]"></div>
+          {/* Email Selection Example */}
+          <div className="mb-6">
+            <h4 className="font-semibold text-gray-800 mb-3">Example: Email Selection</h4>
+            <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded hover:bg-blue-50">
+                  <input type="checkbox" checked className="h-4 w-4 text-blue-600" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">John Doe</div>
+                    <div className="text-xs text-gray-500">john.doe@example.com</div>
                   </div>
-                  <Mail className="h-6 w-6 text-blue-600 relative z-10" />
+                  <div className="text-xs text-gray-500">Dec 15</div>
                 </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-900">Ingest from Emails</h4>
-                  <p className="text-sm text-gray-500">Extract contacts from people you email</p>
+                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded hover:bg-blue-50">
+                  <input type="checkbox" className="h-4 w-4 text-blue-600" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">Jane Smith</div>
+                    <div className="text-xs text-gray-500">jane@company.com</div>
+                  </div>
+                  <div className="text-xs text-gray-500">Nov 28</div>
+                </div>
+                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded hover:bg-blue-50">
+                  <input type="checkbox" checked className="h-4 w-4 text-blue-600" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">Bob Johnson</div>
+                    <div className="text-xs text-gray-500">bob@client.com</div>
+                  </div>
+                  <div className="text-xs text-gray-500">Dec 10</div>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
-                <strong>From Email Messages:</strong> Scans your recent Outlook emails (up to 200 messages)
-                to extract unique contacts from people you've emailed. Automatically filters out automated
-                emails and business services.
-              </p>
+              <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+                <span className="text-sm text-gray-600">2 of 3 selected</span>
+                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+                  Save Selected Contacts
+                </button>
+              </div>
             </div>
+          </div>
 
-            {/* From Contacts Card */}
-            <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all">
-              <div className="flex items-center gap-4 mb-4">
-                {/* Microsoft Logo + Users Icon */}
-                <div className="relative h-12 w-12 rounded-lg bg-white border-2 border-gray-200 flex items-center justify-center">
-                  <div className="absolute top-0 left-0 flex gap-0.5 p-0.5">
-                    <div className="w-2 h-2 bg-[#F25022]"></div>
-                    <div className="w-2 h-2 bg-[#7FBA00]"></div>
-                    <div className="w-2 h-2 bg-[#00A4EF]"></div>
-                    <div className="w-2 h-2 bg-[#FFB900]"></div>
+          {/* Contacts Selection Example */}
+          <div className="mb-6">
+            <h4 className="font-semibold text-gray-800 mb-3">Example: Contacts Selection</h4>
+            <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded hover:bg-purple-50">
+                  <input type="checkbox" checked className="h-4 w-4 text-purple-600" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">Sarah Williams</div>
+                    <div className="text-xs text-gray-500">sarah@partner.com • VP of Sales</div>
                   </div>
-                  <Users className="h-6 w-6 text-purple-600 relative z-10" />
                 </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-900">Ingest from Contacts</h4>
-                  <p className="text-sm text-gray-500">Import from Microsoft Contacts</p>
+                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded hover:bg-purple-50">
+                  <input type="checkbox" className="h-4 w-4 text-purple-600" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">Mike Chen</div>
+                    <div className="text-xs text-gray-500">mike@vendor.com • Director</div>
+                  </div>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
-                <strong>From Contacts Address Book:</strong> Imports contacts directly from your Microsoft
-                Contacts (saved in your address book). Includes company names and job titles when available.
-              </p>
+              <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+                <span className="text-sm text-gray-600">1 of 2 selected</span>
+                <button className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium">
+                  Save Selected Contacts
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* LinkedIn Details */}
         <div>
           <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            Alternative: Enrich with LinkedIn
+            LinkedIn Enrichment
           </h3>
           <p className="text-gray-700 mb-4">
-            On the Load Up page, you'll also see an <strong>"Enrich with LinkedIn"</strong> option.
-            This doesn't require connecting an account - you simply copy and paste the URL of a
-            LinkedIn profile or search results page, and the system will extract the contact
-            information automatically.
+            No account connection needed! Simply copy and paste a LinkedIn profile URL or search results
+            page URL, and the system will extract contact information automatically.
           </p>
-
-          {/* Visual LinkedIn Card matching the actual page */}
-          <div className="mt-4 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-6 max-w-md">
+          <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-6 max-w-md">
             <div className="mb-4 flex items-center">
               <div className="mr-3 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-[#0077B5]">
-                {/* LinkedIn "in" logo */}
                 <div className="w-7 h-7 bg-white rounded-sm flex items-center justify-center">
                   <span className="text-[#0077B5] font-bold text-xs leading-none">in</span>
                 </div>
@@ -528,16 +619,53 @@ function HowToIngestContent() {
                 <h4 className="text-lg font-semibold text-gray-900">Enrich with LinkedIn</h4>
               </div>
             </div>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-700 mb-3">
               Find people in your network and add them as contacts
             </p>
-            <div className="mt-4 pt-4 border-t border-purple-200">
-              <p className="text-xs text-gray-600">
-                <strong>How it works:</strong> Copy and paste a LinkedIn profile URL or search results
-                page URL. The system will extract contact information automatically - no account
-                connection needed.
-              </p>
+            <div className="bg-white rounded p-3 text-xs text-gray-600">
+              <strong>Example URLs:</strong><br />
+              • https://linkedin.com/in/john-doe<br />
+              • https://linkedin.com/search/results/people/?keywords=sales
             </div>
+          </div>
+        </div>
+
+        {/* CSV Details */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            CSV Upload
+          </h3>
+          <p className="text-gray-700 mb-4">
+            Perfect for bulk imports. Export your contacts from any system (Excel, Google Sheets, CRM, etc.)
+            as a CSV file, then upload it directly.
+          </p>
+          <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50 max-w-md">
+            <div className="flex items-center gap-3 mb-2">
+              <FileSpreadsheet className="h-6 w-6 text-blue-600" />
+              <h4 className="font-semibold text-gray-900">Upload CSV</h4>
+            </div>
+            <p className="text-sm text-gray-700">
+              Bulk import contacts from a CSV file. Make sure your CSV has columns for name, email, company, etc.
+            </p>
+          </div>
+        </div>
+
+        {/* Manual Details */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Manual Entry
+          </h3>
+          <p className="text-gray-700 mb-4">
+            Need to add just one contact quickly? Use manual entry for a simple, straightforward form.
+          </p>
+          <div className="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 max-w-md">
+            <div className="flex items-center gap-3 mb-2">
+              <User className="h-6 w-6 text-gray-600" />
+              <h4 className="font-semibold text-gray-900">Add Manually</h4>
+            </div>
+            <p className="text-sm text-gray-700">
+              Enter a single contact one at a time (name, email, company, etc.)
+            </p>
           </div>
         </div>
 
