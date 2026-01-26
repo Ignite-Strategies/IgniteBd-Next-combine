@@ -412,35 +412,95 @@ function HowToIngestContent() {
 
         <div>
           <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            Step 2: Choose Your Ingestion Method
+            Step 2: Connect to Microsoft
           </h3>
           <p className="text-gray-700 mb-4">
-            Once you're on the People Hub, you'll see several options for
-            importing contacts. For now, we'll review these two methods:
+            Once you're on the Microsoft import page, you'll first need to connect your Microsoft account.
+            Look for the <strong>"Connect to Microsoft"</strong> button in the top right corner of the page.
           </p>
 
-          <div className="space-y-4 mt-4">
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
-              <h4 className="font-semibold text-blue-900 mb-2">
-                Microsoft
-              </h4>
-              <p className="text-blue-800">
-                Connect first, then you'll see the following import options
-                available. Simply follow the prompts to sync your contacts from
-                Microsoft.
+          {/* Visual Connect Button */}
+          <div className="mt-4 mb-6 bg-white border-2 border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm text-gray-500">Top Right Corner</div>
+              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm">
+                <Mail className="h-4 w-4" />
+                Connect to Microsoft
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              Click this button to authenticate with your Microsoft account. You'll be redirected
+              to Microsoft's login page, then brought back to continue.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Step 3: Choose Your Import Source
+          </h3>
+          <p className="text-gray-700 mb-4">
+            After connecting, you'll see two cards to choose from. These represent the two ways
+            you can import contacts from Microsoft:
+          </p>
+
+          {/* Visual Two Cards */}
+          <div className="mt-4 grid md:grid-cols-2 gap-6 max-w-3xl">
+            {/* From Email Card */}
+            <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="h-12 w-12 rounded-lg bg-blue-500 flex items-center justify-center">
+                  <Mail className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900">Ingest from Emails</h4>
+                  <p className="text-sm text-gray-500">Extract contacts from people you email</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                <strong>From Email Messages:</strong> Scans your recent Outlook emails (up to 200 messages)
+                to extract unique contacts from people you've emailed. Automatically filters out automated
+                emails and business services.
               </p>
             </div>
 
-            <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
-              <h4 className="font-semibold text-purple-900 mb-2">
-                LinkedIn
-              </h4>
-              <p className="text-purple-800">
-                Literally copy and paste the URL of a LinkedIn profile or search
-                results page. The system will extract the contact information
-                automatically.
+            {/* From Contacts Card */}
+            <div className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="h-12 w-12 rounded-lg bg-purple-500 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900">Ingest from Contacts</h4>
+                  <p className="text-sm text-gray-500">Import from Microsoft Contacts</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                <strong>From Contacts Address Book:</strong> Imports contacts directly from your Microsoft
+                Contacts (saved in your address book). Includes company names and job titles when available.
               </p>
             </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Alternative: LinkedIn Import
+          </h3>
+          <p className="text-gray-700 mb-4">
+            For LinkedIn, you don't need to connect an account. Simply copy and paste the URL of a
+            LinkedIn profile or search results page, and the system will extract the contact information
+            automatically.
+          </p>
+          <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+            <h4 className="font-semibold text-purple-900 mb-2">
+              LinkedIn
+            </h4>
+            <p className="text-purple-800">
+              Literally copy and paste the URL of a LinkedIn profile or search
+              results page. The system will extract the contact information
+              automatically.
+            </p>
           </div>
         </div>
 
