@@ -18,6 +18,7 @@ import {
   Plus,
   Mail,
   ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 
 // Content Components
@@ -505,22 +506,38 @@ function HowToIngestContent() {
 
         <div>
           <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            Alternative: LinkedIn Import
+            Alternative: Enrich with LinkedIn
           </h3>
           <p className="text-gray-700 mb-4">
-            For LinkedIn, you don't need to connect an account. Simply copy and paste the URL of a
-            LinkedIn profile or search results page, and the system will extract the contact information
-            automatically.
+            On the Load Up page, you'll also see an <strong>"Enrich with LinkedIn"</strong> option.
+            This doesn't require connecting an account - you simply copy and paste the URL of a
+            LinkedIn profile or search results page, and the system will extract the contact
+            information automatically.
           </p>
-          <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
-            <h4 className="font-semibold text-purple-900 mb-2">
-              LinkedIn
-            </h4>
-            <p className="text-purple-800">
-              Literally copy and paste the URL of a LinkedIn profile or search
-              results page. The system will extract the contact information
-              automatically.
+
+          {/* Visual LinkedIn Card matching the actual page */}
+          <div className="mt-4 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-6 max-w-md">
+            <div className="mb-4 flex items-center">
+              <div className="mr-3 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-[#0077B5]">
+                {/* LinkedIn "in" logo */}
+                <div className="w-7 h-7 bg-white rounded-sm flex items-center justify-center">
+                  <span className="text-[#0077B5] font-bold text-xs leading-none">in</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-lg font-semibold text-gray-900">Enrich with LinkedIn</h4>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700">
+              Find people in your network and add them as contacts
             </p>
+            <div className="mt-4 pt-4 border-t border-purple-200">
+              <p className="text-xs text-gray-600">
+                <strong>How it works:</strong> Copy and paste a LinkedIn profile URL or search results
+                page URL. The system will extract contact information automatically - no account
+                connection needed.
+              </p>
+            </div>
           </div>
         </div>
 
