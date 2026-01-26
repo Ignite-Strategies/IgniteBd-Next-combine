@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Sparkles,
@@ -8,18 +8,25 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
+import { useOwner } from '@/hooks/useOwner';
 
 function LoadUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId');
+  const { owner } = useOwner();
+  
+  // Get Microsoft connection status from owner (already hydrated)
+  const microsoftConnected = owner?.microsoftConnected || false;
 
   const LOAD_OPTIONS = [
     {
       id: 'import-microsoft',
       title: 'Import from Microsoft',
       description: 'Import from Outlook emails or Microsoft Contacts address book',
-      route: companyHQId ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}` : '/contacts/ingest/microsoft',
+      route: companyHQId 
+        ? `/contacts/ingest/microsoft?companyHQId=${companyHQId}&microsoftConnected=${microsoftConnected}`
+        : `/contacts/ingest/microsoft?microsoftConnected=${microsoftConnected}`,
       icon: Mail,
       containerClasses:
         'from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-400',

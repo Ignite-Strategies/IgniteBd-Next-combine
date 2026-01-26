@@ -13,48 +13,36 @@ function MicrosoftEmailIngestContent() {
   // Get ownerId from localStorage (needed for connect button)
   const [ownerId, setOwnerId] = useState(null);
   
-  // Simple connection status - just check if token exists
-  const [isConnected, setIsConnected] = useState(false);
-  const [checkingConnection, setCheckingConnection] = useState(true);
+  // Connection status from URL param (set by previous page) or default to false
+  // Trust the previous page - no API call on mount
+  const isConnectedFromUrl = searchParams?.get('microsoftConnected') === 'true';
+  const [isConnected, setIsConnected] = useState(isConnectedFromUrl);
   const [connectionError, setConnectionError] = useState(null);
   
-  // Simple API check on page load - just look for token
-  const checkConnection = useCallback(async () => {
-    setCheckingConnection(true);
-    try {
-      const response = await api.get('/api/microsoft/status');
-      setIsConnected(response.data.connected || false);
-      setConnectionError(null);
-    } catch (error) {
-      console.error('Failed to check connection:', error);
-      setIsConnected(false);
-    } finally {
-      setCheckingConnection(false);
-    }
-  }, []);
-  
-  // Initialize and check connection on mount
+  // Initialize ownerId on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedOwnerId = localStorage.getItem('ownerId');
     if (storedOwnerId) setOwnerId(storedOwnerId);
-    checkConnection();
-  }, [checkConnection]);
+  }, []);
   
-  // Handle OAuth callback - refresh connection status
+  // Handle OAuth callback - set connection status
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const success = searchParams?.get('success');
     const error = searchParams?.get('error');
     
-    // If OAuth just completed, refresh connection and clear query params
-    if (success === '1' || error) {
-      checkConnection();
-      router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}` : ''));
+    // If OAuth just completed successfully, we're connected
+    if (success === '1') {
+      setIsConnected(true);
       setConnectionError(null);
+      router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}&microsoftConnected=true` : '?microsoftConnected=true'));
+    } else if (error) {
+      setIsConnected(false);
+      router.replace('/contacts/ingest/microsoft' + (companyHQId ? `?companyHQId=${companyHQId}` : ''));
     }
-  }, [searchParams, router, companyHQId, checkConnection]);
+  }, [searchParams, router, companyHQId]);
   
   const [source, setSource] = useState(null); // null = landing page, 'email' or 'contacts'
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -218,12 +206,7 @@ function MicrosoftEmailIngestContent() {
             
             {/* Connection Status & Connect Button - Top Right */}
             <div className="flex items-center gap-3">
-              {checkingConnection ? (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span>Checking...</span>
-                </div>
-              ) : isConnected ? (
+              {isConnected ? (
                 <div className="flex items-center gap-2 text-sm text-green-600">
                   <CheckCircle2 className="h-4 w-4" />
                   <span>Connected</span>
