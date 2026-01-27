@@ -9,7 +9,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * Query params:
  * - platformId: REQUIRED - Filter by platform (ensures platform-scoped access)
  * - companyHQId: Filter by company
- * - invoiceType: Filter by type (PLATFORM_FEE, MONTHLY_RECURRING, CUSTOM, WORK_PACKAGE)
+ * - invoiceType: Filter by type (PLATFORM_FEE, MONTHLY_RECURRING, CUSTOM, WORK_PACKAGE, PLAN_SUBSCRIPTION)
  * - status: Filter by status (NOT_PAID, PAID, PARTIAL)
  */
 export async function GET(request: Request) {
@@ -97,6 +97,8 @@ export async function GET(request: Request) {
       stripeCheckoutSessionId: invoice.stripeCheckoutSessionId,
       stripePaymentIntentId: invoice.stripePaymentIntentId,
       stripeCustomerId: invoice.stripeCustomerId,
+      stripeInvoiceId: invoice.stripeInvoiceId,
+      stripeSubscriptionId: invoice.stripeSubscriptionId,
     }));
 
     return NextResponse.json({

@@ -132,10 +132,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 /**
  * Handle invoice.paid
  * Update company_hqs by stripeSubscriptionId, set planStatus = ACTIVE
+ * Also write to invoices table for payment history
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   try {
     const subscriptionId = invoice.subscription as string | null;
+    const invoiceId = invoice.id;
+    const amountPaid = invoice.amount_paid; // in cents
+    const currency = invoice.currency || 'usd';
+    const customerId = invoice.customer as string | null;
 
     if (!subscriptionId) {
       console.warn('⚠️ invoice.paid: No subscription ID');
@@ -145,21 +150,56 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     // Find company by subscription ID
     const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscriptionId },
+      include: {
+        plans: true, // Get plan info for invoice name/description
+      },
     });
 
-    if (company) {
-      await prisma.company_hqs.update({
-        where: { id: company.id },
-        data: {
-          planStatus: 'ACTIVE',
-          planEndedAt: null,
-        },
-      });
-
-      console.log(`✅ Invoice paid: Company ${company.id} set to ACTIVE`);
-    } else {
+    if (!company) {
       console.warn(`⚠️ invoice.paid: Company not found for subscription ${subscriptionId}`);
+      return;
     }
+
+    // Update company_hqs status
+    await prisma.company_hqs.update({
+      where: { id: company.id },
+      data: {
+        planStatus: 'ACTIVE',
+        planEndedAt: null,
+      },
+    });
+
+    // Write to invoices table for payment history
+    const planName = company.plans?.name || 'Plan Subscription';
+    const invoiceDescription = company.plans?.description || `Subscription payment for ${planName}`;
+
+    // Upsert invoice (create if doesn't exist, update if it does)
+    await prisma.invoices.upsert({
+      where: { stripeInvoiceId: invoiceId },
+      create: {
+        companyHQId: company.id,
+        invoiceType: 'PLAN_SUBSCRIPTION',
+        invoiceName: planName,
+        invoiceDescription: invoiceDescription,
+        totalExpected: amountPaid,
+        totalReceived: amountPaid,
+        currency: currency.toUpperCase(),
+        status: 'PAID',
+        paidAt: new Date(),
+        stripeInvoiceId: invoiceId,
+        stripeSubscriptionId: subscriptionId,
+        stripeCustomerId: customerId,
+        stripePaymentIntentId: invoice.payment_intent as string | null,
+      },
+      update: {
+        totalReceived: amountPaid,
+        status: 'PAID',
+        paidAt: new Date(),
+        stripePaymentIntentId: invoice.payment_intent as string | null,
+      },
+    });
+
+    console.log(`✅ Invoice paid: Company ${company.id} set to ACTIVE, payment history saved (invoice ${invoiceId})`);
   } catch (error) {
     console.error('❌ Error handling invoice.paid:', error);
     throw error;
