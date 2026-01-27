@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { getCalendarEvents } from '@/lib/microsoftGraphClient';
+import { getCalendarEvents, isMicrosoftConnected } from '@/lib/microsoftGraphClient';
 
 export async function GET(request) {
   try {
@@ -20,8 +20,6 @@ export async function GET(request) {
       where: { firebaseId: firebaseUser.uid },
       select: {
         id: true,
-        microsoftAccessToken: true,
-        microsoftRefreshToken: true,
       },
     });
 
@@ -32,8 +30,9 @@ export async function GET(request) {
       );
     }
 
-    // Check if Microsoft account is connected
-    if (!owner.microsoftAccessToken && !owner.microsoftRefreshToken) {
+    // Check if Microsoft account is connected (using MicrosoftAccount model)
+    const connected = await isMicrosoftConnected(owner.id);
+    if (!connected) {
       return NextResponse.json(
         { 
           success: false, 

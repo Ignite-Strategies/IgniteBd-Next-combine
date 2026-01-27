@@ -30,8 +30,10 @@ export async function GET(request) {
       );
     }
 
-    // Check if Microsoft is connected
-    if (!owner.microsoftAccessToken) {
+    // Check if Microsoft is connected (using MicrosoftAccount model)
+    const { isMicrosoftConnected } = await import('@/lib/microsoftGraphClient');
+    const connected = await isMicrosoftConnected(owner.id);
+    if (!connected) {
       return NextResponse.json(
         { success: false, error: 'Microsoft account not connected' },
         { status: 400 }

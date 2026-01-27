@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 /**
  * GET /api/debug/microsoft-status
  * Debug endpoint to check Microsoft connection status for current user
+ * Now uses MicrosoftAccount model instead of owner.microsoft* fields
  */
 export async function GET(request) {
   try {
@@ -17,12 +18,6 @@ export async function GET(request) {
         email: true,
         firstName: true,
         lastName: true,
-        microsoftAccessToken: true,
-        microsoftRefreshToken: true,
-        microsoftExpiresAt: true,
-        microsoftEmail: true,
-        microsoftDisplayName: true,
-        microsoftTenantId: true,
       },
     });
 
@@ -33,19 +28,31 @@ export async function GET(request) {
       }, { status: 404 });
     }
 
-    const now = new Date();
-    const expiresAt = owner.microsoftExpiresAt ? new Date(owner.microsoftExpiresAt) : null;
+    // Get MicrosoftAccount record (new model)
+    const microsoftAccount = await prisma.microsoftAccount.findUnique({
+      where: { ownerId: owner.id },
+      select: {
+        id: true,
+        accessToken: true,
+        refreshToken: true,
+        expiresAt: true,
+        microsoftEmail: true,
+        microsoftDisplayName: true,
+        microsoftTenantId: true,
+      },
+    });
 
-    const hasAccessToken = !!owner.microsoftAccessToken;
-    const hasRefreshToken = !!owner.microsoftRefreshToken;
+    const now = new Date();
+    const expiresAt = microsoftAccount?.expiresAt ? new Date(microsoftAccount.expiresAt) : null;
+
+    const hasAccessToken = !!microsoftAccount?.accessToken;
+    const hasRefreshToken = !!microsoftAccount?.refreshToken;
     const hasExpiresAt = !!expiresAt;
     const isNotExpired = expiresAt ? expiresAt > now : false;
 
     const microsoftConnected = !!(
-      owner.microsoftAccessToken &&
-      owner.microsoftRefreshToken &&
-      expiresAt &&
-      expiresAt > now
+      microsoftAccount?.accessToken &&
+      microsoftAccount?.refreshToken
     );
 
     return NextResponse.json({
@@ -53,13 +60,13 @@ export async function GET(request) {
       owner: {
         id: owner.id,
         email: owner.email,
-        name: `${owner.firstName} ${owner.lastName}`,
+        name: `${owner.firstName || ''} ${owner.lastName || ''}`.trim(),
       },
       microsoft: {
         connected: microsoftConnected,
-        email: owner.microsoftEmail,
-        displayName: owner.microsoftDisplayName,
-        tenantId: owner.microsoftTenantId,
+        email: microsoftAccount?.microsoftEmail || null,
+        displayName: microsoftAccount?.microsoftDisplayName || null,
+        tenantId: microsoftAccount?.microsoftTenantId || null,
         hasAccessToken,
         hasRefreshToken,
         hasExpiresAt,

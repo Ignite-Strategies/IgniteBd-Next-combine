@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getValidAccessToken } from '@/lib/microsoftGraphClient';
-import { getRedis } from '@/lib/redis';
 import crypto from 'crypto';
 
 /**
@@ -11,9 +10,15 @@ import crypto from 'crypto';
  * Fetch and aggregate email senders from Microsoft Graph messages
  * Returns preview of unique people from email metadata
  * 
+ * Query Parameters:
+ * - skip: Number of messages to skip (default: 0)
+ *   Examples: skip=0 (messages 1-100), skip=100 (messages 101-200), skip=200 (messages 201-300)
+ * 
  * Returns:
  * {
+ *   "success": true,
  *   "generatedAt": "ISO_TIMESTAMP",
+ *   "skip": 0,
  *   "limit": 50,
  *   "items": [
  *     {
@@ -31,10 +36,10 @@ import crypto from 'crypto';
  * }
  * 
  * Behavior:
- * - Checks Redis first (preview:microsoft_email:${ownerId})
- * - If miss → fetch 50 messages, aggregate, store in Redis
- * - TTL: 30-60 minutes
- * - No database writes
+ * - Fetches 100 messages starting from skip position
+ * - Processes and filters to return up to 50 unique contacts
+ * - No caching - always fresh data
+ * - Simple pagination: skip=0, skip=100, skip=200, etc.
  */
 export async function GET(request) {
   try {
@@ -51,23 +56,9 @@ export async function GET(request) {
       );
     }
 
-    // Check Redis for existing preview
-    const redisClient = getRedis();
-    const redisKey = `preview:microsoft_email:${owner.id}`;
-    
-    try {
-      const cached = await redisClient.get(redisKey);
-      if (cached) {
-        const cachedData = typeof cached === 'string' ? JSON.parse(cached) : cached;
-        console.log(`✅ Returning cached Microsoft email preview for owner: ${owner.id}`);
-        return NextResponse.json({
-          success: true,
-          ...cachedData,
-        });
-      }
-    } catch (redisError) {
-      console.warn('⚠️ Redis get failed (will recompute):', redisError.message);
-    }
+    // Get skip parameter from query string (default: 0)
+    const { searchParams } = new URL(request.url);
+    const skip = parseInt(searchParams.get('skip') || '0', 10);
 
     // Get valid access token (handles refresh automatically)
     let accessToken;
@@ -80,9 +71,9 @@ export async function GET(request) {
       );
     }
 
-    // Fetch messages from Microsoft Graph - fetch enough to get 50 unique contacts after filtering
-    // Reduced from 200 to 100 for better performance (early exit stops at 50 anyway)
-    const graphUrl = 'https://graph.microsoft.com/v1.0/me/messages?$select=from,receivedDateTime&$top=100&$orderby=receivedDateTime desc';
+    // Fetch messages from Microsoft Graph with skip parameter for pagination
+    // skip=0 → messages 1-100, skip=100 → messages 101-200, skip=200 → messages 201-300, etc.
+    const graphUrl = `https://graph.microsoft.com/v1.0/me/messages?$select=from,receivedDateTime&$top=100&$skip=${skip}&$orderby=receivedDateTime desc`;
     
     let messagesResponse;
     try {
@@ -451,25 +442,13 @@ export async function GET(request) {
     // Prepare preview data - always show 50 (or fewer if we don't have that many unique contacts)
     const previewData = {
       generatedAt: new Date().toISOString(),
+      skip,
       limit: 50,
       items,
+      hasMore: items.length === 50, // If we got 50, there might be more
     };
 
-    // Store in Redis with 45 minute TTL
-    try {
-      const ttl = 45 * 60; // 45 minutes
-      await redisClient.setex(
-        redisKey,
-        ttl,
-        JSON.stringify(previewData)
-      );
-      console.log(`✅ Microsoft email preview stored in Redis: ${redisKey}`);
-    } catch (redisError) {
-      console.warn('⚠️ Redis store failed (non-critical):', redisError.message);
-      // Continue - we can still return preview data
-    }
-
-    // Return preview data
+    // Return preview data (no caching - always fresh)
     return NextResponse.json({
       success: true,
       ...previewData,

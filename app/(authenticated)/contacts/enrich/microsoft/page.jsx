@@ -31,20 +31,25 @@ function MicrosoftEnrichContent() {
   const [enriching, setEnriching] = useState(false);
 
   async function handleFetchContacts() {
-    // Check Microsoft connection from owner hook (no API call needed)
-    if (!owner?.microsoftAccessToken) {
-      if (!ownerId) {
-        alert('Please wait for authentication to complete');
+    // Check Microsoft connection via API (MicrosoftAccount model)
+    try {
+      const statusResponse = await api.get('/api/microsoft/status');
+      if (!statusResponse.data?.connected) {
+        if (!ownerId) {
+          alert('Please wait for authentication to complete');
+          return;
+        }
+        // Redirect to login with ownerId
+        window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
         return;
       }
-      // Redirect to login with ownerId
-      window.location.href = `/api/microsoft/login?ownerId=${ownerId}`;
-      return;
+    } catch (error) {
+      // If status check fails, try to proceed - API will handle error
+      console.warn('Microsoft status check failed:', error);
     }
 
     setLoading(true);
     try {
-
       const contactsResponse = await api.get('/api/microsoft-graph/contacts');
       if (contactsResponse.data?.success) {
         const parsed = (contactsResponse.data.contacts || []).map((contact) => {

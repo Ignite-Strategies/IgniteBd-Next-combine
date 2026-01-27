@@ -70,12 +70,13 @@ function MicrosoftEmailIngestContent() {
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [skip, setSkip] = useState(0); // Track pagination: 0, 100, 200, etc.
 
   // Don't auto-load - user selects source first
 
   // Load preview function - Call API directly, no connection check
   // The API will return 401 if not connected, which we handle below
-  const handleLoadPreview = useCallback(async (selectedSource) => {
+  const handleLoadPreview = useCallback(async (selectedSource, currentSkip = 0) => {
     const sourceToUse = selectedSource || source;
     if (!sourceToUse) return;
     
@@ -84,15 +85,16 @@ function MicrosoftEmailIngestContent() {
     setConnectionError(null);
     
     try {
-      // Call API directly - no connection check needed
-      // API will handle authentication and return 401 if not connected
+      // Call API with skip parameter for pagination
+      // skip=0 → messages 1-100, skip=100 → messages 101-200, etc.
       const endpoint = sourceToUse === 'email' 
-        ? '/api/microsoft/email-contacts/preview'
-        : '/api/microsoft/contacts/preview';
+        ? `/api/microsoft/email-contacts/preview?skip=${currentSkip}`
+        : `/api/microsoft/contacts/preview?skip=${currentSkip}`;
       const response = await api.get(endpoint);
       
       if (response.data?.success) {
         setPreview(response.data);
+        setSkip(currentSkip); // Update skip state
         setSelectedIds(new Set());
         setSaveResult(null);
         // API call succeeded = we're connected! Update status
@@ -124,10 +126,11 @@ function MicrosoftEmailIngestContent() {
     }
   }, [source]);
 
-  // Select source and load
+  // Select source and load (reset to first batch)
   const handleSelectSource = useCallback((selectedSource) => {
     setSource(selectedSource);
-    handleLoadPreview(selectedSource);
+    setSkip(0); // Reset to first batch
+    handleLoadPreview(selectedSource, 0);
   }, [handleLoadPreview]);
 
   // Connect button
@@ -196,6 +199,7 @@ function MicrosoftEmailIngestContent() {
         : '/api/microsoft/contacts/save';
       const response = await api.post(endpoint, {
         previewIds: Array.from(selectedIds),
+        previewItems: preview?.items || [], // Send full preview items (no Redis needed)
         companyHQId,
       });
       if (response.data?.success) {
@@ -398,16 +402,19 @@ function MicrosoftEmailIngestContent() {
                   </p>
                 )}
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setSaveResult(null);
-                      handleLoadPreview();
-                    }}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors flex items-center gap-2"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Import Next 50
-                  </button>
+                  {preview?.hasMore && (
+                    <button
+                      onClick={() => {
+                        setSaveResult(null);
+                        const nextSkip = skip + 100; // Move to next batch
+                        handleLoadPreview(source, nextSkip);
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Import Next 50
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setSaveResult(null);
@@ -474,30 +481,30 @@ function MicrosoftEmailIngestContent() {
                   <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
                     <div className="w-4"></div>
                     <div>Name</div>
-                    <div className="text-right">Last Send</div>
-                    <div className="text-center">Status</div>
-                    <div className="text-right w-16">Times Contacted</div>
+                    <div className="text-right">Last Email</div>
+                    <div className="text-center">Recency</div>
+                    <div className="text-right w-16">Messages</div>
                   </div>
                   {preview.items.map((item) => {
-                    // Determine status color based on last contact
+                    // Determine status based on last email received (not "activity")
                     let statusColor = 'gray';
                     let statusText = 'New';
-                    if (item.stats?.lastSeenAt) {
-                      const daysSince = Math.floor((new Date() - new Date(item.stats.lastSeenAt)) / (1000 * 60 * 60 * 24));
-                      if (daysSince <= 7) {
-                        statusColor = 'green';
-                        statusText = 'Recent';
-                      } else if (daysSince <= 30) {
-                        statusColor = 'yellow';
-                        statusText = 'Active';
-                      } else {
-                        statusColor = 'red';
-                        statusText = 'Stale';
-                      }
-                    }
+                    
                     if (item.alreadyExists) {
                       statusColor = 'blue';
                       statusText = 'Exists';
+                    } else if (item.stats?.lastSeenAt) {
+                      const daysSince = Math.floor((new Date() - new Date(item.stats.lastSeenAt)) / (1000 * 60 * 60 * 24));
+                      if (daysSince <= 7) {
+                        statusColor = 'green';
+                        statusText = 'Last Week';
+                      } else if (daysSince <= 30) {
+                        statusColor = 'yellow';
+                        statusText = 'Last Month';
+                      } else {
+                        statusColor = 'red';
+                        statusText = 'Older';
+                      }
                     }
 
                     return (
