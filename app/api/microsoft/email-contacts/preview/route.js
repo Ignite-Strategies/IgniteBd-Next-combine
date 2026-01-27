@@ -80,8 +80,9 @@ export async function GET(request) {
       );
     }
 
-    // Fetch messages from Microsoft Graph - fetch more to ensure we get 50 unique contacts
-    const graphUrl = 'https://graph.microsoft.com/v1.0/me/messages?$select=from,receivedDateTime&$top=200&$orderby=receivedDateTime desc';
+    // Fetch messages from Microsoft Graph - fetch enough to get 50 unique contacts after filtering
+    // Reduced from 200 to 100 for better performance (early exit stops at 50 anyway)
+    const graphUrl = 'https://graph.microsoft.com/v1.0/me/messages?$select=from,receivedDateTime&$top=100&$orderby=receivedDateTime desc';
     
     let messagesResponse;
     try {
@@ -115,7 +116,7 @@ export async function GET(request) {
     // Filter out automated/business emails
     function isAutomatedEmail(email, displayName) {
       const emailLower = email.toLowerCase();
-      const nameLower = (displayName || '').toLowerCase();
+      const nameLower = (displayName || '').toLowerCase().trim();
       
       // Common automated email patterns
       const automatedPatterns = [
@@ -146,71 +147,111 @@ export async function GET(request) {
         return true;
       }
       
-      // Common automated/business domains
-      const automatedDomains = [
-        'sendgrid.com',
-        'sendgrid.net',
-        'mail.sendgrid.net',
+      // If no display name or display name is just the email, skip business name check
+      if (!displayName || nameLower === emailLower || nameLower.length === 0) {
+        // Continue to domain check below
+      } else {
+        // Check if displayName looks like a business name (not a person name)
+        // Person names: "John Smith", "Mary", "Robert Johnson"
+        // Business names: "QuickBooks", "Acme Corp", "Tech Solutions Inc"
+        
+        const words = nameLower.split(/\s+/).filter(w => w.length > 0);
+        
+        // Single word that's not a common first name = likely business
+        if (words.length === 1) {
+          const word = words[0];
+          // Common first names (allow these - might be a person)
+          const commonFirstNames = new Set([
+            'alex', 'chris', 'dana', 'jordan', 'kelly', 'morgan', 'pat', 'robin', 'sam', 'taylor',
+            'james', 'john', 'robert', 'michael', 'william', 'david', 'richard', 'joseph', 'thomas',
+            'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah',
+            'emily', 'emma', 'sophia', 'olivia', 'ava', 'mia', 'chloe', 'ella', 'avery', 'sofia',
+          ]);
+          
+          // If it's a common first name, allow it
+          if (!commonFirstNames.has(word) && word.length > 4) {
+            // Single word, not a common name, longer than 4 chars = likely business
+            return true;
+          }
+        }
+        
+        // Multiple words: check for business indicators
+        if (words.length >= 2) {
+          // Business indicators (Inc, LLC, Corp, etc.)
+          const businessIndicators = ['inc', 'llc', 'corp', 'ltd', 'co', 'company', 'solutions', 
+            'services', 'systems', 'group', 'associates', 'partners', 'enterprises', 'industries',
+            'technologies', 'consulting', 'advisory', 'capital', 'ventures', 'holdings'];
+          
+          // Check if any word is a business indicator
+          if (words.some(word => businessIndicators.includes(word))) {
+            return true;
+          }
+          
+          // Check capitalization pattern in original displayName (not lowercased)
+          // Business names often have unusual capitalization: "QuickBooks", "Stripe Inc"
+          const originalWords = (displayName || '').split(/\s+/).filter(w => w.length > 0);
+          if (originalWords.length >= 2) {
+            // Check if all words start with capital (business name pattern)
+            const allStartWithCapital = originalWords.every(word => 
+              word.length > 0 && /^[A-Z]/.test(word)
+            );
+            
+            // Common name words (exception for real people)
+            const commonNameWords = new Set([
+              'john', 'jane', 'mary', 'james', 'robert', 'michael', 'william', 'david',
+              'smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'miller', 'davis',
+            ]);
+            
+            // If all words start with capital and none are common names, likely business
+            if (allStartWithCapital && !words.some(word => commonNameWords.has(word))) {
+              return true;
+            }
+          }
+        }
+      }
+      
+      // Common automated/business domains (using Set for O(1) lookup)
+      const automatedDomains = new Set([
+        'sendgrid.com', 'sendgrid.net', 'mail.sendgrid.net',
         'godaddy.com',
-        'venmo.com',
-        'email.venmo.com',
-        'bluevine.com',
-        'email.bluevine.com',
-        'stripe.com',
-        'mail.stripe.com',
-        'paypal.com',
-        'mail.paypal.com',
-        'amazon.com',
-        'amazonaws.com',
-        'mail.amazon.com',
-        'github.com',
-        'noreply.github.com',
-        'linkedin.com',
-        'notifications.linkedin.com',
-        'facebook.com',
-        'mail.facebook.com',
-        'twitter.com',
-        'x.com',
-        'mail.x.com',
-        'google.com',
-        'mail.google.com',
-        'microsoft.com',
-        'mail.microsoft.com',
-        'outlook.com',
-        'mail.outlook.com',
-        'mailchimp.com',
-        'mail.mailchimp.com',
-        'hubspot.com',
-        'mail.hubspot.com',
-        'salesforce.com',
-        'mail.salesforce.com',
-        'zendesk.com',
-        'mail.zendesk.com',
-        'intercom.com',
-        'mail.intercom.com',
-        'slack.com',
-        'mail.slack.com',
-        'dropbox.com',
-        'mail.dropbox.com',
-        'zoom.us',
-        'mail.zoom.us',
-        'calendly.com',
-        'mail.calendly.com',
-        'eventbrite.com',
-        'mail.eventbrite.com',
-        'square.com',
-        'mail.square.com',
-        'quickbooks.com',
-        'mail.quickbooks.com',
-        'xero.com',
-        'mail.xero.com',
-        'freshbooks.com',
-        'mail.freshbooks.com',
-      ];
+        'venmo.com', 'email.venmo.com',
+        'bluevine.com', 'email.bluevine.com',
+        'stripe.com', 'mail.stripe.com',
+        'paypal.com', 'mail.paypal.com',
+        'amazon.com', 'amazonaws.com', 'mail.amazon.com',
+        'github.com', 'noreply.github.com',
+        'linkedin.com', 'notifications.linkedin.com',
+        'facebook.com', 'mail.facebook.com',
+        'twitter.com', 'x.com', 'mail.x.com',
+        'google.com', 'mail.google.com',
+        'microsoft.com', 'mail.microsoft.com',
+        'outlook.com', 'mail.outlook.com',
+        'mailchimp.com', 'mail.mailchimp.com',
+        'hubspot.com', 'mail.hubspot.com',
+        'salesforce.com', 'mail.salesforce.com',
+        'zendesk.com', 'mail.zendesk.com',
+        'intercom.com', 'mail.intercom.com',
+        'slack.com', 'mail.slack.com',
+        'dropbox.com', 'mail.dropbox.com',
+        'zoom.us', 'mail.zoom.us',
+        'calendly.com', 'mail.calendly.com',
+        'eventbrite.com', 'mail.eventbrite.com',
+        'square.com', 'mail.square.com',
+        'quickbooks.com', 'mail.quickbooks.com', 'intuit.com', 'mail.intuit.com', 'quickbooks.intuit.com',
+        'xero.com', 'mail.xero.com',
+        'freshbooks.com', 'mail.freshbooks.com',
+      ]);
       
       const domain = emailLower.split('@')[1];
-      if (automatedDomains.includes(domain)) {
+      // Check exact domain match
+      if (automatedDomains.has(domain)) {
         return true;
+      }
+      // Check if domain ends with any automated domain (catches subdomains)
+      for (const automatedDomain of automatedDomains) {
+        if (domain.endsWith('.' + automatedDomain)) {
+          return true;
+        }
       }
       
       // Check if displayName looks like a business/service name (common patterns)
@@ -240,7 +281,8 @@ export async function GET(request) {
         /^calendly$/i,
         /^eventbrite$/i,
         /^square$/i,
-        /^quickbooks$/i,
+        /^quickbooks/i,  // Matches "QuickBooks", "QuickBooks Online", etc.
+        /^intuit/i,      // Matches "Intuit", "Intuit QuickBooks", etc.
         /^xero$/i,
         /^freshbooks$/i,
         /renewals?$/i,
@@ -255,13 +297,96 @@ export async function GET(request) {
         return true;
       }
       
+      // Check if displayName looks like a business name (not a person name)
+      // Person names typically: "John Smith", "Mary", "Robert Johnson"
+      // Business names: "QuickBooks", "Acme Corp", "Tech Solutions Inc"
+      const looksLikeBusinessName = () => {
+        if (!nameLower || nameLower.length === 0) {
+          return false; // No name to check
+        }
+        
+        const words = nameLower.split(/\s+/).filter(w => w.length > 0);
+        
+        // Single word that's not a common first name = likely business
+        if (words.length === 1) {
+          const word = words[0];
+          // Common first names (allow these)
+          const commonFirstNames = new Set([
+            'alex', 'chris', 'dana', 'jordan', 'kelly', 'morgan', 'pat', 'robin', 'sam', 'taylor',
+            'james', 'john', 'robert', 'michael', 'william', 'david', 'richard', 'joseph', 'thomas',
+            'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah',
+            'emily', 'emma', 'sophia', 'olivia', 'ava', 'mia', 'chloe', 'ella', 'avery', 'sofia',
+          ]);
+          
+          // If it's a common first name, allow it
+          if (commonFirstNames.has(word)) {
+            return false;
+          }
+          
+          // Single word that's longer than 4 chars and not a common name = likely business
+          if (word.length > 4) {
+            return true;
+          }
+        }
+        
+        // Multiple words: check if it looks like a business
+        if (words.length >= 2) {
+          // Business indicators in names
+          const businessIndicators = ['inc', 'llc', 'corp', 'ltd', 'co', 'company', 'solutions', 
+            'services', 'systems', 'group', 'associates', 'partners', 'enterprises', 'industries',
+            'technologies', 'consulting', 'advisory', 'capital', 'ventures', 'holdings'];
+          
+          // Check if any word is a business indicator
+          if (words.some(word => businessIndicators.includes(word))) {
+            return true;
+          }
+          
+          // Check if all words are capitalized (like "QuickBooks Online", "Stripe Inc")
+          // This is a heuristic: business names often have unusual capitalization
+          const allWordsCapitalized = words.every(word => {
+            return word.length > 0 && (
+              /^[A-Z]/.test(word) || // Starts with capital
+              word === word.toUpperCase() || // All caps
+              word.length <= 2 // Abbreviation
+            );
+          });
+          
+          // If all words are capitalized and it's not a common name pattern, likely business
+          if (allWordsCapitalized && words.length >= 2) {
+            // Exception: common name patterns like "John Smith" (two common words)
+            const commonNameWords = new Set([
+              'john', 'jane', 'mary', 'james', 'robert', 'michael', 'william', 'david',
+              'smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'miller', 'davis',
+            ]);
+            const hasCommonNameWords = words.some(word => commonNameWords.has(word));
+            
+            if (!hasCommonNameWords) {
+              return true; // All capitalized, no common names = likely business
+            }
+          }
+        }
+        
+        return false;
+      };
+      
+      if (looksLikeBusinessName()) {
+        return true;
+      }
+      
       return false;
     }
 
     // Aggregate messages into unique people by email address
+    // Early exit when we have 50 unique contacts to improve performance
     const contactMap = new Map();
+    const TARGET_CONTACTS = 50;
 
     for (const message of messages) {
+      // Early exit: if we already have enough unique contacts, stop processing
+      if (contactMap.size >= TARGET_CONTACTS) {
+        break;
+      }
+
       const from = message.from;
       if (!from || !from.emailAddress) {
         continue;
@@ -278,12 +403,15 @@ export async function GET(request) {
       if (isAutomatedEmail(email, displayName)) {
         continue;
       }
-      
+
       const domain = email.split('@')[1];
       const receivedDateTime = message.receivedDateTime;
 
-      // Generate stable previewId (hash of email)
-      const previewId = crypto.createHash('sha256').update(email).digest('hex').substring(0, 16);
+      // Generate stable previewId (hash of email) - only if new contact
+      let previewId;
+      if (!contactMap.has(email)) {
+        previewId = crypto.createHash('sha256').update(email).digest('hex').substring(0, 16);
+      }
 
       if (contactMap.has(email)) {
         const existing = contactMap.get(email);
@@ -317,9 +445,8 @@ export async function GET(request) {
       }
     }
 
-    // Convert map to array and take first 50
-    const allItems = Array.from(contactMap.values());
-    const items = allItems.slice(0, 50);
+    // Convert map to array (already limited to 50 by early exit)
+    const items = Array.from(contactMap.values());
 
     // Prepare preview data - always show 50 (or fewer if we don't have that many unique contacts)
     const previewData = {
