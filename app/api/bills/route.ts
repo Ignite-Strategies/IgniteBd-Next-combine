@@ -16,14 +16,14 @@ export async function GET(request: Request) {
   try {
     const bills = await prisma.bills.findMany({
       include: {
-        _count: { select: { bill_sends: true } },
+        _count: { select: { bills_to_companies: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     const formatted = bills.map((b) => {
       const { _count, ...rest } = b;
-      return { ...rest, sendCount: _count.bill_sends };
+      return { ...rest, sendCount: _count.bills_to_companies };
     });
 
     return NextResponse.json({ success: true, bills: formatted });

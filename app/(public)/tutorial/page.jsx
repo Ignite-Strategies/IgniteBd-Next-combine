@@ -991,6 +991,366 @@ function ManagingContactsContent() {
   );
 }
 
+function TemplatesContent() {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-4">
+        Email Templates with Variables
+      </h2>
+
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg mb-6">
+        <p className="text-blue-900 text-sm">
+          <strong>What are Templates?</strong> Templates allow you to create <strong>dynamic, personalized emails</strong> using variable tags that automatically get filled in with actual contact data when you send emails. No more generic "Hey bro" messages!
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Accessing Templates
+          </h3>
+          <p className="text-gray-700 mb-4">
+            Navigate to <strong>"Templates"</strong> in the sidebar under the <strong>"Engage"</strong> section. This is where you create and manage your reusable email templates.
+          </p>
+
+          {/* Visual Sidebar with Templates highlighted */}
+          <div className="mt-4 w-64 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🔥</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  Ignite BD
+                </span>
+              </div>
+            </div>
+
+            <nav className="p-4 space-y-6">
+              <div>
+                <h6 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Engage
+                </h6>
+                <ul className="space-y-1">
+                  <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                    <Users className="h-5 w-5" />
+                    <span>People</span>
+                  </li>
+                  <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700">
+                    <MessageSquare className="h-5 w-5" />
+                    <span>Outreach</span>
+                  </li>
+                  <li className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium border-2 border-red-300 bg-red-50 text-red-700">
+                    <FileCode className="h-5 w-5" />
+                    <span>Templates</span>
+                  </li>
+                </ul>
+              </div>
+            </nav>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            How Templates Work
+          </h3>
+          <p className="text-gray-700 mb-4">
+            Instead of writing static emails, you create templates with <strong>variable tags</strong> like <code className="bg-gray-100 px-2 py-1 rounded text-sm">{"{{firstName}}"}</code> or <code className="bg-gray-100 px-2 py-1 rounded text-sm">{"{{companyName}}"}</code>. When you send an email, these tags automatically get replaced with real contact information.
+          </p>
+
+          {/* Example Template */}
+          <div className="mt-6 space-y-4">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">Example Template:</h4>
+              <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-4 font-mono text-sm">
+                <div className="space-y-2 text-gray-800">
+                  <div>Hi <span className="bg-yellow-100 px-1 rounded">{"{{firstName}}"}</span>,</div>
+                  <div className="mt-2"></div>
+                  <div>I know it's been <span className="bg-yellow-100 px-1 rounded">{"{{timeSinceConnected}}"}</span> since we connected.</div>
+                  <div>I saw you recently started working at <span className="bg-yellow-100 px-1 rounded">{"{{companyName}}"}</span>.</div>
+                  <div className="mt-2"></div>
+                  <div>Not sure if you knew, but I run <span className="bg-yellow-100 px-1 rounded">{"{{myBusinessName}}"}</span>.</div>
+                  <div className="mt-2"></div>
+                  <div>Let's get together in <span className="bg-yellow-100 px-1 rounded">{"{{timeHorizon}}"}</span> — <span className="bg-yellow-100 px-1 rounded">{"{{desiredOutcome}}"}</span>.</div>
+                  <div className="mt-2"></div>
+                  <div>No pressure at all — just wanted to reach out.</div>
+                  <div className="mt-2"></div>
+                  <div>Cheers to what's ahead!</div>
+                  <div className="mt-2"></div>
+                  <div><span className="bg-yellow-100 px-1 rounded">{"{{myRole}}"}</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">When Sent to a Contact, It Becomes:</h4>
+              <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 font-mono text-sm">
+                <div className="space-y-2 text-gray-800">
+                  <div>Hi <span className="font-semibold text-green-700">Sarah</span>,</div>
+                  <div className="mt-2"></div>
+                  <div>I know it's been <span className="font-semibold text-green-700">2 years</span> since we connected.</div>
+                  <div>I saw you recently started working at <span className="font-semibold text-green-700">TechCorp</span>.</div>
+                  <div className="mt-2"></div>
+                  <div>Not sure if you knew, but I run <span className="font-semibold text-green-700">Ignite Growth Partners</span>.</div>
+                  <div className="mt-2"></div>
+                  <div>Let's get together in <span className="font-semibold text-green-700">2026</span> — <span className="font-semibold text-green-700">see if we can collaborate</span>.</div>
+                  <div className="mt-2"></div>
+                  <div>No pressure at all — just wanted to reach out.</div>
+                  <div className="mt-2"></div>
+                  <div>Cheers to what's ahead!</div>
+                  <div className="mt-2"></div>
+                  <div><span className="font-semibold text-green-700">Joel</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Available Variables
+          </h3>
+          <p className="text-gray-700 mb-4">
+            Here are all the variables you can use in your templates:
+          </p>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border-2 border-gray-200 rounded-lg">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b">Variable</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b">Description</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{firstName}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TEXT</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Contact's first name</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{lastName}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TEXT</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Contact's last name</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{companyName}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TEXT</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Current company name</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{title}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TEXT</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Job title</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{timeSinceConnected}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TIME_DURATION</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Time since last contact (e.g., "2 years", "6 months")</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{timeHorizon}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">ENUM</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">When you want to connect (e.g., "2026", "Q1 2025")</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{knowledgeOfBusiness}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">BOOLEAN</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Do they know your business? ("yes" or "no")</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{desiredOutcome}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TEXT</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">What you want from them</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{myBusinessName}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TEXT</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Your company name</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 font-mono text-sm bg-gray-50"><code>{"{{myRole}}"}</code></td>
+                  <td className="px-4 py-3 text-sm text-gray-600">TEXT</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">Your name/role</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Creating a Template
+          </h3>
+          <p className="text-gray-700 mb-4">
+            Follow these steps to create your first template:
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center font-bold">
+                1
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-800 mb-2">Select "Variables" Mode</h4>
+                <p className="text-sm text-gray-700">
+                  In the template builder, choose <strong>"Variables"</strong> mode to create templates with variable tags.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center font-bold">
+                2
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-800 mb-2">Fill in Relationship Context</h4>
+                <p className="text-sm text-gray-700">
+                  Select the relationship type (COLD, WARM, ESTABLISHED, DORMANT), type of person (CURRENT_CLIENT, FORMER_CLIENT, etc.), why you're reaching out, and what you want from them.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center font-bold">
+                3
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-800 mb-2">Generate Template</h4>
+                <p className="text-sm text-gray-700">
+                  Click <strong>"Generate Template"</strong> to create a template with variable tags automatically inserted based on your context.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center font-bold">
+                4
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-800 mb-2">Review and Edit</h4>
+                <p className="text-sm text-gray-700">
+                  Review the generated template and detected variables. You can manually edit the template text or add/remove variables as needed.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center font-bold">
+                5
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-800 mb-2">Save Template</h4>
+                <p className="text-sm text-gray-700">
+                  Save your template for reuse. You can now use it when sending emails to any contact, and the variables will automatically fill in with their information.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Using Templates When Sending Emails
+          </h3>
+          <p className="text-gray-700 mb-4">
+            When you're ready to send an email:
+          </p>
+
+          <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-lg space-y-3">
+            <div className="flex items-start gap-3">
+              <Mail className="h-5 w-5 text-purple-600 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-purple-900 mb-1">1. Select a Contact</h4>
+                <p className="text-sm text-purple-800">Choose the contact you want to email from your People list.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <FileCode className="h-5 w-5 text-purple-600 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-purple-900 mb-1">2. Choose Your Template</h4>
+                <p className="text-sm text-purple-800">Select one of your saved templates from the template picker.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-5 w-5 text-purple-600 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-purple-900 mb-1">3. Template Auto-Fills</h4>
+                <p className="text-sm text-purple-800">The system automatically replaces all variable tags with the contact's actual information.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Edit2 className="h-5 w-5 text-purple-600 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-purple-900 mb-1">4. Review and Send</h4>
+                <p className="text-sm text-purple-800">Review the personalized email, make any final edits if needed, then send!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Best Practices
+          </h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 border-2 border-green-200 rounded-lg bg-green-50">
+              <div className="flex items-center gap-3 mb-2">
+                <User className="h-5 w-5 text-green-600" />
+                <h4 className="font-semibold text-gray-900">Always Include firstName</h4>
+              </div>
+              <p className="text-sm text-gray-700">
+                Makes emails feel personal and addressed directly to the recipient.
+              </p>
+            </div>
+
+            <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+              <div className="flex items-center gap-3 mb-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                <h4 className="font-semibold text-gray-900">Use timeSinceConnected</h4>
+              </div>
+              <p className="text-sm text-gray-700">
+                For dormant relationships, acknowledge the gap to show you're aware of the time passed.
+              </p>
+            </div>
+
+            <div className="p-4 border-2 border-purple-200 rounded-lg bg-purple-50">
+              <div className="flex items-center gap-3 mb-2">
+                <Building2 className="h-5 w-5 text-purple-600" />
+                <h4 className="font-semibold text-gray-900">Reference companyName</h4>
+              </div>
+              <p className="text-sm text-gray-700">
+                When relevant, shows you're paying attention to their current situation.
+              </p>
+            </div>
+
+            <div className="p-4 border-2 border-orange-200 rounded-lg bg-orange-50">
+              <div className="flex items-center gap-3 mb-2">
+                <MessageSquare className="h-5 w-5 text-orange-600" />
+                <h4 className="font-semibold text-gray-900">Keep desiredOutcome Soft</h4>
+              </div>
+              <p className="text-sm text-gray-700">
+                Low pressure, optional feel helps maintain relationships without being pushy.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-6 mt-6">
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            🎉 You're All Set!
+          </h3>
+          <p className="text-gray-700 mb-4">
+            You now know how to create and use email templates with variables. This is the final step in getting started with Ignite BD. Templates help you maintain personal, contextual outreach at scale.
+          </p>
+          <p className="text-gray-700">
+            Start creating your first template and see how it transforms your email outreach from generic to personalized!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TUTORIAL_TOPICS = [
   {
     id: 'orientation',
@@ -1022,6 +1382,17 @@ const TUTORIAL_TOPICS = [
         id: 'overview',
         title: 'Overview',
         component: ManagingContactsContent,
+      },
+    ],
+  },
+  {
+    id: 'templates',
+    title: 'Templates',
+    sections: [
+      {
+        id: 'email-templates',
+        title: 'Email Templates with Variables',
+        component: TemplatesContent,
       },
     ],
   },

@@ -21,7 +21,7 @@ export async function GET(
     const bill = await prisma.bills.findUnique({
       where: { id },
       include: {
-        _count: { select: { bill_sends: true } },
+        _count: { select: { bills_to_companies: true } },
       },
     });
 
@@ -32,7 +32,7 @@ export async function GET(
     const { _count, ...rest } = bill;
     return NextResponse.json({
       success: true,
-      bill: { ...rest, sendCount: _count.bill_sends },
+      bill: { ...rest, sendCount: _count.bills_to_companies },
     });
   } catch (e) {
     console.error('❌ GET /api/bills/[id]:', e);
@@ -104,7 +104,7 @@ export async function PUT(
 
 /**
  * DELETE /api/bills/[id]
- * Delete a bill (cascades to bill_sends)
+ * Delete a bill (cascades to bills_to_companies)
  */
 export async function DELETE(
   request: Request,

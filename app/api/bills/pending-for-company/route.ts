@@ -6,7 +6,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * GET /api/bills/pending-for-company?companyId=xxx
  *
  * List pending one-off bills sent to this company (for "in settings" UX).
- * Returns PENDING bill_sends with checkout URLs so user can pay if they lost the email link.
+ * Returns PENDING bills_to_companies with checkout URLs so user can pay if they lost the email link.
  */
 export async function GET(request: Request) {
   try {
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const pending = await prisma.bill_sends.findMany({
+    const pending = await prisma.bills_to_companies.findMany({
       where: { companyId, status: 'PENDING' },
       include: {
         bills: {
