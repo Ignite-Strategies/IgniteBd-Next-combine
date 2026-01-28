@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { getValidAccessToken } from '@/lib/microsoftGraphClient';
-import { getRedis } from '@/lib/redis';
 import crypto from 'crypto';
 
 /**
@@ -11,10 +10,16 @@ import crypto from 'crypto';
  * Fetch Microsoft Contacts (address book) and return preview
  * Similar to email-contacts/preview but uses /me/contacts instead of /me/messages
  * 
+ * Query Parameters:
+ * - skip: Number of contacts to skip (default: 0)
+ *   Examples: skip=0 (contacts 1-50), skip=50 (contacts 51-100), skip=100 (contacts 101-150)
+ * 
  * Returns:
  * {
+ *   "success": true,
  *   "generatedAt": "ISO_TIMESTAMP",
- *   "limit": 1000,
+ *   "skip": 0,
+ *   "limit": 50,
  *   "items": [
  *     {
  *       "previewId": "hash_of_email",
@@ -25,8 +30,15 @@ import crypto from 'crypto';
  *       "jobTitle": "CEO",
  *       "alreadyExists": false
  *     }
- *   ]
+ *   ],
+ *   "hasMore": true
  * }
+ * 
+ * Behavior:
+ * - Fetches 200 contacts starting from skip position
+ * - Processes and filters to return up to 50 unique contacts
+ * - No caching - always fresh data
+ * - Simple pagination: skip=0, skip=50, skip=100, etc.
  */
 export async function GET(request) {
   try {
@@ -43,23 +55,9 @@ export async function GET(request) {
       );
     }
 
-    // Check Redis for existing preview
-    const redisClient = getRedis();
-    const redisKey = `preview:microsoft_contacts:${owner.id}`;
-    
-    try {
-      const cached = await redisClient.get(redisKey);
-      if (cached) {
-        const cachedData = typeof cached === 'string' ? JSON.parse(cached) : cached;
-        console.log(`✅ Returning cached Microsoft contacts preview for owner: ${owner.id}`);
-        return NextResponse.json({
-          success: true,
-          ...cachedData,
-        });
-      }
-    } catch (redisError) {
-      console.warn('⚠️ Redis get failed (will recompute):', redisError.message);
-    }
+    // Get skip parameter from query string (default: 0)
+    const { searchParams } = new URL(request.url);
+    const skip = parseInt(searchParams.get('skip') || '0', 10);
 
     // Get valid access token (handles refresh automatically)
     let accessToken;
@@ -72,8 +70,10 @@ export async function GET(request) {
       );
     }
 
-    // Fetch contacts from Microsoft Graph - get enough to ensure 50 after filtering
-    const graphUrl = 'https://graph.microsoft.com/v1.0/me/contacts?$top=200&$select=displayName,emailAddresses,companyName,jobTitle';
+    // Fetch contacts from Microsoft Graph with skip parameter for pagination
+    // skip=0 → contacts 1-200, skip=200 → contacts 201-400, etc.
+    // Note: Microsoft Graph Contacts API uses $skip for pagination
+    const graphUrl = `https://graph.microsoft.com/v1.0/me/contacts?$top=200&$skip=${skip}&$select=displayName,emailAddresses,companyName,jobTitle`;
     
     let contactsResponse;
     try {
@@ -211,25 +211,14 @@ export async function GET(request) {
     // Prepare preview data
     const previewData = {
       generatedAt: new Date().toISOString(),
+      skip,
       limit: 50,
       items,
+      hasMore: items.length === 50, // If we got 50, there might be more
       source: 'contacts', // Indicates this is from Microsoft Contacts, not email messages
     };
 
-    // Store in Redis with 45 minute TTL
-    try {
-      const ttl = 45 * 60; // 45 minutes
-      await redisClient.setex(
-        redisKey,
-        ttl,
-        JSON.stringify(previewData)
-      );
-      console.log(`✅ Microsoft contacts preview stored in Redis: ${redisKey}`);
-    } catch (redisError) {
-      console.warn('⚠️ Redis store failed (non-critical):', redisError.message);
-    }
-
-    // Return preview data
+    // Return preview data (no caching - always fresh)
     return NextResponse.json({
       success: true,
       ...previewData,

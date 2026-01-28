@@ -406,7 +406,10 @@ function MicrosoftEmailIngestContent() {
                     <button
                       onClick={() => {
                         setSaveResult(null);
-                        const nextSkip = skip + 100; // Move to next batch
+                        // Email: fetch 100 messages → increment by 100
+                        // Contacts: fetch 200 contacts → increment by 200
+                        const skipIncrement = source === 'email' ? 100 : 200;
+                        const nextSkip = skip + skipIncrement;
                         handleLoadPreview(source, nextSkip);
                       }}
                       className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors flex items-center gap-2"

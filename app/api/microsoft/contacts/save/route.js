@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { getRedis } from '@/lib/redis';
 import { resolveMembership } from '@/lib/membership';
 
 /**
@@ -13,6 +12,7 @@ import { resolveMembership } from '@/lib/membership';
  * Body:
  * {
  *   "previewIds": ["hash1", "hash2", ...],
+ *   "previewItems": [{ previewId, email, displayName, ... }, ...], // Full preview items
  *   "companyHQId": "required"
  * }
  */
@@ -32,12 +32,19 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { previewIds, companyHQId } = body;
+    const { previewIds, previewItems, companyHQId } = body;
 
     // Validate inputs
     if (!previewIds || !Array.isArray(previewIds) || previewIds.length === 0) {
       return NextResponse.json(
         { success: false, error: 'previewIds array is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!previewItems || !Array.isArray(previewItems)) {
+      return NextResponse.json(
+        { success: false, error: 'previewItems array is required' },
         { status: 400 }
       );
     }
@@ -70,29 +77,8 @@ export async function POST(request) {
       );
     }
 
-    // Load preview from Redis
-    const redisClient = getRedis();
-    const redisKey = `preview:microsoft_contacts:${owner.id}`;
-    
-    let previewData;
-    try {
-      const cached = await redisClient.get(redisKey);
-      if (!cached) {
-        return NextResponse.json(
-          { success: false, error: 'Preview not found. Please refresh and try again.' },
-          { status: 404 }
-        );
-      }
-      previewData = typeof cached === 'string' ? JSON.parse(cached) : cached;
-    } catch (redisError) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to load preview data' },
-        { status: 500 }
-      );
-    }
-
-    // Filter items by previewIds
-    const itemsToSave = (previewData.items || []).filter(item => 
+    // Filter items by previewIds from previewItems array (no Redis needed)
+    const itemsToSave = previewItems.filter(item => 
       previewIds.includes(item.previewId)
     );
 
