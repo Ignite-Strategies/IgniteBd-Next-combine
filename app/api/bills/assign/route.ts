@@ -5,10 +5,8 @@ import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
 import { getOrCreateStripeCustomer } from '@/lib/stripe/customer';
 import { generateBillSlug } from '@/lib/billSlug';
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL ||
-  process.env.APP_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://app.ignitegrowth.biz');
+// Payment URLs always use app.ignitegrowth.biz (public-facing app, not platform manager)
+const BASE_URL = 'https://app.ignitegrowth.biz';
 
 /**
  * POST /api/bills/assign
