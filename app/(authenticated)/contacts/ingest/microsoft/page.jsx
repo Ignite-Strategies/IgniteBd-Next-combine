@@ -481,16 +481,17 @@ function MicrosoftEmailIngestContent() {
             {preview.items.length > 0 ? (
               <>
                 <div className="max-h-[calc(100vh-400px)] overflow-y-auto mb-4 border rounded">
-                  <div className="grid grid-cols-[auto_1fr_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
+                  <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
                     <div className="w-4"></div>
                     <div>Name</div>
+                    <div className="text-right">Last Email</div>
                     <div className="text-right">Status</div>
                   </div>
                   {preview.items.map((item) => {
                     return (
                       <div
                         key={item.previewId}
-                        className={`grid grid-cols-[auto_1fr_auto] gap-3 items-center px-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
+                        className={`grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
                           selectedIds.has(item.previewId) ? 'bg-blue-50' : ''
                         }`}
                         onClick={() => toggleSelect(item.previewId)}
@@ -510,6 +511,11 @@ function MicrosoftEmailIngestContent() {
                           {item.companyName && (
                             <div className="text-xs text-gray-400 truncate">{item.companyName}</div>
                           )}
+                        </div>
+                        <div className="text-xs text-gray-500 text-right whitespace-nowrap">
+                          {item.stats?.lastSeenAt 
+                            ? new Date(item.stats.lastSeenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            : item.companyName ? '-' : '-'}
                         </div>
                         <div className="flex justify-end">
                           {item.alreadyExists && (
