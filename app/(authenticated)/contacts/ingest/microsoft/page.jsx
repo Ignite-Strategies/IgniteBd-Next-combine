@@ -481,39 +481,16 @@ function MicrosoftEmailIngestContent() {
             {preview.items.length > 0 ? (
               <>
                 <div className="max-h-[calc(100vh-400px)] overflow-y-auto mb-4 border rounded">
-                  <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
+                  <div className="grid grid-cols-[auto_1fr_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
                     <div className="w-4"></div>
                     <div>Name</div>
-                    <div className="text-right">Last Email</div>
-                    <div className="text-center">Recency</div>
-                    <div className="text-right w-16">Messages</div>
+                    <div className="text-right">Status</div>
                   </div>
                   {preview.items.map((item) => {
-                    // Determine status based on last email received (not "activity")
-                    let statusColor = 'gray';
-                    let statusText = 'New';
-                    
-                    if (item.alreadyExists) {
-                      statusColor = 'blue';
-                      statusText = 'Exists';
-                    } else if (item.stats?.lastSeenAt) {
-                      const daysSince = Math.floor((new Date() - new Date(item.stats.lastSeenAt)) / (1000 * 60 * 60 * 24));
-                      if (daysSince <= 7) {
-                        statusColor = 'green';
-                        statusText = 'Last Week';
-                      } else if (daysSince <= 30) {
-                        statusColor = 'yellow';
-                        statusText = 'Last Month';
-                      } else {
-                        statusColor = 'red';
-                        statusText = 'Older';
-                      }
-                    }
-
                     return (
                       <div
                         key={item.previewId}
-                        className={`grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 items-center px-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
+                        className={`grid grid-cols-[auto_1fr_auto] gap-3 items-center px-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
                           selectedIds.has(item.previewId) ? 'bg-blue-50' : ''
                         }`}
                         onClick={() => toggleSelect(item.previewId)}
@@ -530,25 +507,16 @@ function MicrosoftEmailIngestContent() {
                             {item.displayName || item.email.split('@')[0]}
                           </div>
                           <div className="text-xs text-gray-500 truncate">{item.email}</div>
+                          {item.companyName && (
+                            <div className="text-xs text-gray-400 truncate">{item.companyName}</div>
+                          )}
                         </div>
-                        <div className="text-xs text-gray-500 text-right whitespace-nowrap">
-                          {item.stats?.lastSeenAt 
-                            ? new Date(item.stats.lastSeenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                            : item.companyName || '-'}
-                        </div>
-                        <div className="flex justify-center">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            statusColor === 'green' ? 'bg-green-100 text-green-700' :
-                            statusColor === 'yellow' ? 'bg-yellow-100 text-yellow-700' :
-                            statusColor === 'red' ? 'bg-red-100 text-red-700' :
-                            statusColor === 'blue' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {statusText}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-400 text-right w-16">
-                          {item.stats?.messageCount ? `${item.stats.messageCount}` : ''}
+                        <div className="flex justify-end">
+                          {item.alreadyExists && (
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                              Already Exists
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
