@@ -239,18 +239,22 @@ Both use the same logic, just different endpoints.
 **Query**:
 ```javascript
 const existing = await prisma.contact.findUnique({
-  where: { email },
+  where: { email },  // ⚠️ BUG: Should be { email, crmId }!
 });
 ```
 
 **Key Points**:
 - ❌ **ONLY checks by email** (not firstName/lastName)
-- ❌ **Does NOT check companyHQ** - checks globally across ALL contacts
-- ✅ Uses Prisma `findUnique` with email (assumes email is unique)
+- ❌ **Does NOT check companyHQ** - checks globally but schema is per-companyHQ!
+- ⚠️ **BUG**: Uses `findUnique({ where: { email } })` but schema has `@@unique([email, crmId])`
+- ⚠️ **BUG**: `findUnique` requires ALL unique fields - this will FAIL or be incorrect!
 - ✅ If exists → skip (don't create duplicate)
 - ✅ Handles race conditions (P2002 error = unique constraint violation)
 
-**Problem**: This checks GLOBALLY, not per companyHQ!
+**CRITICAL BUG**: 
+- Schema: `@@unique([email, crmId])` - unique per companyHQ
+- Save check: `findUnique({ where: { email } })` - only checks email
+- **This is WRONG!** Should check `{ email, crmId }` to match schema constraint
 
 ### Contact Model Schema
 
@@ -260,14 +264,18 @@ const existing = await prisma.contact.findUnique({
 model Contact {
   id        String   @id @default(cuid())
   crmId     String   // CompanyHQ ID
-  email     String   @unique  // UNIQUE constraint on email (global!)
+  email     String?  // Can be null
   firstName String?
   lastName  String?
   // ... other fields
+  
+  @@unique([email, crmId])  // Unique per companyHQ!
 }
 ```
 
-**Key Constraint**: `email` is `@unique` - means ONE contact per email across ENTIRE database, not per companyHQ.
+**Key Constraint**: `@@unique([email, crmId])` - means ONE contact per email **per companyHQ**.
+- Same email CAN exist in different companyHQs
+- Same email CANNOT exist twice in same companyHQ
 
 ## Critical Issues Identified
 
@@ -295,18 +303,27 @@ model Contact {
 5. Result: "0 saved" - confusing!
 ```
 
-### Issue 2: Email Uniqueness Constraint ⚠️
+### Issue 2: Save Check Doesn't Match Schema Constraint ⚠️ **CRITICAL BUG**
 
-**Schema**: `email String @unique`
+**Schema**: `@@unique([email, crmId])` - unique per companyHQ
 
-**Implication**:
-- One email = one contact globally
-- Cannot have same email in different companyHQs
-- If contact exists in Company A, cannot import to Company B
+**Save Check**: `findUnique({ where: { email } })` - only checks email
 
-**Question**: Is this intentional?
-- If YES → Need to check globally in review step too
-- If NO → Need to remove `@unique` constraint and check per `crmId`
+**Problem**:
+- Schema allows same email in different companyHQs
+- But save route checks globally (wrong!)
+- `findUnique` with partial unique key might not work correctly
+- Should check: `findUnique({ where: { email_crmId: { email, crmId } } })` or use `findFirst`
+
+**Fix Needed**: Update save route to check per companyHQ:
+```javascript
+const existing = await prisma.contact.findFirst({
+  where: { 
+    email: contactData.email,
+    crmId: companyHQId 
+  },
+});
+```
 
 ### Issue 3: Race Condition Handling ✅
 
@@ -434,17 +451,20 @@ prisma.contact.findUnique({
    - Checks: crmId IN ["company-b"] → NOT FOUND
    - Shows: "Will Import" ✅
 4. Save Step:
-   - Checks: email = "joel@example.com" → FOUND (exists globally)
+   - Checks: findUnique({ where: { email } }) → ⚠️ BUG - doesn't check crmId!
+   - Might find contact from Company A (wrong!)
+   - Or might fail because email alone isn't unique
    - Skips: skipped++
 5. Result: "0 saved" - user confused!
 ```
 
 ### Why This Happens
 
-**Review checks**: User's companyHQs only
-**Save checks**: Globally (all companies)
+**Review checks**: User's companyHQs only (correct per schema)
+**Save checks**: Only email, not crmId (WRONG - doesn't match schema!)
 
-**Schema constraint**: `email @unique` prevents same email in different companies
+**Schema constraint**: `@@unique([email, crmId])` allows same email in different companies
+**Save logic**: Checks only email (bug!)
 
 ## Solutions
 
@@ -515,17 +535,35 @@ prisma.contact.findUnique({
 
 ## Recommendations
 
-1. **Make Review Check Global** (Quick Fix)
-   - Change `checkExistingContacts` to check globally
-   - Match save logic
-   - User sees accurate status
+### 1. Fix Save Route to Check Per CompanyHQ (CRITICAL)
 
-2. **Consider Schema Change** (Long-term)
-   - If contacts should be per-companyHQ, remove `@unique` from email
-   - Add `@@unique([crmId, email])` instead
-   - Update both review and save to check per companyHQ
+**Current (WRONG)**:
+```javascript
+const existing = await prisma.contact.findUnique({
+  where: { email },
+});
+```
 
-3. **Better Error Messages**
+**Should Be**:
+```javascript
+const existing = await prisma.contact.findFirst({
+  where: { 
+    email: contactData.email,
+    crmId: companyHQId 
+  },
+});
+```
+
+**Why**: Matches schema constraint `@@unique([email, crmId])` - check per companyHQ!
+
+### 2. Update Review Check to Match
+
+**Current**: Checks user's companyHQs (correct)
+**Keep**: This is correct - shows if contact exists in user's companies
+
+**Optional Enhancement**: Show which companyHQ contact exists in
+
+### 3. Better Error Messages
    - If save skips contact that review said was new, explain why
    - Show which company the contact exists in
 

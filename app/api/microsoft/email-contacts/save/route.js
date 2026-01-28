@@ -114,13 +114,16 @@ export async function POST(request) {
           continue;
         }
 
-        // Check if contact already exists (by email)
-        const existing = await prisma.contact.findUnique({
-          where: { email },
+        // Check if contact already exists (by email AND crmId - matches schema @@unique([email, crmId]))
+        const existing = await prisma.contact.findFirst({
+          where: { 
+            email: contactData.email,
+            crmId: companyHQId 
+          },
         });
 
         if (existing) {
-          // Skip if already exists
+          // Skip if already exists in this companyHQ
           skipped++;
           continue;
         }
