@@ -82,8 +82,10 @@ function MicrosoftReviewContent() {
         sessionStorage.removeItem('microsoftPreviewItems');
         sessionStorage.removeItem('microsoftSelectedIds');
         
-        // Navigate back with success
-        router.push(`/contacts/ingest/microsoft?companyHQId=${companyHQId}&saved=${response.data.saved}&skipped=${response.data.skipped}`);
+        // Navigate to success page with saved contact IDs
+        const savedIds = response.data.savedContactIds || [];
+        const savedIdsParam = savedIds.length > 0 ? savedIds.join(',') : '';
+        router.push(`/contacts/ingest/microsoft/success?companyHQId=${companyHQId}&saved=${response.data.saved}&skipped=${response.data.skipped}&contactIds=${savedIdsParam}`);
       }
     } catch (err) {
       console.error('Save failed:', err);

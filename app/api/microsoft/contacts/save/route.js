@@ -97,6 +97,7 @@ export async function POST(request) {
     let saved = 0;
     let skipped = 0;
     const errors = [];
+    const savedContactIds = []; // Track IDs of successfully saved contacts
 
     for (const contactData of contactsToSave) {
       try {
@@ -122,7 +123,7 @@ export async function POST(request) {
         }
 
         // Create contact
-        await prisma.contact.create({
+        const createdContact = await prisma.contact.create({
           data: {
             crmId: companyHQId,
             email: contactData.email,
@@ -134,6 +135,7 @@ export async function POST(request) {
         });
 
         saved++;
+        savedContactIds.push(createdContact.id); // Store the ID
       } catch (error) {
         // Handle unique constraint violation (race condition)
         if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
@@ -151,6 +153,7 @@ export async function POST(request) {
       success: true,
       saved,
       skipped,
+      savedContactIds, // Return array of saved contact IDs
       errors: errors.length > 0 ? errors : undefined,
       message: `Saved ${saved} contact${saved !== 1 ? 's' : ''}`,
     });
