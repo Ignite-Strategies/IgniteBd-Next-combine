@@ -5,8 +5,8 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 /**
  * GET /api/bills/pending-for-company?companyId=xxx
  *
- * List pending one-off bills sent to this company (for "in settings" UX).
- * Returns PENDING bills_to_companies with checkout URLs so user can pay if they lost the email link.
+ * MANY-TO-ONE: List pending bills for this company (bills.companyId = companyId).
+ * Returns PENDING bills with checkout URLs so user can pay if they lost the email link.
  */
 export async function GET(request: Request) {
   try {
@@ -25,27 +25,22 @@ export async function GET(request: Request) {
       );
     }
 
-    const pending = await prisma.bills_to_companies.findMany({
+    const pending = await prisma.bills.findMany({
       where: { companyId, status: 'PENDING' },
-      include: {
-        bills: {
-          select: { id: true, name: true, description: true, amountCents: true, currency: true },
-        },
-      },
       orderBy: { createdAt: 'desc' },
     });
 
     const items = pending
-      .filter((s) => s.checkoutUrl)
-      .map((s) => ({
-        billSendId: s.id,
-        billId: s.bills.id,
-        billName: s.bills.name,
-        description: s.bills.description,
-        amountCents: s.bills.amountCents,
-        currency: s.bills.currency,
-        checkoutUrl: s.checkoutUrl,
-        createdAt: s.createdAt,
+      .filter((b) => b.checkoutUrl)
+      .map((b) => ({
+        billId: b.id,
+        billName: b.name,
+        description: b.description,
+        amountCents: b.amountCents,
+        currency: b.currency,
+        checkoutUrl: b.checkoutUrl,
+        publicBillUrl: b.publicBillUrl,
+        createdAt: b.createdAt,
       }));
 
     return NextResponse.json({ success: true, pending: items });

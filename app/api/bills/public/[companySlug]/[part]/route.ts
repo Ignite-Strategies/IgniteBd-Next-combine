@@ -19,27 +19,24 @@ export async function GET(
 
     const slug = `${companySlug.trim()}/${part.trim()}`;
 
-    const row = await prisma.bills_to_companies.findUnique({
+    // Find bill by slug directly (slug is now on bills table)
+    const bill = await prisma.bills.findUnique({
       where: { slug },
       include: {
-        bills: true,
         company_hqs: { select: { id: true, companyName: true } },
       },
     });
 
-    if (!row) {
+    if (!bill) {
       return NextResponse.json({ error: 'Bill not found' }, { status: 404 });
     }
 
-    if (row.status !== 'PENDING') {
+    if (bill.status !== 'PENDING') {
       return NextResponse.json(
-        { error: 'This bill is no longer available for payment.', status: row.status },
+        { error: 'This bill is no longer available for payment.', status: bill.status },
         { status: 410 }
       );
     }
-
-    const bill = row.bills;
-    const company = row.company_hqs;
 
     return NextResponse.json({
       success: true,
@@ -50,12 +47,12 @@ export async function GET(
         amountCents: bill.amountCents,
         currency: bill.currency,
       },
-      company: {
-        id: company.id,
-        companyName: company.companyName,
-      },
-      checkoutUrl: row.checkoutUrl,
-      publicBillUrl: row.publicBillUrl,
+      company: bill.company_hqs ? {
+        id: bill.company_hqs.id,
+        companyName: bill.company_hqs.companyName,
+      } : null,
+      checkoutUrl: bill.checkoutUrl,
+      publicBillUrl: bill.publicBillUrl,
     });
   } catch (e) {
     console.error('❌ GET /api/bills/public/[companySlug]/[part]:', e);

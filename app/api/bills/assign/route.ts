@@ -12,8 +12,8 @@ const BASE_URL =
 /**
  * POST /api/bills/assign
  *
- * SIMPLE SERVICE: Assign company to bill → creates bills_to_companies junction entry AND generates payment URL.
- * One atomic operation: assign + generate URL.
+ * MANY-TO-ONE: Assign company to bill → sets bill.companyId AND generates payment URL.
+ * One atomic operation: set companyId + generate URL.
  *
  * Body: { billId, companyId, successUrl?, cancelUrl? }
  */
@@ -40,9 +40,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if assignment already exists
-    const existing = await prisma.bills_to_companies.findFirst({
-      where: { billId, companyId },
+    // Check if bill already has a company assigned
+    const existingBill = await prisma.bills.findUnique({
+      where: { id: billId },
       include: {
         company_hqs: {
           select: { id: true, companyName: true },
@@ -50,34 +50,40 @@ export async function POST(request: Request) {
       },
     });
 
-    if (existing) {
-      // Return existing assignment with URL if it exists
+    if (!existingBill) {
+      return NextResponse.json({ success: false, error: 'Bill not found' }, { status: 404 });
+    }
+
+    // If bill already assigned to this company, return existing
+    if (existingBill.companyId === companyId && existingBill.publicBillUrl) {
       return NextResponse.json({
         success: true,
-        billId: existing.billId,
-        companyId: existing.companyId,
-        companyName: existing.company_hqs.companyName,
-        status: existing.status,
-        publicBillUrl: existing.publicBillUrl || null,
-        checkoutUrl: existing.checkoutUrl || null,
-        slug: existing.slug || null,
-        createdAt: existing.createdAt,
-        message: existing.publicBillUrl ? 'Bill already assigned. Payment URL available.' : 'Bill already assigned but no payment URL.',
+        billId: existingBill.id,
+        companyId: existingBill.companyId,
+        companyName: existingBill.company_hqs?.companyName,
+        status: existingBill.status,
+        publicBillUrl: existingBill.publicBillUrl,
+        checkoutUrl: existingBill.checkoutUrl,
+        slug: existingBill.slug,
+        createdAt: existingBill.createdAt,
+        message: 'Bill already assigned. Payment URL available.',
       });
     }
 
-    // Verify bill and company exist
-    const [bill, company] = await Promise.all([
-      prisma.bills.findUnique({ where: { id: billId } }),
-      prisma.company_hqs.findUnique({
-        where: { id: companyId },
-        select: { id: true, companyName: true, stripeCustomerId: true },
-      }),
-    ]);
-
-    if (!bill) {
-      return NextResponse.json({ success: false, error: 'Bill not found' }, { status: 404 });
+    // If bill assigned to different company, return error
+    if (existingBill.companyId && existingBill.companyId !== companyId) {
+      return NextResponse.json(
+        { success: false, error: 'Bill is already assigned to a different company' },
+        { status: 400 }
+      );
     }
+
+    // Verify company exists
+    const company = await prisma.company_hqs.findUnique({
+      where: { id: companyId },
+      select: { id: true, companyName: true, stripeCustomerId: true },
+    });
+
     if (!company) {
       return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 });
     }
@@ -85,11 +91,11 @@ export async function POST(request: Request) {
     // Create Stripe Checkout session
     const session = await createBillCheckoutSession({
       bill: {
-        id: bill.id,
-        name: bill.name,
-        description: bill.description,
-        amountCents: bill.amountCents,
-        currency: bill.currency,
+        id: existingBill.id,
+        name: existingBill.name,
+        description: existingBill.description,
+        amountCents: existingBill.amountCents,
+        currency: existingBill.currency,
       },
       company: {
         id: company.id,
@@ -102,15 +108,25 @@ export async function POST(request: Request) {
 
     const checkoutUrl = session.url ?? null;
 
-    // CREATE JUNCTION TABLE ENTRY - THIS IS THE MUTATION
-    console.log(`[ASSIGN] Creating bills_to_companies entry: billId=${billId}, companyId=${companyId}`);
-    const assignment = await prisma.bills_to_companies.create({
+    // Generate slug and public URL (use bill.id instead of assignment.id)
+    const { slug, companySlug, part } = generateBillSlug(
+      company.companyName,
+      existingBill.name,
+      existingBill.id
+    );
+    const publicBillUrl = `${BASE_URL}/bill/${companySlug}/${part}`;
+
+    // UPDATE BILL DIRECTLY - SET companyId AND URL FIELDS
+    console.log(`[ASSIGN] Updating bill: billId=${billId}, companyId=${companyId}`);
+    const updated = await prisma.bills.update({
+      where: { id: billId },
       data: {
-        billId,
         companyId,
         stripeCheckoutSessionId: session.id,
         checkoutUrl,
         status: 'PENDING',
+        slug,
+        publicBillUrl,
       },
       include: {
         company_hqs: {
@@ -118,35 +134,14 @@ export async function POST(request: Request) {
         },
       },
     });
-    console.log(`[ASSIGN] ✅ Junction entry created: id=${assignment.id}, billId=${assignment.billId}, companyId=${assignment.companyId}`);
+    console.log(`[ASSIGN] ✅ Bill updated: companyId=${updated.companyId}, publicBillUrl=${updated.publicBillUrl}`);
 
-    // Generate slug and public URL
-    const { slug, companySlug, part } = generateBillSlug(
-      company.companyName,
-      bill.name,
-      assignment.id
-    );
-    const publicBillUrl = `${BASE_URL}/bill/${companySlug}/${part}`;
-
-    // Update junction entry with URL
-    console.log(`[ASSIGN] Updating junction entry with URL: id=${assignment.id}, slug=${slug}`);
-    const updated = await prisma.bills_to_companies.update({
-      where: { id: assignment.id },
-      data: { slug, publicBillUrl },
-      include: {
-        company_hqs: {
-          select: { id: true, companyName: true },
-        },
-      },
-    });
-    console.log(`[ASSIGN] ✅ Junction entry updated: publicBillUrl=${updated.publicBillUrl}`);
-
-    // Return the mutated assignment with URL
+    // Return the updated bill with URL
     return NextResponse.json({
       success: true,
-      billId: updated.billId,
+      billId: updated.id,
       companyId: updated.companyId,
-      companyName: updated.company_hqs.companyName,
+      companyName: updated.company_hqs?.companyName,
       status: updated.status,
       publicBillUrl: updated.publicBillUrl,
       checkoutUrl: updated.checkoutUrl,
