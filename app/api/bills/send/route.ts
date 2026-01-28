@@ -12,10 +12,20 @@ const BASE_URL =
 /**
  * POST /api/bills/send
  *
+ * ⚠️ COMMENTED OUT - Assignment now automatically generates payment URL.
+ * Use POST /api/bills/assign instead - it creates junction entry AND generates URL.
+ *
  * Create one-time Stripe Checkout, store bills_to_companies row, return public URL.
  * Body: { billId, companyId, successUrl?, cancelUrl? } only. Assign = bill → company_hq (junction); no extra models.
  */
 export async function POST(request: Request) {
+  // COMMENTED OUT - Assignment now handles URL generation automatically
+  return NextResponse.json(
+    { success: false, error: 'This endpoint is deprecated. Use POST /api/bills/assign instead - it automatically generates the payment URL.' },
+    { status: 410 }
+  );
+
+  /* COMMENTED OUT CODE BELOW
   try {
     await verifyFirebaseToken(request);
   } catch {
@@ -114,4 +124,5 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+  */
 }
