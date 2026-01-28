@@ -1415,6 +1415,7 @@ model bills {
   status                  BillSendStatus         @default(PENDING)
   slug                    String?                @unique
   publicBillUrl           String?
+  paidAt                  DateTime?              // When payment was received (set by Stripe webhook)
   createdAt               DateTime               @default(now())
   updatedAt               DateTime               @updatedAt
   company_hqs             company_hqs?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1422,6 +1423,7 @@ model bills {
   @@index([companyId])
   @@index([status])
   @@index([slug])
+  @@index([paidAt])
 }
 
 enum BillSendStatus {

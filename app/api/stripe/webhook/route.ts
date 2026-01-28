@@ -113,16 +113,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       });
 
       if (bill) {
-        // Update bill status to PAID
+        // Update bill status to PAID and set paidAt timestamp
         await prisma.bills.update({
           where: { id: bill.id },
           data: {
             status: 'PAID',
+            paidAt: new Date(), // Capture payment timestamp
             updatedAt: new Date(),
           },
         });
 
-        console.log(`✅ Bill payment completed: Bill ${bill.id} set to PAID`);
+        console.log(`✅ Bill payment completed: Bill ${bill.id} set to PAID at ${new Date().toISOString()}`);
       } else {
         console.warn(`⚠️ checkout.session.completed: Bill not found for session ${session.id}`);
       }

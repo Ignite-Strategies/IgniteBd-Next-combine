@@ -5,6 +5,9 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 /**
  * GET /api/bills
  * List all bills (templates for one-off billing)
+ * 
+ * Query params:
+ * - status: Filter by status (PENDING, PAID, EXPIRED)
  */
 export async function GET(request: Request) {
   try {
@@ -14,7 +17,16 @@ export async function GET(request: Request) {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status') as 'PENDING' | 'PAID' | 'EXPIRED' | null;
+
+    // Build where clause
+    const where = status && ['PENDING', 'PAID', 'EXPIRED'].includes(status)
+      ? { status }
+      : undefined;
+
     const bills = await prisma.bills.findMany({
+      where,
       include: {
         company_hqs: {
           select: { id: true, companyName: true },
