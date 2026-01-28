@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
+import { getOrCreateStripeCustomer } from '@/lib/stripe/customer';
 import { generateBillSlug } from '@/lib/billSlug';
 
 const BASE_URL =
@@ -88,7 +89,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 });
     }
 
-    // Create Stripe Checkout session
+    // PRE-MUTATION VALIDATION: Ensure company has Stripe customer ID (create if missing)
+    // This happens BEFORE the bill assignment mutation - validates billing capability
+    console.log(`[ASSIGN] Validating Stripe customer for company ${companyId}...`);
+    const stripeCustomerId = await getOrCreateStripeCustomer(company);
+    
+    if (!stripeCustomerId) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to create Stripe customer for company' },
+        { status: 500 }
+      );
+    }
+    
+    console.log(`[ASSIGN] ✅ Stripe customer validated: ${stripeCustomerId}`);
+
+    // Refresh company data to get updated stripeCustomerId if it was just created
+    const companyWithStripe = await prisma.company_hqs.findUnique({
+      where: { id: companyId },
+      select: { id: true, companyName: true, stripeCustomerId: true },
+    });
+
+    if (!companyWithStripe || !companyWithStripe.stripeCustomerId) {
+      return NextResponse.json(
+        { success: false, error: 'Company Stripe customer validation failed' },
+        { status: 500 }
+      );
+    }
+
+    // NOW create Stripe Checkout session (after validation)
     const session = await createBillCheckoutSession({
       bill: {
         id: existingBill.id,
@@ -98,9 +126,9 @@ export async function POST(request: Request) {
         currency: existingBill.currency,
       },
       company: {
-        id: company.id,
-        companyName: company.companyName,
-        stripeCustomerId: company.stripeCustomerId,
+        id: companyWithStripe.id,
+        companyName: companyWithStripe.companyName,
+        stripeCustomerId: companyWithStripe.stripeCustomerId,
       },
       successUrl,
       cancelUrl,
