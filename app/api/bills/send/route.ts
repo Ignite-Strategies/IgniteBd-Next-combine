@@ -7,25 +7,18 @@ import { generateBillSlug } from '@/lib/billSlug';
 const BASE_URL =
   process.env.NEXT_PUBLIC_APP_URL ||
   process.env.APP_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://app.ignitegrowth.biz');
 
 /**
  * POST /api/bills/send
  *
- * ⚠️ COMMENTED OUT - Assignment now automatically generates payment URL.
- * Use POST /api/bills/assign instead - it creates junction entry AND generates URL.
+ * MODULAR: Generate payment URL for an EXISTING bill assignment.
+ * Requires that bills_to_companies entry already exists (created via POST /api/bills/assign).
+ * Creates Stripe Checkout session and generates public payment URL.
  *
- * Create one-time Stripe Checkout, store bills_to_companies row, return public URL.
- * Body: { billId, companyId, successUrl?, cancelUrl? } only. Assign = bill → company_hq (junction); no extra models.
+ * Body: { billId, companyId, successUrl?, cancelUrl? }
  */
 export async function POST(request: Request) {
-  // COMMENTED OUT - Assignment now handles URL generation automatically
-  return NextResponse.json(
-    { success: false, error: 'This endpoint is deprecated. Use POST /api/bills/assign instead - it automatically generates the payment URL.' },
-    { status: 410 }
-  );
-
-  /* COMMENTED OUT CODE BELOW
   try {
     await verifyFirebaseToken(request);
   } catch {
@@ -48,21 +41,42 @@ export async function POST(request: Request) {
       );
     }
 
-    const [bill, company] = await Promise.all([
-      prisma.bills.findUnique({ where: { id: billId } }),
-      prisma.company_hqs.findUnique({
-        where: { id: companyId },
-        select: { id: true, companyName: true, stripeCustomerId: true },
-      }),
-    ]);
+    // Find existing assignment - must exist first!
+    const assignment = await prisma.bills_to_companies.findFirst({
+      where: { billId, companyId },
+      include: {
+        bills: true,
+        company_hqs: {
+          select: { id: true, companyName: true, stripeCustomerId: true },
+        },
+      },
+    });
 
-    if (!bill) {
-      return NextResponse.json({ success: false, error: 'Bill not found' }, { status: 404 });
-    }
-    if (!company) {
-      return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 });
+    if (!assignment) {
+      return NextResponse.json(
+        { success: false, error: 'Bill must be assigned to company first. Use POST /api/bills/assign to create assignment.' },
+        { status: 400 }
+      );
     }
 
+    // If payment URL already exists, return it
+    if (assignment.publicBillUrl) {
+      return NextResponse.json({
+        success: true,
+        billId: assignment.billId,
+        companyId: assignment.companyId,
+        companyName: assignment.company_hqs.companyName,
+        publicBillUrl: assignment.publicBillUrl,
+        checkoutUrl: assignment.checkoutUrl,
+        slug: assignment.slug,
+        message: 'Payment URL already exists for this assignment.',
+      });
+    }
+
+    const bill = assignment.bills;
+    const company = assignment.company_hqs;
+
+    // Create Stripe Checkout session
     const session = await createBillCheckoutSession({
       bill: {
         id: bill.id,
@@ -82,47 +96,49 @@ export async function POST(request: Request) {
 
     const checkoutUrl = session.url ?? null;
 
-    const row = await prisma.bills_to_companies.create({
-      data: {
-        billId,
-        companyId,
-        stripeCheckoutSessionId: session.id,
-        checkoutUrl,
-        status: 'PENDING',
-      },
-    });
-
+    // Generate slug and public URL
     const { slug, companySlug, part } = generateBillSlug(
       company.companyName,
       bill.name,
-      row.id
+      assignment.id
     );
     const publicBillUrl = `${BASE_URL}/bill/${companySlug}/${part}`;
 
-    await prisma.bills_to_companies.update({
-      where: { id: row.id },
-      data: { slug, publicBillUrl },
+    // Update existing assignment with payment URL details
+    const updated = await prisma.bills_to_companies.update({
+      where: { id: assignment.id },
+      data: {
+        stripeCheckoutSessionId: session.id,
+        checkoutUrl,
+        slug,
+        publicBillUrl,
+      },
+      include: {
+        company_hqs: {
+          select: { id: true, companyName: true },
+        },
+      },
     });
 
     return NextResponse.json({
       success: true,
-      url: publicBillUrl,
-      checkoutUrl: checkoutUrl ?? undefined,
-      slug,
-      message: publicBillUrl
-        ? 'Bill page link created. Copy URL and share with client (e.g. email, Slack). They’ll see the bill and can pay via Stripe.'
-        : 'Session created but no URL returned.',
+      billId: updated.billId,
+      companyId: updated.companyId,
+      companyName: updated.company_hqs.companyName,
+      publicBillUrl: updated.publicBillUrl,
+      checkoutUrl: updated.checkoutUrl,
+      slug: updated.slug,
+      message: 'Payment URL generated. Copy URL and share with client (e.g. email, Slack).',
     });
   } catch (e) {
     console.error('❌ POST /api/bills/send:', e);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to send bill',
+        error: 'Failed to generate payment URL',
         details: e instanceof Error ? e.message : 'Unknown error',
       },
       { status: 500 }
     );
   }
-  */
 }
