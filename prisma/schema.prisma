@@ -357,7 +357,7 @@ model company_hqs {
   planStartedAt                                 DateTime? // When plan access started
   planEndedAt                                   DateTime? // When plan access ends
   plans                                         plans?                          @relation(fields: [planId], references: [id])
-  bills_to_companies                            bills_to_companies[]
+  bills                                         bills[]
   assessments                                   assessments[]
   blogs                                         blogs[]
   campaigns                                     campaigns[]
@@ -1404,31 +1404,21 @@ model plans {
 
 // One-off billing (ONE_OFF_BILLING.md). Same shape as plans, no interval. Platform push.
 model bills {
-  id          String       @id @default(cuid())
-  name        String
-  description String?
-  amountCents Int
-  currency    String       @default("usd")
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  bills_to_companies  bills_to_companies[]
-}
-
-model bills_to_companies {
-  id                      String         @id @default(cuid())
-  billId                  String
-  companyId               String
-  stripeCheckoutSessionId String?        @unique
+  id                      String                @id @default(cuid())
+  name                    String
+  description             String?
+  amountCents             Int
+  currency                String                 @default("usd")
+  companyId               String?                // FK → company_hqs.id (many bills → one company)
+  stripeCheckoutSessionId String?                @unique
   checkoutUrl             String?
-  status                  BillSendStatus @default(PENDING)
-  slug                    String?        @unique
+  status                  BillSendStatus         @default(PENDING)
+  slug                    String?                @unique
   publicBillUrl           String?
-  createdAt               DateTime       @default(now())
-  updatedAt               DateTime       @updatedAt
-  bills                   bills          @relation(fields: [billId], references: [id], onDelete: Cascade)
-  company_hqs             company_hqs    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  company_hqs             company_hqs?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@index([billId])
   @@index([companyId])
   @@index([status])
   @@index([slug])
