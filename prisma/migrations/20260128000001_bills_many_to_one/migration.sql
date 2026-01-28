@@ -10,9 +10,8 @@ ALTER TABLE "bills" ADD COLUMN IF NOT EXISTS "slug" TEXT;
 ALTER TABLE "bills" ADD COLUMN IF NOT EXISTS "publicBillUrl" TEXT;
 
 -- Step 2: Migrate data from bills_to_companies to bills
--- For bills with single assignment: update the bill directly
--- For bills with multiple assignments: create new bill records (one per company)
--- First, handle single assignments
+-- For each bill, use the FIRST assignment (by createdAt) if multiple exist
+-- This ensures each bill gets exactly one companyId
 UPDATE "bills" b
 SET 
   "companyId" = btc."companyId",
@@ -23,58 +22,6 @@ SET
   "publicBillUrl" = btc."publicBillUrl"
 FROM "bills_to_companies" btc
 WHERE b.id = btc."billId"
-  AND (SELECT COUNT(*) FROM "bills_to_companies" WHERE "billId" = b.id) = 1;
-
--- Step 3: For bills with multiple assignments, create new bill records
--- (Skip the original bill, create copies for additional companies)
-INSERT INTO "bills" (
-  "id",
-  "name",
-  "description",
-  "amountCents",
-  "currency",
-  "companyId",
-  "stripeCheckoutSessionId",
-  "checkoutUrl",
-  "status",
-  "slug",
-  "publicBillUrl",
-  "createdAt",
-  "updatedAt"
-)
-SELECT 
-  gen_random_uuid()::text,
-  b."name",
-  b."description",
-  b."amountCents",
-  b."currency",
-  btc."companyId",
-  btc."stripeCheckoutSessionId",
-  btc."checkoutUrl",
-  btc."status",
-  btc."slug",
-  btc."publicBillUrl",
-  btc."createdAt",
-  btc."updatedAt"
-FROM "bills_to_companies" btc
-JOIN "bills" b ON b.id = btc."billId"
-WHERE (SELECT COUNT(*) FROM "bills_to_companies" WHERE "billId" = b.id) > 1
-  AND btc."createdAt" != (
-    SELECT MIN("createdAt") FROM "bills_to_companies" WHERE "billId" = b.id
-  );
-
--- Step 4: Update original bills that had multiple assignments (keep first assignment)
-UPDATE "bills" b
-SET 
-  "companyId" = btc."companyId",
-  "stripeCheckoutSessionId" = btc."stripeCheckoutSessionId",
-  "checkoutUrl" = btc."checkoutUrl",
-  "status" = btc."status",
-  "slug" = btc."slug",
-  "publicBillUrl" = btc."publicBillUrl"
-FROM "bills_to_companies" btc
-WHERE b.id = btc."billId"
-  AND (SELECT COUNT(*) FROM "bills_to_companies" WHERE "billId" = b.id) > 1
   AND btc."createdAt" = (
     SELECT MIN("createdAt") FROM "bills_to_companies" WHERE "billId" = b.id
   );
