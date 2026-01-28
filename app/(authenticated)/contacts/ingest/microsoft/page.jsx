@@ -386,17 +386,38 @@ function MicrosoftEmailIngestContent() {
 
         {/* Success Message */}
         {saveResult && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+          <div className={`border rounded-lg p-6 mb-6 ${
+            saveResult.saved > 0 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-yellow-50 border-yellow-200'
+          }`}>
             <div className="flex items-start">
-              <CheckCircle2 className="h-6 w-6 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+              <CheckCircle2 className={`h-6 w-6 mr-3 mt-0.5 flex-shrink-0 ${
+                saveResult.saved > 0 ? 'text-green-500' : 'text-yellow-500'
+              }`} />
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-green-800 mb-2">
-                  Successfully imported {saveResult.saved} contact{saveResult.saved !== 1 ? 's' : ''}
-                </h3>
-                {saveResult.skipped > 0 && (
-                  <p className="text-sm text-green-700 mb-4">
-                    {saveResult.skipped} contact{saveResult.skipped !== 1 ? 's' : ''} skipped (already exist)
-                  </p>
+                {saveResult.saved > 0 ? (
+                  <>
+                    <h3 className="text-lg font-semibold text-green-800 mb-2">
+                      Successfully imported {saveResult.saved} contact{saveResult.saved !== 1 ? 's' : ''}
+                    </h3>
+                    {saveResult.skipped > 0 && (
+                      <p className="text-sm text-green-700 mb-4">
+                        {saveResult.skipped} contact{saveResult.skipped !== 1 ? 's' : ''} skipped (already exist)
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+                      No new contacts imported
+                    </h3>
+                    {saveResult.skipped > 0 && (
+                      <p className="text-sm text-yellow-700 mb-4">
+                        All {saveResult.skipped} contact{saveResult.skipped !== 1 ? 's' : ''} already exist in your database
+                      </p>
+                    )}
+                  </>
                 )}
                 <div className="flex gap-3">
                   {preview?.hasMore && (
