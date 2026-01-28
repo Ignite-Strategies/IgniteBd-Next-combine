@@ -105,11 +105,12 @@ export async function GET(request) {
     const messages = messagesResponse.value || [];
 
     // Filter out automated/business emails
+    // Simple heuristic: Keep people (first + last name), filter businesses
     function isAutomatedEmail(email, displayName) {
       const emailLower = email.toLowerCase();
       const nameLower = (displayName || '').toLowerCase().trim();
       
-      // Common automated email patterns
+      // Common automated email patterns (definitely filter these)
       const automatedPatterns = [
         /^noreply@/i,
         /^no-reply@/i,
@@ -129,79 +130,14 @@ export async function GET(request) {
         /^help@/i,
         /^info@/i,
         /^contact@/i,
-        /^hello@/i,
-        /^hi@/i,
       ];
       
-      // Check email patterns
+      // Check email patterns first
       if (automatedPatterns.some(pattern => pattern.test(emailLower))) {
         return true;
       }
       
-      // If no display name or display name is just the email, skip business name check
-      if (!displayName || nameLower === emailLower || nameLower.length === 0) {
-        // Continue to domain check below
-      } else {
-        // Check if displayName looks like a business name (not a person name)
-        // Person names: "John Smith", "Mary", "Robert Johnson"
-        // Business names: "QuickBooks", "Acme Corp", "Tech Solutions Inc"
-        
-        const words = nameLower.split(/\s+/).filter(w => w.length > 0);
-        
-        // Single word that's not a common first name = likely business
-        if (words.length === 1) {
-          const word = words[0];
-          // Common first names (allow these - might be a person)
-          const commonFirstNames = new Set([
-            'alex', 'chris', 'dana', 'jordan', 'kelly', 'morgan', 'pat', 'robin', 'sam', 'taylor',
-            'james', 'john', 'robert', 'michael', 'william', 'david', 'richard', 'joseph', 'thomas',
-            'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah',
-            'emily', 'emma', 'sophia', 'olivia', 'ava', 'mia', 'chloe', 'ella', 'avery', 'sofia',
-          ]);
-          
-          // If it's a common first name, allow it
-          if (!commonFirstNames.has(word) && word.length > 4) {
-            // Single word, not a common name, longer than 4 chars = likely business
-            return true;
-          }
-        }
-        
-        // Multiple words: check for business indicators
-        if (words.length >= 2) {
-          // Business indicators (Inc, LLC, Corp, etc.)
-          const businessIndicators = ['inc', 'llc', 'corp', 'ltd', 'co', 'company', 'solutions', 
-            'services', 'systems', 'group', 'associates', 'partners', 'enterprises', 'industries',
-            'technologies', 'consulting', 'advisory', 'capital', 'ventures', 'holdings'];
-          
-          // Check if any word is a business indicator
-          if (words.some(word => businessIndicators.includes(word))) {
-            return true;
-          }
-          
-          // Check capitalization pattern in original displayName (not lowercased)
-          // Business names often have unusual capitalization: "QuickBooks", "Stripe Inc"
-          const originalWords = (displayName || '').split(/\s+/).filter(w => w.length > 0);
-          if (originalWords.length >= 2) {
-            // Check if all words start with capital (business name pattern)
-            const allStartWithCapital = originalWords.every(word => 
-              word.length > 0 && /^[A-Z]/.test(word)
-            );
-            
-            // Common name words (exception for real people)
-            const commonNameWords = new Set([
-              'john', 'jane', 'mary', 'james', 'robert', 'michael', 'william', 'david',
-              'smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'miller', 'davis',
-            ]);
-            
-            // If all words start with capital and none are common names, likely business
-            if (allStartWithCapital && !words.some(word => commonNameWords.has(word))) {
-              return true;
-            }
-          }
-        }
-      }
-      
-      // Common automated/business domains (using Set for O(1) lookup)
+      // Common automated/business domains (definitely filter these)
       const automatedDomains = new Set([
         'sendgrid.com', 'sendgrid.net', 'mail.sendgrid.net',
         'godaddy.com',
@@ -231,10 +167,11 @@ export async function GET(request) {
         'quickbooks.com', 'mail.quickbooks.com', 'intuit.com', 'mail.intuit.com', 'quickbooks.intuit.com',
         'xero.com', 'mail.xero.com',
         'freshbooks.com', 'mail.freshbooks.com',
+        'substack.com', // Filter Substack newsletters
+        'ebay.com', 'info.ebay.com', // Filter eBay
       ]);
       
       const domain = emailLower.split('@')[1];
-      // Check exact domain match
       if (automatedDomains.has(domain)) {
         return true;
       }
@@ -245,126 +182,58 @@ export async function GET(request) {
         }
       }
       
-      // Check if displayName looks like a business/service name (common patterns)
-      const businessNamePatterns = [
-        /^sendgrid$/i,
-        /^godaddy/i,
-        /^venmo$/i,
-        /^bluevine$/i,
-        /^stripe$/i,
-        /^paypal$/i,
-        /^amazon$/i,
-        /^github$/i,
-        /^linkedin$/i,
-        /^facebook$/i,
-        /^twitter$/i,
-        /^google$/i,
-        /^microsoft$/i,
-        /^outlook$/i,
-        /^mailchimp$/i,
-        /^hubspot$/i,
-        /^salesforce$/i,
-        /^zendesk$/i,
-        /^intercom$/i,
-        /^slack$/i,
-        /^dropbox$/i,
-        /^zoom$/i,
-        /^calendly$/i,
-        /^eventbrite$/i,
-        /^square$/i,
-        /^quickbooks/i,  // Matches "QuickBooks", "QuickBooks Online", etc.
-        /^intuit/i,      // Matches "Intuit", "Intuit QuickBooks", etc.
-        /^xero$/i,
-        /^freshbooks$/i,
-        /renewals?$/i,
-        /notifications?$/i,
-        /alerts?$/i,
-        /updates?$/i,
-        /newsletter$/i,
-        /marketing$/i,
-      ];
-      
-      if (businessNamePatterns.some(pattern => pattern.test(nameLower))) {
+      // SIMPLE HEURISTIC: If displayName can be parsed into firstName + lastName, keep it
+      // Otherwise, filter it as a business
+      if (!displayName || nameLower === emailLower || nameLower.length === 0) {
+        // No display name or just email = likely automated/business
         return true;
       }
       
-      // Check if displayName looks like a business name (not a person name)
-      // Person names typically: "John Smith", "Mary", "Robert Johnson"
-      // Business names: "QuickBooks", "Acme Corp", "Tech Solutions Inc"
-      const looksLikeBusinessName = () => {
-        if (!nameLower || nameLower.length === 0) {
-          return false; // No name to check
-        }
-        
-        const words = nameLower.split(/\s+/).filter(w => w.length > 0);
-        
-        // Single word that's not a common first name = likely business
-        if (words.length === 1) {
-          const word = words[0];
-          // Common first names (allow these)
-          const commonFirstNames = new Set([
-            'alex', 'chris', 'dana', 'jordan', 'kelly', 'morgan', 'pat', 'robin', 'sam', 'taylor',
-            'james', 'john', 'robert', 'michael', 'william', 'david', 'richard', 'joseph', 'thomas',
-            'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah',
-            'emily', 'emma', 'sophia', 'olivia', 'ava', 'mia', 'chloe', 'ella', 'avery', 'sofia',
-          ]);
-          
-          // If it's a common first name, allow it
-          if (commonFirstNames.has(word)) {
-            return false;
-          }
-          
-          // Single word that's longer than 4 chars and not a common name = likely business
-          if (word.length > 4) {
-            return true;
-          }
-        }
-        
-        // Multiple words: check if it looks like a business
-        if (words.length >= 2) {
-          // Business indicators in names
-          const businessIndicators = ['inc', 'llc', 'corp', 'ltd', 'co', 'company', 'solutions', 
-            'services', 'systems', 'group', 'associates', 'partners', 'enterprises', 'industries',
-            'technologies', 'consulting', 'advisory', 'capital', 'ventures', 'holdings'];
-          
-          // Check if any word is a business indicator
-          if (words.some(word => businessIndicators.includes(word))) {
-            return true;
-          }
-          
-          // Check if all words are capitalized (like "QuickBooks Online", "Stripe Inc")
-          // This is a heuristic: business names often have unusual capitalization
-          const allWordsCapitalized = words.every(word => {
-            return word.length > 0 && (
-              /^[A-Z]/.test(word) || // Starts with capital
-              word === word.toUpperCase() || // All caps
-              word.length <= 2 // Abbreviation
-            );
-          });
-          
-          // If all words are capitalized and it's not a common name pattern, likely business
-          if (allWordsCapitalized && words.length >= 2) {
-            // Exception: common name patterns like "John Smith" (two common words)
-            const commonNameWords = new Set([
-              'john', 'jane', 'mary', 'james', 'robert', 'michael', 'william', 'david',
-              'smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'miller', 'davis',
-            ]);
-            const hasCommonNameWords = words.some(word => commonNameWords.has(word));
-            
-            if (!hasCommonNameWords) {
-              return true; // All capitalized, no common names = likely business
-            }
-          }
-        }
-        
-        return false;
-      };
+      const words = nameLower.split(/\s+/).filter(w => w.length > 0);
       
-      if (looksLikeBusinessName()) {
+      // If it's 2 words (firstName lastName), keep it - it's a person!
+      if (words.length === 2) {
+        // Check if both words look like names (not business indicators)
+        const businessIndicators = ['inc', 'llc', 'corp', 'ltd', 'co', 'company', 'solutions', 
+          'services', 'systems', 'group', 'associates', 'partners', 'enterprises', 'industries',
+          'technologies', 'consulting', 'advisory', 'capital', 'ventures', 'holdings'];
+        
+        // If neither word is a business indicator, it's probably a person name
+        const hasBusinessIndicator = words.some(word => businessIndicators.includes(word));
+        if (!hasBusinessIndicator) {
+          return false; // Keep it - looks like "FirstName LastName"
+        }
+      }
+      
+      // If it's 1 word, might be a person (common first name) or business
+      if (words.length === 1) {
+        const word = words[0];
+        // Common first names (allow these - might be a person)
+        const commonFirstNames = new Set([
+          'alex', 'chris', 'dana', 'jordan', 'kelly', 'morgan', 'pat', 'robin', 'sam', 'taylor',
+          'james', 'john', 'robert', 'michael', 'william', 'david', 'richard', 'joseph', 'thomas',
+          'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah',
+          'emily', 'emma', 'sophia', 'olivia', 'ava', 'mia', 'chloe', 'ella', 'avery', 'sofia',
+          'joel', 'adam', 'daniel', 'matthew', 'mark', 'luke', 'paul', 'peter', 'andrew', 'steven',
+        ]);
+        
+        if (commonFirstNames.has(word)) {
+          return false; // Keep it - common first name
+        }
+        
+        // Single word, not a common name, longer than 4 chars = likely business
+        if (word.length > 4) {
+          return true;
+        }
+      }
+      
+      // 3+ words or has business indicators = likely business
+      if (words.length >= 3) {
         return true;
       }
       
-      return false;
+      // Default: if we can't confidently say it's a person, filter it
+      return true;
     }
 
     // Aggregate messages into unique people by email address

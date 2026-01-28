@@ -73,6 +73,8 @@ export async function GET(request) {
     // Fetch contacts from Microsoft Graph with skip parameter for pagination
     // skip=0 → contacts 1-200, skip=200 → contacts 201-400, etc.
     // Note: Microsoft Graph Contacts API uses $skip for pagination
+    // IMPORTANT: Microsoft Graph Contacts API might return contacts without emailAddresses
+    // We need to check if there's a nextLink for pagination
     const graphUrl = `https://graph.microsoft.com/v1.0/me/contacts?$top=200&$skip=${skip}&$select=displayName,emailAddresses,companyName,jobTitle`;
     
     let contactsResponse;
@@ -103,6 +105,17 @@ export async function GET(request) {
     }
 
     const contacts = contactsResponse.value || [];
+    const hasNextLink = !!contactsResponse['@odata.nextLink'];
+    
+    // Debug: Log what we got from Microsoft Graph
+    console.log(`📊 Microsoft Graph returned ${contacts.length} contacts (skip=${skip}, hasNextLink=${hasNextLink})`);
+    if (contacts.length > 0) {
+      console.log(`📊 Sample contacts:`, contacts.slice(0, 3).map(c => ({
+        displayName: c.displayName,
+        hasEmail: !!(c.emailAddresses && c.emailAddresses.length > 0),
+        emailCount: c.emailAddresses?.length || 0,
+      })));
+    }
 
     // Filter out automated emails (same function as email preview)
     function isAutomatedEmail(email, displayName) {
@@ -164,6 +177,9 @@ export async function GET(request) {
 
     // Transform contacts to preview format
     const contactMap = new Map();
+    let skippedNoEmail = 0;
+    let skippedAutomated = 0;
+    let skippedAlreadyExists = 0;
 
     for (const contact of contacts) {
       const emailAddresses = contact.emailAddresses || [];
@@ -171,16 +187,19 @@ export async function GET(request) {
         || emailAddresses[0];
 
       if (!primaryEmail || !primaryEmail.address) {
+        skippedNoEmail++;
         continue;
       }
 
       const email = primaryEmail.address.toLowerCase().trim();
       if (!email || !email.includes('@')) {
+        skippedNoEmail++;
         continue;
       }
 
       // Skip automated emails
       if (isAutomatedEmail(email, contact.displayName)) {
+        skippedAutomated++;
         continue;
       }
 
@@ -207,15 +226,31 @@ export async function GET(request) {
     // Convert map to array and take first 50
     const allItems = Array.from(contactMap.values());
     const items = allItems.slice(0, 50);
+    
+    // Debug: Log filtering stats
+    console.log(`📊 Contacts filtering stats (skip=${skip}):`);
+    console.log(`  - Total from Graph: ${contacts.length}`);
+    console.log(`  - Skipped (no email): ${skippedNoEmail}`);
+    console.log(`  - Skipped (automated): ${skippedAutomated}`);
+    console.log(`  - Final unique contacts: ${allItems.length}`);
+    console.log(`  - Returning: ${items.length}`);
 
     // Prepare preview data
+    // hasMore: true if we got a full batch (200) OR if there's a nextLink from Graph API
     const previewData = {
       generatedAt: new Date().toISOString(),
       skip,
       limit: 50,
       items,
-      hasMore: items.length === 50, // If we got 50, there might be more
+      hasMore: hasNextLink || (contacts.length === 200 && allItems.length >= 50), // If Graph has more OR we got full batch with 50+ items
       source: 'contacts', // Indicates this is from Microsoft Contacts, not email messages
+      debug: {
+        totalFromGraph: contacts.length,
+        hasNextLink,
+        skippedNoEmail,
+        skippedAutomated,
+        uniqueContacts: allItems.length,
+      },
     };
 
     // Return preview data (no caching - always fresh)
