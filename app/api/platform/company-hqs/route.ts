@@ -64,6 +64,21 @@ export async function GET(request: Request) {
             lastName: true,
           },
         },
+        bills: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            amountCents: true,
+            currency: true,
+            status: true,
+            paidAt: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
         _count: {
           select: {
             company_memberships: true,
