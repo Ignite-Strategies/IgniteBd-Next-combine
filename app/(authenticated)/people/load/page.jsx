@@ -6,6 +6,8 @@ import {
   Sparkles,
   Mail,
   ArrowRight,
+  FileSpreadsheet,
+  UserPlus,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
@@ -15,6 +17,19 @@ function LoadUpPageContent() {
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId');
   const LOAD_OPTIONS = [
+    {
+      id: 'import-csv',
+      title: 'Upload CSV',
+      description: 'Upload a CSV file to import contacts in bulk',
+      route: companyHQId 
+        ? `/contacts/upload?companyHQId=${companyHQId}`
+        : '/contacts/upload',
+      icon: FileSpreadsheet,
+      containerClasses:
+        'from-green-50 to-green-100 border-green-200 hover:border-green-400',
+      iconClasses: 'bg-green-500 text-white',
+      primary: true,
+    },
     {
       id: 'import-microsoft',
       title: 'Import from Microsoft',
@@ -37,6 +52,19 @@ function LoadUpPageContent() {
       containerClasses:
         'from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400',
       iconClasses: 'bg-purple-500 text-white',
+      primary: true,
+    },
+    {
+      id: 'add-manual',
+      title: 'Add Manually',
+      description: 'Enter contact information one at a time',
+      route: companyHQId 
+        ? `/contacts/manual?companyHQId=${companyHQId}`
+        : '/contacts/manual',
+      icon: UserPlus,
+      containerClasses:
+        'from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400',
+      iconClasses: 'bg-blue-500 text-white',
       primary: true,
     },
   ];
