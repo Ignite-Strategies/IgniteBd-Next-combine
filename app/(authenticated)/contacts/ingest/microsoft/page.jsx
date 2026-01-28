@@ -72,6 +72,20 @@ function MicrosoftEmailIngestContent() {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [skip, setSkip] = useState(0); // Track pagination: 0, 100, 200, etc.
 
+  // Check for success redirect from review page
+  useEffect(() => {
+    const saved = searchParams?.get('saved');
+    const skipped = searchParams?.get('skipped');
+    if (saved || skipped) {
+      setSaveResult({
+        saved: parseInt(saved || '0', 10),
+        skipped: parseInt(skipped || '0', 10),
+      });
+      // Clear URL params
+      router.replace(`/contacts/ingest/microsoft${companyHQId ? `?companyHQId=${companyHQId}` : ''}`);
+    }
+  }, [searchParams, router, companyHQId]);
+
   // Don't auto-load - user selects source first
 
   // Load preview function - Call API directly, no connection check
@@ -181,8 +195,8 @@ function MicrosoftEmailIngestContent() {
     }
   }
 
-  // Save button
-  async function handleSave() {
+  // Review button - navigate to review page
+  function handleReview() {
     if (!companyHQId) {
       alert('Company context required. Please navigate from a company.');
       return;
@@ -192,29 +206,12 @@ function MicrosoftEmailIngestContent() {
       return;
     }
 
-    setSaving(true);
-    try {
-      const endpoint = source === 'email'
-        ? '/api/microsoft/email-contacts/save'
-        : '/api/microsoft/contacts/save';
-      const response = await api.post(endpoint, {
-        previewIds: Array.from(selectedIds),
-        previewItems: preview?.items || [], // Send full preview items (no Redis needed)
-        companyHQId,
-      });
-      if (response.data?.success) {
-        setSaveResult({
-          saved: response.data.saved,
-          skipped: response.data.skipped,
-        });
-        setSelectedIds(new Set());
-      }
-    } catch (error) {
-      console.error('Save failed:', error);
-      alert('Failed to save contacts. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+    // Store preview items and selected IDs in sessionStorage for review page
+    sessionStorage.setItem('microsoftPreviewItems', JSON.stringify(preview?.items || []));
+    sessionStorage.setItem('microsoftSelectedIds', JSON.stringify(Array.from(selectedIds)));
+    
+    // Navigate to review page
+    router.push(`/contacts/ingest/microsoft/review?companyHQId=${companyHQId}&source=${source}`);
   }
 
   return (
@@ -481,17 +478,16 @@ function MicrosoftEmailIngestContent() {
             {preview.items.length > 0 ? (
               <>
                 <div className="max-h-[calc(100vh-400px)] overflow-y-auto mb-4 border rounded">
-                  <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
+                  <div className="grid grid-cols-[auto_1fr_auto] gap-3 px-3 py-2 bg-gray-50 border-b font-semibold text-xs text-gray-600 sticky top-0 z-10">
                     <div className="w-4"></div>
                     <div>Name</div>
                     <div className="text-right">Last Email</div>
-                    <div className="text-right">Status</div>
                   </div>
                   {preview.items.map((item) => {
                     return (
                       <div
                         key={item.previewId}
-                        className={`grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
+                        className={`grid grid-cols-[auto_1fr_auto] gap-3 items-center px-3 py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
                           selectedIds.has(item.previewId) ? 'bg-blue-50' : ''
                         }`}
                         onClick={() => toggleSelect(item.previewId)}
@@ -517,13 +513,6 @@ function MicrosoftEmailIngestContent() {
                             ? new Date(item.stats.lastSeenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                             : item.companyName ? '-' : '-'}
                         </div>
-                        <div className="flex justify-end">
-                          {item.alreadyExists && (
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                              Already Exists
-                            </span>
-                          )}
-                        </div>
                       </div>
                     );
                   })}
@@ -534,21 +523,12 @@ function MicrosoftEmailIngestContent() {
                     {selectedIds.size} of {preview.items.length} selected
                   </p>
                   <button
-                    onClick={handleSave}
-                    disabled={saving || selectedIds.size === 0 || !companyHQId}
+                    onClick={handleReview}
+                    disabled={selectedIds.size === 0 || !companyHQId}
                     className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm hover:shadow transition-all flex items-center gap-2"
                   >
-                    {saving ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Importing...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4" />
-                        Import Selected ({selectedIds.size})
-                      </>
-                    )}
+                    <Check className="h-4 w-4" />
+                    Review Selected ({selectedIds.size})
                   </button>
                 </div>
               </>

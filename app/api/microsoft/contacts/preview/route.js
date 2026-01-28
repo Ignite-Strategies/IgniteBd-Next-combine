@@ -152,34 +152,10 @@ export async function GET(request) {
       return false;
     }
 
-    // Get all existing contact emails for this owner's companies
-    // Check which contacts already exist in database
-    const companyHQIds = await prisma.company_memberships.findMany({
-      where: { userId: owner.id },
-      select: { companyHqId: true },
-    }).then(memberships => memberships.map(m => m.companyHqId));
-
-    const existingContacts = companyHQIds.length > 0
-      ? await prisma.contact.findMany({
-          where: {
-            crmId: { in: companyHQIds },
-            email: { not: null },
-          },
-          select: {
-            email: true,
-          },
-        })
-      : [];
-
-    const existingEmails = new Set(
-      existingContacts.map(c => c.email?.toLowerCase().trim()).filter(Boolean)
-    );
-
     // Transform contacts to preview format
     const contactMap = new Map();
     let skippedNoEmail = 0;
     let skippedAutomated = 0;
-    let skippedAlreadyExists = 0;
 
     for (const contact of contacts) {
       const emailAddresses = contact.emailAddresses || [];
@@ -209,9 +185,6 @@ export async function GET(request) {
       // Generate stable previewId (hash of email)
       const previewId = crypto.createHash('sha256').update(email).digest('hex').substring(0, 16);
 
-      // Check if already exists
-      const alreadyExists = existingEmails.has(email);
-
       contactMap.set(email, {
         previewId,
         email,
@@ -219,7 +192,6 @@ export async function GET(request) {
         domain,
         companyName: contact.companyName || null,
         jobTitle: contact.jobTitle || null,
-        alreadyExists,
       });
     }
 
@@ -234,6 +206,8 @@ export async function GET(request) {
     console.log(`  - Skipped (automated): ${skippedAutomated}`);
     console.log(`  - Final unique contacts: ${allItems.length}`);
     console.log(`  - Returning: ${items.length}`);
+    console.log(`  - Note: "Already Exists" check happens in review step`);
+    console.log(`  - Note: "Already Exists" check happens in review step`);
 
     // Prepare preview data
     // hasMore: true if we got a full batch (200) OR if there's a nextLink from Graph API

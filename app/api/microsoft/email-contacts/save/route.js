@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { resolveMembership } from '@/lib/membership';
+import { mapPreviewItemToContact } from '@/lib/contactFromPreviewService';
 
 /**
  * POST /api/microsoft/email-contacts/save
  * 
  * Save selected email contacts from preview to database
+ * Uses contactFromPreviewService for mapping
  * 
  * Body:
  * {
@@ -17,8 +19,9 @@ import { resolveMembership } from '@/lib/membership';
  * 
  * Behavior:
  * - Filter items by previewIds from previewItems array
- * - For each item: create Contact with email, firstName, lastName
- * - No enrichment, no company/title/phone
+ * - Map each item using contactFromPreviewService
+ * - Create Contact with email, firstName, lastName
+ * - Skip if already exists
  * - Returns count of saved contacts
  */
 export async function POST(request) {
@@ -82,7 +85,7 @@ export async function POST(request) {
       );
     }
 
-    // Filter items by previewIds from previewItems array (no Redis needed)
+    // Filter items by previewIds from previewItems array
     const itemsToSave = previewItems.filter(item => 
       previewIds.includes(item.previewId)
     );
@@ -94,32 +97,21 @@ export async function POST(request) {
       );
     }
 
+    // Map preview items to contact data using service
+    const contactsToSave = itemsToSave.map(item => mapPreviewItemToContact(item));
+
     // Create contacts
     let saved = 0;
     let skipped = 0;
     const errors = [];
 
-    for (const item of itemsToSave) {
+    for (const contactData of contactsToSave) {
       try {
-        const email = item.email.toLowerCase().trim();
+        const email = contactData.email;
         
         if (!email || !email.includes('@')) {
           skipped++;
           continue;
-        }
-
-        // Parse displayName into firstName/lastName (best effort)
-        let firstName = null;
-        let lastName = null;
-        
-        if (item.displayName) {
-          const nameParts = item.displayName.trim().split(/\s+/);
-          if (nameParts.length === 1) {
-            firstName = nameParts[0];
-          } else if (nameParts.length >= 2) {
-            firstName = nameParts[0];
-            lastName = nameParts.slice(1).join(' ');
-          }
         }
 
         // Check if contact already exists (by email)
@@ -137,9 +129,9 @@ export async function POST(request) {
         await prisma.contact.create({
           data: {
             crmId: companyHQId,
-            email,
-            firstName,
-            lastName,
+            email: contactData.email,
+            firstName: contactData.firstName,
+            lastName: contactData.lastName,
             // Explicitly ignore: company, title, phone, enrichment
           },
         });
@@ -151,7 +143,7 @@ export async function POST(request) {
           skipped++;
         } else {
           errors.push({
-            email: item.email,
+            email: contactData.email,
             error: error.message,
           });
         }
