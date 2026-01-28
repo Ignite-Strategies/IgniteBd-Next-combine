@@ -1,73 +1,66 @@
-'use client';
-
-import { useParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { prisma } from '@/lib/prisma';
 import BillContainer from '@/components/bill/BillContainer';
+import { notFound } from 'next/navigation';
 
 /**
  * Public bill page: /bill/[companySlug]/[part].
  * Dynamic URL: bill/companyname/billname-shortId.
- * Fetches bill + company + checkoutUrl, shows BillContainer, Pay now → Stripe.
+ * Server Component - fetches data server-side, no useEffect, instant load.
  */
-export default function BillBySlugPage() {
-  const params = useParams();
-  const companySlug = params?.companySlug;
-  const part = params?.part;
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default async function BillBySlugPage({ params }) {
+  const { companySlug, part } = await params;
 
-  useEffect(() => {
-    if (!companySlug || !part) {
-      setLoading(false);
-      setError('Invalid link');
-      return;
-    }
-    const url = `/api/bills/public/${encodeURIComponent(companySlug)}/${encodeURIComponent(part)}`;
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) return res.json().then((d) => Promise.reject(d));
-        return res.json();
-      })
-      .then((d) => {
-        if (d?.success) setData(d);
-        else setError(d?.error || 'Failed to load bill');
-      })
-      .catch((e) => setError(e?.error || e?.message || 'Failed to load bill'))
-      .finally(() => setLoading(false));
-  }, [companySlug, part]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-        <p className="mt-4 text-sm text-gray-600">Loading bill…</p>
-      </div>
-    );
+  if (!companySlug?.trim() || !part?.trim()) {
+    notFound();
   }
 
-  if (error || !data) {
+  const slug = `${companySlug.trim()}/${part.trim()}`;
+
+  try {
+    // Fetch bill directly from database (server-side, no API call needed)
+    const bill = await prisma.bills.findUnique({
+      where: { slug },
+      include: {
+        company_hqs: { select: { id: true, companyName: true } },
+      },
+    });
+
+    if (!bill) {
+      notFound();
+    }
+
+    if (bill.status !== 'PENDING') {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
+          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-center">
+            <h1 className="text-xl font-semibold text-gray-900">Bill no longer available</h1>
+            <p className="mt-2 text-gray-600">
+              This bill is no longer available for payment. Status: {bill.status}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-center">
-          <h1 className="text-xl font-semibold text-gray-900">Bill not found</h1>
-          <p className="mt-2 text-gray-600">{error || 'This link may have expired or is invalid.'}</p>
+      <div className="min-h-screen bg-gray-50 px-4 py-12">
+        <div className="mx-auto max-w-2xl">
+          <BillContainer
+            companyName={bill.company_hqs?.companyName}
+            bill={{
+              id: bill.id,
+              name: bill.name,
+              description: bill.description,
+              amountCents: bill.amountCents,
+              currency: bill.currency,
+            }}
+            checkoutUrl={bill.checkoutUrl}
+          />
         </div>
       </div>
     );
+  } catch (error) {
+    console.error('❌ Error loading bill:', error);
+    notFound();
   }
-
-  const { bill, company, checkoutUrl } = data;
-
-  return (
-    <div className="min-h-screen bg-gray-50 px-4 py-12">
-      <div className="mx-auto max-w-2xl">
-        <BillContainer
-          companyName={company?.companyName}
-          bill={bill}
-          checkoutUrl={checkoutUrl}
-        />
-      </div>
-    </div>
-  );
 }
