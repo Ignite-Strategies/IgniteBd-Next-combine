@@ -12,8 +12,8 @@ const BASE_URL =
 /**
  * POST /api/bills/assign
  *
- * Assign a company to a bill → creates bills_to_companies row (junction) AND generates payment URL.
- * This is the single action: assign company → create junction entry → generate URL → return URL.
+ * SIMPLE SERVICE: Assign company to bill → creates bills_to_companies junction entry AND generates payment URL.
+ * One atomic operation: assign + generate URL.
  *
  * Body: { billId, companyId, successUrl?, cancelUrl? }
  */
@@ -43,6 +43,11 @@ export async function POST(request: Request) {
     // Check if assignment already exists
     const existing = await prisma.bills_to_companies.findFirst({
       where: { billId, companyId },
+      include: {
+        company_hqs: {
+          select: { id: true, companyName: true },
+        },
+      },
     });
 
     if (existing) {
@@ -51,16 +56,17 @@ export async function POST(request: Request) {
         success: true,
         billId: existing.billId,
         companyId: existing.companyId,
-        companyName: (await prisma.company_hqs.findUnique({ where: { id: companyId }, select: { companyName: true } }))?.companyName,
+        companyName: existing.company_hqs.companyName,
         status: existing.status,
-        publicBillUrl: existing.publicBillUrl,
-        checkoutUrl: existing.checkoutUrl,
-        slug: existing.slug,
+        publicBillUrl: existing.publicBillUrl || null,
+        checkoutUrl: existing.checkoutUrl || null,
+        slug: existing.slug || null,
         createdAt: existing.createdAt,
         message: existing.publicBillUrl ? 'Bill already assigned. Payment URL available.' : 'Bill already assigned but no payment URL.',
       });
     }
 
+    // Verify bill and company exist
     const [bill, company] = await Promise.all([
       prisma.bills.findUnique({ where: { id: billId } }),
       prisma.company_hqs.findUnique({
@@ -96,7 +102,8 @@ export async function POST(request: Request) {
 
     const checkoutUrl = session.url ?? null;
 
-    // Create junction table entry
+    // CREATE JUNCTION TABLE ENTRY - THIS IS THE MUTATION
+    console.log(`[ASSIGN] Creating bills_to_companies entry: billId=${billId}, companyId=${companyId}`);
     const assignment = await prisma.bills_to_companies.create({
       data: {
         billId,
@@ -111,6 +118,7 @@ export async function POST(request: Request) {
         },
       },
     });
+    console.log(`[ASSIGN] ✅ Junction entry created: id=${assignment.id}, billId=${assignment.billId}, companyId=${assignment.companyId}`);
 
     // Generate slug and public URL
     const { slug, companySlug, part } = generateBillSlug(
@@ -120,7 +128,8 @@ export async function POST(request: Request) {
     );
     const publicBillUrl = `${BASE_URL}/bill/${companySlug}/${part}`;
 
-    // Update with slug and public URL
+    // Update junction entry with URL
+    console.log(`[ASSIGN] Updating junction entry with URL: id=${assignment.id}, slug=${slug}`);
     const updated = await prisma.bills_to_companies.update({
       where: { id: assignment.id },
       data: { slug, publicBillUrl },
@@ -130,7 +139,9 @@ export async function POST(request: Request) {
         },
       },
     });
+    console.log(`[ASSIGN] ✅ Junction entry updated: publicBillUrl=${updated.publicBillUrl}`);
 
+    // Return the mutated assignment with URL
     return NextResponse.json({
       success: true,
       billId: updated.billId,
