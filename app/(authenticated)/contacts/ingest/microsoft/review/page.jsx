@@ -134,14 +134,25 @@ function MicrosoftReviewContent() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Review Contacts</h1>
-            <p className="text-gray-600">
-              Review how contacts will be saved. {stats && (
-                <span className="font-medium">
-                  {stats.new} new, {stats.alreadyExists} already exist
-                </span>
-              )}
-            </p>
+            <h1 className="text-3xl font-bold mb-2">Review Contacts Before Import</h1>
+            {stats && (
+              <div className="flex items-center gap-4 mt-2">
+                {stats.new > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">
+                      {stats.new} New
+                    </span>
+                  </div>
+                )}
+                {stats.alreadyExists > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm font-medium">
+                      {stats.alreadyExists} Already in Contacts
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <button
             onClick={handleBack}
@@ -151,6 +162,23 @@ function MicrosoftReviewContent() {
             Back
           </button>
         </div>
+
+        {/* Warning Banner if all exist */}
+        {stats && stats.alreadyExists === stats.total && stats.total > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <X className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-yellow-800 mb-1">
+                  All {stats.total} contact{stats.total !== 1 ? 's' : ''} already exist in your database
+                </h3>
+                <p className="text-sm text-yellow-700">
+                  These contacts won't be imported again. You can go back and select different contacts.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Contacts Table */}
         <div className="bg-white rounded-lg shadow border mb-6">
@@ -189,12 +217,13 @@ function MicrosoftReviewContent() {
                     <td className="px-4 py-3 text-center">
                       {contact.alreadyExists ? (
                         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Already Exists
+                          <X className="h-3 w-3 mr-1" />
+                          Already in Contacts
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
                           <Check className="h-3 w-3 mr-1" />
-                          New
+                          Will Import
                         </span>
                       )}
                     </td>
@@ -213,23 +242,35 @@ function MicrosoftReviewContent() {
           >
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || contacts.length === 0}
-            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save {stats?.new || 0} Contact{stats?.new !== 1 ? 's' : ''}
-              </>
+          <div className="flex items-center gap-4">
+            {stats && stats.alreadyExists > 0 && (
+              <p className="text-sm text-gray-600">
+                {stats.alreadyExists} already exist • {stats.new} will be imported
+              </p>
             )}
-          </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || contacts.length === 0 || (stats && stats.new === 0)}
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Saving...
+                </>
+              ) : stats && stats.new === 0 ? (
+                <>
+                  <X className="h-4 w-4" />
+                  All Already Exist
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Import {stats?.new || 0} Contact{stats?.new !== 1 ? 's' : ''}
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
