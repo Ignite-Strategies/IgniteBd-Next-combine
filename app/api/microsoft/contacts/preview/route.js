@@ -117,42 +117,154 @@ export async function GET(request) {
       })));
     }
 
-    // Filter out automated emails (same function as email preview)
+    // Filter out automated emails (same comprehensive function as email preview)
     function isAutomatedEmail(email, displayName) {
       const emailLower = email.toLowerCase();
-      const nameLower = (displayName || '').toLowerCase();
+      const nameLower = (displayName || '').toLowerCase().trim();
       
+      // Filter out emails containing these keywords in the email address
+      const emailKeywords = ['mail', 'subscriptions', 'subscription', 'team', 'noreply', 'no-reply'];
+      if (emailKeywords.some(keyword => emailLower.includes(keyword))) {
+        return true;
+      }
+      
+      // Filter out anything with hyphens in email or display name
+      if (emailLower.includes('-') || (displayName && displayName.includes('-'))) {
+        return true;
+      }
+      
+      // Common automated email patterns (definitely filter these)
       const automatedPatterns = [
         /^noreply@/i,
         /^no-reply@/i,
         /^donotreply@/i,
+        /^donot-reply@/i,
         /^automated@/i,
+        /^automation@/i,
         /^system@/i,
         /^notification@/i,
+        /^notifications@/i,
+        /^alerts@/i,
+        /^mailer@/i,
+        /^mailer-daemon@/i,
+        /^postmaster@/i,
+        /^webmaster@/i,
+        /^support@/i,
+        /^help@/i,
+        /^info@/i,
+        /^contact@/i,
       ];
       
+      // Check email patterns first
       if (automatedPatterns.some(pattern => pattern.test(emailLower))) {
         return true;
       }
       
-      const automatedDomains = [
-        'sendgrid.com',
+      // Common automated/business domains (definitely filter these)
+      const automatedDomains = new Set([
+        'sendgrid.com', 'sendgrid.net', 'mail.sendgrid.net',
         'godaddy.com',
-        'venmo.com',
-        'email.venmo.com',
-        'bluevine.com',
-        'email.bluevine.com',
-      ];
+        'venmo.com', 'email.venmo.com',
+        'bluevine.com', 'email.bluevine.com',
+        'stripe.com', 'mail.stripe.com',
+        'paypal.com', 'mail.paypal.com',
+        'amazon.com', 'amazonaws.com', 'mail.amazon.com',
+        'github.com', 'noreply.github.com',
+        'linkedin.com', 'notifications.linkedin.com',
+        'facebook.com', 'mail.facebook.com',
+        'twitter.com', 'x.com', 'mail.x.com',
+        'google.com', 'mail.google.com',
+        'microsoft.com', 'mail.microsoft.com',
+        'outlook.com', 'mail.outlook.com',
+        'mailchimp.com', 'mail.mailchimp.com',
+        'hubspot.com', 'mail.hubspot.com',
+        'salesforce.com', 'mail.salesforce.com',
+        'zendesk.com', 'mail.zendesk.com',
+        'intercom.com', 'mail.intercom.com',
+        'slack.com', 'mail.slack.com',
+        'dropbox.com', 'mail.dropbox.com',
+        'zoom.us', 'mail.zoom.us',
+        'calendly.com', 'mail.calendly.com',
+        'eventbrite.com', 'mail.eventbrite.com',
+        'square.com', 'mail.square.com',
+        'quickbooks.com', 'mail.quickbooks.com', 'intuit.com', 'mail.intuit.com', 'quickbooks.intuit.com',
+        'xero.com', 'mail.xero.com',
+        'freshbooks.com', 'mail.freshbooks.com',
+        'substack.com', // Filter Substack newsletters
+        'ebay.com', 'info.ebay.com', // Filter eBay
+        'wix.com', 'wixsite.com', // Filter Wix
+        'adobe.com', // Filter Adobe (mail@mail.adobe.com)
+        'businessinsider.com', // Filter Business Insider
+      ]);
       
       const domain = emailLower.split('@')[1];
-      if (automatedDomains.includes(domain)) {
+      if (automatedDomains.has(domain)) {
+        return true;
+      }
+      // Check if domain ends with any automated domain (catches subdomains)
+      for (const automatedDomain of automatedDomains) {
+        if (domain.endsWith('.' + automatedDomain)) {
+          return true;
+        }
+      }
+      
+      // SIMPLE HEURISTIC: If displayName can be parsed into firstName + lastName, keep it
+      // Otherwise, filter it as a business
+      if (!displayName || nameLower === emailLower || nameLower.length === 0) {
+        // No display name or just email = likely automated/business
         return true;
       }
       
-      return false;
+      const words = nameLower.split(/\s+/).filter(w => w.length > 0);
+      
+      // If it's 2 words (firstName lastName), keep it - it's a person!
+      if (words.length === 2) {
+        // Check if both words look like names (not business indicators)
+        const businessIndicators = ['inc', 'llc', 'corp', 'ltd', 'co', 'company', 'solutions', 
+          'services', 'systems', 'group', 'associates', 'partners', 'enterprises', 'industries',
+          'technologies', 'consulting', 'advisory', 'capital', 'ventures', 'holdings'];
+        
+        // If neither word is a business indicator, it's probably a person name
+        const hasBusinessIndicator = words.some(word => businessIndicators.includes(word));
+        if (!hasBusinessIndicator) {
+          return false; // Keep it - looks like "FirstName LastName"
+        }
+      }
+      
+      // If it's 1 word, might be a person (common first name) or business
+      if (words.length === 1) {
+        const word = words[0];
+        // Common first names (allow these - might be a person)
+        const commonFirstNames = new Set([
+          'alex', 'chris', 'dana', 'jordan', 'kelly', 'morgan', 'pat', 'robin', 'sam', 'taylor',
+          'james', 'john', 'robert', 'michael', 'william', 'david', 'richard', 'joseph', 'thomas',
+          'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah',
+          'emily', 'emma', 'sophia', 'olivia', 'ava', 'mia', 'chloe', 'ella', 'avery', 'sofia',
+          'joel', 'adam', 'daniel', 'matthew', 'mark', 'luke', 'paul', 'peter', 'andrew', 'steven',
+        ]);
+        
+        if (commonFirstNames.has(word)) {
+          return false; // Keep it - common first name
+        }
+        
+        // Single word, not a common name, longer than 4 chars = likely business
+        if (word.length > 4) {
+          return true;
+        }
+      }
+      
+      // 3+ words or has business indicators = likely business
+      if (words.length >= 3) {
+        return true;
+      }
+      
+      // Default: if we can't confidently say it's a person, filter it
+      return true;
     }
 
     // Transform contacts to preview format
+    // Process ALL contacts in the batch to ensure pagination consistency
+    // Then return up to 50 unique contacts
     const contactMap = new Map();
     let skippedNoEmail = 0;
     let skippedAutomated = 0;
@@ -176,6 +288,11 @@ export async function GET(request) {
       // Skip automated emails
       if (isAutomatedEmail(email, contact.displayName)) {
         skippedAutomated++;
+        continue;
+      }
+
+      // Skip if we already have this email (duplicate within batch)
+      if (contactMap.has(email)) {
         continue;
       }
 
@@ -204,9 +321,8 @@ export async function GET(request) {
     console.log(`  - Total from Graph: ${contacts.length}`);
     console.log(`  - Skipped (no email): ${skippedNoEmail}`);
     console.log(`  - Skipped (automated): ${skippedAutomated}`);
-    console.log(`  - Final unique contacts: ${allItems.length}`);
+    console.log(`  - Unique contacts found: ${allItems.length}`);
     console.log(`  - Returning: ${items.length}`);
-    console.log(`  - Note: "Already Exists" check happens in review step`);
     console.log(`  - Note: "Already Exists" check happens in review step`);
 
     // Prepare preview data
@@ -224,6 +340,7 @@ export async function GET(request) {
         skippedNoEmail,
         skippedAutomated,
         uniqueContacts: allItems.length,
+        returned: items.length,
       },
     };
 
