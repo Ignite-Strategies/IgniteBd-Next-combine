@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
+import { generateBillSlug } from '@/lib/billSlug';
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_APP_URL ||
@@ -11,8 +12,8 @@ const BASE_URL =
 /**
  * POST /api/bills/send
  *
- * Send bill to company: create one-time Stripe Checkout, store bill_send, return public URL.
- * Body: { billId, companyId, successUrl?, cancelUrl? }
+ * Create one-time Stripe Checkout, store bills_to_companies row, return public URL.
+ * Body: { billId, companyId, successUrl?, cancelUrl? } only. Assign = bill → company_hq (junction); no extra models.
  */
 export async function POST(request: Request) {
   try {
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
 
     const checkoutUrl = session.url ?? null;
 
-    const billSend = await prisma.bill_sends.create({
+    const row = await prisma.bills_to_companies.create({
       data: {
         billId,
         companyId,
@@ -81,12 +82,25 @@ export async function POST(request: Request) {
       },
     });
 
+    const { slug, companySlug, part } = generateBillSlug(
+      company.companyName,
+      bill.name,
+      row.id
+    );
+    const publicBillUrl = `${BASE_URL}/bill/${companySlug}/${part}`;
+
+    await prisma.bills_to_companies.update({
+      where: { id: row.id },
+      data: { slug, publicBillUrl },
+    });
+
     return NextResponse.json({
       success: true,
-      url: checkoutUrl,
-      billSendId: billSend.id,
-      message: checkoutUrl
-        ? 'Checkout link created. Share the URL with the client to pay.'
+      url: publicBillUrl,
+      checkoutUrl: checkoutUrl ?? undefined,
+      slug,
+      message: publicBillUrl
+        ? 'Bill page link created. Copy URL and share with client (e.g. email, Slack). They’ll see the bill and can pay via Stripe.'
         : 'Session created but no URL returned.',
     });
   } catch (e) {

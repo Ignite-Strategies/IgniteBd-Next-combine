@@ -1421,6 +1421,8 @@ model bills_to_companies {
   stripeCheckoutSessionId String?        @unique
   checkoutUrl             String?
   status                  BillSendStatus @default(PENDING)
+  slug                    String?        @unique
+  publicBillUrl           String?
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   bills                   bills          @relation(fields: [billId], references: [id], onDelete: Cascade)
@@ -1429,6 +1431,7 @@ model bills_to_companies {
   @@index([billId])
   @@index([companyId])
   @@index([status])
+  @@index([slug])
 }
 
 enum BillSendStatus {
