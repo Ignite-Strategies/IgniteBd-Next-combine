@@ -110,6 +110,17 @@ export async function GET(request) {
       const emailLower = email.toLowerCase();
       const nameLower = (displayName || '').toLowerCase().trim();
       
+      // Filter out emails containing these keywords in the email address
+      const emailKeywords = ['mail', 'subscriptions', 'subscription', 'team', 'noreply', 'no-reply'];
+      if (emailKeywords.some(keyword => emailLower.includes(keyword))) {
+        return true;
+      }
+      
+      // Filter out anything with hyphens in email or display name
+      if (emailLower.includes('-') || (displayName && displayName.includes('-'))) {
+        return true;
+      }
+      
       // Common automated email patterns (definitely filter these)
       const automatedPatterns = [
         /^noreply@/i,
@@ -169,6 +180,9 @@ export async function GET(request) {
         'freshbooks.com', 'mail.freshbooks.com',
         'substack.com', // Filter Substack newsletters
         'ebay.com', 'info.ebay.com', // Filter eBay
+        'wix.com', 'wixsite.com', // Filter Wix
+        'adobe.com', // Filter Adobe (mail@mail.adobe.com)
+        'businessinsider.com', // Filter Business Insider
       ]);
       
       const domain = emailLower.split('@')[1];
