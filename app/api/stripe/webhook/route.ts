@@ -94,35 +94,64 @@ export async function POST(request: Request) {
 
 /**
  * Handle checkout.session.completed
- * Update company_hqs directly with payment status
+ * Handles both:
+ * 1. Plan subscriptions (companyHQId + planId)
+ * 2. One-off bills (billId + companyId)
  */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   try {
+    const billId = session.metadata?.billId;
     const companyHQId = session.metadata?.companyHQId;
     const planId = session.metadata?.planId;
+    const type = session.metadata?.type;
 
-    if (!companyHQId || !planId) {
-      console.warn('⚠️ checkout.session.completed: Missing companyHQId or planId in metadata');
+    // Handle one-off bill payment
+    if (billId && type === 'one_off_bill') {
+      // Find bill by checkout session ID (most reliable)
+      const bill = await prisma.bills.findUnique({
+        where: { stripeCheckoutSessionId: session.id },
+      });
+
+      if (bill) {
+        // Update bill status to PAID
+        await prisma.bills.update({
+          where: { id: bill.id },
+          data: {
+            status: 'PAID',
+            updatedAt: new Date(),
+          },
+        });
+
+        console.log(`✅ Bill payment completed: Bill ${bill.id} set to PAID`);
+      } else {
+        console.warn(`⚠️ checkout.session.completed: Bill not found for session ${session.id}`);
+      }
       return;
     }
 
-    // Update company_hqs directly
-    await prisma.company_hqs.update({
-      where: { id: companyHQId },
-      data: {
-        planStatus: 'ACTIVE',
-        planId: planId, // Ensure planId is set
-        stripeSubscriptionId: session.subscription as string | null, // Set if subscription, null if one-time
-        planStartedAt: new Date(),
-        planEndedAt: null,
-      },
-    });
+    // Handle plan subscription payment
+    if (companyHQId && planId) {
+      // Update company_hqs directly
+      await prisma.company_hqs.update({
+        where: { id: companyHQId },
+        data: {
+          planStatus: 'ACTIVE',
+          planId: planId, // Ensure planId is set
+          stripeSubscriptionId: session.subscription as string | null, // Set if subscription, null if one-time
+          planStartedAt: new Date(),
+          planEndedAt: null,
+        },
+      });
 
-    if (session.subscription) {
-      console.log(`✅ Subscription checkout completed: Company ${companyHQId} set to ACTIVE with subscription ${session.subscription}`);
-    } else {
-      console.log(`✅ One-time payment completed: Company ${companyHQId} set to ACTIVE`);
+      if (session.subscription) {
+        console.log(`✅ Subscription checkout completed: Company ${companyHQId} set to ACTIVE with subscription ${session.subscription}`);
+      } else {
+        console.log(`✅ One-time payment completed: Company ${companyHQId} set to ACTIVE`);
+      }
+      return;
     }
+
+    console.warn('⚠️ checkout.session.completed: Missing required metadata (billId+type or companyHQId+planId)');
   } catch (error) {
     console.error('❌ Error handling checkout.session.completed:', error);
     throw error;
