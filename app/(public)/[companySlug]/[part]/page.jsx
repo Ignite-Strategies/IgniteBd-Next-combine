@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import BillContainer from '@/components/bill/BillContainer';
+import InvoiceBill from '@/components/bill/InvoiceBill';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import BillLoading from './loading';
@@ -32,7 +32,15 @@ async function BillPageContent({ companySlug, part, slug }) {
     const bill = await prisma.bills.findUnique({
       where: { slug },
       include: {
-        company_hqs: { select: { id: true, companyName: true } },
+        company_hqs: { 
+          select: { 
+            id: true, 
+            companyName: true,
+            companyStreet: true,
+            companyCity: true,
+            companyState: true,
+          } 
+        },
       },
     });
 
@@ -45,7 +53,15 @@ async function BillPageContent({ companySlug, part, slug }) {
       const billByUrl = await prisma.bills.findFirst({
         where: { publicBillUrl },
         include: {
-          company_hqs: { select: { id: true, companyName: true } },
+          company_hqs: { 
+            select: { 
+              id: true, 
+              companyName: true,
+              companyStreet: true,
+              companyCity: true,
+              companyState: true,
+            } 
+          },
         },
       });
       if (billByUrl) {
@@ -64,20 +80,23 @@ async function BillPageContent({ companySlug, part, slug }) {
           );
         }
         return (
-          <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-4">
-            <div className="mx-auto max-w-2xl w-full">
-              <BillContainer
-                companyName={billByUrl.company_hqs?.companyName}
-                bill={{
-                  id: billByUrl.id,
-                  name: billByUrl.name,
-                  description: billByUrl.description,
-                  amountCents: billByUrl.amountCents,
-                  currency: billByUrl.currency,
-                }}
-                checkoutUrl={billByUrl.checkoutUrl}
-              />
-            </div>
+          <div className="min-h-screen bg-gray-100 py-12 px-4">
+            <InvoiceBill
+              bill={{
+                id: billByUrl.id,
+                name: billByUrl.name,
+                description: billByUrl.description,
+                amountCents: billByUrl.amountCents,
+                currency: billByUrl.currency,
+              }}
+              checkoutUrl={billByUrl.checkoutUrl}
+              companyName={billByUrl.company_hqs?.companyName}
+              companyAddress={{
+                street: billByUrl.company_hqs?.companyStreet,
+                city: billByUrl.company_hqs?.companyCity,
+                state: billByUrl.company_hqs?.companyState,
+              }}
+            />
           </div>
         );
       }
@@ -98,20 +117,23 @@ async function BillPageContent({ companySlug, part, slug }) {
     }
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-4">
-        <div className="mx-auto max-w-2xl w-full">
-          <BillContainer
-            companyName={bill.company_hqs?.companyName}
-            bill={{
-              id: bill.id,
-              name: bill.name,
-              description: bill.description,
-              amountCents: bill.amountCents,
-              currency: bill.currency,
-            }}
-            checkoutUrl={bill.checkoutUrl}
-          />
-        </div>
+      <div className="min-h-screen bg-gray-100 py-12 px-4">
+        <InvoiceBill
+          bill={{
+            id: bill.id,
+            name: bill.name,
+            description: bill.description,
+            amountCents: bill.amountCents,
+            currency: bill.currency,
+          }}
+          checkoutUrl={bill.checkoutUrl}
+          companyName={bill.company_hqs?.companyName}
+          companyAddress={{
+            street: bill.company_hqs?.companyStreet,
+            city: bill.company_hqs?.companyCity,
+            state: bill.company_hqs?.companyState,
+          }}
+        />
       </div>
     );
   } catch (error) {
