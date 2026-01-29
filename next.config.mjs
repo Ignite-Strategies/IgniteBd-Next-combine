@@ -17,21 +17,8 @@ const nextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return [
-      {
-        // Rewrite bills.ignitegrowth.biz/company-slug/bill-id to /bill/company-slug/bill-id
-        source: '/:companySlug/:part',
-        destination: '/bill/:companySlug/:part',
-        has: [
-          {
-            type: 'host',
-            value: 'bills.ignitegrowth.biz',
-          },
-        ],
-      },
-    ];
-  },
+  // Removed rewrites - using direct route app/(public)/[companySlug]/[part]/page.jsx
+  // This route handles bills.ignitegrowth.biz/company-slug/bill-id directly
   webpack: (config, { isServer }) => {
     // Exclude Node.js-only packages from client-side bundles
     if (!isServer) {
