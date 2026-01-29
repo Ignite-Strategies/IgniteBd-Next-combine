@@ -1,13 +1,22 @@
 import { prisma } from '@/lib/prisma';
 import BillContainer from '@/components/bill/BillContainer';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 
 /**
- * Public bill page: /bill/[companySlug]/[part].
- * Dynamic URL: bill/companyname/billname-shortId.
- * Server Component - fetches data server-side, no useEffect, instant load.
+ * Root-level bill page for bills subdomain: /[companySlug]/[part]
+ * This handles bills.ignitegrowth.biz/company-slug/bill-id directly
+ * Falls back to /bill/[companySlug]/[part] route if not on bills subdomain
  */
-export default async function BillBySlugPage({ params }) {
+export default async function RootBillPage({ params }) {
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
+  
+  // Only handle bills subdomain at root level
+  if (!host.includes('bills.ignitegrowth.biz')) {
+    notFound();
+  }
+
   const { companySlug, part } = await params;
 
   if (!companySlug?.trim() || !part?.trim()) {
