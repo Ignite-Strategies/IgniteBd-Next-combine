@@ -24,27 +24,27 @@ model GoogleOAuthToken {
 }
 
 model MicrosoftAccount {
-  id                    String    @id @default(cuid())
-  ownerId               String
-  owner                 owners    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  
+  id      String @id @default(cuid())
+  ownerId String
+  owner   owners @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
   // Microsoft identity (can be different from owner.email!)
-  microsoftEmail        String
-  microsoftDisplayName  String?
-  microsoftTenantId     String?
-  
+  microsoftEmail       String
+  microsoftDisplayName String?
+  microsoftTenantId    String?
+
   // OAuth tokens
-  accessToken           String
-  refreshToken          String
-  expiresAt             DateTime?
-  
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime?
+
   // Metadata
-  connectedAt           DateTime  @default(now())
-  lastRefreshedAt       DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  
-  @@unique([ownerId])  // One Microsoft account per owner
+  connectedAt     DateTime  @default(now())
+  lastRefreshedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([ownerId]) // One Microsoft account per owner
   @@index([ownerId])
   @@index([microsoftEmail])
 }
@@ -335,6 +335,7 @@ model company_hqs {
   companyStreet                                 String?
   companyCity                                   String?
   companyState                                  String?
+  companyZip                                    String?
   companyWebsite                                String?
   whatYouDo                                     String?
   companyIndustry                               String?
@@ -349,7 +350,7 @@ model company_hqs {
   tier                                          String?
   stripeCustomerId                              String?                         @unique // Stripe customer ID (cus_...) - billing identity
   platformId                                    String? // Top-level platform container (temporarily optional for migration)
-  platform                                      platform?                        @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  platform                                      platform?                       @relation(fields: [platformId], references: [id], onDelete: Cascade)
   // Plan & Access (consolidated)
   planId                                        String? // FK → Plan.id (temporarily optional for migration)
   planStatus                                    PlatformAccessStatus? // ACTIVE, PAST_DUE, CANCELED
@@ -473,7 +474,7 @@ model Contact {
   country                                                   String?
   companyName                                               String?
   companyDomain                                             String?
-  positionType                                              String?  // "VP", "Director", "Manager", etc.
+  positionType                                              String? // "VP", "Director", "Manager", etc.
   contactCompanyId                                          String?
   howMet                                                    String?
   notes                                                     String?
@@ -498,10 +499,10 @@ model Contact {
   buyingPowerScore                                          Int?
   buyingTriggers                                            String[]                  @default([])
   careerMomentumScore                                       Int?
-  careerMomentum                                            String?  // "high" | "medium" | "low" (inferred from signals)
+  careerMomentum                                            String? // "high" | "medium" | "low" (inferred from signals)
   careerProgression                                         String?
   careerStabilityScore                                      Int?
-  whatTheyreLookingFor                                      String?  // Inferred: "growth", "stability", "opportunity", etc.
+  whatTheyreLookingFor                                      String? // Inferred: "growth", "stability", "opportunity", etc.
   careerTimeline                                            Json?
   companyId                                                 String?
   companyIndustry                                           String?
@@ -906,8 +907,8 @@ model invoices {
   stripeCheckoutSessionId String?
   stripePaymentIntentId   String?
   stripeCustomerId        String?
-  stripeInvoiceId         String?        @unique // Stripe invoice ID (in_...) for plan subscriptions
-  stripeSubscriptionId    String?        // Stripe subscription ID (sub_...) for plan subscriptions
+  stripeInvoiceId         String?   @unique // Stripe invoice ID (in_...) for plan subscriptions
+  stripeSubscriptionId    String? // Stripe subscription ID (sub_...) for plan subscriptions
 
   // Timestamps
   createdAt DateTime  @default(now())
@@ -1404,21 +1405,21 @@ model plans {
 
 // One-off billing (ONE_OFF_BILLING.md). Same shape as plans, no interval. Platform push.
 model bills {
-  id                      String                @id @default(cuid())
+  id                      String         @id @default(cuid())
   name                    String
   description             String?
   amountCents             Int
-  currency                String                 @default("usd")
-  companyId               String?                // FK → company_hqs.id (many bills → one company)
-  stripeCheckoutSessionId String?                @unique
+  currency                String         @default("usd")
+  companyId               String? // FK → company_hqs.id (many bills → one company)
+  stripeCheckoutSessionId String?        @unique
   checkoutUrl             String?
-  status                  BillSendStatus         @default(PENDING)
-  slug                    String?                @unique
+  status                  BillSendStatus @default(PENDING)
+  slug                    String?        @unique
   publicBillUrl           String?
-  paidAt                  DateTime?              // When payment was received (set by Stripe webhook)
-  createdAt               DateTime               @default(now())
-  updatedAt               DateTime               @updatedAt
-  company_hqs             company_hqs?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  paidAt                  DateTime? // When payment was received (set by Stripe webhook)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  company_hqs             company_hqs?   @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([status])

@@ -39,6 +39,7 @@ async function BillPageContent({ companySlug, part, slug }) {
             companyStreet: true,
             companyCity: true,
             companyState: true,
+            companyZip: true,
           } 
         },
       },
@@ -60,6 +61,7 @@ async function BillPageContent({ companySlug, part, slug }) {
               companyStreet: true,
               companyCity: true,
               companyState: true,
+              companyZip: true,
             } 
           },
         },
@@ -95,6 +97,7 @@ async function BillPageContent({ companySlug, part, slug }) {
                 street: billByUrl.company_hqs?.companyStreet,
                 city: billByUrl.company_hqs?.companyCity,
                 state: billByUrl.company_hqs?.companyState,
+                zip: billByUrl.company_hqs?.companyZip,
               }}
             />
           </div>
@@ -132,6 +135,7 @@ async function BillPageContent({ companySlug, part, slug }) {
             street: bill.company_hqs?.companyStreet,
             city: bill.company_hqs?.companyCity,
             state: bill.company_hqs?.companyState,
+            zip: bill.company_hqs?.companyZip,
           }}
         />
       </div>
