@@ -1,32 +1,16 @@
 import { NextResponse } from 'next/server';
 
 /**
- * Middleware to handle bills subdomain routing
- * Ensures bills.ignitegrowth.biz/company-slug/bill-id routes correctly
+ * Middleware for bills subdomain - minimal, just logs for debugging
+ * Route matching is handled by Next.js app router: app/(public)/[companySlug]/[part]/page.jsx
  */
 export function middleware(request) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get('host') || '';
 
-  // Only handle bills subdomain
+  // Log bills subdomain requests for debugging
   if (host.includes('bills.ignitegrowth.biz')) {
-    // Log for debugging
-    console.log(`🔍 Bills subdomain request: ${pathname} (host: ${host})`);
-    
-    // Path should be /company-slug/bill-id (two segments)
-    const pathSegments = pathname.split('/').filter(Boolean);
-    
-    // Allow bill routes to pass through to app/(public)/[companySlug]/[part]/page.jsx
-    if (pathSegments.length === 2 && !pathname.startsWith('/api/')) {
-      console.log(`✅ Allowing bill route: ${pathname}`);
-      return NextResponse.next();
-    }
-    
-    // Block other routes on bills subdomain (except API)
-    if (pathname !== '/' && !pathname.startsWith('/api/')) {
-      console.log(`❌ Blocking non-bill route on bills subdomain: ${pathname}`);
-      return NextResponse.rewrite(new URL('/not-found', request.url));
-    }
+    console.log(`🔍 [BILLS] ${pathname} (host: ${host})`);
   }
 
   return NextResponse.next();
