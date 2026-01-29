@@ -27,21 +27,7 @@ export async function GET(request: Request) {
 
     const bills = await prisma.bills.findMany({
       where,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        amountCents: true,
-        currency: true,
-        companyId: true,
-        stripeCheckoutSessionId: true,
-        checkoutUrl: true,
-        status: true,
-        slug: true,
-        publicBillUrl: true,
-        createdAt: true,
-        updatedAt: true,
-        // paidAt: true, // TODO: Uncomment after migration 20260128000002_add_paid_at_to_bills is deployed
+      include: {
         company_hqs: {
           select: { id: true, companyName: true },
         },
