@@ -72,7 +72,9 @@ export default function AppShell({ children }) {
   // Routes that should never show navigation or context header (even when authenticated)
   const PUBLIC_ROUTES = ['/'];
   // Public bill payment routes - standalone pages, no admin UI
+  // Check for both /bill/... and root-level bill routes (for bills subdomain)
   const BILL_ROUTES = ['/bill'];
+  const isRootBillRoute = pathname && /^\/[^\/]+\/[^\/]+$/.test(pathname) && pathname.split('/').length === 3;
   // Auth/onboarding/setup routes that shouldn't show context header
   const HIDE_CONTEXT_ROUTES = [
     '/welcome', 
@@ -85,7 +87,7 @@ export default function AppShell({ children }) {
     '/owner-identity-survey',
   ];
   const isPublicRoute = pathname && PUBLIC_ROUTES.includes(pathname);
-  const isBillRoute = pathname && BILL_ROUTES.some(route => pathname.startsWith(route));
+  const isBillRoute = pathname && (BILL_ROUTES.some(route => pathname.startsWith(route)) || isRootBillRoute);
   const shouldHideContext = pathname && HIDE_CONTEXT_ROUTES.some(route => pathname.startsWith(route));
 
   // Show navigation when authenticated, but not on public routes like splash or bill pages

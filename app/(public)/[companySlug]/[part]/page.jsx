@@ -1,22 +1,16 @@
 import { prisma } from '@/lib/prisma';
 import BillContainer from '@/components/bill/BillContainer';
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
+import { Suspense } from 'react';
+import BillLoading from './loading';
 
 /**
- * Root-level bill page for bills subdomain: /[companySlug]/[part]
+ * Public bill page for bills subdomain: /[companySlug]/[part]
  * This handles bills.ignitegrowth.biz/company-slug/bill-id directly
- * Falls back to /bill/[companySlug]/[part] route if not on bills subdomain
+ * Server Component - fetches data server-side, no auth, no AppShell, no client-side collision
+ * Completely standalone bill container
  */
 export default async function RootBillPage({ params }) {
-  const headersList = await headers();
-  const host = headersList.get('host') || '';
-  
-  // Only handle bills subdomain at root level
-  if (!host.includes('bills.ignitegrowth.biz')) {
-    notFound();
-  }
-
   const { companySlug, part } = await params;
 
   if (!companySlug?.trim() || !part?.trim()) {
@@ -25,6 +19,14 @@ export default async function RootBillPage({ params }) {
 
   const slug = `${companySlug.trim()}/${part.trim()}`;
 
+  return (
+    <Suspense fallback={<BillLoading />}>
+      <BillPageContent companySlug={companySlug} part={part} slug={slug} />
+    </Suspense>
+  );
+}
+
+async function BillPageContent({ companySlug, part, slug }) {
   try {
     // Fetch bill directly from database (server-side, no API call needed)
     const bill = await prisma.bills.findUnique({
