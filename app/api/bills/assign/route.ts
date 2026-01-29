@@ -5,8 +5,9 @@ import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
 import { getOrCreateStripeCustomer } from '@/lib/stripe/customer';
 import { generateBillSlug } from '@/lib/billSlug';
 
-// Payment URLs always use app.ignitegrowth.biz (public-facing app, not platform manager)
-const BASE_URL = 'https://app.ignitegrowth.biz';
+// Payment URLs: Use bills subdomain for cleaner URLs, fallback to app domain
+const BILLS_DOMAIN = process.env.BILLS_DOMAIN || 'bills.ignitegrowth.biz';
+const APP_DOMAIN = 'https://app.ignitegrowth.biz';
 
 /**
  * POST /api/bills/assign
@@ -28,8 +29,8 @@ export async function POST(request: Request) {
     const {
       billId,
       companyId,
-      successUrl = `${BASE_URL}/bill-paid`,
-      cancelUrl = `${BASE_URL}/bill-canceled`,
+      successUrl = `${APP_DOMAIN}/bill-paid`,
+      cancelUrl = `${APP_DOMAIN}/bill-canceled`,
     } = body ?? {};
 
     if (!billId || !companyId) {
@@ -140,7 +141,9 @@ export async function POST(request: Request) {
       existingBill.name,
       existingBill.id
     );
-    const publicBillUrl = `${BASE_URL}/bill/${companySlug}/${part}`;
+    // Use bills subdomain with cleaner URL format (no /bill/ prefix)
+    // Rewrites in next.config.mjs handle routing: bills.ignitegrowth.biz/company-slug/bill-id → /bill/company-slug/bill-id
+    const publicBillUrl = `https://${BILLS_DOMAIN}/${companySlug}/${part}`;
 
     // UPDATE BILL DIRECTLY - SET companyId AND URL FIELDS
     console.log(`[ASSIGN] Updating bill: billId=${billId}, companyId=${companyId}`);

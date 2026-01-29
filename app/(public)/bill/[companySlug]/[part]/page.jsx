@@ -31,10 +31,10 @@ export default async function BillBySlugPage({ params }) {
 
     if (bill.status !== 'PENDING') {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-center">
-            <h1 className="text-xl font-semibold text-gray-900">Bill no longer available</h1>
-            <p className="mt-2 text-gray-600">
+        <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-4">
+          <div className="max-w-md mx-auto text-center space-y-4 bg-white/10 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
+            <h1 className="text-2xl font-bold text-white">Bill no longer available</h1>
+            <p className="text-white/80">
               This bill is no longer available for payment. Status: {bill.status}
             </p>
           </div>
@@ -43,8 +43,8 @@ export default async function BillBySlugPage({ params }) {
     }
 
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="mx-auto max-w-2xl">
+      <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-4">
+        <div className="mx-auto max-w-2xl w-full">
           <BillContainer
             companyName={bill.company_hqs?.companyName}
             bill={{
