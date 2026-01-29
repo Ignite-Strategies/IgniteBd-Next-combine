@@ -18,8 +18,11 @@ export default function PublicLayout({ children }) {
     /^\/[^\/]+\/[^\/]+$/.test(pathname) // Matches /company-slug/bill-id pattern
   );
 
-  // Bill routes: NO AppShell, NO Providers, just pure content
-  if (isBillRoute) {
+  // Check if this is the tutorial route (has its own header)
+  const isTutorialRoute = pathname && pathname.startsWith('/tutorial');
+
+  // Bill routes and tutorial: NO AppShell, NO Providers, just pure content
+  if (isBillRoute || isTutorialRoute) {
     return <>{children}</>;
   }
 
