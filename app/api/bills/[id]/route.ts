@@ -61,7 +61,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, description, amountCents, currency } = body;
+    const { name, description, amountCents, currency, status, paidAt } = body;
 
     const existing = await prisma.bills.findUnique({ where: { id } });
     if (!existing) {
@@ -80,17 +80,32 @@ export async function PUT(
         { status: 400 }
       );
     }
+    if (status !== undefined && !['PENDING', 'PAID', 'EXPIRED'].includes(status)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid status. Must be PENDING, PAID, or EXPIRED' },
+        { status: 400 }
+      );
+    }
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = String(name).trim();
+    if (description !== undefined) {
+      updateData.description = description != null ? String(description).trim() || null : null;
+    }
+    if (amountCents !== undefined) updateData.amountCents = Math.round(Number(amountCents));
+    if (currency !== undefined) updateData.currency = String(currency).toLowerCase();
+    if (status !== undefined) updateData.status = status;
+    if (paidAt !== undefined) {
+      // If setting status to PAID and paidAt is provided, use it; otherwise use current time
+      updateData.paidAt = paidAt ? new Date(paidAt) : new Date();
+    } else if (status === 'PAID' && !existing.paidAt) {
+      // If marking as PAID and no paidAt provided, set to now
+      updateData.paidAt = new Date();
+    }
 
     const bill = await prisma.bills.update({
       where: { id },
-      data: {
-        ...(name !== undefined && { name: String(name).trim() }),
-        ...(description !== undefined && {
-          description: description != null ? String(description).trim() || null : null,
-        }),
-        ...(amountCents !== undefined && { amountCents: Math.round(Number(amountCents)) }),
-        ...(currency !== undefined && { currency: String(currency).toLowerCase() }),
-      },
+      data: updateData,
     });
 
     return NextResponse.json({ success: true, bill });
