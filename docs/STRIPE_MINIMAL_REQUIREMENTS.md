@@ -29,7 +29,7 @@ Stripe only requires **3 things** to create a checkout session:
   // OPTIONAL (but we include them)
   mode: 'payment',              // Optional - defaults to 'payment'
   customer: 'cus_xxx',         // Optional - links payment to customer
-  expires_at: 1234567890,      // Optional - defaults to 24 hours
+  // expires_at: REMOVED - Stripe defaults to 24 hours, we don't need it
   metadata: {                   // Optional - just for our tracking
     billId: 'xxx',
     companyId: 'xxx',
@@ -37,6 +37,12 @@ Stripe only requires **3 things** to create a checkout session:
   },
 }
 ```
+
+**Note:** We removed `expires_at` because:
+- Stripe defaults to 24 hours automatically
+- It's not required
+- We were setting it wrong (7 days > 24 hour limit) and causing errors
+- Since we create new sessions on each page load, expiration doesn't matter anyway
 
 ## What Could Go Wrong?
 
