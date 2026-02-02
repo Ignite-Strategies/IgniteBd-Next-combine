@@ -55,9 +55,9 @@ export async function createBillCheckoutSession({
   const customerId = await getOrCreateStripeCustomer(company);
   console.log('[STRIPE_CHECKOUT] Customer ID:', customerId);
 
-  // Set expiration to 7 days (Stripe's maximum)
+  // Set expiration to 24 hours (Stripe's maximum)
   // Note: Expiration doesn't matter for correctness - we create new sessions on each page load
-  const expiresAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days in seconds
+  const expiresAt = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 24 hours in seconds
 
   const sessionParams = {
     mode: 'payment' as const,
