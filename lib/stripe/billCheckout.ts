@@ -90,6 +90,8 @@ export async function createBillCheckoutSession({
     customer: sessionParams.customer,
     amountCents: sessionParams.line_items[0].price_data.unit_amount,
     currency: sessionParams.line_items[0].price_data.currency,
+    expires_at: sessionParams.expires_at, // CRITICAL: Log expiration to catch issues
+    expires_at_hours: Math.floor((sessionParams.expires_at - Math.floor(Date.now() / 1000)) / 3600), // Hours until expiration
   });
 
   const session = await stripe.checkout.sessions.create(sessionParams);
