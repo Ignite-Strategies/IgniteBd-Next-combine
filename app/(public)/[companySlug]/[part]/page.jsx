@@ -38,6 +38,7 @@ export default async function RootBillPage({ params }) {
 async function BillPageContent({ companySlug, part, slug }) {
   try {
     // Fetch bill directly from database (server-side, no API call needed)
+    // CRITICAL: Must include company_hqs relationship to get stripeCustomerId
     const bill = await prisma.bills.findUnique({
       where: { slug },
       include: {
@@ -45,7 +46,7 @@ async function BillPageContent({ companySlug, part, slug }) {
           select: { 
             id: true, 
             companyName: true,
-            stripeCustomerId: true,
+            stripeCustomerId: true,  // ← REQUIRED for Stripe API call
             companyStreet: true,
             companyCity: true,
             companyState: true,
@@ -54,6 +55,15 @@ async function BillPageContent({ companySlug, part, slug }) {
         },
       },
     });
+    
+    // Debug: Verify relationship loaded
+    if (bill && bill.companyId && !bill.company_hqs) {
+      console.error('[BILL_PAGE] ⚠️ CRITICAL: companyId set but company_hqs relationship is NULL!', {
+        billId: bill.id,
+        companyId: bill.companyId,
+        slug: bill.slug,
+      });
+    }
 
     if (!bill) {
       // Log for debugging - check if slug matches
