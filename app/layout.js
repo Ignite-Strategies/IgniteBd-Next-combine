@@ -8,6 +8,7 @@ const geistSans = Geist({
   subsets: ["latin"],
   display: "swap",
   preload: true,
+  adjustFontFallback: false, // Prevent fallback font preloading to avoid warnings
 });
 
 const geistMono = Geist_Mono({
@@ -16,6 +17,7 @@ const geistMono = Geist_Mono({
   display: "swap",
   preload: false, // Only preload the main font
   adjustFontFallback: false, // Prevent font fallback preloading
+  fallback: ['monospace'], // Use system fallback instead of preloading
 });
 
 export const metadata = {
