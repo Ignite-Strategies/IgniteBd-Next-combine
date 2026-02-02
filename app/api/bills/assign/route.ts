@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
 import { getOrCreateStripeCustomer } from '@/lib/stripe/customer';
 import { generateBillSlug } from '@/lib/billSlug';
+
+// IMPORTANT:
+// Bills are durable DB objects.
+// Stripe Checkout Sessions are ephemeral payment windows.
+// We intentionally create a new Checkout Session per page load
+// and never store or reuse session IDs.
 
 // Payment URLs: Use bills subdomain for cleaner URLs, fallback to app domain
 const BILLS_DOMAIN = process.env.BILLS_DOMAIN || 'bills.ignitegrowth.biz';
@@ -54,7 +59,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Bill not found' }, { status: 404 });
     }
 
-    // If bill already assigned to this company, return existing
+    // If bill already assigned to this company, return success
+    // Note: We don't create/store checkout sessions here - they're created on bill page load
     if (existingBill.companyId === companyId && existingBill.publicBillUrl) {
       return NextResponse.json({
         success: true,
@@ -63,10 +69,9 @@ export async function POST(request: Request) {
         companyName: existingBill.company_hqs?.companyName,
         status: existingBill.status,
         publicBillUrl: existingBill.publicBillUrl,
-        checkoutUrl: existingBill.checkoutUrl,
         slug: existingBill.slug,
         createdAt: existingBill.createdAt,
-        message: 'Bill already assigned. Payment URL available.',
+        message: 'Bill already assigned. Payment URL available at publicBillUrl.',
       });
     }
 
@@ -115,26 +120,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // NOW create Stripe Checkout session (after validation)
-    const session = await createBillCheckoutSession({
-      bill: {
-        id: existingBill.id,
-        name: existingBill.name,
-        description: existingBill.description,
-        amountCents: existingBill.amountCents,
-        currency: existingBill.currency,
-      },
-      company: {
-        id: companyWithStripe.id,
-        companyName: companyWithStripe.companyName,
-        stripeCustomerId: companyWithStripe.stripeCustomerId,
-      },
-      successUrl,
-      cancelUrl,
-    });
-
-    const checkoutUrl = session.url ?? null;
-
     // Generate slug and public URL (use bill.id instead of assignment.id)
     const { slug, companySlug, part } = generateBillSlug(
       company.companyName,
@@ -146,16 +131,18 @@ export async function POST(request: Request) {
     const publicBillUrl = `https://${BILLS_DOMAIN}/${companySlug}/${part}`;
 
     // UPDATE BILL DIRECTLY - SET companyId AND URL FIELDS
+    // Note: We do NOT create/store Stripe checkout sessions here - they're created on bill page load
     console.log(`[ASSIGN] Updating bill: billId=${billId}, companyId=${companyId}`);
     const updated = await prisma.bills.update({
       where: { id: billId },
       data: {
         companyId,
-        stripeCheckoutSessionId: session.id,
-        checkoutUrl,
         status: 'PENDING',
         slug,
         publicBillUrl,
+        // Explicitly clear any old session data - sessions are ephemeral
+        stripeCheckoutSessionId: null,
+        checkoutUrl: null,
       },
       include: {
         company_hqs: {
@@ -165,7 +152,8 @@ export async function POST(request: Request) {
     });
     console.log(`[ASSIGN] ✅ Bill updated: companyId=${updated.companyId}, publicBillUrl=${updated.publicBillUrl}`);
 
-    // Return the updated bill with URL
+    // Return the updated bill with public URL
+    // Checkout sessions are created on-demand when the bill page loads
     return NextResponse.json({
       success: true,
       billId: updated.id,
@@ -173,10 +161,9 @@ export async function POST(request: Request) {
       companyName: updated.company_hqs?.companyName,
       status: updated.status,
       publicBillUrl: updated.publicBillUrl,
-      checkoutUrl: updated.checkoutUrl,
       slug: updated.slug,
       createdAt: updated.createdAt,
-      message: 'Bill assigned and payment URL generated.',
+      message: 'Bill assigned. Payment URL available at publicBillUrl.',
     });
   } catch (e) {
     console.error('❌ POST /api/bills/assign:', e);

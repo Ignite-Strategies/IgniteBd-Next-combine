@@ -107,25 +107,29 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
     // Handle one-off bill payment
     if (billId && type === 'one_off_bill') {
-      // Find bill by checkout session ID (most reliable)
+      // Find bill by billId from metadata (sessions are ephemeral, bills are durable)
       const bill = await prisma.bills.findUnique({
-        where: { stripeCheckoutSessionId: session.id },
+        where: { id: billId },
       });
 
       if (bill) {
-        // Update bill status to PAID and set paidAt timestamp
-        await prisma.bills.update({
-          where: { id: bill.id },
-          data: {
-            status: 'PAID',
-            paidAt: new Date(), // Capture payment timestamp
-            updatedAt: new Date(),
-          },
-        });
+        // Only update if bill is still PENDING (idempotent - safe to receive duplicate webhooks)
+        if (bill.status === 'PENDING') {
+          await prisma.bills.update({
+            where: { id: bill.id },
+            data: {
+              status: 'PAID',
+              paidAt: new Date(), // Capture payment timestamp
+              updatedAt: new Date(),
+            },
+          });
 
-        console.log(`✅ Bill payment completed: Bill ${bill.id} set to PAID at ${new Date().toISOString()}`);
+          console.log(`✅ Bill payment completed: Bill ${bill.id} set to PAID at ${new Date().toISOString()}`);
+        } else {
+          console.log(`ℹ️ Bill ${bill.id} already marked as ${bill.status}, skipping update (idempotent)`);
+        }
       } else {
-        console.warn(`⚠️ checkout.session.completed: Bill not found for session ${session.id}`);
+        console.warn(`⚠️ checkout.session.completed: Bill not found for billId ${billId}`);
       }
       return;
     }

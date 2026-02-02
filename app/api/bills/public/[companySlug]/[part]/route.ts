@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
+
+const APP_DOMAIN = 'https://app.ignitegrowth.biz';
+
+// IMPORTANT:
+// Bills are durable DB objects.
+// Stripe Checkout Sessions are ephemeral payment windows.
+// We intentionally create a new Checkout Session per request
+// and never store or reuse session IDs.
 
 /**
  * GET /api/bills/public/[companySlug]/[part]
@@ -38,6 +47,33 @@ export async function GET(
       );
     }
 
+    // Always create a fresh Stripe Checkout Session
+    let checkoutUrl: string | null = null;
+    if (bill.company_hqs && bill.companyId) {
+      try {
+        const session = await createBillCheckoutSession({
+          bill: {
+            id: bill.id,
+            name: bill.name,
+            description: bill.description,
+            amountCents: bill.amountCents,
+            currency: bill.currency,
+          },
+          company: {
+            id: bill.company_hqs.id,
+            companyName: bill.company_hqs.companyName,
+            stripeCustomerId: bill.company_hqs.stripeCustomerId,
+          },
+          successUrl: `${APP_DOMAIN}/bill-paid`,
+          cancelUrl: `${APP_DOMAIN}/bill-canceled`,
+        });
+        checkoutUrl = session.url;
+      } catch (error) {
+        console.error('❌ Error creating checkout session:', error);
+        // Continue without checkoutUrl - client can retry
+      }
+    }
+
     return NextResponse.json({
       success: true,
       bill: {
@@ -51,7 +87,7 @@ export async function GET(
         id: bill.company_hqs.id,
         companyName: bill.company_hqs.companyName,
       } : null,
-      checkoutUrl: bill.checkoutUrl,
+      checkoutUrl,
       publicBillUrl: bill.publicBillUrl,
     });
   } catch (e) {

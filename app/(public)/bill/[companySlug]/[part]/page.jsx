@@ -1,6 +1,15 @@
 import { prisma } from '@/lib/prisma';
 import BillContainer from '@/components/bill/BillContainer';
 import { notFound } from 'next/navigation';
+import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
+
+const APP_DOMAIN = 'https://app.ignitegrowth.biz';
+
+// IMPORTANT:
+// Bills are durable DB objects.
+// Stripe Checkout Sessions are ephemeral payment windows.
+// We intentionally create a new Checkout Session per page load
+// and never store or reuse session IDs.
 
 /**
  * Public bill page: /bill/[companySlug]/[part].
@@ -21,7 +30,13 @@ export default async function BillBySlugPage({ params }) {
     const bill = await prisma.bills.findUnique({
       where: { slug },
       include: {
-        company_hqs: { select: { id: true, companyName: true } },
+        company_hqs: { 
+          select: { 
+            id: true, 
+            companyName: true,
+            stripeCustomerId: true,
+          } 
+        },
       },
     });
 
@@ -34,7 +49,13 @@ export default async function BillBySlugPage({ params }) {
       const billByUrl = await prisma.bills.findFirst({
         where: { publicBillUrl },
         include: {
-          company_hqs: { select: { id: true, companyName: true } },
+          company_hqs: { 
+            select: { 
+              id: true, 
+              companyName: true,
+              stripeCustomerId: true,
+            } 
+          },
         },
       });
       if (billByUrl) {
@@ -52,6 +73,33 @@ export default async function BillBySlugPage({ params }) {
             </div>
           );
         }
+
+        // Always create a fresh Stripe Checkout Session on page load
+        let checkoutUrlByUrl: string | null = null;
+        if (billByUrl.company_hqs && billByUrl.companyId) {
+          try {
+            const session = await createBillCheckoutSession({
+              bill: {
+                id: billByUrl.id,
+                name: billByUrl.name,
+                description: billByUrl.description,
+                amountCents: billByUrl.amountCents,
+                currency: billByUrl.currency,
+              },
+              company: {
+                id: billByUrl.company_hqs.id,
+                companyName: billByUrl.company_hqs.companyName,
+                stripeCustomerId: billByUrl.company_hqs.stripeCustomerId,
+              },
+              successUrl: `${APP_DOMAIN}/bill-paid`,
+              cancelUrl: `${APP_DOMAIN}/bill-canceled`,
+            });
+            checkoutUrlByUrl = session.url;
+          } catch (error) {
+            console.error('❌ Error creating checkout session:', error);
+          }
+        }
+
         return (
           <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-4">
             <div className="mx-auto max-w-2xl w-full">
@@ -64,7 +112,7 @@ export default async function BillBySlugPage({ params }) {
                   amountCents: billByUrl.amountCents,
                   currency: billByUrl.currency,
                 }}
-                checkoutUrl={billByUrl.checkoutUrl}
+                checkoutUrl={checkoutUrlByUrl}
               />
             </div>
           </div>
@@ -86,6 +134,32 @@ export default async function BillBySlugPage({ params }) {
       );
     }
 
+    // Always create a fresh Stripe Checkout Session on page load
+    let checkoutUrl: string | null = null;
+    if (bill.company_hqs && bill.companyId) {
+      try {
+        const session = await createBillCheckoutSession({
+          bill: {
+            id: bill.id,
+            name: bill.name,
+            description: bill.description,
+            amountCents: bill.amountCents,
+            currency: bill.currency,
+          },
+          company: {
+            id: bill.company_hqs.id,
+            companyName: bill.company_hqs.companyName,
+            stripeCustomerId: bill.company_hqs.stripeCustomerId,
+          },
+          successUrl: `${APP_DOMAIN}/bill-paid`,
+          cancelUrl: `${APP_DOMAIN}/bill-canceled`,
+        });
+        checkoutUrl = session.url;
+      } catch (error) {
+        console.error('❌ Error creating checkout session:', error);
+      }
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center p-4">
         <div className="mx-auto max-w-2xl w-full">
@@ -98,7 +172,7 @@ export default async function BillBySlugPage({ params }) {
               amountCents: bill.amountCents,
               currency: bill.currency,
             }}
-            checkoutUrl={bill.checkoutUrl}
+            checkoutUrl={checkoutUrl}
           />
         </div>
       </div>

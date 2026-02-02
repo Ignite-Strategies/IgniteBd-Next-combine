@@ -35,13 +35,13 @@ export async function GET(
     }
 
     // If bill has companyId, return that company
+    // Note: checkoutUrl is not returned - sessions are created on-demand when loading bill page
     if (bill.companyId && bill.company_hqs) {
       const company = {
         billId: bill.id,
         companyId: bill.companyId,
         companyName: bill.company_hqs.companyName,
         status: bill.status,
-        checkoutUrl: bill.checkoutUrl,
         publicBillUrl: bill.publicBillUrl,
         slug: bill.slug,
         createdAt: bill.createdAt,

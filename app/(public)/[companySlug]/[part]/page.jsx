@@ -3,6 +3,15 @@ import InvoiceBill from '@/components/bill/InvoiceBill';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import BillLoading from './loading';
+import { createBillCheckoutSession } from '@/lib/stripe/billCheckout';
+
+const APP_DOMAIN = 'https://app.ignitegrowth.biz';
+
+// IMPORTANT:
+// Bills are durable DB objects.
+// Stripe Checkout Sessions are ephemeral payment windows.
+// We intentionally create a new Checkout Session per page load
+// and never store or reuse session IDs.
 
 /**
  * Public bill page for bills subdomain: /[companySlug]/[part]
@@ -36,6 +45,7 @@ async function BillPageContent({ companySlug, part, slug }) {
           select: { 
             id: true, 
             companyName: true,
+            stripeCustomerId: true,
             companyStreet: true,
             companyCity: true,
             companyState: true,
@@ -58,6 +68,7 @@ async function BillPageContent({ companySlug, part, slug }) {
             select: { 
               id: true, 
               companyName: true,
+              stripeCustomerId: true,
               companyStreet: true,
               companyCity: true,
               companyState: true,
@@ -81,6 +92,38 @@ async function BillPageContent({ companySlug, part, slug }) {
             </div>
           );
         }
+
+        // Always create a fresh Stripe Checkout Session on page load
+        // Sessions are ephemeral - never stored or reused
+        let checkoutUrlByUrl: string | null = null;
+
+        if (billByUrl.company_hqs && billByUrl.companyId) {
+          try {
+            const session = await createBillCheckoutSession({
+              bill: {
+                id: billByUrl.id,
+                name: billByUrl.name,
+                description: billByUrl.description,
+                amountCents: billByUrl.amountCents,
+                currency: billByUrl.currency,
+              },
+              company: {
+                id: billByUrl.company_hqs.id,
+                companyName: billByUrl.company_hqs.companyName,
+                stripeCustomerId: billByUrl.company_hqs.stripeCustomerId,
+              },
+              successUrl: `${APP_DOMAIN}/bill-paid`,
+              cancelUrl: `${APP_DOMAIN}/bill-canceled`,
+            });
+
+            checkoutUrlByUrl = session.url;
+          } catch (error) {
+            console.error('❌ Error creating checkout session:', error);
+            // If session creation fails, we can't show payment button
+            // But we still show the bill details
+          }
+        }
+
         return (
           <div className="min-h-screen bg-gray-100 py-12 px-4">
             <InvoiceBill
@@ -91,7 +134,7 @@ async function BillPageContent({ companySlug, part, slug }) {
                 amountCents: billByUrl.amountCents,
                 currency: billByUrl.currency,
               }}
-              checkoutUrl={billByUrl.checkoutUrl}
+              checkoutUrl={checkoutUrlByUrl}
               companyName={billByUrl.company_hqs?.companyName}
               companyAddress={{
                 street: billByUrl.company_hqs?.companyStreet,
@@ -119,6 +162,37 @@ async function BillPageContent({ companySlug, part, slug }) {
       );
     }
 
+    // Always create a fresh Stripe Checkout Session on page load
+    // Sessions are ephemeral - never stored or reused
+    let checkoutUrl: string | null = null;
+
+    if (bill.company_hqs && bill.companyId) {
+      try {
+        const session = await createBillCheckoutSession({
+          bill: {
+            id: bill.id,
+            name: bill.name,
+            description: bill.description,
+            amountCents: bill.amountCents,
+            currency: bill.currency,
+          },
+          company: {
+            id: bill.company_hqs.id,
+            companyName: bill.company_hqs.companyName,
+            stripeCustomerId: bill.company_hqs.stripeCustomerId,
+          },
+          successUrl: `${APP_DOMAIN}/bill-paid`,
+          cancelUrl: `${APP_DOMAIN}/bill-canceled`,
+        });
+
+        checkoutUrl = session.url;
+      } catch (error) {
+        console.error('❌ Error creating checkout session:', error);
+        // If session creation fails, we can't show payment button
+        // But we still show the bill details
+      }
+    }
+
     return (
       <div className="min-h-screen bg-gray-100 py-12 px-4">
         <InvoiceBill
@@ -129,7 +203,7 @@ async function BillPageContent({ companySlug, part, slug }) {
             amountCents: bill.amountCents,
             currency: bill.currency,
           }}
-          checkoutUrl={bill.checkoutUrl}
+          checkoutUrl={checkoutUrl}
           companyName={bill.company_hqs?.companyName}
           companyAddress={{
             street: bill.company_hqs?.companyStreet,

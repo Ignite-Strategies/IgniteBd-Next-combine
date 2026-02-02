@@ -6,7 +6,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * GET /api/bills/pending-for-company?companyId=xxx
  *
  * MANY-TO-ONE: List pending bills for this company (bills.companyId = companyId).
- * Returns PENDING bills with checkout URLs so user can pay if they lost the email link.
+ * Returns PENDING bills with publicBillUrl - checkout sessions are created on-demand when loading bill page.
  */
 export async function GET(request: Request) {
   try {
@@ -30,15 +30,15 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Note: checkoutUrl is not stored - sessions are created on-demand when loading bill page
     const items = pending
-      .filter((b) => b.checkoutUrl)
+      .filter((b) => b.publicBillUrl) // Only return bills that have been assigned (have publicBillUrl)
       .map((b) => ({
         billId: b.id,
         billName: b.name,
         description: b.description,
         amountCents: b.amountCents,
         currency: b.currency,
-        checkoutUrl: b.checkoutUrl,
         publicBillUrl: b.publicBillUrl,
         createdAt: b.createdAt,
       }));
