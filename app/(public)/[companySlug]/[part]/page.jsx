@@ -117,11 +117,23 @@ async function BillPageContent({ companySlug, part, slug }) {
             });
 
             checkoutUrlByUrl = session.url;
+            
+            if (!checkoutUrlByUrl) {
+              console.error('❌ Stripe session created but URL is null:', session.id);
+            }
           } catch (error) {
             console.error('❌ Error creating checkout session:', error);
-            // If session creation fails, we can't show payment button
-            // But we still show the bill details
+            console.error('   Bill ID:', billByUrl.id);
+            console.error('   Company ID:', billByUrl.companyId);
+            console.error('   Company Name:', billByUrl.company_hqs?.companyName);
+            console.error('   Stripe Customer ID:', billByUrl.company_hqs?.stripeCustomerId);
           }
+        } else {
+          console.warn('⚠️ Cannot create checkout session - missing company_hqs or companyId:', {
+            hasCompanyHqs: !!billByUrl.company_hqs,
+            companyId: billByUrl.companyId,
+          });
+        }
         }
 
         return (
@@ -186,11 +198,24 @@ async function BillPageContent({ companySlug, part, slug }) {
         });
 
         checkoutUrl = session.url;
+        
+        if (!checkoutUrl) {
+          console.error('❌ Stripe session created but URL is null:', session.id);
+        }
       } catch (error) {
         console.error('❌ Error creating checkout session:', error);
+        console.error('   Bill ID:', bill.id);
+        console.error('   Company ID:', bill.companyId);
+        console.error('   Company Name:', bill.company_hqs?.companyName);
+        console.error('   Stripe Customer ID:', bill.company_hqs?.stripeCustomerId);
         // If session creation fails, we can't show payment button
         // But we still show the bill details
       }
+    } else {
+      console.warn('⚠️ Cannot create checkout session - missing company_hqs or companyId:', {
+        hasCompanyHqs: !!bill.company_hqs,
+        companyId: bill.companyId,
+      });
     }
 
     return (
