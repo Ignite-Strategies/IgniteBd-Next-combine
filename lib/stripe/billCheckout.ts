@@ -55,10 +55,9 @@ export async function createBillCheckoutSession({
   const customerId = await getOrCreateStripeCustomer(company);
   console.log('[STRIPE_CHECKOUT] Customer ID:', customerId);
 
-  // Set expiration to 24 hours (Stripe's maximum)
-  // Note: Expiration doesn't matter for correctness - we create new sessions on each page load
-  const expiresAt = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 24 hours in seconds
-
+  // MINIMAL: Only pass what Stripe actually needs
+  // Stripe defaults to 24 hours expiration - we don't need to set it
+  // Since we create new sessions on each page load, expiration doesn't matter anyway
   const sessionParams = {
     mode: 'payment' as const,
     customer: customerId,
@@ -77,7 +76,7 @@ export async function createBillCheckoutSession({
     ],
     success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: cancelUrl,
-    expires_at: expiresAt,
+    // expires_at: REMOVED - Stripe defaults to 24 hours, we don't need to set it
     metadata: {
       billId: bill.id,
       companyId: company.id,
@@ -90,8 +89,7 @@ export async function createBillCheckoutSession({
     customer: sessionParams.customer,
     amountCents: sessionParams.line_items[0].price_data.unit_amount,
     currency: sessionParams.line_items[0].price_data.currency,
-    expires_at: sessionParams.expires_at, // CRITICAL: Log expiration to catch issues
-    expires_at_hours: Math.floor((sessionParams.expires_at - Math.floor(Date.now() / 1000)) / 3600), // Hours until expiration
+    // expires_at: Not set - Stripe will use default (24 hours)
   });
 
   const session = await stripe.checkout.sessions.create(sessionParams);
