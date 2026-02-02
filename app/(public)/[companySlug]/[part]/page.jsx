@@ -215,6 +215,29 @@ async function BillPageContent({ companySlug, part, slug }) {
       companyName: bill.company_hqs?.companyName,
       stripeCustomerId: bill.company_hqs?.stripeCustomerId,
     });
+    
+    // CRITICAL CHECK: Verify companyId matches company_hqs.id
+    if (bill.companyId && bill.company_hqs) {
+      const idsMatch = bill.companyId === bill.company_hqs.id;
+      console.log('[BILL_PAGE] Company ID match check:', {
+        billCompanyId: bill.companyId,
+        companyHqsId: bill.company_hqs.id,
+        idsMatch,
+      });
+      if (!idsMatch) {
+        console.error('[BILL_PAGE] ⚠️ MISMATCH: bill.companyId does not match company_hqs.id!', {
+          billCompanyId: bill.companyId,
+          companyHqsId: bill.company_hqs.id,
+        });
+      }
+    } else if (bill.companyId && !bill.company_hqs) {
+      console.error('[BILL_PAGE] ⚠️ CRITICAL: bill.companyId is set but company_hqs relationship is NULL!', {
+        billId: bill.id,
+        billCompanyId: bill.companyId,
+        expectedCompanyId: '24beffe1-6ada-4442-b90b-7e3ad8a2ec7d', // From user's company record
+        doesItMatch: bill.companyId === '24beffe1-6ada-4442-b90b-7e3ad8a2ec7d',
+      });
+    }
 
     if (bill.company_hqs && bill.companyId) {
       try {
