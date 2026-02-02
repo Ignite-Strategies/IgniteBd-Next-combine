@@ -75,7 +75,7 @@ export default async function BillBySlugPage({ params }) {
         }
 
         // Always create a fresh Stripe Checkout Session on page load
-        let checkoutUrlByUrl: string | null = null;
+        let checkoutUrlByUrl = null;
         if (billByUrl.company_hqs && billByUrl.companyId) {
           try {
             const session = await createBillCheckoutSession({
@@ -135,7 +135,7 @@ export default async function BillBySlugPage({ params }) {
     }
 
     // Always create a fresh Stripe Checkout Session on page load
-    let checkoutUrl: string | null = null;
+    let checkoutUrl = null;
     if (bill.company_hqs && bill.companyId) {
       try {
         const session = await createBillCheckoutSession({

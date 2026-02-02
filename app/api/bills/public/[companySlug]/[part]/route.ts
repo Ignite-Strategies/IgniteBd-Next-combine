@@ -48,7 +48,7 @@ export async function GET(
     }
 
     // Always create a fresh Stripe Checkout Session
-    let checkoutUrl: string | null = null;
+    let checkoutUrl = null;
     if (bill.company_hqs && bill.companyId) {
       try {
         const session = await createBillCheckoutSession({

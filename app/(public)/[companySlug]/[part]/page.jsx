@@ -95,7 +95,7 @@ async function BillPageContent({ companySlug, part, slug }) {
 
         // Always create a fresh Stripe Checkout Session on page load
         // Sessions are ephemeral - never stored or reused
-        let checkoutUrlByUrl: string | null = null;
+        let checkoutUrlByUrl = null;
 
         if (billByUrl.company_hqs && billByUrl.companyId) {
           try {
@@ -164,7 +164,7 @@ async function BillPageContent({ companySlug, part, slug }) {
 
     // Always create a fresh Stripe Checkout Session on page load
     // Sessions are ephemeral - never stored or reused
-    let checkoutUrl: string | null = null;
+    let checkoutUrl = null;
 
     if (bill.company_hqs && bill.companyId) {
       try {
