@@ -134,7 +134,6 @@ async function BillPageContent({ companySlug, part, slug }) {
             companyId: billByUrl.companyId,
           });
         }
-        }
 
         return (
           <div className="min-h-screen bg-gray-100 py-12 px-4">
