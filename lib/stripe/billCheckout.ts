@@ -42,14 +42,25 @@ export async function createBillCheckoutSession({
   successUrl: string;
   cancelUrl: string;
 }) {
+  console.log('[STRIPE_CHECKOUT] Creating session:', {
+    billId: bill.id,
+    billName: bill.name,
+    amountCents: bill.amountCents,
+    currency: bill.currency,
+    companyId: company.id,
+    companyName: company.companyName,
+    hasStripeCustomerId: !!company.stripeCustomerId,
+  });
+
   const customerId = await getOrCreateStripeCustomer(company);
+  console.log('[STRIPE_CHECKOUT] Customer ID:', customerId);
 
   // Set expiration to 7 days (Stripe's maximum)
   // Note: Expiration doesn't matter for correctness - we create new sessions on each page load
   const expiresAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days in seconds
 
-  const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
+  const sessionParams = {
+    mode: 'payment' as const,
     customer: customerId,
     line_items: [
       {
@@ -72,6 +83,21 @@ export async function createBillCheckoutSession({
       companyId: company.id,
       type: 'one_off_bill',
     },
+  };
+
+  console.log('[STRIPE_CHECKOUT] Session params:', {
+    mode: sessionParams.mode,
+    customer: sessionParams.customer,
+    amountCents: sessionParams.line_items[0].price_data.unit_amount,
+    currency: sessionParams.line_items[0].price_data.currency,
+  });
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+
+  console.log('[STRIPE_CHECKOUT] Session created:', {
+    id: session.id,
+    url: session.url,
+    status: session.status,
   });
 
   return session;

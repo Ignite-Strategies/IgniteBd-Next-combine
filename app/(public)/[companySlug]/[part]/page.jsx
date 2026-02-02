@@ -97,8 +97,19 @@ async function BillPageContent({ companySlug, part, slug }) {
         // Sessions are ephemeral - never stored or reused
         let checkoutUrlByUrl = null;
 
+        // Debug: Log bill state
+        console.log('[BILL_PAGE] Bill loaded (by URL):', {
+          billId: billByUrl.id,
+          companyId: billByUrl.companyId,
+          hasCompanyHqs: !!billByUrl.company_hqs,
+          companyHqsId: billByUrl.company_hqs?.id,
+          companyName: billByUrl.company_hqs?.companyName,
+          stripeCustomerId: billByUrl.company_hqs?.stripeCustomerId,
+        });
+
         if (billByUrl.company_hqs && billByUrl.companyId) {
           try {
+            console.log('[BILL_PAGE] Creating Stripe checkout session...');
             const session = await createBillCheckoutSession({
               bill: {
                 id: billByUrl.id,
@@ -117,12 +128,19 @@ async function BillPageContent({ companySlug, part, slug }) {
             });
 
             checkoutUrlByUrl = session.url;
+            console.log('[BILL_PAGE] ✅ Stripe session created:', {
+              sessionId: session.id,
+              hasUrl: !!checkoutUrlByUrl,
+              url: checkoutUrlByUrl?.substring(0, 50) + '...',
+            });
             
             if (!checkoutUrlByUrl) {
               console.error('❌ Stripe session created but URL is null:', session.id);
             }
           } catch (error) {
             console.error('❌ Error creating checkout session:', error);
+            console.error('   Error message:', error.message);
+            console.error('   Error stack:', error.stack);
             console.error('   Bill ID:', billByUrl.id);
             console.error('   Company ID:', billByUrl.companyId);
             console.error('   Company Name:', billByUrl.company_hqs?.companyName);
@@ -132,6 +150,7 @@ async function BillPageContent({ companySlug, part, slug }) {
           console.warn('⚠️ Cannot create checkout session - missing company_hqs or companyId:', {
             hasCompanyHqs: !!billByUrl.company_hqs,
             companyId: billByUrl.companyId,
+            billId: billByUrl.id,
           });
         }
 
@@ -177,8 +196,19 @@ async function BillPageContent({ companySlug, part, slug }) {
     // Sessions are ephemeral - never stored or reused
     let checkoutUrl = null;
 
+    // Debug: Log bill state
+    console.log('[BILL_PAGE] Bill loaded:', {
+      billId: bill.id,
+      companyId: bill.companyId,
+      hasCompanyHqs: !!bill.company_hqs,
+      companyHqsId: bill.company_hqs?.id,
+      companyName: bill.company_hqs?.companyName,
+      stripeCustomerId: bill.company_hqs?.stripeCustomerId,
+    });
+
     if (bill.company_hqs && bill.companyId) {
       try {
+        console.log('[BILL_PAGE] Creating Stripe checkout session...');
         const session = await createBillCheckoutSession({
           bill: {
             id: bill.id,
@@ -197,12 +227,19 @@ async function BillPageContent({ companySlug, part, slug }) {
         });
 
         checkoutUrl = session.url;
+        console.log('[BILL_PAGE] ✅ Stripe session created:', {
+          sessionId: session.id,
+          hasUrl: !!checkoutUrl,
+          url: checkoutUrl?.substring(0, 50) + '...',
+        });
         
         if (!checkoutUrl) {
           console.error('❌ Stripe session created but URL is null:', session.id);
         }
       } catch (error) {
         console.error('❌ Error creating checkout session:', error);
+        console.error('   Error message:', error.message);
+        console.error('   Error stack:', error.stack);
         console.error('   Bill ID:', bill.id);
         console.error('   Company ID:', bill.companyId);
         console.error('   Company Name:', bill.company_hqs?.companyName);
@@ -214,6 +251,7 @@ async function BillPageContent({ companySlug, part, slug }) {
       console.warn('⚠️ Cannot create checkout session - missing company_hqs or companyId:', {
         hasCompanyHqs: !!bill.company_hqs,
         companyId: bill.companyId,
+        billId: bill.id,
       });
     }
 
