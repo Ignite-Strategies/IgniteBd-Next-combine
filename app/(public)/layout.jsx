@@ -20,8 +20,13 @@ export default function PublicLayout({ children }) {
 
   const isTutorialRoute = pathname && pathname.startsWith('/tutorial');
   const isPlanCheckoutRoute = pathname && pathname.startsWith('/plan-checkout');
+  const isRetainerRoute = pathname && (
+    pathname.startsWith('/retainer/') ||
+    pathname === '/retainer-paid' ||
+    pathname === '/retainer-canceled'
+  );
 
-  if (isBillRoute || isTutorialRoute || isPlanCheckoutRoute) {
+  if (isBillRoute || isTutorialRoute || isPlanCheckoutRoute || isRetainerRoute) {
     return <>{children}</>;
   }
 

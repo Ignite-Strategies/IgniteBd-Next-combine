@@ -359,6 +359,7 @@ model company_hqs {
   planEndedAt                                   DateTime? // When plan access ends
   plans                                         plans?                          @relation(fields: [planId], references: [id])
   bills                                         bills[]
+  company_retainers                             company_retainers[]
   assessments                                   assessments[]
   blogs                                         blogs[]
   campaigns                                     campaigns[]
@@ -374,6 +375,7 @@ model company_hqs {
   domain_registry                               domain_registry?
   email_sequences                               email_sequences[]
   invoices                                      invoices[]
+  income                                        income[]
   invoice_settings                              invoice_settings?
   invoice_templates                             invoice_templates[]
   landing_pages                                 landing_pages[]
@@ -385,6 +387,7 @@ model company_hqs {
   template_relationship_helpers                 template_relationship_helpers[]
   templates                                     templates[]
   work_packages                                 work_packages[]
+  financials                                    financials?
 
   @@index([stripeCustomerId])
   @@index([platformId])
@@ -530,6 +533,10 @@ model Contact {
   urgencyScore                                              Int?
   buyingReadiness                                           BuyingReadiness?
   buyerPerson                                               BuyerPerson?
+  // Manual outreach tracking fields
+  persona_type                                              PersonaType?
+  prior_relationship                                        RelationshipEnum?
+  lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]             @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
   companies                                                 companies?                @relation(fields: [contactCompanyId], references: [id])
@@ -551,6 +558,7 @@ model Contact {
   @@index([firebaseUid])
   @@index([ownerId])
   @@index([role])
+  @@index([prior_relationship])
   @@map("contacts")
 }
 
@@ -922,6 +930,7 @@ model invoices {
   contacts           Contact?             @relation(fields: [contactId], references: [id])
   companies          companies?           @relation(fields: [companyId], references: [id])
   payments           payments[]
+  income             income[]
 
   @@index([status])
   @@index([invoiceType])
@@ -1427,10 +1436,51 @@ model bills {
   @@index([paidAt])
 }
 
+// Company-specific recurring retainers (isolated from universal plan model).
+model company_retainers {
+  id                   String         @id @default(cuid())
+  companyId            String
+  name                 String
+  description          String?
+  amountCents          Int
+  currency             String         @default("usd")
+  interval             RetainerInterval @default(MONTH)
+  startDate            DateTime?
+  status               RetainerStatus @default(DRAFT)
+  slug                 String?        @unique
+  publicRetainerUrl    String?
+  stripeSubscriptionId String?        @unique
+  activatedAt          DateTime?
+  paidAt               DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  company_hqs company_hqs @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([slug])
+  @@index([stripeSubscriptionId])
+}
+
 enum BillSendStatus {
   PENDING
   PAID
   EXPIRED
+}
+
+enum RetainerStatus {
+  DRAFT
+  LINK_SENT
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum RetainerInterval {
+  MONTH
 }
 
 // PlatformAccess removed - consolidated into company_hqs fields:
@@ -1608,3 +1658,142 @@ enum WorkPackageStatus {
   ACTIVE
   COMPLETED
 }
+
+// Financials - Simple ledger system
+model financials {
+  id          String   @id @default(cuid())
+  companyHQId String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company_hqs company_hqs   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  expenses    expenses[]
+  income      income[]
+  equity      equity[]
+  csvImports  csv_imports[]
+
+  @@map("financials")
+}
+
+model expenses {
+  id           String   @id @default(cuid())
+  financialsId String
+  date         DateTime
+  amount       Int // Amount in cents
+  description  String
+  category     String? // Free-form category name
+  vendor       String?
+  receiptUrl   String?
+
+  // CSV import tracking
+  csvImportId  String?
+  csvRowNumber Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  financials  financials   @relation(fields: [financialsId], references: [id], onDelete: Cascade)
+  csv_imports csv_imports? @relation(fields: [csvImportId], references: [id])
+
+  @@index([financialsId])
+  @@index([date])
+  @@index([category])
+  @@map("expenses")
+}
+
+model income {
+  id           String   @id @default(cuid())
+  financialsId String
+  date         DateTime
+  amount       Int // Amount in cents
+  description  String
+  category     String? // Free-form category name
+  source       String?
+
+  // Stripe integration
+  stripePaymentIntentId String? @unique
+  stripeInvoiceId       String?
+  invoiceId             String? // FK to invoices
+
+  // CSV import tracking
+  csvImportId  String?
+  csvRowNumber Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  financials    financials   @relation(fields: [financialsId], references: [id], onDelete: Cascade)
+  invoices      invoices?    @relation(fields: [invoiceId], references: [id])
+  csv_imports   csv_imports? @relation(fields: [csvImportId], references: [id])
+  companyHqs    company_hqs? @relation(fields: [company_hqsId], references: [id])
+  company_hqsId String?
+
+  @@index([financialsId])
+  @@index([date])
+  @@index([category])
+  @@index([stripePaymentIntentId])
+  @@map("income")
+}
+
+model equity {
+  id           String   @id @default(cuid())
+  financialsId String
+  date         DateTime
+  amount       Int // Amount in cents
+  description  String
+  category     String? // Free-form category name
+  source       String?
+
+  // CSV import tracking
+  csvImportId  String?
+  csvRowNumber Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  financials  financials   @relation(fields: [financialsId], references: [id], onDelete: Cascade)
+  csv_imports csv_imports? @relation(fields: [csvImportId], references: [id])
+
+  @@index([financialsId])
+  @@index([date])
+  @@index([category])
+  @@map("equity")
+}
+
+model csv_imports {
+  id            String       @id @default(cuid())
+  financialsId  String
+  fileName      String
+  fileUrl       String
+  rowCount      Int
+  importedCount Int          @default(0)
+  status        ImportStatus @default(PENDING)
+  columnMapping Json? // Column mapping config
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  financials financials @relation(fields: [financialsId], references: [id], onDelete: Cascade)
+  expenses   expenses[]
+  income     income[]
+  equity     equity[]
+
+  @@index([financialsId])
+  @@map("csv_imports")
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum PersonaType {
+  DECISION_MAKER
+  INFLUENCER
+  END_USER
+  GATEKEEPER
+  CHAMPION
+  OTHER
+}
+

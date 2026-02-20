@@ -97,10 +97,12 @@ export async function POST(request: Request) {
  * Handles both:
  * 1. Plan subscriptions (companyHQId + planId)
  * 2. One-off bills (billId + companyId)
+ * 3. Company-specific retainers (retainerId + companyId)
  */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   try {
     const billId = session.metadata?.billId;
+    const retainerId = session.metadata?.retainerId;
     const companyHQId = session.metadata?.companyHQId;
     const planId = session.metadata?.planId;
     const type = session.metadata?.type;
@@ -131,6 +133,33 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       } else {
         console.warn(`⚠️ checkout.session.completed: Bill not found for billId ${billId}`);
       }
+      return;
+    }
+
+    // Handle company-specific retainer subscription payment
+    if (retainerId && type === 'company_retainer') {
+      const existingRetainer = await prisma.company_retainers.findUnique({
+        where: { id: retainerId },
+        select: { id: true, activatedAt: true },
+      });
+
+      if (!existingRetainer) {
+        console.warn(`⚠️ checkout.session.completed: Retainer not found for retainerId ${retainerId}`);
+        return;
+      }
+
+      await prisma.company_retainers.update({
+        where: { id: retainerId },
+        data: {
+          status: 'ACTIVE',
+          stripeSubscriptionId: session.subscription as string | null,
+          activatedAt: existingRetainer.activatedAt ?? new Date(),
+        },
+      });
+
+      console.log(
+        `✅ Retainer checkout completed: Retainer ${retainerId} set to ACTIVE with subscription ${session.subscription}`
+      );
       return;
     }
 
@@ -180,6 +209,55 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
     if (!subscriptionId) {
       console.warn('⚠️ invoice.paid: No subscription ID');
+      return;
+    }
+
+    // Retainer-first: if this subscription belongs to a company-specific retainer,
+    // update retainer state and payment history without touching SaaS plan state.
+    const retainer = await prisma.company_retainers.findFirst({
+      where: { stripeSubscriptionId: subscriptionId },
+      include: { company_hqs: true },
+    });
+    if (retainer) {
+      await prisma.company_retainers.update({
+        where: { id: retainer.id },
+        data: {
+          status: 'ACTIVE',
+          paidAt: new Date(),
+          activatedAt: retainer.activatedAt ?? new Date(),
+        },
+      });
+
+      await prisma.invoices.upsert({
+        where: { stripeInvoiceId: invoiceId },
+        create: {
+          companyHQId: retainer.companyId,
+          invoiceType: 'MONTHLY_RECURRING',
+          invoiceName: retainer.name,
+          invoiceDescription: retainer.description || `Retainer payment for ${retainer.name}`,
+          totalExpected: amountPaid,
+          totalReceived: amountPaid,
+          currency: currency.toUpperCase(),
+          status: 'PAID',
+          paidAt: new Date(),
+          stripeInvoiceId: invoiceId,
+          stripeSubscriptionId: subscriptionId,
+          stripeCustomerId: customerId,
+          stripePaymentIntentId: invoice.payment_intent as string | null,
+          isRecurring: true,
+          recurringFrequency: 'MONTH',
+          lastBilledDate: new Date(),
+        },
+        update: {
+          totalReceived: amountPaid,
+          status: 'PAID',
+          paidAt: new Date(),
+          stripePaymentIntentId: invoice.payment_intent as string | null,
+          lastBilledDate: new Date(),
+        },
+      });
+
+      console.log(`✅ Retainer invoice paid: Retainer ${retainer.id} marked ACTIVE`);
       return;
     }
 
@@ -255,6 +333,20 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
       return;
     }
 
+    const retainer = await prisma.company_retainers.findFirst({
+      where: { stripeSubscriptionId: subscriptionId },
+      select: { id: true },
+    });
+
+    if (retainer) {
+      await prisma.company_retainers.update({
+        where: { id: retainer.id },
+        data: { status: 'PAST_DUE' },
+      });
+      console.log(`⚠️ Payment failed: Retainer ${retainer.id} set to PAST_DUE`);
+      return;
+    }
+
     const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscriptionId },
     });
@@ -283,6 +375,31 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   try {
+    const retainer = await prisma.company_retainers.findFirst({
+      where: { stripeSubscriptionId: subscription.id },
+      select: { id: true },
+    });
+
+    if (retainer) {
+      let status: 'ACTIVE' | 'PAST_DUE' | 'CANCELED' = 'ACTIVE';
+
+      if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
+        status = 'PAST_DUE';
+      } else if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+        status = 'CANCELED';
+      }
+
+      await prisma.company_retainers.update({
+        where: { id: retainer.id },
+        data: {
+          status,
+          ...(status === 'CANCELED' ? { canceledAt: new Date() } : {}),
+        },
+      });
+      console.log(`✅ Retainer subscription updated: Retainer ${retainer.id} set to ${status}`);
+      return;
+    }
+
     const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscription.id },
     });
@@ -329,6 +446,22 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   try {
+    const retainer = await prisma.company_retainers.findFirst({
+      where: { stripeSubscriptionId: subscription.id },
+      select: { id: true },
+    });
+    if (retainer) {
+      await prisma.company_retainers.update({
+        where: { id: retainer.id },
+        data: {
+          status: 'CANCELED',
+          canceledAt: new Date(),
+        },
+      });
+      console.log(`✅ Retainer subscription deleted: Retainer ${retainer.id} set to CANCELED`);
+      return;
+    }
+
     const company = await prisma.company_hqs.findUnique({
       where: { stripeSubscriptionId: subscription.id },
     });
