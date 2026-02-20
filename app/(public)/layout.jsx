@@ -14,15 +14,14 @@ export default function PublicLayout({ children }) {
   
   // Check if this is a bill route (root-level or /bill/)
   const isBillRoute = pathname && (
-    pathname.startsWith('/bill/') || 
+    pathname.startsWith('/bill/') ||
     /^\/[^\/]+\/[^\/]+$/.test(pathname) // Matches /company-slug/bill-id pattern
   );
 
-  // Check if this is the tutorial route (has its own header)
   const isTutorialRoute = pathname && pathname.startsWith('/tutorial');
+  const isPlanCheckoutRoute = pathname && pathname.startsWith('/plan-checkout');
 
-  // Bill routes and tutorial: NO AppShell, NO Providers, just pure content
-  if (isBillRoute || isTutorialRoute) {
+  if (isBillRoute || isTutorialRoute || isPlanCheckoutRoute) {
     return <>{children}</>;
   }
 

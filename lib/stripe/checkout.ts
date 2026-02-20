@@ -8,6 +8,7 @@ type CompanyHQ = {
   id: string;
   companyName: string;
   stripeCustomerId: string | null;
+  planStartedAt?: Date | string | null;
 };
 
 type Plan = {
@@ -33,10 +34,12 @@ export async function createCheckoutSession({
   company,
   plan,
   successUrl,
+  cancelUrl,
 }: {
   company: CompanyHQ;
   plan: Plan;
   successUrl: string;
+  cancelUrl?: string;
 }) {
   // Get or create Stripe customer
   const customerId = await getOrCreateStripeCustomer(company);
@@ -59,7 +62,6 @@ export async function createCheckoutSession({
     }
   }
 
-  // Build line items - use price ID (faster, cleaner than price_data)
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
     {
       price: priceId,
@@ -67,18 +69,37 @@ export async function createCheckoutSession({
     },
   ];
 
-  // Create checkout session
-  // Use redirect mode for simplicity (can switch to embedded later if needed)
-  return stripe.checkout.sessions.create({
+  const startedAt =
+    company.planStartedAt instanceof Date
+      ? company.planStartedAt
+      : company.planStartedAt
+        ? new Date(company.planStartedAt)
+        : null;
+  const billingCycleAnchor =
+    mode === 'subscription' &&
+    startedAt &&
+    startedAt.getTime() > Date.now()
+      ? Math.floor(startedAt.getTime() / 1000)
+      : undefined;
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode,
     customer: customerId,
     line_items: lineItems,
     success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${successUrl}?canceled=true`,
+    cancel_url: cancelUrl || `${successUrl}?canceled=true`,
     metadata: {
       companyHQId: company.id,
       planId: plan.id,
     },
-  });
+    ...(billingCycleAnchor && {
+      subscription_data: {
+        billing_cycle_anchor: billingCycleAnchor,
+        proration_behavior: 'none',
+      },
+    }),
+  };
+
+  return stripe.checkout.sessions.create(sessionParams);
 }
 

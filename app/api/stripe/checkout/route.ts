@@ -36,7 +36,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch company with plan
     const company = await prisma.company_hqs.findUnique({
       where: { id: companyHQId },
       include: {
@@ -65,12 +64,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create checkout session using plan data
     const session = await createCheckoutSession({
       company: {
         id: company.id,
         companyName: company.companyName,
         stripeCustomerId: company.stripeCustomerId,
+        planStartedAt: company.planStartedAt,
       },
       plan: {
         id: company.plans.id,

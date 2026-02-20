@@ -4,11 +4,12 @@ import { prisma } from '@/lib/prisma'
 
 /**
  * POST /api/platform/plans/assign
- * 
+ *
  * Assign a plan to a company_hq (set company_hqs.planId).
+ * Optional startDate (ISO string) sets planStartedAt for subscription start / billing anchor.
  * Returns the updated company with FK relations.
- * 
- * Body: { companyId, planId }
+ *
+ * Body: { companyId, planId, startDate?: string }
  */
 export async function POST(request: Request) {
   try {
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { companyId, planId } = body ?? {}
+    const { companyId, planId, startDate: startDateStr } = body ?? {}
 
     if (!companyId || !planId) {
       return NextResponse.json(
@@ -42,13 +43,24 @@ export async function POST(request: Request) {
       )
     }
 
+    const planStartedAt = startDateStr
+      ? (() => {
+          const d = new Date(startDateStr)
+          return isNaN(d.getTime()) ? undefined : d
+        })()
+      : undefined
+
     const company = await prisma.company_hqs.update({
       where: { id: companyId },
-      data: { planId },
+      data: {
+        planId,
+        ...(planStartedAt && { planStartedAt }),
+      },
       select: {
         id: true,
         companyName: true,
         planId: true,
+        planStartedAt: true,
         plans: {
           select: {
             id: true,
@@ -70,11 +82,11 @@ export async function POST(request: Request) {
       },
     })
 
-    // Flatten owner and plan data
     const formattedCompany = {
       id: company.id,
       companyName: company.companyName,
       planId: company.planId,
+      planStartedAt: company.planStartedAt,
       planName: company.plans?.name,
       plans: company.plans,
       owner: company.owners_company_hqs_ownerIdToowners,

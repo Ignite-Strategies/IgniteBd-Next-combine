@@ -134,16 +134,18 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       return;
     }
 
-    // Handle plan subscription payment
     if (companyHQId && planId) {
-      // Update company_hqs directly
+      const existing = await prisma.company_hqs.findUnique({
+        where: { id: companyHQId },
+        select: { planStartedAt: true },
+      });
       await prisma.company_hqs.update({
         where: { id: companyHQId },
         data: {
           planStatus: 'ACTIVE',
-          planId: planId, // Ensure planId is set
-          stripeSubscriptionId: session.subscription as string | null, // Set if subscription, null if one-time
-          planStartedAt: new Date(),
+          planId: planId,
+          stripeSubscriptionId: session.subscription as string | null,
+          planStartedAt: existing?.planStartedAt ?? new Date(),
           planEndedAt: null,
         },
       });
