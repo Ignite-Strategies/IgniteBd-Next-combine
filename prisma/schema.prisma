@@ -255,6 +255,7 @@ model campaigns {
   templates        templates?         @relation(fields: [template_id], references: [id])
   email_activities email_activities[]
   email_sequences  email_sequences[]
+  emails           emails[]
 
   @@index([company_hq_id])
   @@index([contact_list_id])
@@ -555,6 +556,7 @@ model Contact {
   work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]            @relation("work_packages_workPackageMemberIdTocontacts")
   contact_analyses                                          contact_analyses?
   off_platform_email_sends                                  off_platform_email_sends[]
+  emails                                                    emails[]
 
   @@unique([email, crmId])
   @@index([companyDomain])
@@ -643,6 +645,7 @@ model email_activities {
   owners              owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   email_sequences     email_sequences? @relation(fields: [sequence_id], references: [id])
   sequence_steps      sequence_steps?  @relation(fields: [sequence_step_id], references: [id])
+  emails              emails?          @relation("EmailActivityToEmail")
 
   @@index([campaign_id])
   @@index([contact_id, createdAt])
@@ -1876,6 +1879,52 @@ enum PersonaType {
   OTHER
 }
 
+enum EmailSource {
+  PLATFORM
+  OFF_PLATFORM
+}
+
+model emails {
+  id        String      @id @default(cuid())
+  contactId String // FK to Contact
+  sendDate  DateTime // When email was sent
+  subject   String?
+  body      String?     @db.Text // Full email body
+  source    EmailSource // PLATFORM | OFF_PLATFORM
+  platform  String? // "sendgrid", "gmail", "outlook", "apollo", "manual"
+
+  // Response tracking
+  contactResponse String?   @db.Text // The actual reply text from contact
+  respondedAt     DateTime? // When contact responded
+  responseSubject String? // Subject of their reply
+  hasResponded    Boolean   @default(false)
+
+  // References to original records (if applicable)
+  emailActivityId   String? @unique // If from email_activities
+  offPlatformSendId String? @unique // If from off_platform_email_sends
+
+  // Metadata
+  messageId  String? @unique // SendGrid message ID (if platform)
+  campaignId String?
+  sequenceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts           Contact                   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  email_activities   email_activities?         @relation("EmailActivityToEmail", fields: [emailActivityId], references: [id], onDelete: SetNull)
+  off_platform_sends off_platform_email_sends? @relation("OffPlatformSendToEmail", fields: [offPlatformSendId], references: [id], onDelete: SetNull)
+  campaigns          campaigns?                @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([contactId])
+  @@index([contactId, sendDate])
+  @@index([sendDate])
+  @@index([hasResponded])
+  @@index([source])
+  @@index([messageId])
+  @@map("emails")
+}
+
 enum ContextOfRelationship {
   DONT_KNOW
   PRIOR_CONVERSATION
@@ -1913,6 +1962,7 @@ model off_platform_email_sends {
   updatedAt DateTime @updatedAt
 
   contacts Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  emails   emails? @relation("OffPlatformSendToEmail")
 
   @@index([contactId])
   @@index([contactId, emailSent])
