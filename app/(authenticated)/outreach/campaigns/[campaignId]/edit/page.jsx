@@ -148,9 +148,9 @@ function CampaignEditContent({ params }) {
     if (!companyHQId) return;
     setLoadingSnippets(true);
     try {
-      const response = await api.get(`/api/outreach/snippets?companyHQId=${companyHQId}`);
+      const response = await api.get(`/api/outreach/content-snips?companyHQId=${companyHQId}`);
       if (response.data?.success) {
-        setSnippets(response.data.snippets || []);
+        setSnippets(response.data.snips || []);
       }
     } catch (error) {
       console.error('Error loading snippets:', error);
@@ -159,8 +159,8 @@ function CampaignEditContent({ params }) {
     }
   };
 
-  const insertSnippetAtCursor = (variableName) => {
-    const tag = `{{snippet:${variableName}}}`;
+  const insertSnippetAtCursor = (snipName) => {
+    const tag = `{{snippet:${snipName}}}`;
     const textarea = bodyTextareaRef.current;
     if (textarea) {
       const start = textarea.selectionStart;
@@ -181,6 +181,8 @@ function CampaignEditContent({ params }) {
   const filteredSnippets = snippetIntentFilter
     ? snippets.filter((s) => (s.intentType || '') === snippetIntentFilter)
     : snippets;
+  // content_snips use snipName; template_snippets use variableName - support both
+  const getSnippetInsertKey = (s) => s.snipName ?? s.variableName;
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -578,13 +580,13 @@ function CampaignEditContent({ params }) {
                                   <button
                                     key={s.id}
                                     type="button"
-                                    onClick={() => insertSnippetAtCursor(s.variableName)}
+                                    onClick={() => insertSnippetAtCursor(getSnippetInsertKey(s))}
                                     className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                                    title={s.body ? `${s.name}: ${s.body.slice(0, 80)}…` : s.name}
+                                    title={s.snipText ? `${s.snipName}: ${s.snipText.slice(0, 80)}…` : s.name || s.snipName}
                                   >
-                                    {s.name}
-                                    {s.intentType && (
-                                      <span className="ml-1 text-gray-400">({s.intentType})</span>
+                                    {s.name || s.snipName}
+                                    {(s.intentType || s.snipType) && (
+                                      <span className="ml-1 text-gray-400">({s.intentType || s.snipType})</span>
                                     )}
                                   </button>
                                 ))}

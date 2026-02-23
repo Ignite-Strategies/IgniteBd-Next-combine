@@ -387,6 +387,7 @@ model company_hqs {
   template_relationship_helpers                 template_relationship_helpers[]
   templates                                     templates[]
   template_snippets                             template_snippets[]
+  content_snips                                 content_snips[]
   work_packages                                 work_packages[]
   financials                                    financials?
 
@@ -1309,6 +1310,26 @@ model template_snippets {
 
   @@unique([companyHQId, variableName])
   @@index([companyHQId])
+}
+
+// ContentSnip-style library: ingest via CSV, use in templates or free-floating
+model content_snips {
+  id          String      @id @default(cuid())
+  companyHQId String
+  snipName    String      // unique per company; used as {{snippet:snipName}} in templates
+  snipText    String      @db.Text
+  snipType    String      // subject | intent | service | competitor | value | cta | relationship | generic
+  contextType String?     // email | blog | linkedin | internal | multi
+  intentType  String?    // reactivation | prior_contact | intro | competitor | seasonal | relationship_only
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@unique([companyHQId, snipName])
+  @@index([companyHQId])
+  @@index([companyHQId, snipType])
+  @@index([companyHQId, isActive])
 }
 
 model work_collateral {
