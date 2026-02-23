@@ -19,9 +19,11 @@ function getOpenAIClient() {
   return openaiClient;
 }
 
-const SNIP_TYPES = ['subject', 'intent', 'service', 'competitor', 'value', 'cta', 'relationship', 'generic'];
-const CONTEXT_TYPES = ['email', 'blog', 'linkedin', 'internal', 'multi'];
-const INTENT_TYPES = ['reactivation', 'prior_contact', 'intro', 'competitor', 'seasonal', 'relationship_only'];
+const TEMPLATE_POSITIONS = ['SUBJECT_LINE', 'OPENING_GREETING', 'CATCH_UP', 'BUSINESS_CONTEXT', 'VALUE_PROPOSITION', 'COMPETITOR_FRAME', 'TARGET_ASK', 'SOFT_CLOSE'];
+const LEGACY_SNIP_TYPE_TO_POSITION = {
+  subject: 'SUBJECT_LINE', intent: 'OPENING_GREETING', service: 'BUSINESS_CONTEXT', competitor: 'COMPETITOR_FRAME',
+  value: 'VALUE_PROPOSITION', cta: 'TARGET_ASK', relationship: 'SOFT_CLOSE', generic: 'SOFT_CLOSE',
+};
 
 function normalizeSnipName(s) {
   return String(s).trim().replace(/\s+/g, '_').toLowerCase() || null;
@@ -74,9 +76,7 @@ Content snippets are reusable text blocks that can contain variable placeholders
 Generate a content snippet based on the user's prompt. Return a JSON object with:
 - snipName: a short, snake_case name (e.g., "intent_reach_out", "cta_book_call")
 - snipText: the actual content text (can include variables like {{firstName}})
-- snipType: one of: ${SNIP_TYPES.join(', ')}
-- contextType: one of: ${CONTEXT_TYPES.join(', ')} (optional, can be null)
-- intentType: one of: ${INTENT_TYPES.join(', ')} (optional, can be null)
+- templatePosition: one of: ${TEMPLATE_POSITIONS.join(', ')} (where in the email: SUBJECT_LINE, OPENING_GREETING, CATCH_UP, BUSINESS_CONTEXT, VALUE_PROPOSITION, COMPETITOR_FRAME, TARGET_ASK, SOFT_CLOSE)
 
 Keep snipText concise (1-3 sentences typically). Make it natural and professional.`;
 
@@ -112,12 +112,11 @@ Keep snipText concise (1-3 sentences typically). Make it natural and professiona
       );
     }
 
-    // Validate and normalize
     const snipName = normalizeSnipName(generated.snipName || prompt.split(' ').slice(0, 3).join('_'));
     const snipText = String(generated.snipText || '').trim();
-    const snipType = SNIP_TYPES.includes(generated.snipType) ? generated.snipType : 'generic';
-    const contextType = generated.contextType && CONTEXT_TYPES.includes(generated.contextType) ? generated.contextType : null;
-    const intentType = generated.intentType && INTENT_TYPES.includes(generated.intentType) ? generated.intentType : null;
+    const templatePosition = TEMPLATE_POSITIONS.includes(generated.templatePosition)
+      ? generated.templatePosition
+      : (LEGACY_SNIP_TYPE_TO_POSITION[generated.snipType] || 'SOFT_CLOSE');
 
     if (!snipText) {
       return NextResponse.json(
@@ -126,14 +125,15 @@ Keep snipText concise (1-3 sentences typically). Make it natural and professiona
       );
     }
 
+    const snipSlug = snipName; // UI can override; must be unique when saving
+
     return NextResponse.json({
       success: true,
       snip: {
         snipName,
+        snipSlug,
         snipText,
-        snipType,
-        contextType,
-        intentType,
+        templatePosition,
       },
     });
   } catch (error) {

@@ -203,9 +203,9 @@ export default function TemplateBuilderPage() {
     }
   };
 
-  // Insert content snip into body at cursor position
-  const insertSnip = (snipName) => {
-    const snip = `{{snippet:${snipName}}}`;
+  // Insert content snip into body at cursor position (use snipSlug for {{snippet:snipSlug}})
+  const insertSnip = (snipSlug) => {
+    const snip = `{{snippet:${snipSlug}}}`;
     const textarea = document.getElementById('body-textarea');
     if (textarea) {
       const start = textarea.selectionStart;
@@ -531,16 +531,16 @@ export default function TemplateBuilderPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {contentSnips.map((snip) => (
                       <button
-                        key={snip.id}
+                        key={snip.snipId}
                         type="button"
-                        onClick={() => insertSnip(snip.snipName)}
+                        onClick={() => insertSnip(snip.snipSlug)}
                         className="text-left px-4 py-3 rounded-lg bg-white border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-50 transition-all shadow-sm hover:shadow"
                         title={snip.snipText}
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <code className="text-amber-700 font-mono font-semibold text-base">{`{{snippet:${snip.snipName}}}`}</code>
-                          {snip.snipType && (
-                            <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">{snip.snipType}</span>
+                          <code className="text-amber-700 font-mono font-semibold text-base">{`{{snippet:${snip.snipSlug}}}`}</code>
+                          {snip.templatePosition && (
+                            <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">{snip.templatePosition}</span>
                           )}
                         </div>
                         <p className="text-gray-600 text-sm line-clamp-2">{snip.snipText}</p>

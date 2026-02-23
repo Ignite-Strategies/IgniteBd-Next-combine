@@ -4,7 +4,20 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { resolveMembership } from '@/lib/membership';
 import { parseCSV } from '@/lib/utils/csv';
 
-const SNIP_TYPES = ['subject', 'opening', 'service', 'competitor', 'value', 'cta', 'relationship', 'generic'];
+const TEMPLATE_POSITIONS = ['SUBJECT_LINE', 'OPENING_GREETING', 'CATCH_UP', 'BUSINESS_CONTEXT', 'VALUE_PROPOSITION', 'COMPETITOR_FRAME', 'TARGET_ASK', 'SOFT_CLOSE'];
+
+// Map legacy CSV snip_type / type to TemplatePosition (for backward compatibility)
+const LEGACY_TYPE_TO_POSITION = {
+  subject: 'SUBJECT_LINE',
+  opening: 'OPENING_GREETING',
+  service: 'BUSINESS_CONTEXT',
+  competitor: 'COMPETITOR_FRAME',
+  value: 'VALUE_PROPOSITION',
+  cta: 'TARGET_ASK',
+  relationship: 'SOFT_CLOSE',
+  generic: 'SOFT_CLOSE',
+  intent: 'OPENING_GREETING',
+};
 
 // Normalize CSV row keys (headers may be snip_name, snipName, Snip Name, etc.)
 function getRowValue(row, ...keys) {
@@ -24,9 +37,8 @@ function normalizeSnipName(s) {
 
 /**
  * POST /api/outreach/content-snips/csv
- * FormData: file (CSV), companyHQId
- * CSV columns (any case): snip_name / snipName, snip_text / snipText, snip_type / snipType, assembly_helper_personas / assemblyHelperPersonas (optional, comma-separated slugs)
- * snip_type required (or default 'generic'); snip_name and snip_text required per row.
+ * FormData: file (CSV), companyHQId (for auth)
+ * CSV columns: snip_name, snip_slug (optional), snip_text, template_position (or legacy snip_type), persona_slug, best_used_when
  */
 export async function POST(request) {
   let firebaseUser;
@@ -41,7 +53,7 @@ export async function POST(request) {
     return NextResponse.json({ success: false, error: 'Form data required' }, { status: 400 });
   }
 
-  let companyHQId = request.nextUrl?.searchParams?.get('companyHQId') || formData.get('companyHQId');
+  const companyHQId = request.nextUrl?.searchParams?.get('companyHQId') || formData.get('companyHQId');
   if (!companyHQId) {
     return NextResponse.json({ success: false, error: 'companyHQId is required' }, { status: 400 });
   }
@@ -86,9 +98,12 @@ export async function POST(request) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const snipName = getRowValue(row, 'snip_name', 'snipName', 'name');
+    const snipSlugRaw = getRowValue(row, 'snip_slug', 'snipSlug', 'slug');
     const snipText = getRowValue(row, 'snip_text', 'snipText', 'text', 'body');
-    let snipType = getRowValue(row, 'snip_type', 'snipType', 'type');
-    const assemblyHelperPersonasRaw = getRowValue(row, 'assembly_helper_personas', 'assemblyHelperPersonas', 'helperPersonas');
+    let templatePosition = getRowValue(row, 'template_position', 'templatePosition', 'position');
+    const legacyType = getRowValue(row, 'snip_type', 'snipType', 'type');
+    const personaSlug = getRowValue(row, 'persona_slug', 'personaSlug') || null;
+    const bestUsedWhen = getRowValue(row, 'best_used_when', 'bestUsedWhen') || null;
 
     if (!snipName || !snipText) {
       errors.push(`Row ${i + 2}: snip_name and snip_text are required`);
@@ -101,48 +116,43 @@ export async function POST(request) {
       continue;
     }
 
-    if (!snipType || !SNIP_TYPES.includes(snipType)) {
-      snipType = 'generic';
+    const slug = (snipSlugRaw && normalizeSnipName(snipSlugRaw)) || name;
+
+    if (templatePosition && TEMPLATE_POSITIONS.includes(templatePosition)) {
+      // use as-is
+    } else if (legacyType && LEGACY_TYPE_TO_POSITION[legacyType.toLowerCase()]) {
+      templatePosition = LEGACY_TYPE_TO_POSITION[legacyType.toLowerCase()];
+    } else {
+      templatePosition = 'SOFT_CLOSE';
     }
 
     try {
-      const existing = await prisma.content_snips.findUnique({
-        where: { companyHQId_snipName: { companyHQId, snipName: name } },
+      const existing = await prisma.contentSnip.findUnique({
+        where: { snipSlug: slug },
       });
 
-      // Parse and validate persona slugs if provided (comma-separated)
-      let personaSlugs = [];
-      if (assemblyHelperPersonasRaw) {
-        const slugs = assemblyHelperPersonasRaw.split(',').map((s) => s.trim()).filter(Boolean);
-        if (slugs.length > 0) {
-          const validPersonas = await prisma.outreach_personas.findMany({
-            where: { slug: { in: slugs } },
-            select: { slug: true },
-          });
-          personaSlugs = validPersonas.map((p) => p.slug);
-        }
-      }
-
       if (existing) {
-        await prisma.content_snips.update({
-          where: { id: existing.id },
+        await prisma.contentSnip.update({
+          where: { snipId: existing.snipId },
           data: {
+            snipName: name,
             snipText,
-            snipType,
-            assemblyHelperPersonas: personaSlugs,
+            templatePosition,
+            personaSlug: personaSlug?.trim() || null,
+            bestUsedWhen: bestUsedWhen?.trim() || null,
             updatedAt: new Date(),
           },
         });
         updated += 1;
       } else {
-        await prisma.content_snips.create({
+        await prisma.contentSnip.create({
           data: {
-            companyHQId,
             snipName: name,
+            snipSlug: slug,
             snipText,
-            snipType,
-            assemblyHelperPersonas: personaSlugs,
-            isActive: true,
+            templatePosition,
+            personaSlug: personaSlug?.trim() || null,
+            bestUsedWhen: bestUsedWhen?.trim() || null,
           },
         });
         created += 1;

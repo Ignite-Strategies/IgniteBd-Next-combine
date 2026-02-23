@@ -388,7 +388,6 @@ model company_hqs {
   template_relationship_helpers                 template_relationship_helpers[]
   templates                                     templates[]
   template_snippets                             template_snippets[]
-  content_snips                                 content_snips[]
   work_packages                                 work_packages[]
   financials                                    financials?
   templateVariables                             template_variables[]
@@ -1330,7 +1329,6 @@ model relationship_contexts {
   contextKey            String                @unique // e.g., PRIOR_COLLEAGUE_LONG_DORMANT_KNOWS_COMPANY
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
-  contentSnips          content_snips[]
 
   @@index([contextKey])
   @@index([contextOfRelationship, relationshipRecency, companyAwareness])
@@ -1339,40 +1337,32 @@ model relationship_contexts {
 // Simple outreach personas - descriptive slugs that drive snippet assembly
 // Example: "FormerColleagueNowReachingoutAgainAfterLongTime"
 model outreach_personas {
-  id           String          @id @default(cuid())
-  slug         String          @unique // e.g., "FormerColleagueNowReachingoutAgainAfterLongTime"
-  name         String // Display name: "Former Colleague - Long Time"
-  description  String?         @db.Text // What this persona represents
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  contentSnips content_snips[]
-  contacts     Contact[]
+  id          String    @id @default(cuid())
+  slug        String    @unique // e.g., "FormerColleagueNowReachingoutAgainAfterLongTime"
+  name        String // Display name: "Former Colleague - Long Time"
+  description String?   @db.Text // What this persona represents
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  contacts    Contact[]
 
   @@index([slug])
 }
 
-// ContentSnip-style library: ingest via CSV, use in templates or free-floating
-// Snippets are independent building blocks - assembly helper personas drive matching
-model content_snips {
-  id                                         String                 @id @default(cuid())
-  companyHQId                                String
-  snipName                                   String // unique per company; used as {{snippet:snipName}} in templates
-  snipText                                   String                 @db.Text
-  snipType                                   String // subject | opening | service | competitor | value | cta | relationship | generic
-  assemblyHelperPersonas                     String[] // Array of persona slugs this snippet works well for (e.g., ["FormerColleague", "UsesCompetitor"])
-  isActive                                   Boolean                @default(true)
-  createdAt                                  DateTime               @default(now())
-  updatedAt                                  DateTime               @updatedAt
-  company_hqs                                company_hqs            @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  relationshipContexts                       relationship_contexts? @relation(fields: [relationship_contextsRelationshipContextId], references: [relationshipContextId])
-  relationship_contextsRelationshipContextId String?
-  outreachPersonas                           outreach_personas?     @relation(fields: [outreach_personasId], references: [id])
-  outreach_personasId                        String?
+// ContentSnip: hydration-friendly snippet library (CSV/manual), use in templates as {{snippet:snipSlug}}
+// templatePosition = where in the template; personaSlug / bestUsedWhen = usage guidance for assembly
+model ContentSnip {
+  snipId           String           @id @default(cuid())
+  snipName         String
+  snipSlug         String           @unique
+  snipText         String           @db.Text
+  templatePosition TemplatePosition
+  personaSlug      String?
+  bestUsedWhen     String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  @@unique([companyHQId, snipName])
-  @@index([companyHQId])
-  @@index([companyHQId, snipType])
-  @@index([companyHQId, isActive])
+  @@map("content_snips")
+  @@index([templatePosition])
 }
 
 model template_variables {
@@ -1969,6 +1959,18 @@ enum CompanyAwareness {
   KNOWS_COMPANY
   KNOWS_COMPANY_COMPETITOR
   KNOWS_BUT_DISENGAGED
+}
+
+// Where in the email template this snippet belongs (not "type" like email — position in the template)
+enum TemplatePosition {
+  SUBJECT_LINE
+  OPENING_GREETING
+  CATCH_UP
+  BUSINESS_CONTEXT
+  VALUE_PROPOSITION
+  COMPETITOR_FRAME
+  TARGET_ASK
+  SOFT_CLOSE
 }
 
 model off_platform_email_sends {

@@ -10,24 +10,15 @@ import {
   ArrowLeft,
   Upload,
   Mail,
-  ToggleLeft,
-  ToggleRight,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 
-const SNIP_TYPES = [
-  'subject',
-  'intent',
-  'service',
-  'competitor',
-  'value',
-  'cta',
-  'relationship',
-  'generic',
-];
-const CONTEXT_TYPES = ['email', 'blog', 'linkedin', 'internal', 'multi'];
-const INTENT_TYPES = ['reactivation', 'prior_contact', 'intro', 'competitor', 'seasonal', 'relationship_only'];
+const TEMPLATE_POSITIONS = ['SUBJECT_LINE', 'OPENING_GREETING', 'CATCH_UP', 'BUSINESS_CONTEXT', 'VALUE_PROPOSITION', 'COMPETITOR_FRAME', 'TARGET_ASK', 'SOFT_CLOSE'];
+const TEMPLATE_POSITION_LABELS = {
+  SUBJECT_LINE: 'Subject line', OPENING_GREETING: 'Opening greeting', CATCH_UP: 'Catch up', BUSINESS_CONTEXT: 'Business context',
+  VALUE_PROPOSITION: 'Value proposition', COMPETITOR_FRAME: 'Competitor frame', TARGET_ASK: 'Target ask (CTA)', SOFT_CLOSE: 'Soft close',
+};
 
 export default function SnippetHomePage() {
   const router = useRouter();
@@ -42,18 +33,15 @@ export default function SnippetHomePage() {
   const [uploadResult, setUploadResult] = useState(null);
   const [form, setForm] = useState({
     snipName: '',
+    snipSlug: '',
     snipText: '',
-    snipType: 'generic',
-    contextType: '',
-    intentType: '',
-    isActive: true,
+    templatePosition: 'SOFT_CLOSE',
+    personaSlug: '',
+    bestUsedWhen: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [filterSnipType, setFilterSnipType] = useState('');
-  const [filterContextType, setFilterContextType] = useState('');
-  const [filterIntentType, setFilterIntentType] = useState('');
-  const [showInactive, setShowInactive] = useState(false);
+  const [filterPosition, setFilterPosition] = useState('');
 
   useEffect(() => {
     const id =
@@ -71,10 +59,7 @@ export default function SnippetHomePage() {
     }
     setLoading(true);
     const params = new URLSearchParams({ companyHQId });
-    if (filterSnipType) params.set('snipType', filterSnipType);
-    if (filterContextType) params.set('contextType', filterContextType);
-    if (filterIntentType) params.set('intentType', filterIntentType);
-    if (showInactive) params.set('activeOnly', 'false');
+    if (filterPosition) params.set('templatePosition', filterPosition);
     api
       .get(`/api/outreach/content-snips?${params.toString()}`)
       .then((res) => {
@@ -86,7 +71,7 @@ export default function SnippetHomePage() {
 
   useEffect(() => {
     loadSnips();
-  }, [companyHQId, filterSnipType, filterContextType, filterIntentType, showInactive]);
+  }, [companyHQId, filterPosition]);
 
   const handleSave = async () => {
     if (!companyHQId || !form.snipName?.trim() || form.snipText === undefined) {
@@ -99,11 +84,11 @@ export default function SnippetHomePage() {
       if (editingId) {
         const res = await api.put(`/api/outreach/content-snips/${editingId}`, {
           snipName: form.snipName.trim(),
+          snipSlug: form.snipSlug?.trim() || undefined,
           snipText: form.snipText,
-          snipType: form.snipType,
-          contextType: form.contextType || null,
-          intentType: form.intentType || null,
-          isActive: form.isActive,
+          templatePosition: form.templatePosition,
+          personaSlug: form.personaSlug?.trim() || null,
+          bestUsedWhen: form.bestUsedWhen?.trim() || null,
         });
         if (res.data?.success) {
           loadSnips();
@@ -115,11 +100,11 @@ export default function SnippetHomePage() {
         const res = await api.post('/api/outreach/content-snips', {
           companyHQId,
           snipName: form.snipName.trim(),
+          snipSlug: form.snipSlug?.trim() || undefined,
           snipText: form.snipText,
-          snipType: form.snipType,
-          contextType: form.contextType || null,
-          intentType: form.intentType || null,
-          isActive: form.isActive,
+          templatePosition: form.templatePosition,
+          personaSlug: form.personaSlug?.trim() || null,
+          bestUsedWhen: form.bestUsedWhen?.trim() || null,
         });
         if (res.data?.success) {
           loadSnips();
@@ -134,12 +119,12 @@ export default function SnippetHomePage() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (snip) => {
     if (!window.confirm('Delete this snippet? This cannot be undone.')) return;
     try {
-      await api.delete(`/api/outreach/content-snips/${id}`);
+      await api.delete(`/api/outreach/content-snips/${snip.snipId}`);
       loadSnips();
-      if (editingId === id) {
+      if (editingId === snip.snipId) {
         setEditingId(null);
         setShowForm(false);
         resetForm();
@@ -179,39 +164,28 @@ export default function SnippetHomePage() {
     }
   };
 
-  const toggleActive = async (snip) => {
-    try {
-      await api.put(`/api/outreach/content-snips/${snip.id}`, {
-        isActive: !snip.isActive,
-      });
-      loadSnips();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to update');
-    }
-  };
-
   const resetForm = () => {
     setForm({
       snipName: '',
+      snipSlug: '',
       snipText: '',
-      snipType: 'generic',
-      contextType: '',
-      intentType: '',
-      isActive: true,
+      templatePosition: 'SOFT_CLOSE',
+      personaSlug: '',
+      bestUsedWhen: '',
     });
     setError('');
   };
 
   const startEdit = (s) => {
-    setEditingId(s.id);
+    setEditingId(s.snipId);
     setShowForm(true);
     setForm({
       snipName: s.snipName,
+      snipSlug: s.snipSlug || '',
       snipText: s.snipText || '',
-      snipType: s.snipType || 'generic',
-      contextType: s.contextType || '',
-      intentType: s.intentType || '',
-      isActive: s.isActive !== false,
+      templatePosition: s.templatePosition || 'SOFT_CLOSE',
+      personaSlug: s.personaSlug || '',
+      bestUsedWhen: s.bestUsedWhen || '',
     });
   };
 
@@ -221,10 +195,10 @@ export default function SnippetHomePage() {
     resetForm();
   };
 
-  const addToTemplate = (snipName) => {
+  const addToTemplate = (snipSlug) => {
     const q = new URLSearchParams();
     if (companyHQId) q.set('companyHQId', companyHQId);
-    q.set('insertSnippet', snipName);
+    q.set('insertSnippet', snipSlug);
     router.push(`/outreach/campaigns/create?${q.toString()}`);
   };
 
@@ -250,7 +224,7 @@ export default function SnippetHomePage() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Snippet home"
-          subtitle="Content snips: ingest via CSV or add manually. Use in templates as {{snippet:snipName}} or keep free-floating."
+          subtitle="Content snips: ingest via CSV or add manually. Use in templates as {{snippet:snipSlug}}."
           backTo="/outreach"
           backLabel="Back to Outreach"
         />
@@ -307,11 +281,15 @@ export default function SnippetHomePage() {
               <p className="mb-2 text-xs text-gray-600">
                 Columns: <code className="rounded bg-gray-200 px-1">snip_name</code>,{' '}
                 <code className="rounded bg-gray-200 px-1">snip_text</code>,{' '}
-                <code className="rounded bg-gray-200 px-1">snip_type</code> (optional, default generic),{' '}
-                <code className="rounded bg-gray-200 px-1">context_type</code>,{' '}
-                <code className="rounded bg-gray-200 px-1">intent_type</code> (optional).{' '}
+                <code className="rounded bg-gray-200 px-1">template_position</code> (optional, default SOFT_CLOSE),{' '}
+                <code className="rounded bg-gray-200 px-1">assembly_helper_personas</code> (optional, comma-separated persona slugs).{' '}
                 <a
-                  href="data:text/csv;charset=utf-8,snip_name,snip_text,snip_type,context_type,intent_type%0Aintent_reach_out,I wanted to reach out,intent,email,prior_contact%0Aintent_follow_up,I wanted to follow up,intent,email,reactivation"
+                  href={`data:text/csv;charset=utf-8,${encodeURIComponent([
+                    'snip_name,snip_text,template_position,assembly_helper_personas',
+                    'subject_company_only,{{Company}},SUBJECT_LINE,',
+                    'opening_reconnect,Following up on our conversation about {{topic}}.,OPENING_GREETING,FormerColleagueNowReachingoutAgainAfterLongTime',
+                    'cta_brief_call,Please let me know if a brief call would be worthwhile.,TARGET_ASK,',
+                  ].join('\n'))}`}
                   download="content-snips-template.csv"
                   className="text-red-600 hover:underline"
                 >
@@ -363,53 +341,46 @@ export default function SnippetHomePage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">Snip type</label>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Slug (for {{snippet:slug}})</label>
+                  <input
+                    type="text"
+                    value={form.snipSlug}
+                    onChange={(e) => setForm((f) => ({ ...f, snipSlug: e.target.value }))}
+                    placeholder="optional, derived from name"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Template position</label>
                   <select
-                    value={form.snipType}
-                    onChange={(e) => setForm((f) => ({ ...f, snipType: e.target.value }))}
+                    value={form.templatePosition}
+                    onChange={(e) => setForm((f) => ({ ...f, templatePosition: e.target.value }))}
                     className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   >
-                    {SNIP_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                    {TEMPLATE_POSITIONS.map((p) => (
+                      <option key={p} value={p}>{TEMPLATE_POSITION_LABELS[p]}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">Context type</label>
-                  <select
-                    value={form.contextType}
-                    onChange={(e) => setForm((f) => ({ ...f, contextType: e.target.value }))}
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Persona slug</label>
+                  <input
+                    type="text"
+                    value={form.personaSlug}
+                    onChange={(e) => setForm((f) => ({ ...f, personaSlug: e.target.value }))}
+                    placeholder="optional"
                     className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  >
-                    <option value="">—</option>
-                    {CONTEXT_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">Intent type</label>
-                  <select
-                    value={form.intentType}
-                    onChange={(e) => setForm((f) => ({ ...f, intentType: e.target.value }))}
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Best used when</label>
+                  <input
+                    type="text"
+                    value={form.bestUsedWhen}
+                    onChange={(e) => setForm((f) => ({ ...f, bestUsedWhen: e.target.value }))}
+                    placeholder="optional"
                     className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  >
-                    <option value="">—</option>
-                    {INTENT_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 sm:col-span-2">
-                  <label className="flex items-center gap-2 text-xs text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={form.isActive}
-                      onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                      className="rounded border-gray-300"
-                    />
-                    Active
-                  </label>
+                  />
                 </div>
               </div>
               <div className="mt-3">
@@ -442,48 +413,23 @@ export default function SnippetHomePage() {
             </div>
           )}
 
-          {/* Filters */}
+          {/* Hydrate / Show toggle: all positions or one segment */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500">Filter:</span>
+            <span className="text-xs font-medium text-gray-700">Show:</span>
             <select
-              value={filterSnipType}
-              onChange={(e) => setFilterSnipType(e.target.value)}
-              className="rounded border border-gray-300 px-2 py-1 text-xs"
+              value={filterPosition}
+              onChange={(e) => setFilterPosition(e.target.value)}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white"
+              title="Hydrate all or only snippets for one position"
             >
-              <option value="">All types</option>
-              {SNIP_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              <option value="">Hydrate all</option>
+              {TEMPLATE_POSITIONS.map((p) => (
+                <option key={p} value={p}>Hydrate {TEMPLATE_POSITION_LABELS[p].toLowerCase()} only</option>
               ))}
             </select>
-            <select
-              value={filterContextType}
-              onChange={(e) => setFilterContextType(e.target.value)}
-              className="rounded border border-gray-300 px-2 py-1 text-xs"
-            >
-              <option value="">All contexts</option>
-              {CONTEXT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select
-              value={filterIntentType}
-              onChange={(e) => setFilterIntentType(e.target.value)}
-              className="rounded border border-gray-300 px-2 py-1 text-xs"
-            >
-              <option value="">All intents</option>
-              {INTENT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <label className="flex items-center gap-1 text-xs text-gray-600">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              Show inactive
-            </label>
+            <span className="text-xs text-gray-500">
+              {filterPosition ? `Showing ${TEMPLATE_POSITION_LABELS[filterPosition] || filterPosition} only` : 'Showing all positions (segmented below)'}
+            </span>
           </div>
 
           {loading ? (
@@ -491,67 +437,37 @@ export default function SnippetHomePage() {
           ) : snips.length === 0 ? (
             <p className="text-gray-500">
               No snippets yet. Upload a CSV or add one above. Use in templates as{' '}
-              <code className="rounded bg-gray-100 px-1">{'{{snippet:snip_name}}'}</code>.
+              <code className="rounded bg-gray-100 px-1">{'{{snippet:snipSlug}}'}</code>.
             </p>
-          ) : (
+          ) : filterPosition ? (
+            /* Single segment: flat table */
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead>
                   <tr>
                     <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                    <th className="py-2 text-left font-medium text-gray-700">Type</th>
-                    <th className="py-2 text-left font-medium text-gray-700">Context / Intent</th>
+                    <th className="py-2 text-left font-medium text-gray-700">Slug</th>
+                    <th className="py-2 text-left font-medium text-gray-700">Persona / Best used when</th>
                     <th className="py-2 text-left font-medium text-gray-700">Text</th>
                     <th className="py-2 text-right font-medium text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {snips.map((s) => (
-                    <tr key={s.id} className={!s.isActive ? 'bg-gray-50 opacity-75' : ''}>
+                    <tr key={s.snipId}>
                       <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
-                      <td className="py-2">
-                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{s.snipType}</span>
-                      </td>
+                      <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
                       <td className="py-2 text-gray-600">
-                        {[s.contextType, s.intentType].filter(Boolean).join(' / ') || '—'}
+                        {[s.personaSlug, s.bestUsedWhen].filter(Boolean).join(' · ') || '—'}
                       </td>
                       <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
                         {s.snipText}
                       </td>
                       <td className="py-2 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => addToTemplate(s.snipName)}
-                            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-red-600"
-                            title="Add to template"
-                          >
-                            <Mail className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleActive(s)}
-                            className="rounded p-1.5 text-gray-500 hover:bg-gray-100"
-                            title={s.isActive ? 'Deactivate' : 'Activate'}
-                          >
-                            {s.isActive ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => startEdit(s)}
-                            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(s.id)}
-                            className="rounded p-1.5 text-red-500 hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <button type="button" onClick={() => addToTemplate(s.snipSlug)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-red-600" title="Add to template"><Mail className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => handleDelete(s)} className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -559,11 +475,68 @@ export default function SnippetHomePage() {
                 </tbody>
               </table>
             </div>
+          ) : (
+            /* Segmented by position: one section per position */
+            <div className="space-y-8">
+              {TEMPLATE_POSITIONS.map((position) => {
+                const positionSnips = snips.filter((s) => s.templatePosition === position);
+                if (positionSnips.length === 0) return null;
+                return (
+                  <div key={position} className="rounded-lg border border-gray-200 bg-gray-50/50 overflow-hidden">
+                    <div className="px-4 py-2 border-b border-gray-200 bg-white">
+                      <h3 className="text-sm font-semibold text-gray-800">
+                        {TEMPLATE_POSITION_LABELS[position]}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {positionSnips.length} snippet{positionSnips.length !== 1 ? 's' : ''} — or{' '}
+                        <button type="button" onClick={() => setFilterPosition(position)} className="text-red-600 hover:underline font-medium">
+                          hydrate this position only
+                        </button>
+                      </p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead>
+                          <tr>
+                            <th className="py-2 text-left font-medium text-gray-700">Name</th>
+                            <th className="py-2 text-left font-medium text-gray-700">Slug</th>
+                            <th className="py-2 text-left font-medium text-gray-700">Persona / Best used when</th>
+                            <th className="py-2 text-left font-medium text-gray-700">Text</th>
+                            <th className="py-2 text-right font-medium text-gray-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {positionSnips.map((s) => (
+                            <tr key={s.snipId}>
+                              <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
+                              <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
+                              <td className="py-2 text-gray-600">
+                                {[s.personaSlug, s.bestUsedWhen].filter(Boolean).join(' · ') || '—'}
+                              </td>
+                              <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
+                                {s.snipText}
+                              </td>
+                              <td className="py-2 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button type="button" onClick={() => addToTemplate(s.snipSlug)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-red-600" title="Add to template"><Mail className="h-4 w-4" /></button>
+                                  <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
+                                  <button type="button" onClick={() => handleDelete(s)} className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
         <p className="mt-4 text-xs text-gray-500">
-          Snippets can be inserted in campaign email body as {`{{snippet:snip_name}}`}. Use &quot;Add to template&quot; to
+          Snippets can be inserted in campaign email body as {`{{snippet:snipSlug}}`}. Use &quot;Add to template&quot; to
           open campaigns and insert there, or keep them free-floating in this library.
         </p>
       </div>

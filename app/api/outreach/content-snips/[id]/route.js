@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { resolveMembership } from '@/lib/membership';
 
-const SNIP_TYPES = ['subject', 'opening', 'service', 'competitor', 'value', 'cta', 'relationship', 'generic'];
+const TEMPLATE_POSITIONS = ['SUBJECT_LINE', 'OPENING_GREETING', 'CATCH_UP', 'BUSINESS_CONTEXT', 'VALUE_PROPOSITION', 'COMPETITOR_FRAME', 'TARGET_ASK', 'SOFT_CLOSE'];
 
 /**
- * GET /api/outreach/content-snips/[id]
+ * GET /api/outreach/content-snips/[id] — id can be snipId or snipSlug
  */
 export async function GET(request, { params }) {
   let firebaseUser;
@@ -29,16 +28,11 @@ export async function GET(request, { params }) {
     return NextResponse.json({ success: false, error: 'Owner not found' }, { status: 404 });
   }
 
-  const snip = await prisma.content_snips.findUnique({
-    where: { id },
+  const snip = await prisma.contentSnip.findFirst({
+    where: { OR: [{ snipId: id }, { snipSlug: id }] },
   });
   if (!snip) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
-  }
-
-  const { membership } = await resolveMembership(owner.id, snip.companyHQId);
-  if (!membership) {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
   }
 
   return NextResponse.json({ success: true, snip });
@@ -46,8 +40,7 @@ export async function GET(request, { params }) {
 
 /**
  * PUT /api/outreach/content-snips/[id]
- * Body: { snipName?, snipText?, snipType?, assemblyHelperPersonas?, isActive? }
- * assemblyHelperPersonas: string[] - Array of persona slugs
+ * Body: { snipName?, snipSlug?, snipText?, templatePosition?, personaSlug?, bestUsedWhen? }
  */
 export async function PUT(request, { params }) {
   let firebaseUser;
@@ -70,16 +63,11 @@ export async function PUT(request, { params }) {
     return NextResponse.json({ success: false, error: 'Owner not found' }, { status: 404 });
   }
 
-  const existing = await prisma.content_snips.findUnique({
-    where: { id },
+  const existing = await prisma.contentSnip.findFirst({
+    where: { OR: [{ snipId: id }, { snipSlug: id }] },
   });
   if (!existing) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
-  }
-
-  const { membership } = await resolveMembership(owner.id, existing.companyHQId);
-  if (!membership) {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
   }
 
   const body = await request.json().catch(() => ({}));
@@ -89,25 +77,17 @@ export async function PUT(request, { params }) {
     const name = String(body.snipName).trim().replace(/\s+/g, '_').toLowerCase();
     if (name) data.snipName = name;
   }
-  if (body.snipText !== undefined) data.snipText = String(body.snipText);
-  if (body.snipType !== undefined && SNIP_TYPES.includes(body.snipType)) data.snipType = body.snipType;
-  if (body.assemblyHelperPersonas !== undefined) {
-    // Validate persona slugs exist
-    if (Array.isArray(body.assemblyHelperPersonas) && body.assemblyHelperPersonas.length > 0) {
-      const validPersonas = await prisma.outreach_personas.findMany({
-        where: { slug: { in: body.assemblyHelperPersonas } },
-        select: { slug: true },
-      });
-      const validSlugs = validPersonas.map((p) => p.slug);
-      data.assemblyHelperPersonas = validSlugs;
-    } else {
-      data.assemblyHelperPersonas = [];
-    }
+  if (body.snipSlug !== undefined) {
+    const slug = String(body.snipSlug).trim().toLowerCase().replace(/\s+/g, '_');
+    if (slug) data.snipSlug = slug;
   }
-  if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+  if (body.snipText !== undefined) data.snipText = String(body.snipText);
+  if (body.templatePosition !== undefined && TEMPLATE_POSITIONS.includes(body.templatePosition)) data.templatePosition = body.templatePosition;
+  if (body.personaSlug !== undefined) data.personaSlug = body.personaSlug ? String(body.personaSlug).trim() : null;
+  if (body.bestUsedWhen !== undefined) data.bestUsedWhen = body.bestUsedWhen ? String(body.bestUsedWhen).trim() : null;
 
-  const snip = await prisma.content_snips.update({
-    where: { id },
+  const snip = await prisma.contentSnip.update({
+    where: { snipId: existing.snipId },
     data,
   });
 
@@ -115,7 +95,7 @@ export async function PUT(request, { params }) {
 }
 
 /**
- * DELETE /api/outreach/content-snips/[id]
+ * DELETE /api/outreach/content-snips/[id] — id can be snipId or snipSlug
  */
 export async function DELETE(request, { params }) {
   let firebaseUser;
@@ -138,20 +118,15 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ success: false, error: 'Owner not found' }, { status: 404 });
   }
 
-  const existing = await prisma.content_snips.findUnique({
-    where: { id },
+  const existing = await prisma.contentSnip.findFirst({
+    where: { OR: [{ snipId: id }, { snipSlug: id }] },
   });
   if (!existing) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
   }
 
-  const { membership } = await resolveMembership(owner.id, existing.companyHQId);
-  if (!membership) {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-  }
-
-  await prisma.content_snips.delete({
-    where: { id },
+  await prisma.contentSnip.delete({
+    where: { snipId: existing.snipId },
   });
 
   return NextResponse.json({ success: true });

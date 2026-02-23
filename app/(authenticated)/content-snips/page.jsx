@@ -17,16 +17,37 @@ import {
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
 
-const SNIP_TYPES = [
-  'subject',
-  'opening', // Replaces generic "intent" - strategic openings
-  'service',
-  'competitor',
-  'value',
-  'cta',
-  'relationship',
-  'generic',
+// Where in the template this snippet belongs (template position, not "type")
+const TEMPLATE_POSITIONS = [
+  'SUBJECT_LINE',
+  'OPENING_GREETING',
+  'CATCH_UP',
+  'BUSINESS_CONTEXT',
+  'VALUE_PROPOSITION',
+  'COMPETITOR_FRAME',
+  'TARGET_ASK',
+  'SOFT_CLOSE',
 ];
+
+const TEMPLATE_POSITION_LABELS = {
+  SUBJECT_LINE: 'Subject line',
+  OPENING_GREETING: 'Opening greeting',
+  CATCH_UP: 'Catch up',
+  BUSINESS_CONTEXT: 'Business context',
+  VALUE_PROPOSITION: 'Value proposition',
+  COMPETITOR_FRAME: 'Competitor frame',
+  TARGET_ASK: 'Target ask (CTA)',
+  SOFT_CLOSE: 'Soft close',
+};
+
+// CSV template: snip_name, snip_text, template_position, assembly_helper_personas
+const CSV_TEMPLATE = [
+  'snip_name,snip_text,template_position,assembly_helper_personas',
+  'subject_company_only,{{Company}},SUBJECT_LINE,',
+  'opening_reconnect,Following up on our conversation about {{topic}}.,OPENING_GREETING,FormerColleagueNowReachingoutAgainAfterLongTime',
+  'competitor_checkin,How is your current provider working for you?,COMPETITOR_FRAME,"FormerColleagueNowReachingoutAgainAfterLongTime,CompetitorSwitchingProspect"',
+  'cta_brief_call,Please let me know if a brief call would be worthwhile.,TARGET_ASK,',
+].join('\n');
 
 function ContentSnipsLandingPage() {
   const router = useRouter();
@@ -45,10 +66,11 @@ function ContentSnipsLandingPage() {
   // Form state for manual creation
   const [form, setForm] = useState({
     snipName: '',
+    snipSlug: '',
     snipText: '',
-    snipType: 'generic',
-    assemblyHelperPersonas: [],
-    isActive: true,
+    templatePosition: 'SOFT_CLOSE',
+    personaSlug: '',
+    bestUsedWhen: '',
   });
   const [saving, setSaving] = useState(false);
   const [personas, setPersonas] = useState([]);
@@ -84,7 +106,7 @@ function ContentSnipsLandingPage() {
     } else {
       setLoading(false);
     }
-  }, [companyHQId]);
+  }, [companyHQId, hydrateFilter]);
 
   const loadPersonas = async () => {
     setLoadingPersonas(true);
@@ -100,11 +122,15 @@ function ContentSnipsLandingPage() {
     }
   };
 
+  const [hydrateFilter, setHydrateFilter] = useState(''); // '' = all, or TEMPLATE_POSITION
+
   const loadSnips = async () => {
     if (!companyHQId) return;
     setLoading(true);
     try {
-      const res = await api.get(`/api/outreach/content-snips?companyHQId=${companyHQId}&activeOnly=false`);
+      const params = new URLSearchParams({ companyHQId });
+      if (hydrateFilter) params.set('templatePosition', hydrateFilter);
+      const res = await api.get(`/api/outreach/content-snips?${params.toString()}`);
       if (res.data?.success) {
         setSnips(res.data.snips || []);
       }
@@ -126,10 +152,11 @@ function ContentSnipsLandingPage() {
       if (editingId) {
         const res = await api.put(`/api/outreach/content-snips/${editingId}`, {
           snipName: form.snipName.trim(),
+          snipSlug: form.snipSlug?.trim() || undefined,
           snipText: form.snipText,
-          snipType: form.snipType,
-          assemblyHelperPersonas: form.assemblyHelperPersonas || [],
-          isActive: form.isActive,
+          templatePosition: form.templatePosition,
+          personaSlug: form.personaSlug?.trim() || null,
+          bestUsedWhen: form.bestUsedWhen?.trim() || null,
         });
         if (res.data?.success) {
           setSuccess('Content snip updated successfully!');
@@ -142,10 +169,11 @@ function ContentSnipsLandingPage() {
         const res = await api.post('/api/outreach/content-snips', {
           companyHQId,
           snipName: form.snipName.trim(),
+          snipSlug: form.snipSlug?.trim() || undefined,
           snipText: form.snipText,
-          snipType: form.snipType,
-          assemblyHelperPersonas: form.assemblyHelperPersonas || [],
-          isActive: form.isActive,
+          templatePosition: form.templatePosition,
+          personaSlug: form.personaSlug?.trim() || null,
+          bestUsedWhen: form.bestUsedWhen?.trim() || null,
         });
         if (res.data?.success) {
           setSuccess('Content snip created successfully!');
@@ -178,11 +206,11 @@ function ContentSnipsLandingPage() {
         const generated = res.data.snip;
         setForm({
           snipName: generated.snipName || '',
+          snipSlug: generated.snipSlug || '',
           snipText: generated.snipText || '',
-          snipType: generated.snipType || 'generic',
-          contextType: generated.contextType || '',
-          intentType: generated.intentType || '',
-          isActive: true,
+          templatePosition: generated.templatePosition || 'SOFT_CLOSE',
+          personaSlug: '',
+          bestUsedWhen: '',
         });
         setCreateMode('manual');
         setAiPrompt('');
@@ -264,14 +292,14 @@ function ContentSnipsLandingPage() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (snipId) => {
     if (!window.confirm('Delete this content snip? This cannot be undone.')) return;
     try {
-      await api.delete(`/api/outreach/content-snips/${id}`);
+      await api.delete(`/api/outreach/content-snips/${snipId}`);
       setSuccess('Content snip deleted successfully!');
       loadSnips();
       setSelectedSnips(new Set());
-      if (editingId === id) {
+      if (editingId === snipId) {
         resetForm();
         setCreateMode(null);
         setShowCreateOptions(false);
@@ -332,30 +360,32 @@ function ContentSnipsLandingPage() {
     if (selectedSnips.size === snipList.length) {
       setSelectedSnips(new Set());
     } else {
-      setSelectedSnips(new Set(snipList.map((s) => s.id)));
+      setSelectedSnips(new Set(snipList.map((s) => s.snipId)));
     }
   };
 
   const startEdit = (snip) => {
-    setEditingId(snip.id);
+    setEditingId(snip.snipId);
     setCreateMode('manual');
     setShowCreateOptions(true);
     setForm({
       snipName: snip.snipName,
+      snipSlug: snip.snipSlug || '',
       snipText: snip.snipText || '',
-      snipType: snip.snipType || 'generic',
-      assemblyHelperPersonas: snip.assemblyHelperPersonas || [],
-      isActive: snip.isActive !== false,
+      templatePosition: snip.templatePosition || 'SOFT_CLOSE',
+      personaSlug: snip.personaSlug || '',
+      bestUsedWhen: snip.bestUsedWhen || '',
     });
   };
 
   const resetForm = () => {
     setForm({
       snipName: '',
+      snipSlug: '',
       snipText: '',
-      snipType: 'generic',
-      assemblyHelperPersonas: [],
-      isActive: true,
+      templatePosition: 'SOFT_CLOSE',
+      personaSlug: '',
+      bestUsedWhen: '',
     });
     setEditingId(null);
     setError('');
@@ -492,7 +522,7 @@ function ContentSnipsLandingPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Content Snips"
-          subtitle="Manage reusable content blocks for your templates. Use in templates as {{snippet:snipName}}."
+          subtitle="Manage reusable content blocks for your templates. Use in templates as {{snippet:snipSlug}}."
           backTo="/templates"
           backLabel="Back to Templates"
         />
@@ -607,55 +637,47 @@ function ContentSnipsLandingPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Snip Type *</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Slug (for {{snippet:slug}})</label>
+                    <input
+                      type="text"
+                      value={form.snipSlug}
+                      onChange={(e) => setForm((f) => ({ ...f, snipSlug: e.target.value }))}
+                      placeholder="optional, derived from name"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Template position *</label>
+                    <p className="mb-1 text-xs text-gray-500">Where in the email does this snippet belong?</p>
                     <select
-                      value={form.snipType}
-                      onChange={(e) => setForm((f) => ({ ...f, snipType: e.target.value }))}
+                      value={form.templatePosition}
+                      onChange={(e) => setForm((f) => ({ ...f, templatePosition: e.target.value }))}
                       className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                     >
-                      {SNIP_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
+                      {TEMPLATE_POSITIONS.map((p) => (
+                        <option key={p} value={p}>{TEMPLATE_POSITION_LABELS[p]}</option>
                       ))}
                     </select>
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Assembly Helper Personas (Optional)
-                    </label>
-                    <p className="mb-2 text-xs text-gray-500">
-                      Which personas does this snippet work well for? Select multiple. Leave empty for general use.
-                    </p>
-                    {loadingPersonas ? (
-                      <p className="text-sm text-gray-500">Loading personas...</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {personas.map((p) => (
-                          <label key={p.slug} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={form.assemblyHelperPersonas.includes(p.slug)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setForm((f) => ({
-                                    ...f,
-                                    assemblyHelperPersonas: [...f.assemblyHelperPersonas, p.slug],
-                                  }));
-                                } else {
-                                  setForm((f) => ({
-                                    ...f,
-                                    assemblyHelperPersonas: f.assemblyHelperPersonas.filter((slug) => slug !== p.slug),
-                                  }));
-                                }
-                              }}
-                              className="rounded border-gray-300"
-                            />
-                            <span className="text-sm">
-                              {p.name} {p.description ? <span className="text-gray-500">- {p.description}</span> : ''}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Persona slug (optional)</label>
+                    <input
+                      type="text"
+                      value={form.personaSlug}
+                      onChange={(e) => setForm((f) => ({ ...f, personaSlug: e.target.value }))}
+                      placeholder="e.g. FormerColleague"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Best used when (optional)</label>
+                    <input
+                      type="text"
+                      value={form.bestUsedWhen}
+                      onChange={(e) => setForm((f) => ({ ...f, bestUsedWhen: e.target.value }))}
+                      placeholder="e.g. reconnecting after long time"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
                   </div>
                 </div>
                 <div className="mt-4">
@@ -669,17 +691,6 @@ function ContentSnipsLandingPage() {
                     rows={6}
                     className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   />
-                </div>
-                <div className="mt-4 flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={form.isActive}
-                      onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                      className="rounded border-gray-300"
-                    />
-                    Active
-                  </label>
                 </div>
                 <div className="mt-4 flex gap-2">
                   <button
@@ -742,10 +753,10 @@ function ContentSnipsLandingPage() {
                 <p className="mb-4 text-sm text-gray-600">
                   Columns: <code className="rounded bg-gray-200 px-1">snip_name</code>,{' '}
                   <code className="rounded bg-gray-200 px-1">snip_text</code>,{' '}
-                  <code className="rounded bg-gray-200 px-1">snip_type</code> (optional, default generic),{' '}
+                  <code className="rounded bg-gray-200 px-1">template_position</code> (optional, default SOFT_CLOSE),{' '}
                   <code className="rounded bg-gray-200 px-1">assembly_helper_personas</code> (optional: comma-separated persona slugs like "FormerColleague,UsesCompetitor").{' '}
                   <a
-                    href="data:text/csv;charset=utf-8,snip_name,snip_text,snip_type%0Aopening_reconnect_prior_conversation,Following up on our conversation about {{topic}},opening%0Acta_brief_call_worthwhile,Please let me know if a brief call would be worthwhile.,cta"
+                    href={`data:text/csv;charset=utf-8,${encodeURIComponent(CSV_TEMPLATE)}`}
                     download="content-snips-template.csv"
                     className="text-red-600 hover:underline"
                   >
@@ -919,6 +930,27 @@ function ContentSnipsLandingPage() {
         {/* Snips List */}
         {!showCreateOptions && (
           <div className="space-y-6">
+            {/* Show / Hydrate toggle */}
+            {snips.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+                <span className="text-sm font-medium text-gray-700">Show:</span>
+                <select
+                  value={hydrateFilter}
+                  onChange={(e) => setHydrateFilter(e.target.value)}
+                  className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white"
+                  title="Hydrate all or only one position"
+                >
+                  <option value="">Hydrate all</option>
+                  {TEMPLATE_POSITIONS.map((p) => (
+                    <option key={p} value={p}>Hydrate {TEMPLATE_POSITION_LABELS[p].toLowerCase()} only</option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-500">
+                  {hydrateFilter ? `Showing ${TEMPLATE_POSITION_LABELS[hydrateFilter] || hydrateFilter} only` : 'Showing all positions (segmented below)'}
+                </span>
+              </div>
+            )}
+
             {/* Bulk Actions Bar */}
             {snips.length > 0 && (
               <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
@@ -950,209 +982,126 @@ function ContentSnipsLandingPage() {
               </div>
             )}
 
-            {/* Subject Line Snippets */}
-            {snips.filter((s) => s.snipType === 'subject').length > 0 && (
-              <div className="rounded-xl bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Subject Lines</h3>
-                    <p className="text-sm text-gray-600">
-                      {snips.filter((s) => s.snipType === 'subject').length} subject line snippet(s)
+            {/* List: empty state, single segment, or segmented by position */}
+            {loading ? (
+              <p className="text-gray-500">Loading…</p>
+            ) : snips.length === 0 ? (
+              <div className="rounded-xl bg-white p-12 text-center shadow-sm">
+                {hydrateFilter ? (
+                  <>
+                    <p className="text-gray-600 mb-4">No snippets for {TEMPLATE_POSITION_LABELS[hydrateFilter] || hydrateFilter}.</p>
+                    <button type="button" onClick={() => setHydrateFilter('')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                      Show all positions
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <FileStack className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No content snips yet</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Create your first content snip to get started. Use them in templates as{' '}
+                      <code className="rounded bg-gray-100 px-1">{'{{snippet:snipSlug}}'}</code>.
                     </p>
-                  </div>
-                </div>
+                    <button type="button" onClick={() => setShowCreateOptions(true)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+                      Create Content Snip
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : hydrateFilter ? (
+              /* Single position: flat table */
+              <div className="rounded-xl bg-white p-6 shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead>
                       <tr>
                         <th className="py-2 text-left font-medium text-gray-700 w-8">
-                          <input
-                            type="checkbox"
-                            checked={snips.filter((s) => s.snipType === 'subject').length > 0 && 
-                              snips.filter((s) => s.snipType === 'subject').every((s) => selectedSnips.has(s.id))}
-                            onChange={() => selectAllSnips(snips.filter((s) => s.snipType === 'subject'))}
-                            className="rounded border-gray-300"
-                          />
+                          <input type="checkbox" checked={snips.length > 0 && snips.every((s) => selectedSnips.has(s.snipId))} onChange={() => selectAllSnips(snips)} className="rounded border-gray-300" />
                         </th>
                         <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Helper Personas</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Slug</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Persona / Best used when</th>
                         <th className="py-2 text-left font-medium text-gray-700">Text</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Status</th>
                         <th className="py-2 text-right font-medium text-gray-700">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {snips
-                        .filter((s) => s.snipType === 'subject')
-                        .map((s) => (
-                          <tr key={s.id} className={!s.isActive ? 'bg-gray-50 opacity-75' : ''}>
-                            <td className="py-2">
-                              <input
-                                type="checkbox"
-                                checked={selectedSnips.has(s.id)}
-                                onChange={() => toggleSelectSnip(s.id)}
-                                className="rounded border-gray-300"
-                              />
-                            </td>
-                            <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
-                            <td className="py-2 text-gray-600">
-                              {s.bestForPersonaType?.replace(/_/g, ' ') || 'General'}
-                            </td>
-                            <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
-                              {s.snipText}
-                            </td>
-                            <td className="py-2">
-                              {s.isActive ? (
-                                <span className="flex items-center gap-1 text-green-600">
-                                  <CheckCircle className="h-4 w-4" />
-                                  Active
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">Inactive</span>
-                              )}
-                            </td>
-                            <td className="py-2 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => startEdit(s)}
-                                  className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                                  title="Edit"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(s.id)}
-                                  className="rounded p-1.5 text-red-500 hover:bg-red-50"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                      {snips.map((s) => (
+                        <tr key={s.snipId}>
+                          <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
+                          <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
+                          <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
+                          <td className="py-2 text-gray-600">{[s.personaSlug, s.bestUsedWhen].filter(Boolean).join(' · ') || '—'}</td>
+                          <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
+                          <td className="py-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
+                              <button type="button" onClick={() => handleDelete(s.snipId)} className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            )}
-
-            {/* Other Snippets */}
-            <div className="rounded-xl bg-white p-6 shadow-sm">
-              {loading ? (
-                <p className="text-gray-500">Loading…</p>
-              ) : snips.filter((s) => s.snipType !== 'subject').length === 0 ? (
-                <div className="text-center py-12">
-                  <FileStack className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No content snips yet</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Create your first content snip to get started. Use them in templates as{' '}
-                    <code className="rounded bg-gray-100 px-1">{'{{snippet:snip_name}}'}</code>.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateOptions(true)}
-                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                  >
-                    Create Content Snip
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Content Snippets</h3>
-                      <p className="text-sm text-gray-600">
-                        {snips.filter((s) => s.snipType !== 'subject').length} snippet(s)
-                      </p>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead>
-                        <tr>
-                          <th className="py-2 text-left font-medium text-gray-700 w-8">
-                            <input
-                              type="checkbox"
-                              checked={snips.filter((s) => s.snipType !== 'subject').length > 0 && 
-                                snips.filter((s) => s.snipType !== 'subject').every((s) => selectedSnips.has(s.id))}
-                              onChange={() => selectAllSnips(snips.filter((s) => s.snipType !== 'subject'))}
-                              className="rounded border-gray-300"
-                            />
-                          </th>
-                          <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                          <th className="py-2 text-left font-medium text-gray-700">Type</th>
-                          <th className="py-2 text-left font-medium text-gray-700">Helper Personas</th>
-                          <th className="py-2 text-left font-medium text-gray-700">Text</th>
-                          <th className="py-2 text-left font-medium text-gray-700">Status</th>
-                          <th className="py-2 text-right font-medium text-gray-700">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {snips
-                          .filter((s) => s.snipType !== 'subject')
-                          .map((s) => (
-                            <tr key={s.id} className={!s.isActive ? 'bg-gray-50 opacity-75' : ''}>
-                              <td className="py-2">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSnips.has(s.id)}
-                                  onChange={() => toggleSelectSnip(s.id)}
-                                  className="rounded border-gray-300"
-                                />
-                              </td>
-                              <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
-                              <td className="py-2">
-                                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{s.snipType}</span>
-                              </td>
-                              <td className="py-2 text-gray-600">
-                                {s.assemblyHelperPersonas && s.assemblyHelperPersonas.length > 0
-                                  ? s.assemblyHelperPersonas.join(', ')
-                                  : 'General'}
-                              </td>
-                              <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
-                                {s.snipText}
-                              </td>
-                              <td className="py-2">
-                                {s.isActive ? (
-                                  <span className="flex items-center gap-1 text-green-600">
-                                    <CheckCircle className="h-4 w-4" />
-                                    Active
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400">Inactive</span>
-                                )}
-                              </td>
-                              <td className="py-2 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => startEdit(s)}
-                                    className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                                    title="Edit"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDelete(s.id)}
-                                    className="rounded p-1.5 text-red-500 hover:bg-red-50"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
+            ) : (
+              /* Hydrate all: segmented by position */
+              <div className="space-y-8">
+                {TEMPLATE_POSITIONS.map((position) => {
+                  const positionSnips = snips.filter((s) => s.templatePosition === position);
+                  if (positionSnips.length === 0) return null;
+                  return (
+                    <div key={position} className="rounded-xl bg-white p-6 shadow-sm border border-gray-200">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{TEMPLATE_POSITION_LABELS[position]}</h3>
+                          <p className="text-sm text-gray-600">
+                            {positionSnips.length} snippet{positionSnips.length !== 1 ? 's' : ''} — or{' '}
+                            <button type="button" onClick={() => setHydrateFilter(position)} className="text-red-600 hover:underline font-medium">
+                              hydrate this position only
+                            </button>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                          <thead>
+                            <tr>
+                              <th className="py-2 text-left font-medium text-gray-700 w-8">
+                                <input type="checkbox" checked={positionSnips.every((s) => selectedSnips.has(s.snipId))} onChange={() => selectAllSnips(positionSnips)} className="rounded border-gray-300" />
+                              </th>
+                              <th className="py-2 text-left font-medium text-gray-700">Name</th>
+                              <th className="py-2 text-left font-medium text-gray-700">Slug</th>
+                              <th className="py-2 text-left font-medium text-gray-700">Persona / Best used when</th>
+                              <th className="py-2 text-left font-medium text-gray-700">Text</th>
+                              <th className="py-2 text-right font-medium text-gray-700">Actions</th>
                             </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {positionSnips.map((s) => (
+                              <tr key={s.snipId}>
+                                <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
+                                <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
+                                <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
+                                <td className="py-2 text-gray-600">{[s.personaSlug, s.bestUsedWhen].filter(Boolean).join(' · ') || '—'}</td>
+                                <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
+                                <td className="py-2 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
+                                    <button type="button" onClick={() => handleDelete(s.snipId)} className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

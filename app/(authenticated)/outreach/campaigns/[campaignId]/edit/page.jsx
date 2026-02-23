@@ -159,8 +159,8 @@ function CampaignEditContent({ params }) {
     }
   };
 
-  const insertSnippetAtCursor = (snipName) => {
-    const tag = `{{snippet:${snipName}}}`;
+  const insertSnippetAtCursor = (snipSlug) => {
+    const tag = `{{snippet:${snipSlug}}}`;
     const textarea = bodyTextareaRef.current;
     if (textarea) {
       const start = textarea.selectionStart;
@@ -179,10 +179,10 @@ function CampaignEditContent({ params }) {
   };
 
   const filteredSnippets = snippetIntentFilter
-    ? snippets.filter((s) => (s.intentType || '') === snippetIntentFilter)
+    ? snippets.filter((s) => (s.templatePosition || '') === snippetIntentFilter)
     : snippets;
-  // content_snips use snipName; template_snippets use variableName - support both
-  const getSnippetInsertKey = (s) => s.snipName ?? s.variableName;
+  // content_snips use snipSlug for {{snippet:snipSlug}}; template_snippets use variableName
+  const getSnippetInsertKey = (s) => s.snipSlug ?? s.snipName ?? s.variableName;
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -560,33 +560,35 @@ function CampaignEditContent({ params }) {
                           ) : (
                             <>
                               <div className="mb-2 flex items-center gap-2">
-                                <label className="text-xs text-gray-600">Filter by intent:</label>
+                                <label className="text-xs text-gray-600">Filter by position:</label>
                                 <select
                                   value={snippetIntentFilter}
                                   onChange={(e) => setSnippetIntentFilter(e.target.value)}
                                   className="rounded border border-gray-300 px-2 py-1 text-xs"
                                 >
                                   <option value="">All</option>
-                                  <option value="reactivation">Reactivation</option>
-                                  <option value="prior_contact">Prior contact</option>
-                                  <option value="intro_positioning">Intro / positioning</option>
-                                  <option value="seasonal">Seasonal</option>
-                                  <option value="neutral_polite">Neutral / polite</option>
-                                  <option value="other">Other</option>
+                                  <option value="SUBJECT_LINE">Subject line</option>
+                                  <option value="OPENING_GREETING">Opening greeting</option>
+                                  <option value="CATCH_UP">Catch up</option>
+                                  <option value="BUSINESS_CONTEXT">Business context</option>
+                                  <option value="VALUE_PROPOSITION">Value proposition</option>
+                                  <option value="COMPETITOR_FRAME">Competitor frame</option>
+                                  <option value="TARGET_ASK">Target ask (CTA)</option>
+                                  <option value="SOFT_CLOSE">Soft close</option>
                                 </select>
                               </div>
                               <div className="flex flex-wrap gap-1.5">
                                 {filteredSnippets.map((s) => (
                                   <button
-                                    key={s.id}
+                                    key={s.snipId ?? s.id}
                                     type="button"
                                     onClick={() => insertSnippetAtCursor(getSnippetInsertKey(s))}
                                     className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                                    title={s.snipText ? `${s.snipName}: ${s.snipText.slice(0, 80)}…` : s.name || s.snipName}
+                                    title={s.snipText ? `${s.snipName ?? s.name}: ${s.snipText.slice(0, 80)}…` : s.name || s.snipName}
                                   >
                                     {s.name || s.snipName}
-                                    {(s.intentType || s.snipType) && (
-                                      <span className="ml-1 text-gray-400">({s.intentType || s.snipType})</span>
+                                    {s.templatePosition && (
+                                      <span className="ml-1 text-gray-400">({s.templatePosition})</span>
                                     )}
                                   </button>
                                 ))}

@@ -57,19 +57,17 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Load available content snippets
-    const snippets = await prisma.content_snips.findMany({
-      where: {
-        companyHQId,
-        isActive: true,
-      },
+    // Load available content snippets (global library)
+    const snippets = await prisma.contentSnip.findMany({
       select: {
+        snipSlug: true,
         snipName: true,
         snipText: true,
-        snipType: true,
-        assemblyHelperPersonas: true,
+        templatePosition: true,
+        personaSlug: true,
+        bestUsedWhen: true,
       },
-      orderBy: [{ snipType: 'asc' }, { snipName: 'asc' }],
+      orderBy: [{ templatePosition: 'asc' }, { snipName: 'asc' }],
     });
 
     if (snippets.length === 0) {
@@ -95,12 +93,14 @@ export async function POST(request) {
       }
     }
 
-    // Format snippets for AI
+    // Format snippets for AI (use snipSlug as stable reference for {{snippet:snipSlug}})
     const snippetsList = snippets.map((s) => ({
-      name: s.snipName,
+      name: s.snipSlug,
+      displayName: s.snipName,
       text: s.snipText,
-      type: s.snipType,
-      assemblyHelperPersonas: s.assemblyHelperPersonas || [],
+      templatePosition: s.templatePosition,
+      personaSlug: s.personaSlug ?? null,
+      bestUsedWhen: s.bestUsedWhen ?? null,
     }));
 
     const openai = getOpenAIClient();
@@ -112,18 +112,16 @@ Your task is to analyze the user's intent and select the most relevant content s
 
 CRITICAL RULES:
 1. You MUST use the provided snippets - do not invent new content
-2. Use snippets in the format: {{snippet:snippetName}}
+2. Use snippets in the format: {{snippet:snippetSlug}} (use the "name" field from each snippet)
 3. You can combine multiple snippets with your own connecting text
 4. Add variables like {{firstName}}, {{companyName}} where appropriate
 5. Create a natural flow: greeting → context → value → ask → close
 6. Select snippets that match the user's intent and relationship type
 
-SNIPPET SELECTION STRATEGY:
-- Start with an "intent" snippet that matches why they're reaching out
-- Add "value" or "service" snippets if relevant to the ask
-- Use "cta" snippets for the call-to-action
-- Consider "relationship" snippets for context
-- Order them logically: intent → context → value → ask → close`;
+SNIPPET SELECTION STRATEGY (use templatePosition to order):
+- SUBJECT_LINE for the email subject
+- OPENING_GREETING then CATCH_UP, BUSINESS_CONTEXT, VALUE_PROPOSITION, COMPETITOR_FRAME (if relevant), TARGET_ASK, SOFT_CLOSE
+- Order body snippets by template position: opening → catch up → context → value → ask → close`;
 
     const userPrompt = `=== USER'S INTENT ===
 ${intent.trim()}
@@ -135,7 +133,7 @@ ${JSON.stringify(snippetsList, null, 2)}
 1. Analyze the user's intent and select the most relevant snippets (typically 2-4 snippets)
 2. Determine the best order for these snippets
 3. Create a complete email template that:
-   - Uses selected snippets in format {{snippet:snippetName}}
+   - Uses selected snippets in format {{snippet:snippetSlug}} (the "name" field)
    - Adds connecting text between snippets for natural flow
    - Includes variables like {{firstName}}, {{companyName}} where appropriate
    - Has a warm, human tone
@@ -145,8 +143,8 @@ Return ONLY valid JSON in this exact format:
 {
   "title": "Descriptive title for this template",
   "subject": "Email subject line (simple, no variables)",
-  "body": "Complete email body using {{snippet:snippetName}} format and variables",
-  "selectedSnippets": ["snippetName1", "snippetName2", ...],
+  "body": "Complete email body using {{snippet:snippetSlug}} format and variables",
+  "selectedSnippets": ["snippetSlug1", "snippetSlug2", ...],
   "reasoning": "Brief explanation of why these snippets were selected and ordered this way"
 }`;
 
@@ -189,7 +187,7 @@ Return ONLY valid JSON in this exact format:
 
     // Verify selected snippets exist
     const selectedSnippets = generated.selectedSnippets || [];
-    const validSnippets = snippets.map((s) => s.snipName);
+    const validSnippets = snippets.map((s) => s.snipSlug);
     const invalidSnippets = selectedSnippets.filter((name) => !validSnippets.includes(name));
     if (invalidSnippets.length > 0) {
       console.warn('AI selected invalid snippets:', invalidSnippets);

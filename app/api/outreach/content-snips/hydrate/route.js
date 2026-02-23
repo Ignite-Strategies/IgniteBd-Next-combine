@@ -3,10 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { resolveMembership } from '@/lib/membership';
 
+const TEMPLATE_POSITIONS = ['SUBJECT_LINE', 'OPENING_GREETING', 'CATCH_UP', 'BUSINESS_CONTEXT', 'VALUE_PROPOSITION', 'COMPETITOR_FRAME', 'TARGET_ASK', 'SOFT_CLOSE'];
+
 /**
- * GET /api/outreach/content-snips/hydrate?companyHQId=xxx
- * Returns all active snippets for a company as a hydrated key-value map
- * Optimized for template resolution: { snipName: snipText, ... }
+ * GET /api/outreach/content-snips/hydrate?companyHQId=xxx&templatePosition=xxx
+ * Returns snippets as a hydrated map keyed by snipSlug (for {{snippet:snipSlug}}).
+ * Optional templatePosition: hydrate all, or only that position (e.g. SUBJECT_LINE).
+ * companyHQId required for auth only.
  */
 export async function GET(request) {
   let firebaseUser;
@@ -20,6 +23,8 @@ export async function GET(request) {
   if (!companyHQId) {
     return NextResponse.json({ success: false, error: 'companyHQId is required' }, { status: 400 });
   }
+
+  const templatePosition = request.nextUrl?.searchParams?.get('templatePosition');
 
   const owner = await prisma.owners.findUnique({
     where: { firebaseId: firebaseUser.uid },
@@ -35,39 +40,43 @@ export async function GET(request) {
   }
 
   try {
-    const snips = await prisma.content_snips.findMany({
-      where: {
-        companyHQId,
-        isActive: true,
-      },
-      orderBy: [{ snipType: 'asc' }, { snipName: 'asc' }],
+    const where = templatePosition && TEMPLATE_POSITIONS.includes(templatePosition)
+      ? { templatePosition }
+      : {};
+    const snips = await prisma.contentSnip.findMany({
+      where,
+      orderBy: [{ templatePosition: 'asc' }, { snipName: 'asc' }],
     });
 
-    // Create hydrated map: snipName -> { snipText, snipType, assemblyHelperPersonas, ... }
     const hydrated = {};
     snips.forEach((snip) => {
-      hydrated[snip.snipName] = {
+      hydrated[snip.snipSlug] = {
         snipText: snip.snipText,
-        snipType: snip.snipType,
-        assemblyHelperPersonas: snip.assemblyHelperPersonas || [],
+        templatePosition: snip.templatePosition,
+        personaSlug: snip.personaSlug ?? null,
+        bestUsedWhen: snip.bestUsedWhen ?? null,
       };
     });
 
     return NextResponse.json({
       success: true,
-      companyHQId,
       snippets: hydrated,
       count: snips.length,
-      byType: snips.reduce((acc, snip) => {
-        if (!acc[snip.snipType]) acc[snip.snipType] = [];
-        acc[snip.snipType].push(snip.snipName);
+      templatePositionFilter: templatePosition && TEMPLATE_POSITIONS.includes(templatePosition) ? templatePosition : null,
+      byPosition: snips.reduce((acc, snip) => {
+        if (!acc[snip.templatePosition]) acc[snip.templatePosition] = [];
+        acc[snip.templatePosition].push(snip.snipSlug);
         return acc;
       }, {}),
     });
   } catch (error) {
-    console.error('❌ Snippet hydration error:', error);
+    console.error('❌ Snippet hydration error:', error?.message || error, error?.stack);
     return NextResponse.json(
-      { success: false, error: 'Failed to hydrate snippets' },
+      {
+        success: false,
+        error: 'Failed to hydrate snippets',
+        detail: error?.message || String(error),
+      },
       { status: 500 },
     );
   }
