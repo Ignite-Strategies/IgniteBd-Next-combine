@@ -12,13 +12,16 @@ import { ensureContactPipeline } from '@/lib/services/pipelineService';
  * Simple contact save process - matches the simplified contact creation flow
  * 
  * Body: FormData with 'file' field containing CSV
- * CSV format (simple):
+ * CSV format (LinkedIn-style columns supported):
  * - firstName, lastName (required)
- * - email (optional)
- * - companyName (optional - for company association)
+ * - email / email address (optional but recommended for outreach)
+ * - company / company name (optional - for company association)
+ * - title / position (optional - job title)
+ * - url (optional - LinkedIn profile URL)
+ * - connected on (optional - LinkedIn connection date, for context)
+ * - phone (optional)
+ * - notes (optional)
  * - pipeline, stage (optional - for deal stage/pipeline setup)
- * 
- * Note: Additional fields like phone, title, notes, howMet should be added on the contact detail page, not via CSV
  * 
  * Returns:
  * - success: boolean
@@ -121,9 +124,27 @@ export async function POST(request) {
         'lastname': 'lastName',
         'last': 'lastName',
         'email': 'email',
+        'email address': 'email',
         'company name': 'companyName',
         'companyname': 'companyName',
         'company': 'companyName',
+        'title': 'title',
+        'job title': 'title',
+        'jobtitle': 'title',
+        'position': 'title',
+        'url': 'linkedinUrl',
+        'linkedin': 'linkedinUrl',
+        'linkedin url': 'linkedinUrl',
+        'linkedinurl': 'linkedinUrl',
+        'profile url': 'linkedinUrl',
+        'connected on': 'linkedinConnectedOn',
+        'connectedon': 'linkedinConnectedOn',
+        'phone': 'phone',
+        'phone number': 'phone',
+        'phonenumber': 'phone',
+        'mobile': 'phone',
+        'notes': 'notes',
+        'note': 'notes',
         'pipeline': 'pipeline',
         'stage': 'stage',
       };
@@ -172,11 +193,16 @@ export async function POST(request) {
           continue;
         }
 
-        // Extract contact data - simple fields only (name, email, company, deal stage)
+        // Extract contact data (name, email, title, phone, notes, company, pipeline/stage)
         const contactData = {
           firstName: normalizedRow.firstName,
           lastName: normalizedRow.lastName,
           email: normalizedRow.email ? normalizedRow.email.toLowerCase().trim() : null,
+          title: normalizedRow.title || null,
+          phone: normalizedRow.phone || null,
+          notes: normalizedRow.notes || null,
+          linkedinUrl: normalizedRow.linkedinUrl || null,
+          linkedinConnectedOn: normalizedRow.linkedinConnectedOn || null,
         };
 
         // Step 1: Create or update contact
@@ -209,24 +235,37 @@ export async function POST(request) {
               continue;
             }
             
-            // Update existing contact - only update name and email (simple fields)
+            // Update existing contact (name, email, title, phone, notes)
+            const updateData = {
+              firstName: contactData.firstName,
+              lastName: contactData.lastName,
+            };
+            if (contactData.title !== undefined) updateData.title = contactData.title;
+            if (contactData.phone !== undefined) updateData.phone = contactData.phone;
+            if (contactData.notes !== undefined) updateData.notes = contactData.notes;
+            if (contactData.linkedinUrl !== undefined) updateData.linkedinUrl = contactData.linkedinUrl;
+            if (contactData.linkedinConnectedOn !== undefined) updateData.linkedinConnectedOn = contactData.linkedinConnectedOn;
             contact = await prisma.contact.update({
               where: { id: existingContact.id },
-              data: {
-                firstName: contactData.firstName,
-                lastName: contactData.lastName,
-              },
+              data: updateData,
             });
             results.updated++;
           } else {
             // Create new contact - email is unique so this should work
             try {
+              const createData = {
+                crmId: companyHQId,
+                firstName: contactData.firstName,
+                lastName: contactData.lastName,
+                email: normalizedEmail,
+                title: contactData.title,
+                phone: contactData.phone,
+                notes: contactData.notes,
+                linkedinUrl: contactData.linkedinUrl,
+                linkedinConnectedOn: contactData.linkedinConnectedOn,
+              };
               contact = await prisma.contact.create({
-                data: {
-                  crmId: companyHQId,
-                  ...contactData,
-                  email: normalizedEmail, // Ensure normalized email
-                },
+                data: createData,
               });
               results.created++;
             } catch (createError) {
@@ -239,12 +278,18 @@ export async function POST(request) {
                   });
                   if (raceContact && raceContact.crmId === companyHQId) {
                     // Found it, update instead - only update name (simple fields)
+                    const raceUpdateData = {
+                      firstName: contactData.firstName,
+                      lastName: contactData.lastName,
+                    };
+                    if (contactData.title !== undefined) raceUpdateData.title = contactData.title;
+                    if (contactData.phone !== undefined) raceUpdateData.phone = contactData.phone;
+                    if (contactData.notes !== undefined) raceUpdateData.notes = contactData.notes;
+                    if (contactData.linkedinUrl !== undefined) raceUpdateData.linkedinUrl = contactData.linkedinUrl;
+                    if (contactData.linkedinConnectedOn !== undefined) raceUpdateData.linkedinConnectedOn = contactData.linkedinConnectedOn;
                     contact = await prisma.contact.update({
                       where: { id: raceContact.id },
-                      data: {
-                        firstName: contactData.firstName,
-                        lastName: contactData.lastName,
-                      },
+                      data: raceUpdateData,
                     });
                     results.updated++;
                   } else {
@@ -263,7 +308,13 @@ export async function POST(request) {
           contact = await prisma.contact.create({
             data: {
               crmId: companyHQId,
-              ...contactData,
+              firstName: contactData.firstName,
+              lastName: contactData.lastName,
+              title: contactData.title,
+              phone: contactData.phone,
+              notes: contactData.notes,
+              linkedinUrl: contactData.linkedinUrl,
+              linkedinConnectedOn: contactData.linkedinConnectedOn,
             },
           });
           results.created++;

@@ -472,6 +472,7 @@ model Contact {
   seniority                                                 String?
   department                                                String?
   linkedinUrl                                               String?
+  linkedinConnectedOn                                       String? // LinkedIn "Connected On" context, e.g. "Jan 2024"
   city                                                      String?
   state                                                     String?
   country                                                   String?

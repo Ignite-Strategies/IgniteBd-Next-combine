@@ -113,13 +113,14 @@ export default function ContactUploadPage() {
 
   const downloadTemplate = () => {
     if (typeof window === 'undefined') return;
-    // Simple template matching the simple contact save process
-    const template = 'First Name,Last Name,Email,Company Name,Pipeline,Stage';
+    // Header row: matches LinkedIn-style export (URL, Connected On) + optional Pipeline, Stage
+    const headers = ['First Name', 'Last Name', 'URL', 'Email Address', 'Company', 'Position', 'Connected On', 'Notes', 'Pipeline', 'Stage'];
+    const template = headers.join(',') + '\n';
     const blob = new Blob([template], { type: 'text/csv' });
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = downloadUrl;
-    link.download = 'contacts_template.csv';
+    link.download = 'contacts_upload_template.csv';
     link.click();
     window.URL.revokeObjectURL(downloadUrl);
   };
@@ -174,7 +175,7 @@ export default function ContactUploadPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Upload CSV</h2>
               <p className="text-gray-600">
-                Required: First Name, Last Name. Optional: Email, Company Name, Pipeline, Stage.
+                Required: First Name, Last Name. Optional: URL, Email Address, Company, Position, Connected On, Notes, Pipeline, Stage.
               </p>
             </div>
             <button
@@ -243,9 +244,9 @@ export default function ContactUploadPage() {
           )}
 
           <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-            <strong className="font-semibold">💡 Batch Processing:</strong> All contacts, companies, and pipelines are processed in one operation. 
-            Companies are automatically created if they don't exist, and pipelines are set for each contact.
-            Supports flexible column names (e.g., "First Name", "firstName", "first" all work).
+            <strong className="font-semibold">💡 Batch Processing:</strong> All contacts, companies, and pipelines are processed in one operation.
+            Companies are created if they don't exist; URL (LinkedIn), Position, Connected On, and Notes are imported.
+            Flexible column names (e.g., "First Name", "firstName", "Email Address", "email" all work).
           </div>
         </div>
       </div>

@@ -9,7 +9,6 @@ type Retainer = {
   description?: string | null;
   amountCents: number;
   currency: string;
-  startDate?: Date | null;
 };
 
 type Company = {
@@ -18,6 +17,12 @@ type Company = {
   stripeCustomerId: string | null;
 };
 
+/**
+ * Create one-time Stripe Checkout session for a retainer (one-off payment).
+ * Same pattern as bills: mode 'payment', no subscription. Gives control for
+ * upcharge, summary of items, etc. Monthly repeat is handled later by cron/service
+ * that creates a new bill or payment opportunity and sends the link.
+ */
 export async function createRetainerCheckoutSession({
   retainer,
   company,
@@ -31,19 +36,8 @@ export async function createRetainerCheckoutSession({
 }) {
   const customerId = await getOrCreateStripeCustomer(company);
 
-  const startDate =
-    retainer.startDate instanceof Date
-      ? retainer.startDate
-      : retainer.startDate
-      ? new Date(retainer.startDate)
-      : null;
-  const billingCycleAnchor =
-    startDate && startDate.getTime() > Date.now()
-      ? Math.floor(startDate.getTime() / 1000)
-      : undefined;
-
   const params: Stripe.Checkout.SessionCreateParams = {
-    mode: "subscription",
+    mode: "payment",
     customer: customerId,
     line_items: [
       {
@@ -54,9 +48,6 @@ export async function createRetainerCheckoutSession({
             ...(retainer.description && { description: retainer.description }),
           },
           unit_amount: retainer.amountCents,
-          recurring: {
-            interval: "month",
-          },
         },
         quantity: 1,
       },
@@ -68,12 +59,6 @@ export async function createRetainerCheckoutSession({
       retainerId: retainer.id,
       companyId: company.id,
     },
-    ...(billingCycleAnchor && {
-      subscription_data: {
-        billing_cycle_anchor: billingCycleAnchor,
-        proration_behavior: "none",
-      },
-    }),
   };
 
   return stripe.checkout.sessions.create(params);

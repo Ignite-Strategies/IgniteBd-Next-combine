@@ -136,11 +136,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       return;
     }
 
-    // Handle company-specific retainer subscription payment
+    // Handle company-specific retainer payment (one-off; no subscription)
     if (retainerId && type === 'company_retainer') {
       const existingRetainer = await prisma.company_retainers.findUnique({
         where: { id: retainerId },
-        select: { id: true, activatedAt: true },
+        select: { id: true, activatedAt: true, companyId: true, name: true, description: true },
       });
 
       if (!existingRetainer) {
@@ -152,13 +152,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         where: { id: retainerId },
         data: {
           status: 'ACTIVE',
-          stripeSubscriptionId: session.subscription as string | null,
+          paidAt: new Date(),
           activatedAt: existingRetainer.activatedAt ?? new Date(),
+          ...(session.subscription && { stripeSubscriptionId: session.subscription as string }),
         },
       });
 
       console.log(
-        `✅ Retainer checkout completed: Retainer ${retainerId} set to ACTIVE with subscription ${session.subscription}`
+        `✅ Retainer checkout completed: Retainer ${retainerId} set to ACTIVE (one-off paid)`
       );
       return;
     }
