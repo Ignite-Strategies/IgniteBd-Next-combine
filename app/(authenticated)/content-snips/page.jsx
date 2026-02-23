@@ -184,28 +184,41 @@ function ContentSnipsLandingPage() {
       setError('Select a CSV file.');
       return;
     }
+    
+    // Validate file type
+    if (!uploadFile.name.toLowerCase().endsWith('.csv')) {
+      setError('Please select a CSV file.');
+      return;
+    }
+    
     setUploading(true);
     setError('');
     setUploadResult(null);
+    
     const fd = new FormData();
     fd.append('file', uploadFile);
     fd.append('companyHQId', companyHQId);
+    
     try {
-      const res = await api.post('/api/outreach/content-snips/csv', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // Axios will automatically set Content-Type with boundary for FormData
+      const res = await api.post('/api/outreach/content-snips/csv', fd);
+      
       if (res.data?.success) {
         setUploadResult(res.data);
         setSuccess(`Uploaded: ${res.data.created} created, ${res.data.updated} updated.`);
         loadSnips();
         setUploadFile(null);
+        // Reset file input
+        const input = document.getElementById('csv-upload-input');
+        if (input) input.value = '';
         setCreateMode(null);
         setShowCreateOptions(false);
       } else {
         setError(res.data?.error || 'Upload failed');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed');
+      console.error('Upload error:', err);
+      setError(err.response?.data?.error || err.message || 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -526,28 +539,66 @@ function ContentSnipsLandingPage() {
                     Download template CSV
                   </a>
                 </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                    className="text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleUpload}
-                    disabled={uploading || !uploadFile}
-                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {uploading ? 'Uploading…' : 'Upload'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelCreate}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                  >
-                    Cancel
-                  </button>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="w-8 h-8 mb-2 text-gray-500" />
+                        <p className="mb-2 text-sm text-gray-500">
+                          <span className="font-semibold">Click to upload</span> or drag and drop
+                        </p>
+                        <p className="text-xs text-gray-500">CSV file only</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setUploadFile(file);
+                          if (file) {
+                            setError('');
+                          }
+                        }}
+                        className="hidden"
+                        id="csv-upload-input"
+                      />
+                    </label>
+                  </div>
+                  {uploadFile && (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="text-sm text-green-800 font-medium">{uploadFile.name}</span>
+                      <span className="text-xs text-green-600">({(uploadFile.size / 1024).toFixed(2)} KB)</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadFile(null);
+                          const input = document.getElementById('csv-upload-input');
+                          if (input) input.value = '';
+                        }}
+                        className="ml-auto text-green-600 hover:text-green-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleUpload}
+                      disabled={uploading || !uploadFile}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uploading ? 'Uploading…' : 'Upload'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelCreate}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
                 {uploadResult && (
                   <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
