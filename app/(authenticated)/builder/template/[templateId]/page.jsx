@@ -63,6 +63,24 @@ export default function TemplateBuilderPage() {
       });
   }, [companyHQId]);
 
+  // Load variables from DB when companyHQId is available
+  useEffect(() => {
+    if (!companyHQId) return;
+    setLoadingVariables(true);
+    api.get(`/api/template-variables?companyHQId=${companyHQId}&activeOnly=true`)
+      .then((res) => {
+        if (res.data?.success) {
+          setDbVariables(res.data.variables || []);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load variables:', err);
+      })
+      .finally(() => {
+        setLoadingVariables(false);
+      });
+  }, [companyHQId]);
+
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -73,6 +91,8 @@ export default function TemplateBuilderPage() {
   const [currentTemplateId, setCurrentTemplateId] = useState(templateId);
   const [contentSnips, setContentSnips] = useState([]);
   const [loadingSnips, setLoadingSnips] = useState(false);
+  const [dbVariables, setDbVariables] = useState([]);
+  const [loadingVariables, setLoadingVariables] = useState(false);
 
   useEffect(() => {
     if (!isNew && templateId) {
@@ -423,26 +443,60 @@ export default function TemplateBuilderPage() {
               <div className="rounded-lg border-2 border-gray-200 bg-gray-50 p-5 mb-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">Available Variables</h3>
-                  <p className="text-sm text-gray-600 italic">Click any variable to insert it into your template</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.values(VariableCatalogue).map((variable) => (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-600 italic">Click any variable to insert it</p>
                     <button
-                      key={variable.key}
                       type="button"
-                      onClick={() => insertVariable(variable.key)}
-                      className="text-left px-4 py-3 rounded-lg bg-white border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all shadow-sm hover:shadow"
-                      title={variable.description}
+                      onClick={() => router.push(`/variables${companyHQId ? `?companyHQId=${companyHQId}` : ''}`)}
+                      className="text-sm text-gray-700 hover:text-gray-900 font-medium underline"
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <code className="text-red-600 font-mono font-semibold text-base">{`{{${variable.key}}}`}</code>
-                      </div>
-                      {variable.description && (
-                        <p className="text-gray-600 text-sm italic">{variable.description}</p>
-                      )}
+                      Manage variables
                     </button>
-                  ))}
+                  </div>
                 </div>
+                {loadingVariables ? (
+                  <p className="text-sm text-gray-500">Loading variables...</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {/* Built-in variables from catalogue */}
+                    {Object.values(VariableCatalogue).map((variable) => (
+                      <button
+                        key={variable.key}
+                        type="button"
+                        onClick={() => insertVariable(variable.key)}
+                        className="text-left px-4 py-3 rounded-lg bg-white border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition-all shadow-sm hover:shadow"
+                        title={variable.description}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <code className="text-red-600 font-mono font-semibold text-base">{`{{${variable.key}}}`}</code>
+                        </div>
+                        {variable.description && (
+                          <p className="text-gray-600 text-sm italic">{variable.description}</p>
+                        )}
+                      </button>
+                    ))}
+                    {/* Custom variables from DB */}
+                    {dbVariables
+                      .filter((v) => !v.isBuiltIn)
+                      .map((variable) => (
+                        <button
+                          key={variable.id}
+                          type="button"
+                          onClick={() => insertVariable(variable.variableKey)}
+                          className="text-left px-4 py-3 rounded-lg bg-white border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 transition-all shadow-sm hover:shadow"
+                          title={variable.description || `Custom variable: ${variable.variableKey}`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <code className="text-blue-600 font-mono font-semibold text-base">{`{{${variable.variableKey}}}`}</code>
+                            <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">{variable.source}</span>
+                          </div>
+                          {variable.description && (
+                            <p className="text-gray-600 text-sm italic">{variable.description}</p>
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
 
               {/* Content Snips - Always Visible */}

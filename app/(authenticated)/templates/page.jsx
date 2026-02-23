@@ -71,6 +71,7 @@ function TemplatesContent() {
   const libraryUrl = `/templates/library-email${baseUrl ? `?companyHQId=${companyHQId}` : ''}`;
   const createUrl = `/templates/create${baseUrl ? `?companyHQId=${companyHQId}` : ''}`;
   const snippetsUrl = `/content-snips${baseUrl ? `?companyHQId=${companyHQId}` : ''}`;
+  const variablesUrl = `/variables${baseUrl ? `?companyHQId=${companyHQId}` : ''}`;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -144,7 +145,11 @@ function TemplatesContent() {
               </div>
             </div>
           </button>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm">
+          <button
+            type="button"
+            onClick={() => router.push(variablesUrl)}
+            className="rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md"
+          >
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
                 <FileText className="h-6 w-6 text-blue-600" />
@@ -157,7 +162,7 @@ function TemplatesContent() {
             <p className="mt-2 text-xs text-gray-500">
               Variables fill per contact on send. Snips store the text; variables own the look.
             </p>
-          </div>
+          </button>
         </div>
 
         {/* Quick actions — three cards */}

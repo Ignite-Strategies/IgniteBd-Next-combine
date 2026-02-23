@@ -390,6 +390,7 @@ model company_hqs {
   content_snips                                 content_snips[]
   work_packages                                 work_packages[]
   financials                                    financials?
+  templateVariables                             template_variables[]
 
   @@index([stripeCustomerId])
   @@index([platformId])
@@ -462,7 +463,7 @@ model contact_lists {
 }
 
 model Contact {
-  id                                                        String                    @id @default(cuid())
+  id                                                        String                     @id @default(cuid())
   crmId                                                     String
   firstName                                                 String?
   lastName                                                  String?
@@ -490,20 +491,20 @@ model Contact {
   enrichmentFetchedAt                                       DateTime?
   enrichmentPayload                                         Json?
   createdById                                               String?
-  firebaseUid                                               String?                   @unique
-  clientPortalUrl                                           String?                   @default("https://clientportal.ignitegrowth.biz")
-  isActivated                                               Boolean                   @default(false)
+  firebaseUid                                               String?                    @unique
+  clientPortalUrl                                           String?                    @default("https://clientportal.ignitegrowth.biz")
+  isActivated                                               Boolean                    @default(false)
   activatedAt                                               DateTime?
   ownerId                                                   String?
-  role                                                      String                    @default("contact")
-  createdAt                                                 DateTime                  @default(now())
-  updatedAt                                                 DateTime                  @updatedAt
+  role                                                      String                     @default("contact")
+  createdAt                                                 DateTime                   @default(now())
+  updatedAt                                                 DateTime                   @updatedAt
   averageTenureMonths                                       Float?
   avgTenureYears                                            Float?
   budgetAuthority                                           Boolean?
   buyerLikelihoodScore                                      Int?
   buyingPowerScore                                          Int?
-  buyingTriggers                                            String[]                  @default([])
+  buyingTriggers                                            String[]                   @default([])
   careerMomentumScore                                       Int?
   careerMomentum                                            String? // "high" | "medium" | "low" (inferred from signals)
   careerProgression                                         String?
@@ -518,11 +519,11 @@ model Contact {
   decisionMaker                                             Boolean?
   enrichmentRedisKey                                        String?
   gatekeeper                                                Boolean?
-  goals                                                     String[]                  @default([])
+  goals                                                     String[]                   @default([])
   influencer                                                Boolean?
   jobRole                                                   String?
   numberOfJobChanges                                        Int?
-  painPoints                                                String[]                  @default([])
+  painPoints                                                String[]                   @default([])
   profileSummary                                            String?
   readinessToBuyScore                                       Int?
   recentJobChange                                           Boolean?
@@ -541,17 +542,17 @@ model Contact {
   prior_relationship                                        RelationshipEnum?
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
   remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
-  company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]             @relation("company_hqs_contactOwnerIdTocontacts")
+  company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
-  companies                                                 companies?                @relation(fields: [contactCompanyId], references: [id])
-  contact_lists                                             contact_lists?            @relation(fields: [contactListId], references: [id])
-  company_hqs_contacts_crmIdTocompany_hqs                   company_hqs               @relation("contacts_crmIdTocompany_hqs", fields: [crmId], references: [id])
+  companies                                                 companies?                 @relation(fields: [contactCompanyId], references: [id])
+  contact_lists                                             contact_lists?             @relation(fields: [contactListId], references: [id])
+  company_hqs_contacts_crmIdTocompany_hqs                   company_hqs                @relation("contacts_crmIdTocompany_hqs", fields: [crmId], references: [id])
   invoices                                                  invoices[]
   invite_tokens                                             invite_tokens[]
   pipelines                                                 pipelines?
   proposals                                                 proposals[]
-  work_packages_work_packages_workPackageClientIdTocontacts work_packages[]           @relation("work_packages_workPackageClientIdTocontacts")
-  work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]           @relation("work_packages_workPackageMemberIdTocontacts")
+  work_packages_work_packages_workPackageClientIdTocontacts work_packages[]            @relation("work_packages_workPackageClientIdTocontacts")
+  work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]            @relation("work_packages_workPackageMemberIdTocontacts")
   contact_analyses                                          contact_analyses?
   off_platform_email_sends                                  off_platform_email_sends[]
 
@@ -1301,15 +1302,15 @@ model templates {
 }
 
 model template_snippets {
-  id          String      @id @default(cuid())
-  companyHQId String
-  variableName String     // e.g. intent_reach_out, mypitch, warm_intro
-  name        String      // Human-readable label
-  intentType  String?     // e.g. reactivation, prior_contact, intro_positioning, seasonal, neutral_polite
-  body        String      @db.Text // Snippet content (can include {{firstName}}, {firm_name}, etc.)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  id           String      @id @default(cuid())
+  companyHQId  String
+  variableName String // e.g. intent_reach_out, mypitch, warm_intro
+  name         String // Human-readable label
+  intentType   String? // e.g. reactivation, prior_contact, intro_positioning, seasonal, neutral_polite
+  body         String      @db.Text // Snippet content (can include {{firstName}}, {firm_name}, etc.)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  company_hqs  company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@unique([companyHQId, variableName])
   @@index([companyHQId])
@@ -1319,11 +1320,11 @@ model template_snippets {
 model content_snips {
   id          String      @id @default(cuid())
   companyHQId String
-  snipName    String      // unique per company; used as {{snippet:snipName}} in templates
+  snipName    String // unique per company; used as {{snippet:snipName}} in templates
   snipText    String      @db.Text
-  snipType    String      // subject | intent | service | competitor | value | cta | relationship | generic
-  contextType String?     // email | blog | linkedin | internal | multi
-  intentType  String?    // reactivation | prior_contact | intro | competitor | seasonal | relationship_only
+  snipType    String // subject | intent | service | competitor | value | cta | relationship | generic
+  contextType String? // email | blog | linkedin | internal | multi
+  intentType  String? // reactivation | prior_contact | intro | competitor | seasonal | relationship_only
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -1333,6 +1334,27 @@ model content_snips {
   @@index([companyHQId])
   @@index([companyHQId, snipType])
   @@index([companyHQId, isActive])
+}
+
+model template_variables {
+  id           String      @id @default(cuid())
+  companyHQId  String
+  variableKey  String // unique per company; used as {{variableKey}} in templates
+  description  String?     @db.Text // Human-readable description
+  source       String // CONTACT | OWNER | COMPUTED | CUSTOM
+  dbField      String? // Field name in source (e.g., 'firstName' for CONTACT source)
+  computedRule String?     @db.Text // For COMPUTED or CUSTOM: how to compute the value
+  isBuiltIn    Boolean     @default(false) // true for standard variables (firstName, etc.)
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  company_hqs  company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@unique([companyHQId, variableKey])
+  @@index([companyHQId])
+  @@index([companyHQId, source])
+  @@index([companyHQId, isActive])
+  @@index([companyHQId, isBuiltIn])
 }
 
 model work_collateral {
@@ -1479,23 +1501,23 @@ model bills {
 
 // Company-specific recurring retainers (isolated from universal plan model).
 model company_retainers {
-  id                   String         @id @default(cuid())
+  id                   String           @id @default(cuid())
   companyId            String
   name                 String
   description          String?
   amountCents          Int
-  currency             String         @default("usd")
+  currency             String           @default("usd")
   interval             RetainerInterval @default(MONTH)
   startDate            DateTime?
-  status               RetainerStatus @default(DRAFT)
-  slug                 String?        @unique
+  status               RetainerStatus   @default(DRAFT)
+  slug                 String?          @unique
   publicRetainerUrl    String?
-  stripeSubscriptionId String?        @unique
+  stripeSubscriptionId String?          @unique
   activatedAt          DateTime?
   paidAt               DateTime?
   canceledAt           DateTime?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   company_hqs company_hqs @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -1839,20 +1861,19 @@ enum PersonaType {
 }
 
 model off_platform_email_sends {
-  id                String   @id @default(cuid())
-  contactId         String
-  emailSent         DateTime // When the email was actually sent (off-platform)
-  subject           String?  // Optional: what was the subject?
-  platform          String?  // Optional: "gmail", "outlook", "apollo", "manual", etc.
-  notes             String?  // Optional: any notes about the send
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  contacts          Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  contactId String
+  emailSent DateTime // When the email was actually sent (off-platform)
+  subject   String? // Optional: what was the subject?
+  platform  String? // Optional: "gmail", "outlook", "apollo", "manual", etc.
+  notes     String? // Optional: any notes about the send
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId])
   @@index([contactId, emailSent])
   @@index([emailSent])
   @@map("off_platform_email_sends")
 }
-
