@@ -29,17 +29,17 @@ export async function POST(request) {
   }
 
   try {
-    const body = await request.json();
+    const payload = await request.json();
     const {
       contactId,
       subject,
-      body,
+      body: bodyText,
       source,
       platform,
       sendDate,
       campaignId,
       sequenceId,
-    } = body ?? {};
+    } = payload ?? {};
 
     if (!contactId) {
       return NextResponse.json(
@@ -82,7 +82,7 @@ export async function POST(request) {
         contactId,
         sendDate: emailSendDate,
         subject: subject || null,
-        body: body || null,
+        body: bodyText || null,
         source: source,
         platform: platform || null,
         campaignId: campaignId || null,
