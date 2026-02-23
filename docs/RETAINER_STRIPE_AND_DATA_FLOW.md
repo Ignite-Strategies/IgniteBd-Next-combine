@@ -55,7 +55,7 @@ Only `checkout.session.completed` (metadata type = company_retainer) matters for
 
 ### Customer notification
 
-Stripe can email a **receipt** for the one-time payment (Dashboard → Settings → Customer emails → "Successful payments"). When you add the monthly cron, your "send the link" step can include your own email with the bill URL.
+Stripe can email a **receipt** for the one-time payment (Dashboard → Settings → Customer emails → "Successful payments"). When you add the monthly cron, your "send the link" step can use the **template email with the bill embedded**: `lib/email/billPaymentLinkTemplate.js` (HTML + text) and `lib/email/sendBillPaymentLinkEmail.js` (SendGrid). API: `POST /api/billing/send-payment-link` with body `{ to, paymentUrl, amountFormatted, companyName, description?, isRetainer? }` sends that email (auth required).
 
 
 ---

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Users, Mail, FileText, CheckCircle, Save, Plus } from 'lucide-react';
+import { Users, Mail, FileText, CheckCircle, Save, Plus, FileCode, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 
 function CampaignEditContent({ params }) {
@@ -29,6 +29,11 @@ function CampaignEditContent({ params }) {
   const [previewText, setPreviewText] = useState('');
   const [body, setBody] = useState('');
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const bodyTextareaRef = useRef(null);
+  const [snippets, setSnippets] = useState([]);
+  const [loadingSnippets, setLoadingSnippets] = useState(false);
+  const [snippetIntentFilter, setSnippetIntentFilter] = useState('');
+  const [snippetsPanelOpen, setSnippetsPanelOpen] = useState(true);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,6 +56,7 @@ function CampaignEditContent({ params }) {
       loadCampaign();
       loadContactLists();
       loadTemplates();
+      loadSnippets();
     }
   }, [campaignId, companyHQId]);
 
@@ -137,6 +143,44 @@ function CampaignEditContent({ params }) {
       setLoadingTemplates(false);
     }
   };
+
+  const loadSnippets = async () => {
+    if (!companyHQId) return;
+    setLoadingSnippets(true);
+    try {
+      const response = await api.get(`/api/outreach/snippets?companyHQId=${companyHQId}`);
+      if (response.data?.success) {
+        setSnippets(response.data.snippets || []);
+      }
+    } catch (error) {
+      console.error('Error loading snippets:', error);
+    } finally {
+      setLoadingSnippets(false);
+    }
+  };
+
+  const insertSnippetAtCursor = (variableName) => {
+    const tag = `{{snippet:${variableName}}}`;
+    const textarea = bodyTextareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const before = body.slice(0, start);
+      const after = body.slice(end);
+      setBody(before + tag + after);
+      setTimeout(() => {
+        textarea.focus();
+        const newPos = start + tag.length;
+        textarea.setSelectionRange(newPos, newPos);
+      }, 0);
+    } else {
+      setBody((prev) => prev + tag);
+    }
+  };
+
+  const filteredSnippets = snippetIntentFilter
+    ? snippets.filter((s) => (s.intentType || '') === snippetIntentFilter)
+    : snippets;
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -457,7 +501,7 @@ function CampaignEditContent({ params }) {
                   </div>
                 </div>
               ) : (
-                // Manual mode: Allow editing
+                // Manual mode: Allow editing + insert snippets
                 <>
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700">
@@ -473,14 +517,89 @@ function CampaignEditContent({ params }) {
                     />
                   </div>
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Email Body *
-                    </label>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-gray-700">
+                        Email Body *
+                      </label>
+                      <a
+                        href="/outreach/snippets"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Manage snippets →
+                      </a>
+                    </div>
+                    {/* Insert snippet panel - lives in template UX next to body */}
+                    <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50">
+                      <button
+                        type="button"
+                        onClick={() => setSnippetsPanelOpen((o) => !o)}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100"
+                      >
+                        <span className="flex items-center gap-2">
+                          <FileCode className="h-4 w-4 text-gray-500" />
+                          Insert snippet
+                        </span>
+                        {snippetsPanelOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
+                      {snippetsPanelOpen && (
+                        <div className="border-t border-gray-200 px-3 py-2">
+                          {loadingSnippets ? (
+                            <p className="text-xs text-gray-500">Loading snippets…</p>
+                          ) : snippets.length === 0 ? (
+                            <p className="text-xs text-gray-500">
+                              No snippets yet.{' '}
+                              <a href="/outreach/snippets" className="text-red-600 hover:underline">
+                                Add snippets
+                              </a>{' '}
+                              to insert blocks like {`{{snippet:mypitch}}`} here.
+                            </p>
+                          ) : (
+                            <>
+                              <div className="mb-2 flex items-center gap-2">
+                                <label className="text-xs text-gray-600">Filter by intent:</label>
+                                <select
+                                  value={snippetIntentFilter}
+                                  onChange={(e) => setSnippetIntentFilter(e.target.value)}
+                                  className="rounded border border-gray-300 px-2 py-1 text-xs"
+                                >
+                                  <option value="">All</option>
+                                  <option value="reactivation">Reactivation</option>
+                                  <option value="prior_contact">Prior contact</option>
+                                  <option value="intro_positioning">Intro / positioning</option>
+                                  <option value="seasonal">Seasonal</option>
+                                  <option value="neutral_polite">Neutral / polite</option>
+                                  <option value="other">Other</option>
+                                </select>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {filteredSnippets.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => insertSnippetAtCursor(s.variableName)}
+                                    className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                                    title={s.body ? `${s.name}: ${s.body.slice(0, 80)}…` : s.name}
+                                  >
+                                    {s.name}
+                                    {s.intentType && (
+                                      <span className="ml-1 text-gray-400">({s.intentType})</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <textarea
+                      ref={bodyTextareaRef}
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
                       rows={10}
-                      placeholder="Write your email content here..."
+                      placeholder="Write your email content here. Use Insert snippet above to add {{snippet:variableName}}."
                       className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                       required
                     />

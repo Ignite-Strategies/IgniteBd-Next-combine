@@ -11,6 +11,7 @@ import {
   BarChart3,
   Target,
   CheckCircle,
+  FileCode,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useOutreachContext } from '@/hooks/useOutreach';
@@ -141,19 +142,29 @@ function OutreachContent() {
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
           actions={
-            <button
-              type="button"
-              onClick={() => {
-                const params = new URLSearchParams();
-                if (targetContact?.id) params.set('contactId', targetContact.id);
-                if (targetProduct?.id) params.set('productId', targetProduct.id);
-                router.push(`/outreach/campaigns/create?${params.toString()}`);
-              }}
-              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-            >
-              <Plus className="h-4 w-4" />
-              New Campaign
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push('/outreach/snippets')}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <FileCode className="h-4 w-4" />
+                Snippets
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (targetContact?.id) params.set('contactId', targetContact.id);
+                  if (targetProduct?.id) params.set('productId', targetProduct.id);
+                  router.push(`/outreach/campaigns/create?${params.toString()}`);
+                }}
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                <Plus className="h-4 w-4" />
+                New Campaign
+              </button>
+            </div>
           }
         />
 

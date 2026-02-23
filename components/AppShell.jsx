@@ -69,6 +69,12 @@ export default function AppShell({ children }) {
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
+  // App routes always get the shell so users can navigate back (e.g. /contacts/view)
+  const isAppRoute = useMemo(() => {
+    if (!pathname) return false;
+    return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
+  }, [pathname]);
+
   // Routes that should never show navigation or context header (even when authenticated)
   const PUBLIC_ROUTES = ['/'];
   // Public bill payment routes - standalone pages, no admin UI
@@ -90,11 +96,9 @@ export default function AppShell({ children }) {
   const isBillRoute = pathname && (BILL_ROUTES.some(route => pathname.startsWith(route)) || isRootBillRoute);
   const shouldHideContext = pathname && HIDE_CONTEXT_ROUTES.some(route => pathname.startsWith(route));
 
-  // Show navigation when authenticated, but not on public routes like splash or bill pages
-  // Also show if auth hasn't been checked yet (optimistic render) to avoid flash
-  // Only hide if explicitly unauthenticated after check
-  // Bill routes are standalone payment pages - never show admin UI
-  const shouldShowShell = !isPublicRoute && !isBillRoute && (!authChecked || isAuthenticated);
+  // Show shell when: not public/bill, and (auth not checked yet, or authenticated, or on an app route).
+  // App routes always get the shell so users are never stuck without nav.
+  const shouldShowShell = !isPublicRoute && !isBillRoute && (!authChecked || isAuthenticated || isAppRoute);
   
   if (shouldShowShell) {
     return (

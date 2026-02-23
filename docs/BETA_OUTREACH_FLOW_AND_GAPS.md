@@ -59,27 +59,21 @@
 
 ---
 
-## 3. Template generation – modular snippets (GoFast-style)
+## 3. Template generation – modular snippets (GoFast-style) ✅ Implemented
 
 **What exists**
 
-- **GoFast “content snippets”:** Reusable blocks keyed by `variableName` (e.g. mypitch), company-scoped.
-  - `content_snippets` table: `companyId`, `variableName`, `name`, `words`, `slug`.
-  - `lib/content-snippets.ts`: `loadCompanySnippets`, `getContentSnippet`, `upsertContentSnippet`, etc.
-  - API: `GET/POST/PUT /api/content-snippets`, generate endpoint.
-- **Ignite templates:** Full templates (subject + body) with variables; `variableMapperService` hydrates `{{firstName}}`, etc. No **snippet** entity in Ignite yet—templates are monolithic.
+- **GoFast “content snippets”:** Reusable blocks keyed by `variableName` (e.g. mypitch), company-scoped (see GoFast repo).
+- **Ignite template snippets (new):**
+  - `template_snippets` table: `companyHQId`, `variableName`, `name`, `body` (company-scoped).
+  - API: `GET/POST /api/outreach/snippets`, `GET/PUT/DELETE /api/outreach/snippets/[id]`. Auth + membership.
+  - UI: **Outreach → Snippets** (`/outreach/snippets`): list, add, edit, delete. Save “mypitch”, “warm_intro”, etc. in one place.
+- **Ignite templates:** Full templates (subject + body) with variables; `variableMapperService` hydrates `{{firstName}}`, etc.
 
-**Gaps**
+**Remaining (optional)**
 
-- **Template snippets in Ignite:** No equivalent of GoFast’s `content_snippets` in Ignite. So “mypitch” and other modular blocks don’t exist as first-class snippet entities; you’d be composing “full 3 paragraphs per persona” instead of “snippet A + snippet B by persona.”
-- **Composition:** Need a way to define a **template** as “composed from snippet IDs/variable names” (e.g. greeting + mypitch + CTA) and hydrate snippet content + contact variables together.
-
-**Recommendation**
-
-- **Option A – Port snippet concept into Ignite:** Add `template_snippets` (or reuse name `content_snippets`) in Ignite: `companyHQId`, `variableName`, `name`, `body`, so the beta user can maintain “mypitch”, “warm_intro”, “competitor_angle”, etc. Then templates reference snippets (e.g. `{{snippet:mypitch}}`) and the variable mapper resolves snippet body then hydrates contact variables inside it.
-- **Option B – Lightweight:** Keep full templates but allow “snippet” fields in the template body that pull from a small key-value store (e.g. company-level key-value or a minimal snippet table). Variable mapper would resolve `{{snippet:mypitch}}` from that store.
-
-Either way, “template snippets” = modular pieces that can be mixed by persona (next step).
+- **Composition in templates:** Variable mapper does not yet resolve `{{snippet:mypitch}}` in template body. Next: load snippet by variableName for the company and inject into body, then hydrate contact variables inside the snippet.
+- **Persona-based snippet combos:** Rules like “warm_competitor = mypitch + competitor_angle + CTA” can build on this once composition is wired.
 
 ---
 

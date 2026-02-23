@@ -28,6 +28,8 @@ function ContactsViewPageContent() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [pipelineFilter, setPipelineFilter] = useState('');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest' | 'name-asc' | 'name-desc'
+  const [recentlyAddedOnly, setRecentlyAddedOnly] = useState(false); // last 7 days
   const [deletingId, setDeletingId] = useState(null);
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -137,14 +139,20 @@ function ContactsViewPageContent() {
   };
 
   const filteredContacts = useMemo(() => {
-    return contacts.filter((contact) => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    let list = contacts.filter((contact) => {
       if (
         pipelineFilter &&
         (contact.pipelines?.pipeline || contact.pipeline?.pipeline) !== pipelineFilter
       ) {
         return false;
       }
-
+      if (recentlyAddedOnly && contact.createdAt) {
+        const created = new Date(contact.createdAt);
+        if (created < sevenDaysAgo) return false;
+      }
       if (!searchTerm) return true;
       const search = searchTerm.toLowerCase();
       const name = `${contact.firstName || ''} ${
@@ -152,8 +160,8 @@ function ContactsViewPageContent() {
       }`.toLowerCase();
       const email = (contact.email || '').toLowerCase();
       const company = (
-        contact.companies?.companyName || 
-        contact.contactCompany?.companyName || 
+        contact.companies?.companyName ||
+        contact.contactCompany?.companyName ||
         ''
       ).toLowerCase();
       return (
@@ -162,7 +170,26 @@ function ContactsViewPageContent() {
         company.includes(search)
       );
     });
-  }, [contacts, pipelineFilter, searchTerm]);
+
+    const sorted = [...list].sort((a, b) => {
+      if (sortBy === 'newest') {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return db - da;
+      }
+      if (sortBy === 'oldest') {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return da - db;
+      }
+      const nameA = `${(a.firstName || '').toLowerCase()} ${(a.lastName || '').toLowerCase()}`.trim();
+      const nameB = `${(b.firstName || '').toLowerCase()} ${(b.lastName || '').toLowerCase()}`.trim();
+      if (sortBy === 'name-asc') return nameA.localeCompare(nameB);
+      if (sortBy === 'name-desc') return nameB.localeCompare(nameA);
+      return 0;
+    });
+    return sorted;
+  }, [contacts, pipelineFilter, searchTerm, sortBy, recentlyAddedOnly]);
 
   const handleSelectAll = () => {
     if (selectedContacts.size === filteredContacts.length) {
@@ -377,8 +404,8 @@ function ContactsViewPageContent() {
           </div>
 
           <div className="mt-4 border-t border-gray-200 pt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="relative">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="relative lg:col-span-2">
                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-gray-400" />
                 <input
                   type="text"
@@ -402,6 +429,28 @@ function ContactsViewPageContent() {
                   <option value="institution">Institution</option>
                 </select>
               </div>
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(event) => setSortBy(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  title="Sort order"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="name-asc">Name A–Z</option>
+                  <option value="name-desc">Name Z–A</option>
+                </select>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={recentlyAddedOnly}
+                  onChange={(event) => setRecentlyAddedOnly(event.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Recently added (7 days)
+              </label>
             </div>
           </div>
         </div>

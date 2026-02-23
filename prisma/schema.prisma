@@ -386,6 +386,7 @@ model company_hqs {
   proposals                                     proposals[]
   template_relationship_helpers                 template_relationship_helpers[]
   templates                                     templates[]
+  template_snippets                             template_snippets[]
   work_packages                                 work_packages[]
   financials                                    financials?
 
@@ -1293,6 +1294,21 @@ model templates {
 
   @@index([companyHQId])
   @@index([ownerId])
+}
+
+model template_snippets {
+  id          String      @id @default(cuid())
+  companyHQId String
+  variableName String     // e.g. intent_reach_out, mypitch, warm_intro
+  name        String      // Human-readable label
+  intentType  String?     // e.g. reactivation, prior_contact, intro_positioning, seasonal, neutral_polite
+  body        String      @db.Text // Snippet content (can include {{firstName}}, {firm_name}, etc.)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@unique([companyHQId, variableName])
+  @@index([companyHQId])
 }
 
 model work_collateral {
