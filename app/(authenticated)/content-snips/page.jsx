@@ -19,7 +19,7 @@ import api from '@/lib/api';
 
 const SNIP_TYPES = [
   'subject',
-  'intent',
+  'opening', // Replaces generic "intent" - strategic openings
   'service',
   'competitor',
   'value',
@@ -27,8 +27,6 @@ const SNIP_TYPES = [
   'relationship',
   'generic',
 ];
-const CONTEXT_TYPES = ['email', 'blog', 'linkedin', 'internal', 'multi'];
-const INTENT_TYPES = ['reactivation', 'prior_contact', 'intro', 'competitor', 'seasonal', 'relationship_only'];
 
 function ContentSnipsLandingPage() {
   const router = useRouter();
@@ -49,11 +47,12 @@ function ContentSnipsLandingPage() {
     snipName: '',
     snipText: '',
     snipType: 'generic',
-    contextType: '',
-    intentType: '',
+    relationshipContextId: '',
     isActive: true,
   });
   const [saving, setSaving] = useState(false);
+  const [relationshipContexts, setRelationshipContexts] = useState([]);
+  const [loadingContexts, setLoadingContexts] = useState(false);
 
   // Upload state
   const [uploadFile, setUploadFile] = useState(null);
@@ -81,10 +80,25 @@ function ContentSnipsLandingPage() {
   useEffect(() => {
     if (companyHQId) {
       loadSnips();
+      loadRelationshipContexts();
     } else {
       setLoading(false);
     }
   }, [companyHQId]);
+
+  const loadRelationshipContexts = async () => {
+    setLoadingContexts(true);
+    try {
+      const res = await api.get('/api/relationship-contexts');
+      if (res.data?.success) {
+        setRelationshipContexts(res.data.contexts || []);
+      }
+    } catch (err) {
+      console.error('Failed to load relationship contexts:', err);
+    } finally {
+      setLoadingContexts(false);
+    }
+  };
 
   const loadSnips = async () => {
     if (!companyHQId) return;
@@ -114,8 +128,7 @@ function ContentSnipsLandingPage() {
           snipName: form.snipName.trim(),
           snipText: form.snipText,
           snipType: form.snipType,
-          contextType: form.contextType || null,
-          intentType: form.intentType || null,
+          relationshipContextId: form.relationshipContextId || null,
           isActive: form.isActive,
         });
         if (res.data?.success) {
@@ -131,8 +144,7 @@ function ContentSnipsLandingPage() {
           snipName: form.snipName.trim(),
           snipText: form.snipText,
           snipType: form.snipType,
-          contextType: form.contextType || null,
-          intentType: form.intentType || null,
+          relationshipContextId: form.relationshipContextId || null,
           isActive: form.isActive,
         });
         if (res.data?.success) {
@@ -332,8 +344,7 @@ function ContentSnipsLandingPage() {
       snipName: snip.snipName,
       snipText: snip.snipText || '',
       snipType: snip.snipType || 'generic',
-      contextType: snip.contextType || '',
-      intentType: snip.intentType || '',
+      relationshipContextId: snip.relationshipContextId || '',
       isActive: snip.isActive !== false,
     });
   };
@@ -343,8 +354,7 @@ function ContentSnipsLandingPage() {
       snipName: '',
       snipText: '',
       snipType: 'generic',
-      contextType: '',
-      intentType: '',
+      relationshipContextId: '',
       isActive: true,
     });
     setEditingId(null);
@@ -584,14 +594,14 @@ function ContentSnipsLandingPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   {editingId ? 'Edit Content Snip' : 'Create Content Snip'}
                 </h3>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">Snip Name *</label>
                     <input
                       type="text"
                       value={form.snipName}
                       onChange={(e) => setForm((f) => ({ ...f, snipName: e.target.value }))}
-                      placeholder="intent_reach_out"
+                      placeholder="opening_reconnect_prior_conversation"
                       className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                       disabled={!!editingId}
                     />
@@ -608,31 +618,29 @@ function ContentSnipsLandingPage() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Context Type</label>
-                    <select
-                      value={form.contextType}
-                      onChange={(e) => setForm((f) => ({ ...f, contextType: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                    >
-                      <option value="">—</option>
-                      {CONTEXT_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Intent Type</label>
-                    <select
-                      value={form.intentType}
-                      onChange={(e) => setForm((f) => ({ ...f, intentType: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                    >
-                      <option value="">—</option>
-                      {INTENT_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Relationship Context (Optional)
+                    </label>
+                    <p className="mb-2 text-xs text-gray-500">
+                      Which relationship context is this snippet best suited for? Leave blank for general use.
+                    </p>
+                    {loadingContexts ? (
+                      <p className="text-sm text-gray-500">Loading contexts...</p>
+                    ) : (
+                      <select
+                        value={form.relationshipContextId}
+                        onChange={(e) => setForm((f) => ({ ...f, relationshipContextId: e.target.value }))}
+                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                      >
+                        <option value="">— General (works for any relationship)</option>
+                        {relationshipContexts.map((ctx) => (
+                          <option key={ctx.relationshipContextId} value={ctx.relationshipContextId}>
+                            {ctx.contextKey.replace(/_/g, ' ')}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
                 <div className="mt-4">
@@ -720,10 +728,9 @@ function ContentSnipsLandingPage() {
                   Columns: <code className="rounded bg-gray-200 px-1">snip_name</code>,{' '}
                   <code className="rounded bg-gray-200 px-1">snip_text</code>,{' '}
                   <code className="rounded bg-gray-200 px-1">snip_type</code> (optional, default generic),{' '}
-                  <code className="rounded bg-gray-200 px-1">context_type</code>,{' '}
-                  <code className="rounded bg-gray-200 px-1">intent_type</code> (optional).{' '}
+                  <code className="rounded bg-gray-200 px-1">relationship_context_id</code> (optional).{' '}
                   <a
-                    href="data:text/csv;charset=utf-8,snip_name,snip_text,snip_type,context_type,intent_type%0Aintent_reach_out,I wanted to reach out,intent,email,prior_contact%0Aintent_follow_up,I wanted to follow up,intent,email,reactivation"
+                    href="data:text/csv;charset=utf-8,snip_name,snip_text,snip_type%0Aopening_reconnect_prior_conversation,Following up on our conversation about {{topic}},opening%0Acta_brief_call_worthwhile,Please let me know if a brief call would be worthwhile.,cta"
                     download="content-snips-template.csv"
                     className="text-red-600 hover:underline"
                   >
@@ -953,7 +960,7 @@ function ContentSnipsLandingPage() {
                           />
                         </th>
                         <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Context / Intent</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Relationship Context</th>
                         <th className="py-2 text-left font-medium text-gray-700">Text</th>
                         <th className="py-2 text-left font-medium text-gray-700">Status</th>
                         <th className="py-2 text-right font-medium text-gray-700">Actions</th>
@@ -974,7 +981,7 @@ function ContentSnipsLandingPage() {
                             </td>
                             <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
                             <td className="py-2 text-gray-600">
-                              {[s.contextType, s.intentType].filter(Boolean).join(' / ') || '—'}
+                              {s.relationship_contexts?.contextKey?.replace(/_/g, ' ') || 'General'}
                             </td>
                             <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
                               {s.snipText}
@@ -1062,7 +1069,7 @@ function ContentSnipsLandingPage() {
                           </th>
                           <th className="py-2 text-left font-medium text-gray-700">Name</th>
                           <th className="py-2 text-left font-medium text-gray-700">Type</th>
-                          <th className="py-2 text-left font-medium text-gray-700">Context / Intent</th>
+                          <th className="py-2 text-left font-medium text-gray-700">Relationship Context</th>
                           <th className="py-2 text-left font-medium text-gray-700">Text</th>
                           <th className="py-2 text-left font-medium text-gray-700">Status</th>
                           <th className="py-2 text-right font-medium text-gray-700">Actions</th>
@@ -1086,7 +1093,7 @@ function ContentSnipsLandingPage() {
                                 <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{s.snipType}</span>
                               </td>
                               <td className="py-2 text-gray-600">
-                                {[s.contextType, s.intentType].filter(Boolean).join(' / ') || '—'}
+                                {s.relationship_contexts?.contextKey?.replace(/_/g, ' ') || 'General'}
                               </td>
                               <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
                                 {s.snipText}

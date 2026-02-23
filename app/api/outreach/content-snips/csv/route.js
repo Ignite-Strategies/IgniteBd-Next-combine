@@ -4,9 +4,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { resolveMembership } from '@/lib/membership';
 import { parseCSV } from '@/lib/utils/csv';
 
-const SNIP_TYPES = ['subject', 'intent', 'service', 'competitor', 'value', 'cta', 'relationship', 'generic'];
-const CONTEXT_TYPES = ['email', 'blog', 'linkedin', 'internal', 'multi'];
-const INTENT_TYPES = ['reactivation', 'prior_contact', 'intro', 'competitor', 'seasonal', 'relationship_only'];
+const SNIP_TYPES = ['subject', 'opening', 'service', 'competitor', 'value', 'cta', 'relationship', 'generic'];
 
 // Normalize CSV row keys (headers may be snip_name, snipName, Snip Name, etc.)
 function getRowValue(row, ...keys) {
@@ -27,7 +25,7 @@ function normalizeSnipName(s) {
 /**
  * POST /api/outreach/content-snips/csv
  * FormData: file (CSV), companyHQId
- * CSV columns (any case): snip_name / snipName, snip_text / snipText, snip_type / snipType, context_type / contextType, intent_type / intentType
+ * CSV columns (any case): snip_name / snipName, snip_text / snipText, snip_type / snipType, relationship_context_id (optional)
  * snip_type required (or default 'generic'); snip_name and snip_text required per row.
  */
 export async function POST(request) {
@@ -90,8 +88,7 @@ export async function POST(request) {
     const snipName = getRowValue(row, 'snip_name', 'snipName', 'name');
     const snipText = getRowValue(row, 'snip_text', 'snipText', 'text', 'body');
     let snipType = getRowValue(row, 'snip_type', 'snipType', 'type');
-    const contextType = getRowValue(row, 'context_type', 'contextType', 'context');
-    const intentType = getRowValue(row, 'intent_type', 'intentType', 'intent');
+    const relationshipContextId = getRowValue(row, 'relationship_context_id', 'relationshipContextId');
 
     if (!snipName || !snipText) {
       errors.push(`Row ${i + 2}: snip_name and snip_text are required`);
@@ -107,8 +104,6 @@ export async function POST(request) {
     if (!snipType || !SNIP_TYPES.includes(snipType)) {
       snipType = 'generic';
     }
-    const ctx = contextType && CONTEXT_TYPES.includes(contextType) ? contextType : null;
-    const intent = intentType && INTENT_TYPES.includes(intentType) ? intentType : null;
 
     try {
       const existing = await prisma.content_snips.findUnique({
@@ -121,8 +116,7 @@ export async function POST(request) {
           data: {
             snipText,
             snipType,
-            contextType: ctx,
-            intentType: intent,
+            relationshipContextId: relationshipContextId || null,
             updatedAt: new Date(),
           },
         });
@@ -134,8 +128,7 @@ export async function POST(request) {
             snipName: name,
             snipText,
             snipType,
-            contextType: ctx,
-            intentType: intent,
+            relationshipContextId: relationshipContextId || null,
             isActive: true,
           },
         });

@@ -1316,24 +1316,40 @@ model template_snippets {
   @@index([companyHQId])
 }
 
+// Relationship context - foundational info about WHO the persona is
+model relationship_contexts {
+  relationshipContextId String                @id @default(cuid())
+  contextOfRelationship ContextOfRelationship
+  relationshipRecency   RelationshipRecency
+  companyAwareness      CompanyAwareness
+  contextKey            String                @unique // e.g., PRIOR_COLLEAGUE_LONG_DORMANT_KNOWS_COMPANY
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  contentSnips          content_snips[]
+
+  @@index([contextKey])
+  @@index([contextOfRelationship, relationshipRecency, companyAwareness])
+}
+
 // ContentSnip-style library: ingest via CSV, use in templates or free-floating
 model content_snips {
-  id          String      @id @default(cuid())
-  companyHQId String
-  snipName    String // unique per company; used as {{snippet:snipName}} in templates
-  snipText    String      @db.Text
-  snipType    String // subject | intent | service | competitor | value | cta | relationship | generic
-  contextType String? // email | blog | linkedin | internal | multi
-  intentType  String? // reactivation | prior_contact | intro | competitor | seasonal | relationship_only
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  id                    String                 @id @default(cuid())
+  companyHQId           String
+  snipName              String // unique per company; used as {{snippet:snipName}} in templates
+  snipText              String                 @db.Text
+  snipType              String // subject | opening | service | competitor | value | cta | relationship | generic
+  relationshipContextId String? // Optional: which relationship context this snippet is best for
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  company_hqs           company_hqs            @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  relationship_contexts relationship_contexts? @relation(fields: [relationshipContextId], references: [relationshipContextId])
 
   @@unique([companyHQId, snipName])
   @@index([companyHQId])
   @@index([companyHQId, snipType])
   @@index([companyHQId, isActive])
+  @@index([relationshipContextId])
 }
 
 model template_variables {
@@ -1858,6 +1874,32 @@ enum PersonaType {
   GATEKEEPER
   CHAMPION
   OTHER
+}
+
+enum ContextOfRelationship {
+  DONT_KNOW
+  PRIOR_CONVERSATION
+  PRIOR_COLLEAGUE
+  PRIOR_SCHOOLMATE
+  CURRENT_CLIENT
+  CONNECTED_LINKEDIN_ONLY
+  REFERRAL
+  REFERRAL_FROM_WARM_CONTACT
+  USED_TO_WORK_AT_TARGET_COMPANY
+}
+
+enum RelationshipRecency {
+  NEW
+  RECENT
+  STALE
+  LONG_DORMANT
+}
+
+enum CompanyAwareness {
+  NO_CLUE
+  KNOWS_COMPANY
+  KNOWS_COMPANY_COMPETITOR
+  KNOWS_BUT_DISENGAGED
 }
 
 model off_platform_email_sends {

@@ -3,9 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { resolveMembership } from '@/lib/membership';
 
-const SNIP_TYPES = ['subject', 'intent', 'service', 'competitor', 'value', 'cta', 'relationship', 'generic'];
-const CONTEXT_TYPES = ['email', 'blog', 'linkedin', 'internal', 'multi'];
-const INTENT_TYPES = ['reactivation', 'prior_contact', 'intro', 'competitor', 'seasonal', 'relationship_only'];
+const SNIP_TYPES = ['subject', 'opening', 'service', 'competitor', 'value', 'cta', 'relationship', 'generic'];
 
 /**
  * GET /api/outreach/content-snips/[id]
@@ -33,6 +31,9 @@ export async function GET(request, { params }) {
 
   const snip = await prisma.content_snips.findUnique({
     where: { id },
+    include: {
+      relationship_contexts: true,
+    },
   });
   if (!snip) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
@@ -48,7 +49,7 @@ export async function GET(request, { params }) {
 
 /**
  * PUT /api/outreach/content-snips/[id]
- * Body: { snipName?, snipText?, snipType?, contextType?, intentType?, isActive? }
+ * Body: { snipName?, snipText?, snipType?, relationshipContextId?, isActive? }
  */
 export async function PUT(request, { params }) {
   let firebaseUser;
@@ -92,13 +93,15 @@ export async function PUT(request, { params }) {
   }
   if (body.snipText !== undefined) data.snipText = String(body.snipText);
   if (body.snipType !== undefined && SNIP_TYPES.includes(body.snipType)) data.snipType = body.snipType;
-  if (body.contextType !== undefined) data.contextType = body.contextType && CONTEXT_TYPES.includes(body.contextType) ? body.contextType : null;
-  if (body.intentType !== undefined) data.intentType = body.intentType && INTENT_TYPES.includes(body.intentType) ? body.intentType : null;
+  if (body.relationshipContextId !== undefined) data.relationshipContextId = body.relationshipContextId || null;
   if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 
   const snip = await prisma.content_snips.update({
     where: { id },
     data,
+    include: {
+      relationship_contexts: true,
+    },
   });
 
   return NextResponse.json({ success: true, snip });
