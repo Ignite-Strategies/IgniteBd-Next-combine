@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { resolveMembership } from '@/lib/membership';
 import { parseCSV } from '@/lib/utils/csv';
-import { findOrCreateCompanyByDomain } from '@/lib/services/companyService';
 import { ensureContactPipeline } from '@/lib/services/pipelineService';
+import { OFFICIAL_PIPELINES, PIPELINE_STAGES } from '@/lib/config/pipelineConfig';
 
 /**
  * POST /api/contacts/batch
@@ -149,6 +149,47 @@ export async function POST(request) {
         'stage': 'stage',
       };
       return mappings[normalized] || normalized;
+    };
+
+    // Normalize pipeline/stage values from CSV (human-friendly or close → canonical slugs)
+    const normalizePipelineValue = (raw) => {
+      if (!raw || typeof raw !== 'string') return null;
+      const s = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+      const map = {
+        prospect: 'prospect',
+        prospects: 'prospect',
+        client: 'client',
+        clients: 'client',
+        collaborator: 'collaborator',
+        collaborators: 'collaborator',
+        institution: 'institution',
+        institutions: 'institution',
+        unassigned: 'unassigned',
+        none: 'unassigned',
+      };
+      return map[s] || (OFFICIAL_PIPELINES.includes(s) ? s : null);
+    };
+
+    const normalizeStageValue = (raw, pipeline = 'prospect') => {
+      if (!raw || typeof raw !== 'string') return null;
+      const s = raw.trim().toLowerCase().replace(/\s+/g, ' ').replace(/\s/g, '-');
+      const stages = PIPELINE_STAGES[pipeline] || PIPELINE_STAGES.prospect;
+      // Prospect: map human-friendly / close variants to canonical
+      const prospectMap = {
+        'need-to-engage': 'need-to-engage',
+        'awaiting-outreach': 'need-to-engage',
+        'not-contacted': 'need-to-engage',
+        'to-contact': 'need-to-engage',
+        interest: 'interest',
+        interested: 'interest',
+        meeting: 'meeting',
+        proposal: 'proposal',
+        contract: 'contract',
+        'contract-signed': 'contract-signed',
+        signed: 'contract-signed',
+      };
+      const canonical = (pipeline === 'prospect' && prospectMap[s]) || (stages.includes(s) ? s : null);
+      return canonical;
     };
 
     // Process each row
@@ -362,19 +403,19 @@ export async function POST(request) {
           }
         }
 
-        // Step 3: Set pipeline
-        if (normalizedRow.pipeline || normalizedRow.stage) {
-          await ensureContactPipeline(contact.id, {
-            pipeline: normalizedRow.pipeline || 'prospect',
-            stage: normalizedRow.stage || 'interest',
-          });
-        } else {
-          // Ensure default pipeline exists
-          await ensureContactPipeline(contact.id, {
-            pipeline: 'prospect',
-            stage: 'interest',
-          });
-        }
+        // Step 3: Set pipeline (default: prospect / need-to-engage = "awaiting outreach")
+        const rawPipeline = normalizedRow.pipeline || '';
+        const rawStage = normalizedRow.stage || '';
+        const pipeline = normalizePipelineValue(rawPipeline) || 'prospect';
+        const stageForPipeline = pipeline === 'unassigned'
+          ? null
+          : (normalizeStageValue(rawStage, pipeline) || (pipeline === 'prospect' ? 'need-to-engage' : (PIPELINE_STAGES[pipeline]?.[0] || 'interest')));
+        await ensureContactPipeline(contact.id, {
+          pipeline,
+          stage: stageForPipeline,
+          defaultPipeline: 'prospect',
+          defaultStage: 'need-to-engage',
+        });
       } catch (error) {
         results.errors.push(`Row ${rowNum}: ${error.message || 'Failed to process contact'}`);
         console.error(`Error processing row ${rowNum}:`, error);

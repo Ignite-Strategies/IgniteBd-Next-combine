@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, FileSpreadsheet, User, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
+import { auth } from '@/lib/firebase';
 
 export default function ContactUploadPage() {
   const router = useRouter();
@@ -60,12 +61,23 @@ export default function ContactUploadPage() {
     setUploading(true);
 
     try {
+      const user = auth.currentUser;
+      if (!user) {
+        alert('Please sign in to upload contacts.');
+        setUploading(false);
+        return;
+      }
+      const token = await user.getIdToken();
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('companyHQId', companyHQId);
 
       const response = await fetch('/api/contacts/batch', {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 
@@ -78,7 +90,8 @@ export default function ContactUploadPage() {
       // Refresh contacts cache
       try {
         const refreshResponse = await fetch(
-          `/api/contacts/retrieve?companyHQId=${companyHQId}`
+          `/api/contacts/retrieve?companyHQId=${companyHQId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json();
