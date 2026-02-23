@@ -543,11 +543,13 @@ model Contact {
   prior_relationship                                        RelationshipEnum?
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
   remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
+  outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
   companies                                                 companies?                 @relation(fields: [contactCompanyId], references: [id])
   contact_lists                                             contact_lists?             @relation(fields: [contactListId], references: [id])
   company_hqs_contacts_crmIdTocompany_hqs                   company_hqs                @relation("contacts_crmIdTocompany_hqs", fields: [crmId], references: [id])
+  outreach_personas                                         outreach_personas?         @relation(fields: [outreachPersonaSlug], references: [slug], onDelete: SetNull)
   invoices                                                  invoices[]
   invite_tokens                                             invite_tokens[]
   pipelines                                                 pipelines?
@@ -1334,25 +1336,43 @@ model relationship_contexts {
   @@index([contextOfRelationship, relationshipRecency, companyAwareness])
 }
 
+// Simple outreach personas - descriptive slugs that drive snippet assembly
+// Example: "FormerColleagueNowReachingoutAgainAfterLongTime"
+model outreach_personas {
+  id           String          @id @default(cuid())
+  slug         String          @unique // e.g., "FormerColleagueNowReachingoutAgainAfterLongTime"
+  name         String // Display name: "Former Colleague - Long Time"
+  description  String?         @db.Text // What this persona represents
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  contentSnips content_snips[]
+  contacts     Contact[]
+
+  @@index([slug])
+}
+
 // ContentSnip-style library: ingest via CSV, use in templates or free-floating
+// Snippets are independent building blocks - assembly helper personas drive matching
 model content_snips {
-  id                    String                 @id @default(cuid())
-  companyHQId           String
-  snipName              String // unique per company; used as {{snippet:snipName}} in templates
-  snipText              String                 @db.Text
-  snipType              String // subject | opening | service | competitor | value | cta | relationship | generic
-  relationshipContextId String? // Optional: which relationship context this snippet is best for
-  isActive              Boolean                @default(true)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  company_hqs           company_hqs            @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  relationship_contexts relationship_contexts? @relation(fields: [relationshipContextId], references: [relationshipContextId])
+  id                                         String                 @id @default(cuid())
+  companyHQId                                String
+  snipName                                   String // unique per company; used as {{snippet:snipName}} in templates
+  snipText                                   String                 @db.Text
+  snipType                                   String // subject | opening | service | competitor | value | cta | relationship | generic
+  assemblyHelperPersonas                     String[] // Array of persona slugs this snippet works well for (e.g., ["FormerColleague", "UsesCompetitor"])
+  isActive                                   Boolean                @default(true)
+  createdAt                                  DateTime               @default(now())
+  updatedAt                                  DateTime               @updatedAt
+  company_hqs                                company_hqs            @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  relationshipContexts                       relationship_contexts? @relation(fields: [relationship_contextsRelationshipContextId], references: [relationshipContextId])
+  relationship_contextsRelationshipContextId String?
+  outreachPersonas                           outreach_personas?     @relation(fields: [outreach_personasId], references: [id])
+  outreach_personasId                        String?
 
   @@unique([companyHQId, snipName])
   @@index([companyHQId])
   @@index([companyHQId, snipType])
   @@index([companyHQId, isActive])
-  @@index([relationshipContextId])
 }
 
 model template_variables {

@@ -25,7 +25,7 @@ function normalizeSnipName(s) {
 /**
  * POST /api/outreach/content-snips/csv
  * FormData: file (CSV), companyHQId
- * CSV columns (any case): snip_name / snipName, snip_text / snipText, snip_type / snipType, relationship_context_id (optional)
+ * CSV columns (any case): snip_name / snipName, snip_text / snipText, snip_type / snipType, assembly_helper_personas / assemblyHelperPersonas (optional, comma-separated slugs)
  * snip_type required (or default 'generic'); snip_name and snip_text required per row.
  */
 export async function POST(request) {
@@ -88,7 +88,7 @@ export async function POST(request) {
     const snipName = getRowValue(row, 'snip_name', 'snipName', 'name');
     const snipText = getRowValue(row, 'snip_text', 'snipText', 'text', 'body');
     let snipType = getRowValue(row, 'snip_type', 'snipType', 'type');
-    const relationshipContextId = getRowValue(row, 'relationship_context_id', 'relationshipContextId');
+    const assemblyHelperPersonasRaw = getRowValue(row, 'assembly_helper_personas', 'assemblyHelperPersonas', 'helperPersonas');
 
     if (!snipName || !snipText) {
       errors.push(`Row ${i + 2}: snip_name and snip_text are required`);
@@ -110,13 +110,26 @@ export async function POST(request) {
         where: { companyHQId_snipName: { companyHQId, snipName: name } },
       });
 
+      // Parse and validate persona slugs if provided (comma-separated)
+      let personaSlugs = [];
+      if (assemblyHelperPersonasRaw) {
+        const slugs = assemblyHelperPersonasRaw.split(',').map((s) => s.trim()).filter(Boolean);
+        if (slugs.length > 0) {
+          const validPersonas = await prisma.outreach_personas.findMany({
+            where: { slug: { in: slugs } },
+            select: { slug: true },
+          });
+          personaSlugs = validPersonas.map((p) => p.slug);
+        }
+      }
+
       if (existing) {
         await prisma.content_snips.update({
           where: { id: existing.id },
           data: {
             snipText,
             snipType,
-            relationshipContextId: relationshipContextId || null,
+            assemblyHelperPersonas: personaSlugs,
             updatedAt: new Date(),
           },
         });
@@ -128,7 +141,7 @@ export async function POST(request) {
             snipName: name,
             snipText,
             snipType,
-            relationshipContextId: relationshipContextId || null,
+            assemblyHelperPersonas: personaSlugs,
             isActive: true,
           },
         });

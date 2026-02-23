@@ -197,4 +197,48 @@ Returns: All emails where hasResponded = true
 
 ---
 
-**Status:** 🟡 Proposal - Ready for Review
+---
+
+## Implementation Status
+
+### ✅ Completed
+
+1. **Database Schema**
+   - ✅ Created `emails` model with all fields
+   - ✅ Added `EmailSource` enum (PLATFORM, OFF_PLATFORM)
+   - ✅ Added relations to Contact, campaigns, email_activities, off_platform_email_sends
+   - ✅ Migration applied: `20260223133218_add_unified_emails_model`
+
+2. **API Endpoints**
+   - ✅ `POST /api/emails` - Create email record (for compose UX)
+   - ✅ `GET /api/emails` - List emails with filters
+   - ✅ `GET /api/emails/[emailId]` - Get single email
+   - ✅ `PUT /api/emails/[emailId]` - Update email (messageId, links, etc.)
+   - ✅ `PUT /api/emails/[emailId]/response` - Record contact response
+
+3. **Integration with Send Flow**
+   - ✅ Updated `/api/outreach/send` to create/update `emails` record
+   - ✅ Supports `emailId` in customArgs (from compose UX)
+   - ✅ Links to `email_activities` via `emailActivityId`
+   - ✅ Returns `emailId` in response for compose UX
+
+### 🔄 Next Steps (Compose UX Integration)
+
+1. **Update Compose UX** to:
+   - Create email record first: `POST /api/emails` with subject/body
+   - Get `emailId` from response
+   - Pass `emailId` in customArgs when building payload
+   - Send endpoint will update the email record with messageId
+
+2. **Response Tracking**
+   - Set up SendGrid inbound webhook
+   - Match replies to `emails` records by messageId
+   - Update `hasResponded`, `contactResponse`, `respondedAt`
+
+3. **Migration of Existing Data** (Optional)
+   - Copy `email_activities` → `emails` (source: PLATFORM)
+   - Copy `off_platform_email_sends` → `emails` (source: OFF_PLATFORM)
+
+---
+
+**Status:** 🟢 Implemented - Ready for Compose UX Integration

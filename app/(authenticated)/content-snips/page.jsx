@@ -47,12 +47,12 @@ function ContentSnipsLandingPage() {
     snipName: '',
     snipText: '',
     snipType: 'generic',
-    relationshipContextId: '',
+    assemblyHelperPersonas: [],
     isActive: true,
   });
   const [saving, setSaving] = useState(false);
-  const [relationshipContexts, setRelationshipContexts] = useState([]);
-  const [loadingContexts, setLoadingContexts] = useState(false);
+  const [personas, setPersonas] = useState([]);
+  const [loadingPersonas, setLoadingPersonas] = useState(false);
 
   // Upload state
   const [uploadFile, setUploadFile] = useState(null);
@@ -80,23 +80,23 @@ function ContentSnipsLandingPage() {
   useEffect(() => {
     if (companyHQId) {
       loadSnips();
-      loadRelationshipContexts();
+      loadPersonas();
     } else {
       setLoading(false);
     }
   }, [companyHQId]);
 
-  const loadRelationshipContexts = async () => {
-    setLoadingContexts(true);
+  const loadPersonas = async () => {
+    setLoadingPersonas(true);
     try {
-      const res = await api.get('/api/relationship-contexts');
+      const res = await api.get('/api/outreach-personas');
       if (res.data?.success) {
-        setRelationshipContexts(res.data.contexts || []);
+        setPersonas(res.data.personas || []);
       }
     } catch (err) {
-      console.error('Failed to load relationship contexts:', err);
+      console.error('Failed to load personas:', err);
     } finally {
-      setLoadingContexts(false);
+      setLoadingPersonas(false);
     }
   };
 
@@ -128,7 +128,7 @@ function ContentSnipsLandingPage() {
           snipName: form.snipName.trim(),
           snipText: form.snipText,
           snipType: form.snipType,
-          relationshipContextId: form.relationshipContextId || null,
+          assemblyHelperPersonas: form.assemblyHelperPersonas || [],
           isActive: form.isActive,
         });
         if (res.data?.success) {
@@ -144,7 +144,7 @@ function ContentSnipsLandingPage() {
           snipName: form.snipName.trim(),
           snipText: form.snipText,
           snipType: form.snipType,
-          relationshipContextId: form.relationshipContextId || null,
+          assemblyHelperPersonas: form.assemblyHelperPersonas || [],
           isActive: form.isActive,
         });
         if (res.data?.success) {
@@ -344,7 +344,7 @@ function ContentSnipsLandingPage() {
       snipName: snip.snipName,
       snipText: snip.snipText || '',
       snipType: snip.snipType || 'generic',
-      relationshipContextId: snip.relationshipContextId || '',
+      assemblyHelperPersonas: snip.assemblyHelperPersonas || [],
       isActive: snip.isActive !== false,
     });
   };
@@ -354,7 +354,7 @@ function ContentSnipsLandingPage() {
       snipName: '',
       snipText: '',
       snipType: 'generic',
-      relationshipContextId: '',
+      assemblyHelperPersonas: [],
       isActive: true,
     });
     setEditingId(null);
@@ -620,26 +620,41 @@ function ContentSnipsLandingPage() {
                   </div>
                   <div className="sm:col-span-2">
                     <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Relationship Context (Optional)
+                      Assembly Helper Personas (Optional)
                     </label>
                     <p className="mb-2 text-xs text-gray-500">
-                      Which relationship context is this snippet best suited for? Leave blank for general use.
+                      Which personas does this snippet work well for? Select multiple. Leave empty for general use.
                     </p>
-                    {loadingContexts ? (
-                      <p className="text-sm text-gray-500">Loading contexts...</p>
+                    {loadingPersonas ? (
+                      <p className="text-sm text-gray-500">Loading personas...</p>
                     ) : (
-                      <select
-                        value={form.relationshipContextId}
-                        onChange={(e) => setForm((f) => ({ ...f, relationshipContextId: e.target.value }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                      >
-                        <option value="">— General (works for any relationship)</option>
-                        {relationshipContexts.map((ctx) => (
-                          <option key={ctx.relationshipContextId} value={ctx.relationshipContextId}>
-                            {ctx.contextKey.replace(/_/g, ' ')}
-                          </option>
+                      <div className="space-y-2">
+                        {personas.map((p) => (
+                          <label key={p.slug} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={form.assemblyHelperPersonas.includes(p.slug)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setForm((f) => ({
+                                    ...f,
+                                    assemblyHelperPersonas: [...f.assemblyHelperPersonas, p.slug],
+                                  }));
+                                } else {
+                                  setForm((f) => ({
+                                    ...f,
+                                    assemblyHelperPersonas: f.assemblyHelperPersonas.filter((slug) => slug !== p.slug),
+                                  }));
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm">
+                              {p.name} {p.description ? <span className="text-gray-500">- {p.description}</span> : ''}
+                            </span>
+                          </label>
                         ))}
-                      </select>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -728,7 +743,7 @@ function ContentSnipsLandingPage() {
                   Columns: <code className="rounded bg-gray-200 px-1">snip_name</code>,{' '}
                   <code className="rounded bg-gray-200 px-1">snip_text</code>,{' '}
                   <code className="rounded bg-gray-200 px-1">snip_type</code> (optional, default generic),{' '}
-                  <code className="rounded bg-gray-200 px-1">relationship_context_id</code> (optional).{' '}
+                  <code className="rounded bg-gray-200 px-1">assembly_helper_personas</code> (optional: comma-separated persona slugs like "FormerColleague,UsesCompetitor").{' '}
                   <a
                     href="data:text/csv;charset=utf-8,snip_name,snip_text,snip_type%0Aopening_reconnect_prior_conversation,Following up on our conversation about {{topic}},opening%0Acta_brief_call_worthwhile,Please let me know if a brief call would be worthwhile.,cta"
                     download="content-snips-template.csv"
@@ -960,7 +975,7 @@ function ContentSnipsLandingPage() {
                           />
                         </th>
                         <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Relationship Context</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Helper Personas</th>
                         <th className="py-2 text-left font-medium text-gray-700">Text</th>
                         <th className="py-2 text-left font-medium text-gray-700">Status</th>
                         <th className="py-2 text-right font-medium text-gray-700">Actions</th>
@@ -981,7 +996,7 @@ function ContentSnipsLandingPage() {
                             </td>
                             <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
                             <td className="py-2 text-gray-600">
-                              {s.relationship_contexts?.contextKey?.replace(/_/g, ' ') || 'General'}
+                              {s.bestForPersonaType?.replace(/_/g, ' ') || 'General'}
                             </td>
                             <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
                               {s.snipText}
@@ -1069,7 +1084,7 @@ function ContentSnipsLandingPage() {
                           </th>
                           <th className="py-2 text-left font-medium text-gray-700">Name</th>
                           <th className="py-2 text-left font-medium text-gray-700">Type</th>
-                          <th className="py-2 text-left font-medium text-gray-700">Relationship Context</th>
+                          <th className="py-2 text-left font-medium text-gray-700">Helper Personas</th>
                           <th className="py-2 text-left font-medium text-gray-700">Text</th>
                           <th className="py-2 text-left font-medium text-gray-700">Status</th>
                           <th className="py-2 text-right font-medium text-gray-700">Actions</th>
@@ -1093,7 +1108,9 @@ function ContentSnipsLandingPage() {
                                 <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{s.snipType}</span>
                               </td>
                               <td className="py-2 text-gray-600">
-                                {s.relationship_contexts?.contextKey?.replace(/_/g, ' ') || 'General'}
+                                {s.assemblyHelperPersonas && s.assemblyHelperPersonas.length > 0
+                                  ? s.assemblyHelperPersonas.join(', ')
+                                  : 'General'}
                               </td>
                               <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
                                 {s.snipText}

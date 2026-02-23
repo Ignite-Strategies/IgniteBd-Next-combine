@@ -180,15 +180,20 @@ export async function POST(request) {
       );
     }
 
-    // Step 5: Log email activity
+    // Step 5: Log email activity and create unified email record
     const toEmail = msg.personalizations[0]?.to[0]?.email || '';
     const subject = msg.personalizations[0]?.subject || '';
     const emailBody = msg.content[0]?.value || '';
     // custom_args is now inside personalizations[0]
     const customArgs = msg.personalizations[0]?.custom_args || {};
+    const emailId = customArgs.emailId || null; // Optional: emailId from compose UX
+    
+    let emailActivityId = null;
+    let createdEmailId = null;
     
     try {
-      await prisma.email_activities.create({
+      // Create email_activities record (existing behavior)
+      const emailActivity = await prisma.email_activities.create({
         data: {
           owner_id: owner.id,
           contact_id: customArgs.contactId || null,
@@ -203,9 +208,44 @@ export async function POST(request) {
           event: 'sent',
         },
       });
-      console.log('✅ Email activity logged');
+      emailActivityId = emailActivity.id;
+      console.log('✅ Email activity logged:', emailActivityId);
+      
+      // Create or update unified emails record
+      if (emailId) {
+        // Update existing email record (created by compose UX)
+        const updatedEmail = await prisma.emails.update({
+          where: { id: emailId },
+          data: {
+            messageId: messageId || null,
+            emailActivityId: emailActivityId,
+            sendDate: new Date(), // Update to actual send time
+          },
+        });
+        createdEmailId = updatedEmail.id;
+        console.log('✅ Email record updated:', createdEmailId);
+      } else if (customArgs.contactId) {
+        // Create new email record (backward compatibility)
+        const email = await prisma.emails.create({
+          data: {
+            contactId: customArgs.contactId,
+            sendDate: new Date(),
+            subject: subject || null,
+            body: emailBody || null,
+            source: 'PLATFORM',
+            platform: 'sendgrid',
+            messageId: messageId || null,
+            emailActivityId: emailActivityId,
+            campaignId: customArgs.campaignId || null,
+            sequenceId: customArgs.sequenceId || null,
+          },
+        });
+        createdEmailId = email.id;
+        console.log('✅ Email record created:', createdEmailId);
+      }
     } catch (dbError) {
       console.warn('⚠️ Could not log email activity:', dbError.message);
+      // Don't fail the send if logging fails
     }
 
     // Step 6: Delete payload from Redis (cleanup)
@@ -216,6 +256,8 @@ export async function POST(request) {
       success: true,
       messageId: messageId || 'unknown',
       statusCode: statusCode || 202,
+      emailId: createdEmailId, // Return emailId for compose UX
+      emailActivityId: emailActivityId,
     });
   } catch (error) {
       // Handle error globally (logs to Vercel)

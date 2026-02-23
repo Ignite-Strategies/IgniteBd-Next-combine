@@ -12,6 +12,7 @@ import {
   FileText,
   CheckCircle,
   ChevronRight,
+  Tag,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -72,6 +73,7 @@ function TemplatesContent() {
   const createUrl = `/templates/create${baseUrl ? `?companyHQId=${companyHQId}` : ''}`;
   const snippetsUrl = `/content-snips${baseUrl ? `?companyHQId=${companyHQId}` : ''}`;
   const variablesUrl = `/variables${baseUrl ? `?companyHQId=${companyHQId}` : ''}`;
+  const personasUrl = '/outreach-personas';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -88,6 +90,14 @@ function TemplatesContent() {
               >
                 <FileStack className="h-4 w-4" />
                 Content snips
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(personasUrl)}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                <Tag className="h-4 w-4" />
+                Persona Bank
               </button>
               <button
                 type="button"

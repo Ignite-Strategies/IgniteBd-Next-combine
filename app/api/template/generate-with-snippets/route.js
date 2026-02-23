@@ -67,8 +67,7 @@ export async function POST(request) {
         snipName: true,
         snipText: true,
         snipType: true,
-        contextType: true,
-        intentType: true,
+        assemblyHelperPersonas: true,
       },
       orderBy: [{ snipType: 'asc' }, { snipName: 'asc' }],
     });
@@ -101,8 +100,7 @@ export async function POST(request) {
       name: s.snipName,
       text: s.snipText,
       type: s.snipType,
-      context: s.contextType,
-      intent: s.intentType,
+      assemblyHelperPersonas: s.assemblyHelperPersonas || [],
     }));
 
     const openai = getOpenAIClient();

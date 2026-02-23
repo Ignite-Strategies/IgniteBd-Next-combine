@@ -40,27 +40,16 @@ export async function GET(request) {
         companyHQId,
         isActive: true,
       },
-      include: {
-        relationship_contexts: true,
-      },
       orderBy: [{ snipType: 'asc' }, { snipName: 'asc' }],
     });
 
-    // Create hydrated map: snipName -> { snipText, snipType, relationshipContext, ... }
+    // Create hydrated map: snipName -> { snipText, snipType, assemblyHelperPersonas, ... }
     const hydrated = {};
     snips.forEach((snip) => {
       hydrated[snip.snipName] = {
         snipText: snip.snipText,
         snipType: snip.snipType,
-        relationshipContextId: snip.relationshipContextId,
-        relationshipContext: snip.relationship_contexts
-          ? {
-              contextKey: snip.relationship_contexts.contextKey,
-              contextOfRelationship: snip.relationship_contexts.contextOfRelationship,
-              relationshipRecency: snip.relationship_contexts.relationshipRecency,
-              companyAwareness: snip.relationship_contexts.companyAwareness,
-            }
-          : null,
+        assemblyHelperPersonas: snip.assemblyHelperPersonas || [],
       };
     });
 

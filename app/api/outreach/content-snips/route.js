@@ -39,19 +39,14 @@ export async function GET(request) {
   }
 
   const snipType = request.nextUrl?.searchParams?.get('snipType');
-  const relationshipContextId = request.nextUrl?.searchParams?.get('relationshipContextId');
   const activeOnly = request.nextUrl?.searchParams?.get('activeOnly') !== 'false';
 
   const where = { companyHQId };
   if (activeOnly) where.isActive = true;
   if (snipType) where.snipType = snipType;
-  if (relationshipContextId) where.relationshipContextId = relationshipContextId;
 
   const snips = await prisma.content_snips.findMany({
     where,
-    include: {
-      relationship_contexts: true,
-    },
     orderBy: [{ snipType: 'asc' }, { snipName: 'asc' }],
   });
 
@@ -60,7 +55,8 @@ export async function GET(request) {
 
 /**
  * POST /api/outreach/content-snips
- * Body: { companyHQId, snipName, snipText, snipType, relationshipContextId?, isActive? }
+ * Body: { companyHQId, snipName, snipText, snipType, assemblyHelperPersonas?, isActive? }
+ * assemblyHelperPersonas: string[] - Array of persona slugs this snippet works for
  */
 export async function POST(request) {
   let firebaseUser;
@@ -71,7 +67,7 @@ export async function POST(request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { companyHQId, snipName, snipText, snipType, relationshipContextId, isActive } = body;
+  const { companyHQId, snipName, snipText, snipType, assemblyHelperPersonas, isActive } = body;
 
   if (!companyHQId || !snipName || snipText === undefined || !snipType) {
     return NextResponse.json(
@@ -111,7 +107,7 @@ export async function POST(request) {
     update: {
       snipText: String(snipText).trim(),
       snipType,
-      relationshipContextId: relationshipContextId || null,
+      assemblyHelperPersonas: Array.isArray(assemblyHelperPersonas) ? assemblyHelperPersonas : [],
       isActive: isActive !== false,
       updatedAt: new Date(),
     },
@@ -120,11 +116,8 @@ export async function POST(request) {
       snipName: name,
       snipText: String(snipText).trim(),
       snipType,
-      relationshipContextId: relationshipContextId || null,
+      assemblyHelperPersonas: Array.isArray(assemblyHelperPersonas) ? assemblyHelperPersonas : [],
       isActive: isActive !== false,
-    },
-    include: {
-      relationship_contexts: true,
     },
   });
 

@@ -31,9 +31,6 @@ export async function GET(request, { params }) {
 
   const snip = await prisma.content_snips.findUnique({
     where: { id },
-    include: {
-      relationship_contexts: true,
-    },
   });
   if (!snip) {
     return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
@@ -49,7 +46,8 @@ export async function GET(request, { params }) {
 
 /**
  * PUT /api/outreach/content-snips/[id]
- * Body: { snipName?, snipText?, snipType?, relationshipContextId?, isActive? }
+ * Body: { snipName?, snipText?, snipType?, assemblyHelperPersonas?, isActive? }
+ * assemblyHelperPersonas: string[] - Array of persona slugs
  */
 export async function PUT(request, { params }) {
   let firebaseUser;
@@ -93,15 +91,24 @@ export async function PUT(request, { params }) {
   }
   if (body.snipText !== undefined) data.snipText = String(body.snipText);
   if (body.snipType !== undefined && SNIP_TYPES.includes(body.snipType)) data.snipType = body.snipType;
-  if (body.relationshipContextId !== undefined) data.relationshipContextId = body.relationshipContextId || null;
+  if (body.assemblyHelperPersonas !== undefined) {
+    // Validate persona slugs exist
+    if (Array.isArray(body.assemblyHelperPersonas) && body.assemblyHelperPersonas.length > 0) {
+      const validPersonas = await prisma.outreach_personas.findMany({
+        where: { slug: { in: body.assemblyHelperPersonas } },
+        select: { slug: true },
+      });
+      const validSlugs = validPersonas.map((p) => p.slug);
+      data.assemblyHelperPersonas = validSlugs;
+    } else {
+      data.assemblyHelperPersonas = [];
+    }
+  }
   if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 
   const snip = await prisma.content_snips.update({
     where: { id },
     data,
-    include: {
-      relationship_contexts: true,
-    },
   });
 
   return NextResponse.json({ success: true, snip });
