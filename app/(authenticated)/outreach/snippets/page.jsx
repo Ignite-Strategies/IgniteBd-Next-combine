@@ -491,7 +491,7 @@ export default function SnippetHomePage() {
           ) : snips.length === 0 ? (
             <p className="text-gray-500">
               No snippets yet. Upload a CSV or add one above. Use in templates as{' '}
-              <code className="rounded bg-gray-100 px-1">{{'{{snippet:snip_name}}'}}</code>.
+              <code className="rounded bg-gray-100 px-1">{'{{snippet:snip_name}}'}</code>.
             </p>
           ) : (
             <div className="overflow-x-auto">
