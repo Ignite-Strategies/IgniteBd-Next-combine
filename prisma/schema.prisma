@@ -540,6 +540,7 @@ model Contact {
   persona_type                                              PersonaType?
   prior_relationship                                        RelationshipEnum?
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
+  remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]             @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
   companies                                                 companies?                @relation(fields: [contactCompanyId], references: [id])
@@ -552,6 +553,7 @@ model Contact {
   work_packages_work_packages_workPackageClientIdTocontacts work_packages[]           @relation("work_packages_workPackageClientIdTocontacts")
   work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]           @relation("work_packages_workPackageMemberIdTocontacts")
   contact_analyses                                          contact_analyses?
+  off_platform_email_sends                                  off_platform_email_sends[]
 
   @@unique([email, crmId])
   @@index([companyDomain])
@@ -562,6 +564,7 @@ model Contact {
   @@index([ownerId])
   @@index([role])
   @@index([prior_relationship])
+  @@index([remindMeOn])
   @@map("contacts")
 }
 
@@ -1833,5 +1836,23 @@ enum PersonaType {
   GATEKEEPER
   CHAMPION
   OTHER
+}
+
+model off_platform_email_sends {
+  id                String   @id @default(cuid())
+  contactId         String
+  emailSent         DateTime // When the email was actually sent (off-platform)
+  subject           String?  // Optional: what was the subject?
+  platform          String?  // Optional: "gmail", "outlook", "apollo", "manual", etc.
+  notes             String?  // Optional: any notes about the send
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  contacts          Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([contactId, emailSent])
+  @@index([emailSent])
+  @@map("off_platform_email_sends")
 }
 
