@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { EmailSource } from '@prisma/client';
 
 /**
  * POST /api/emails
@@ -84,7 +83,7 @@ export async function POST(request) {
         sendDate: emailSendDate,
         subject: subject || null,
         body: body || null,
-        source: source as EmailSource,
+        source: source,
         platform: platform || null,
         campaignId: campaignId || null,
         sequenceId: sequenceId || null,
