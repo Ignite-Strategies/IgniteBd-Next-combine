@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   FileStack,
@@ -30,7 +30,7 @@ const SNIP_TYPES = [
 const CONTEXT_TYPES = ['email', 'blog', 'linkedin', 'internal', 'multi'];
 const INTENT_TYPES = ['reactivation', 'prior_contact', 'intro', 'competitor', 'seasonal', 'relationship_only'];
 
-export default function ContentSnipsLandingPage() {
+function ContentSnipsLandingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
@@ -652,5 +652,21 @@ export default function ContentSnipsLandingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ContentSnipsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <p className="text-gray-600">Loading…</p>
+          </div>
+        </div>
+      }
+    >
+      <ContentSnipsLandingPage />
+    </Suspense>
   );
 }
