@@ -2,19 +2,268 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileSpreadsheet, User, X } from 'lucide-react';
+import { Upload, User, X, ChevronRight } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { auth } from '@/lib/firebase';
+
+// Client-side CSV parse: preserve original header casing
+function parseCSVClient(csvText) {
+  const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length === 0) return { headers: [], rows: [], errors: [] };
+  const parseLine = (line) => {
+    const out = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      const next = line[i + 1];
+      if (c === '"') {
+        if (inQuotes && next === '"') {
+          cur += '"';
+          i++;
+        } else inQuotes = !inQuotes;
+      } else if ((c === ',' && !inQuotes) || (c === '\t' && !inQuotes)) {
+        out.push(cur.trim());
+        cur = '';
+      } else cur += c;
+    }
+    out.push(cur.trim());
+    return out;
+  };
+  const rawHeaders = parseLine(lines[0]);
+  const headers = rawHeaders.map((h) => h.trim()).filter(Boolean);
+  const rows = [];
+  const errors = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseLine(lines[i]);
+    if (vals.every((v) => !v.trim())) continue;
+    if (vals.length !== headers.length) {
+      errors.push(`Row ${i + 1}: expected ${headers.length} columns, got ${vals.length}`);
+      continue;
+    }
+    const row = {};
+    headers.forEach((h, j) => {
+      row[h] = vals[j]?.trim() ?? '';
+    });
+    rows.push(row);
+  }
+  return { headers, rows, errors };
+}
+
+// Same as batch API: CSV header (any case) → our field key
+const HEADER_TO_FIELD = {
+  'first name': 'firstName',
+  firstname: 'firstName',
+  first: 'firstName',
+  'last name': 'lastName',
+  lastname: 'lastName',
+  last: 'lastName',
+  email: 'email',
+  'email address': 'email',
+  'company name': 'companyName',
+  companyname: 'companyName',
+  company: 'companyName',
+  title: 'title',
+  'job title': 'title',
+  jobtitle: 'title',
+  position: 'title',
+  url: 'linkedinUrl',
+  linkedin: 'linkedinUrl',
+  'linkedin url': 'linkedinUrl',
+  linkedinurl: 'linkedinUrl',
+  'profile url': 'linkedinUrl',
+  'connected on': 'linkedinConnectedOn',
+  connectedon: 'linkedinConnectedOn',
+  phone: 'phone',
+  'phone number': 'phone',
+  phonenumber: 'phone',
+  mobile: 'phone',
+  notes: 'notes',
+  note: 'notes',
+  pipeline: 'pipeline',
+  stage: 'stage',
+};
+
+const FIELD_LABELS = {
+  firstName: 'First Name',
+  lastName: 'Last Name',
+  email: 'Email Address',
+  companyName: 'Company',
+  title: 'Position / Title',
+  linkedinUrl: 'URL (LinkedIn)',
+  linkedinConnectedOn: 'Connected On',
+  phone: 'Phone',
+  notes: 'Notes',
+  pipeline: 'Pipeline',
+  stage: 'Stage',
+};
+
+
+function suggestMapping(csvHeaders) {
+  return csvHeaders.map((h) => {
+    const key = (h || '').toLowerCase().trim();
+    const field = HEADER_TO_FIELD[key] || null;
+    return { csvHeader: h, field, label: field ? FIELD_LABELS[field] || field : '—' };
+  });
+}
+
+const FIELD_ORDER = ['firstName', 'lastName', 'email', 'companyName', 'title', 'linkedinUrl', 'linkedinConnectedOn', 'phone', 'notes', 'pipeline', 'stage'];
+const FIELD_TO_CANONICAL_HEADER = {
+  firstName: 'First Name',
+  lastName: 'Last Name',
+  email: 'Email Address',
+  companyName: 'Company',
+  title: 'Position',
+  linkedinUrl: 'URL',
+  linkedinConnectedOn: 'Connected On',
+  phone: 'Phone',
+  notes: 'Notes',
+  pipeline: 'Pipeline',
+  stage: 'Stage',
+};
+
+function buildCSVFromMappedRows(mappedRows) {
+  const headerLine = FIELD_ORDER.map((f) => FIELD_TO_CANONICAL_HEADER[f]).join(',');
+  const escape = (v) => {
+    if (v == null || v === '') return '';
+    const s = String(v);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const lines = [headerLine];
+  mappedRows.forEach((row) => {
+    const vals = FIELD_ORDER.map((f) => row[f] ?? '');
+    lines.push(vals.map(escape).join(','));
+  });
+  return lines.join('\n');
+}
+
+const STEPS = ['View', 'Confirm mapping', 'Edit data', 'Looks good — Save', 'Success'];
 
 export default function ContactUploadPage() {
   const router = useRouter();
   const [file, setFile] = useState(null);
+  const [csvText, setCsvText] = useState('');
+  const [parsed, setParsed] = useState({ headers: [], rows: [], errors: [] });
+  const [step, setStep] = useState(0);
+  const [mapping, setMapping] = useState([]);
+  const [mappedRows, setMappedRows] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [successResult, setSuccessResult] = useState(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleFileSelect = async (event) => {
+    const f = event.target.files?.[0];
+    if (!f) return;
+    if (f.type !== 'text/csv' && !f.name.toLowerCase().endsWith('.csv')) {
+      alert('Please select a CSV file.');
+      return;
+    }
+    setFile(f);
+    const text = await f.text();
+    setCsvText(text);
+    const result = parseCSVClient(text);
+    setParsed(result);
+    setMapping(suggestMapping(result.headers));
+    const mapped = result.rows.map((row) => {
+      const out = {};
+      result.headers.forEach((csvH, i) => {
+        const m = suggestMapping(result.headers)[i];
+        if (m?.field) out[m.field] = row[csvH] ?? '';
+      });
+      return out;
+    });
+    setMappedRows(mapped);
+    setStep(0);
+    setSuccessResult(null);
+  };
+
+  useEffect(() => {
+    if (step >= 1 && mapping.length > 0 && parsed.rows.length > 0) {
+      const mapped = parsed.rows.map((row) => {
+        const out = {};
+        mapping.forEach((m) => {
+          if (m.field && row[m.csvHeader] !== undefined) out[m.field] = row[m.csvHeader] ?? '';
+        });
+        return out;
+      });
+      setMappedRows(mapped);
+    }
+  }, [step, mapping, parsed.rows]);
+
+  const handleCellEdit = (rowIndex, field, value) => {
+    setMappedRows((prev) => {
+      const next = [...prev];
+      if (!next[rowIndex]) return prev;
+      next[rowIndex] = { ...next[rowIndex], [field]: value };
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    const companyHQId = typeof window !== 'undefined' ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId')) : null;
+    if (!companyHQId) {
+      alert('Company context required. Please set your company first.');
+      router.push('/company/create-or-choose');
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      alert('Please sign in to upload contacts.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const token = await user.getIdToken();
+      const csv = buildCSVFromMappedRows(mappedRows);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const uploadFile = new File([blob], file?.name || 'contacts.csv', { type: 'text/csv' });
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('companyHQId', companyHQId);
+      const response = await fetch('/api/contacts/batch', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Upload failed');
+      setSuccessResult(result);
+      setStep(4);
+      try {
+        const refreshResponse = await fetch(`/api/contacts/retrieve?companyHQId=${companyHQId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          if (refreshData.success && refreshData.contacts) {
+            window.localStorage.setItem('contacts', JSON.stringify(refreshData.contacts));
+          }
+        }
+      } catch (_) {}
+    } catch (err) {
+      console.error(err);
+      alert(`Upload failed: ${err.message || 'Please try again.'}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    if (typeof window === 'undefined') return;
+    const template = FIELD_ORDER.map((f) => FIELD_TO_CANONICAL_HEADER[f]).join(',') + '\n';
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'contacts_upload_template.csv';
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   if (!mounted) {
     return (
@@ -27,125 +276,17 @@ export default function ContactUploadPage() {
     );
   }
 
-  const handleFileSelect = (event) => {
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
-
-    if (
-      selectedFile.type !== 'text/csv' &&
-      !selectedFile.name.toLowerCase().endsWith('.csv')
-    ) {
-      alert('Please select a CSV file.');
-      return;
-    }
-
-    setFile(selectedFile);
-  };
-
-  const handleUpload = async () => {
-    if (!file) {
-      alert('Please select a CSV file first.');
-      return;
-    }
-
-    const companyHQId = typeof window !== 'undefined'
-      ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId'))
-      : null;
-
-    if (!companyHQId) {
-      alert('Company context required. Please set your company first.');
-      router.push('/company/create-or-choose');
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        alert('Please sign in to upload contacts.');
-        setUploading(false);
-        return;
-      }
-      const token = await user.getIdToken();
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('companyHQId', companyHQId);
-
-      const response = await fetch('/api/contacts/batch', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Upload failed');
-      }
-
-      // Refresh contacts cache
-      try {
-        const refreshResponse = await fetch(
-          `/api/contacts/retrieve?companyHQId=${companyHQId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json();
-          if (refreshData.success && refreshData.contacts) {
-            window.localStorage.setItem(
-              'contacts',
-              JSON.stringify(refreshData.contacts)
-            );
-          }
-        }
-      } catch (refreshError) {
-        console.warn('Unable to refresh contacts cache', refreshError);
-      }
-
-      // Show success message with details
-      const message = result.message || 
-        `✅ Successfully processed ${result.total || 0} contacts!`;
-      const details = result.errors && result.errors.length > 0
-        ? `\n\nErrors:\n${result.errors.slice(0, 5).join('\n')}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`
-        : '';
-      
-      alert(message + details);
-      setFile(null);
-      router.push('/people');
-    } catch (error) {
-      console.error('Upload failed:', error);
-      alert(`Upload failed: ${error.message || 'Please try again.'}`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const downloadTemplate = () => {
-    if (typeof window === 'undefined') return;
-    // Header row: matches LinkedIn-style export (URL, Connected On) + optional Pipeline, Stage
-    const headers = ['First Name', 'Last Name', 'URL', 'Email Address', 'Company', 'Position', 'Connected On', 'Notes', 'Pipeline', 'Stage'];
-    const template = headers.join(',') + '\n';
-    const blob = new Blob([template], { type: 'text/csv' });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = 'contacts_upload_template.csv';
-    link.click();
-    window.URL.revokeObjectURL(downloadUrl);
-  };
+  const noFile = !file || !csvText;
+  const stepTitles = STEPS;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="📥 Upload Contacts"
+          title="Upload Contacts"
           subtitle="Upload a CSV to add people to your Ignite workspace"
-          backTo="/people/load"
-          backLabel="Back to Load Up"
+          backTo={step === 0 && noFile ? '/people/load' : undefined}
+          backLabel={step === 0 && noFile ? 'Back to Load Up' : step > 0 ? 'Back' : undefined}
         />
 
         <div className="mb-8">
@@ -159,26 +300,10 @@ export default function ContactUploadPage() {
                 <User className="h-8 w-8 text-blue-600 transition group-hover:text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  ➕ Add Manually
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Enter single contacts without using a CSV import.
-                </p>
+                <h3 className="text-xl font-semibold text-gray-900">Add Manually</h3>
+                <p className="text-sm text-gray-600">Enter single contacts without using a CSV import.</p>
               </div>
-              <svg
-                className="h-6 w-6 text-gray-400 transition group-hover:text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+              <ChevronRight className="h-6 w-6 text-gray-400 group-hover:text-blue-600" />
             </div>
           </button>
         </div>
@@ -188,79 +313,269 @@ export default function ContactUploadPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Upload CSV</h2>
               <p className="text-gray-600">
-                Required: First Name, Last Name. Optional: URL, Email Address, Company, Position, Connected On, Notes, Pipeline, Stage.
+                Required: First Name, Last Name. Optional: URL, Email, Company, Position, Connected On, Notes, Pipeline, Stage.
               </p>
             </div>
             <button
               type="button"
               onClick={downloadTemplate}
-              className="text-sm font-semibold text-blue-600 transition hover:text-blue-800"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-800"
             >
-              📥 Download CSV Template
+              Download CSV Template
             </button>
           </div>
 
-          <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center transition-colors hover:border-gray-400">
-            {!file ? (
-              <>
+          {noFile ? (
+            <>
+              <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center hover:border-gray-400">
                 <Upload className="mx-auto mb-4 h-16 w-16 text-gray-400" />
                 <p className="mb-2 text-gray-600">Click to upload or drag and drop</p>
                 <p className="mb-4 text-xs text-gray-500">CSV files only</p>
-                <label className="inline-block cursor-pointer rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700">
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
+                <label className="inline-block cursor-pointer rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700">
+                  <input type="file" accept=".csv" onChange={handleFileSelect} className="hidden" />
                   Select CSV File
                 </label>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <FileSpreadsheet className="h-12 w-12 text-green-600" />
-                <div className="text-center sm:text-left">
-                  <p className="font-medium text-gray-900">{file.name}</p>
-                  <p className="text-sm text-gray-600">
-                    Size: {(file.size / 1024).toFixed(2)} KB
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                <strong>Batch processing:</strong> You’ll get to view rows, confirm column mapping, edit data, then save.
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mb-6 flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-gray-700">Step {step + 1} of 5:</span>
+                <span className="text-sm text-gray-600">{stepTitles[step]}</span>
+                <span className="text-xs text-gray-500">({file.name}, {parsed.rows.length} rows)</span>
+              </div>
+
+              {step === 0 && (
+                <>
+                  <p className="mb-2 text-gray-600">Preview: first rows from your file.</p>
+                  <div className="overflow-x-auto border rounded-lg max-h-80 overflow-y-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          {parsed.headers.map((h) => (
+                            <th key={h} className="px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsed.rows.slice(0, 20).map((row, i) => (
+                          <tr key={i} className="border-t border-gray-200 hover:bg-gray-50">
+                            {parsed.headers.map((h) => (
+                              <td key={h} className="px-3 py-2 text-gray-800 max-w-xs truncate" title={row[h]}>
+                                {row[h]}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {parsed.rows.length > 20 && (
+                    <p className="mt-2 text-sm text-gray-500">Showing first 20 of {parsed.rows.length} rows.</p>
+                  )}
+                  {parsed.errors.length > 0 && (
+                    <div className="mt-2 text-amber-700 text-sm">
+                      Warnings: {parsed.errors.slice(0, 3).join('; ')}
+                      {parsed.errors.length > 3 && ` (+${parsed.errors.length - 3} more)`}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {step === 1 && (
+                <>
+                  <p className="mb-3 text-gray-600">Confirm how your columns map to contact fields. Change any dropdown if needed.</p>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">CSV column</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">Maps to</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mapping.map((m, i) => (
+                          <tr key={i} className="border-t border-gray-200">
+                            <td className="px-3 py-2 text-gray-800 font-medium">{m.csvHeader}</td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={m.field || ''}
+                                onChange={(e) => {
+                                  const v = e.target.value || null;
+                                  setMapping((prev) => {
+                                    const next = [...prev];
+                                    next[i] = { ...next[i], field: v, label: v ? (FIELD_LABELS[v] || v) : '—' };
+                                    return next;
+                                  });
+                                }}
+                                className="rounded border border-gray-300 px-2 py-1 text-gray-800"
+                              >
+                                <option value="">— Don’t import</option>
+                                {Object.entries(FIELD_LABELS).map(([k, label]) => (
+                                  <option key={k} value={k}>{label}</option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <p className="mb-3 text-gray-600">Edit any cell below, then click “Looks good — Save”.</p>
+                  <div className="overflow-x-auto border rounded-lg max-h-96 overflow-y-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-8">#</th>
+                          {Object.keys(FIELD_LABELS).filter((f) => mapping.some((m) => m.field === f)).map((field) => (
+                            <th key={field} className="px-2 py-1.5 text-left font-semibold text-gray-700 whitespace-nowrap">
+                              {FIELD_LABELS[field]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mappedRows.map((row, ri) => (
+                          <tr key={ri} className="border-t border-gray-200 hover:bg-gray-50">
+                            <td className="px-2 py-1 text-gray-500">{ri + 1}</td>
+                            {Object.keys(FIELD_LABELS)
+                              .filter((f) => mapping.some((m) => m.field === f))
+                              .map((field) => (
+                                <td key={field} className="px-2 py-1">
+                                  <input
+                                    type="text"
+                                    value={row[field] ?? ''}
+                                    onChange={(e) => handleCellEdit(ri, field, e.target.value)}
+                                    className="w-full min-w-[8rem] rounded border border-gray-300 px-2 py-1 text-gray-800 text-sm"
+                                  />
+                                </td>
+                              ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <p className="mb-3 text-gray-600">Ready to save {mappedRows.length} contacts. Click below to upload.</p>
+                  <div className="overflow-x-auto border rounded-lg max-h-64 overflow-y-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-8">#</th>
+                          {Object.keys(FIELD_LABELS).filter((f) => mapping.some((m) => m.field === f)).map((field) => (
+                            <th key={field} className="px-2 py-1.5 text-left font-semibold text-gray-700 whitespace-nowrap">
+                              {FIELD_LABELS[field]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mappedRows.slice(0, 10).map((row, ri) => (
+                          <tr key={ri} className="border-t border-gray-200">
+                            <td className="px-2 py-1 text-gray-500">{ri + 1}</td>
+                            {Object.keys(FIELD_LABELS)
+                              .filter((f) => mapping.some((m) => m.field === f))
+                              .map((field) => (
+                                <td key={field} className="px-2 py-1 text-gray-800 max-w-xs truncate">
+                                  {row[field] ?? ''}
+                                </td>
+                              ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {mappedRows.length > 10 && (
+                    <p className="mt-2 text-sm text-gray-500">Showing first 10 of {mappedRows.length} rows.</p>
+                  )}
+                </>
+              )}
+
+              {step === 4 && successResult && (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
+                  <p className="text-lg font-semibold text-green-800">
+                    Processed {successResult.total ?? 0} rows: {successResult.created ?? 0} created, {successResult.updated ?? 0} updated.
                   </p>
+                  {successResult.errors?.length > 0 && (
+                    <p className="mt-2 text-sm text-amber-700">
+                      Some rows had issues: {successResult.errors.slice(0, 3).join('; ')}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => router.push('/people')}
+                    className="mt-4 rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700"
+                  >
+                    View contacts
+                  </button>
                 </div>
+              )}
+
+              <div className="mt-8 flex items-center gap-3 flex-wrap">
+                {step < 4 && (
+                  <>
+                    {step > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setStep((s) => s - 1)}
+                        className="rounded-lg bg-gray-100 px-4 py-2 font-semibold text-gray-700 hover:bg-gray-200"
+                      >
+                        Back
+                      </button>
+                    )}
+                    {step < 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setStep((s) => s + 1)}
+                        className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                      >
+                        Next: {stepTitles[step + 1]}
+                      </button>
+                    )}
+                    {step === 3 && (
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={uploading}
+                        className="rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                      >
+                        {uploading ? 'Saving…' : 'Yes, save these contacts'}
+                      </button>
+                    )}
+                  </>
+                )}
                 <button
                   type="button"
-                  onClick={() => setFile(null)}
-                  className="rounded-full p-2 text-gray-400 transition hover:text-red-600"
+                  onClick={() => {
+                    setFile(null);
+                    setCsvText('');
+                    setParsed({ headers: [], rows: [], errors: [] });
+                    setStep(0);
+                    setMapping([]);
+                    setMappedRows([]);
+                    setSuccessResult(null);
+                  }}
+                  className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  <X className="h-5 w-5" />
+                  Start over
                 </button>
               </div>
-            )}
-          </div>
-
-          {file && (
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => setFile(null)}
-                className="flex-1 rounded-lg bg-gray-100 px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleUpload}
-                disabled={uploading}
-                className="flex-1 rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {uploading ? 'Uploading…' : 'Upload Contacts'}
-              </button>
-            </div>
+            </>
           )}
-
-          <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-            <strong className="font-semibold">💡 Batch Processing:</strong> All contacts, companies, and pipelines are processed in one operation.
-            Companies are created if they don't exist; URL (LinkedIn), Position, Connected On, and Notes are imported.
-            Flexible column names (e.g., "First Name", "firstName", "Email Address", "email" all work).
-          </div>
         </div>
       </div>
     </div>
