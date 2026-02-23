@@ -41,6 +41,8 @@ function ContentSnipsLandingPage() {
   const [createMode, setCreateMode] = useState(null); // 'manual', 'ai', 'upload'
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedSnips, setSelectedSnips] = useState(new Set()); // For bulk delete
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Form state for manual creation
   const [form, setForm] = useState({
@@ -256,6 +258,7 @@ function ContentSnipsLandingPage() {
       await api.delete(`/api/outreach/content-snips/${id}`);
       setSuccess('Content snip deleted successfully!');
       loadSnips();
+      setSelectedSnips(new Set());
       if (editingId === id) {
         resetForm();
         setCreateMode(null);
@@ -263,6 +266,61 @@ function ContentSnipsLandingPage() {
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedSnips.size === 0) {
+      setError('No snippets selected.');
+      return;
+    }
+    
+    if (!window.confirm(`Delete ${selectedSnips.size} content snippet(s)? This cannot be undone.`)) return;
+    
+    setBulkDeleting(true);
+    setError('');
+    
+    try {
+      const deletePromises = Array.from(selectedSnips).map((id) =>
+        api.delete(`/api/outreach/content-snips/${id}`).catch((err) => {
+          console.error(`Failed to delete ${id}:`, err);
+          return { error: err.response?.data?.error || 'Failed to delete' };
+        })
+      );
+      
+      const results = await Promise.all(deletePromises);
+      const errors = results.filter((r) => r?.error);
+      
+      if (errors.length > 0) {
+        setError(`Deleted ${selectedSnips.size - errors.length} snippets. ${errors.length} failed.`);
+      } else {
+        setSuccess(`Successfully deleted ${selectedSnips.size} snippet(s)!`);
+      }
+      
+      setSelectedSnips(new Set());
+      loadSnips();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete snippets');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const toggleSelectSnip = (id) => {
+    const newSelected = new Set(selectedSnips);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedSnips(newSelected);
+  };
+
+  const selectAllSnips = (snipList) => {
+    if (selectedSnips.size === snipList.length) {
+      setSelectedSnips(new Set());
+    } else {
+      setSelectedSnips(new Set(snipList.map((s) => s.id)));
     }
   };
 
@@ -838,87 +896,239 @@ function ContentSnipsLandingPage() {
 
         {/* Snips List */}
         {!showCreateOptions && (
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            {loading ? (
-              <p className="text-gray-500">Loading…</p>
-            ) : snips.length === 0 ? (
-              <div className="text-center py-12">
-                <FileStack className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No content snips yet</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Create your first content snip to get started. Use them in templates as{' '}
-                  <code className="rounded bg-gray-100 px-1">{'{{snippet:snip_name}}'}</code>.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateOptions(true)}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                >
-                  Create Content Snip
-                </button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead>
-                    <tr>
-                      <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                      <th className="py-2 text-left font-medium text-gray-700">Type</th>
-                      <th className="py-2 text-left font-medium text-gray-700">Context / Intent</th>
-                      <th className="py-2 text-left font-medium text-gray-700">Text</th>
-                      <th className="py-2 text-left font-medium text-gray-700">Status</th>
-                      <th className="py-2 text-right font-medium text-gray-700">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {snips.map((s) => (
-                      <tr key={s.id} className={!s.isActive ? 'bg-gray-50 opacity-75' : ''}>
-                        <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
-                        <td className="py-2">
-                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{s.snipType}</span>
-                        </td>
-                        <td className="py-2 text-gray-600">
-                          {[s.contextType, s.intentType].filter(Boolean).join(' / ') || '—'}
-                        </td>
-                        <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
-                          {s.snipText}
-                        </td>
-                        <td className="py-2">
-                          {s.isActive ? (
-                            <span className="flex items-center gap-1 text-green-600">
-                              <CheckCircle className="h-4 w-4" />
-                              Active
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">Inactive</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => startEdit(s)}
-                              className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              title="Edit"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(s.id)}
-                              className="rounded p-1.5 text-red-500 hover:bg-red-50"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="space-y-6">
+            {/* Bulk Actions Bar */}
+            {snips.length > 0 && (
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-700">
+                    {selectedSnips.size > 0 ? `${selectedSnips.size} selected` : 'Select snippets to delete'}
+                  </span>
+                  {selectedSnips.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSnips(new Set())}
+                      className="text-xs text-gray-600 hover:text-gray-900 underline"
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </div>
+                {selectedSnips.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {bulkDeleting ? 'Deleting...' : `Delete ${selectedSnips.size}`}
+                  </button>
+                )}
               </div>
             )}
+
+            {/* Subject Line Snippets */}
+            {snips.filter((s) => s.snipType === 'subject').length > 0 && (
+              <div className="rounded-xl bg-white p-6 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Subject Lines</h3>
+                    <p className="text-sm text-gray-600">
+                      {snips.filter((s) => s.snipType === 'subject').length} subject line snippet(s)
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead>
+                      <tr>
+                        <th className="py-2 text-left font-medium text-gray-700 w-8">
+                          <input
+                            type="checkbox"
+                            checked={snips.filter((s) => s.snipType === 'subject').length > 0 && 
+                              snips.filter((s) => s.snipType === 'subject').every((s) => selectedSnips.has(s.id))}
+                            onChange={() => selectAllSnips(snips.filter((s) => s.snipType === 'subject'))}
+                            className="rounded border-gray-300"
+                          />
+                        </th>
+                        <th className="py-2 text-left font-medium text-gray-700">Name</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Context / Intent</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Text</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Status</th>
+                        <th className="py-2 text-right font-medium text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {snips
+                        .filter((s) => s.snipType === 'subject')
+                        .map((s) => (
+                          <tr key={s.id} className={!s.isActive ? 'bg-gray-50 opacity-75' : ''}>
+                            <td className="py-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedSnips.has(s.id)}
+                                onChange={() => toggleSelectSnip(s.id)}
+                                className="rounded border-gray-300"
+                              />
+                            </td>
+                            <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
+                            <td className="py-2 text-gray-600">
+                              {[s.contextType, s.intentType].filter(Boolean).join(' / ') || '—'}
+                            </td>
+                            <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
+                              {s.snipText}
+                            </td>
+                            <td className="py-2">
+                              {s.isActive ? (
+                                <span className="flex items-center gap-1 text-green-600">
+                                  <CheckCircle className="h-4 w-4" />
+                                  Active
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">Inactive</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(s)}
+                                  className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                  title="Edit"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(s.id)}
+                                  className="rounded p-1.5 text-red-500 hover:bg-red-50"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Other Snippets */}
+            <div className="rounded-xl bg-white p-6 shadow-sm">
+              {loading ? (
+                <p className="text-gray-500">Loading…</p>
+              ) : snips.filter((s) => s.snipType !== 'subject').length === 0 ? (
+                <div className="text-center py-12">
+                  <FileStack className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No content snips yet</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Create your first content snip to get started. Use them in templates as{' '}
+                    <code className="rounded bg-gray-100 px-1">{'{{snippet:snip_name}}'}</code>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateOptions(true)}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                  >
+                    Create Content Snip
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Content Snippets</h3>
+                      <p className="text-sm text-gray-600">
+                        {snips.filter((s) => s.snipType !== 'subject').length} snippet(s)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead>
+                        <tr>
+                          <th className="py-2 text-left font-medium text-gray-700 w-8">
+                            <input
+                              type="checkbox"
+                              checked={snips.filter((s) => s.snipType !== 'subject').length > 0 && 
+                                snips.filter((s) => s.snipType !== 'subject').every((s) => selectedSnips.has(s.id))}
+                              onChange={() => selectAllSnips(snips.filter((s) => s.snipType !== 'subject'))}
+                              className="rounded border-gray-300"
+                            />
+                          </th>
+                          <th className="py-2 text-left font-medium text-gray-700">Name</th>
+                          <th className="py-2 text-left font-medium text-gray-700">Type</th>
+                          <th className="py-2 text-left font-medium text-gray-700">Context / Intent</th>
+                          <th className="py-2 text-left font-medium text-gray-700">Text</th>
+                          <th className="py-2 text-left font-medium text-gray-700">Status</th>
+                          <th className="py-2 text-right font-medium text-gray-700">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {snips
+                          .filter((s) => s.snipType !== 'subject')
+                          .map((s) => (
+                            <tr key={s.id} className={!s.isActive ? 'bg-gray-50 opacity-75' : ''}>
+                              <td className="py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSnips.has(s.id)}
+                                  onChange={() => toggleSelectSnip(s.id)}
+                                  className="rounded border-gray-300"
+                                />
+                              </td>
+                              <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
+                              <td className="py-2">
+                                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{s.snipType}</span>
+                              </td>
+                              <td className="py-2 text-gray-600">
+                                {[s.contextType, s.intentType].filter(Boolean).join(' / ') || '—'}
+                              </td>
+                              <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>
+                                {s.snipText}
+                              </td>
+                              <td className="py-2">
+                                {s.isActive ? (
+                                  <span className="flex items-center gap-1 text-green-600">
+                                    <CheckCircle className="h-4 w-4" />
+                                    Active
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">Inactive</span>
+                                )}
+                              </td>
+                              <td className="py-2 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEdit(s)}
+                                    className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                    title="Edit"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDelete(s.id)}
+                                    className="rounded p-1.5 text-red-500 hover:bg-red-50"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
