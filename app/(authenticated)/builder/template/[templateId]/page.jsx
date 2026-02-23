@@ -45,6 +45,24 @@ export default function TemplateBuilderPage() {
     }
   }, []);
 
+  // Load content snips when companyHQId is available
+  useEffect(() => {
+    if (!companyHQId) return;
+    setLoadingSnips(true);
+    api.get(`/api/outreach/content-snips?companyHQId=${companyHQId}&activeOnly=true`)
+      .then((res) => {
+        if (res.data?.success) {
+          setContentSnips(res.data.snips || []);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load content snips:', err);
+      })
+      .finally(() => {
+        setLoadingSnips(false);
+      });
+  }, [companyHQId]);
+
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -53,6 +71,8 @@ export default function TemplateBuilderPage() {
   const [error, setError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [currentTemplateId, setCurrentTemplateId] = useState(templateId);
+  const [contentSnips, setContentSnips] = useState([]);
+  const [loadingSnips, setLoadingSnips] = useState(false);
 
   useEffect(() => {
     if (!isNew && templateId) {
@@ -160,6 +180,27 @@ export default function TemplateBuilderPage() {
     } else {
       // Fallback: append to end
       setBody(prev => prev + variable);
+    }
+  };
+
+  // Insert content snip into body at cursor position
+  const insertSnip = (snipName) => {
+    const snip = `{{snippet:${snipName}}}`;
+    const textarea = document.getElementById('body-textarea');
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = body;
+      const newText = text.substring(0, start) + snip + text.substring(end);
+      setBody(newText);
+      // Set cursor position after inserted snip
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + snip.length, start + snip.length);
+      }, 0);
+    } else {
+      // Fallback: append to end
+      setBody(prev => prev + snip);
     }
   };
 
@@ -367,31 +408,6 @@ export default function TemplateBuilderPage() {
                   <label className="block text-sm font-semibold text-gray-700">
                     Body *
                   </label>
-                  {isNew && (!title || !title.trim()) && (!subject || !subject.trim()) && (!body || !body.trim()) && (
-                    <button
-                      type="button"
-                      onClick={handleGenerateWithAI}
-                      disabled={generatingAI}
-                      className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
-                    >
-                      {generatingAI ? (
-                        <>
-                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          Generate with AI
-                        </>
-                      )}
-                    </button>
-                  )}
                 </div>
                 <textarea
                   id="body-textarea"
@@ -404,7 +420,7 @@ export default function TemplateBuilderPage() {
               </div>
 
               {/* Available Variables - Always Visible, Better Styling */}
-              <div className="rounded-lg border-2 border-gray-200 bg-gray-50 p-5">
+              <div className="rounded-lg border-2 border-gray-200 bg-gray-50 p-5 mb-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">Available Variables</h3>
                   <p className="text-sm text-gray-600 italic">Click any variable to insert it into your template</p>
@@ -427,6 +443,57 @@ export default function TemplateBuilderPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Content Snips - Always Visible */}
+              <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold text-gray-900">Content Snips</h3>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-600 italic">Click any snip to insert it</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/content-snips${companyHQId ? `?companyHQId=${companyHQId}` : ''}`)}
+                      className="text-sm text-amber-700 hover:text-amber-900 font-medium underline"
+                    >
+                      Manage snips
+                    </button>
+                  </div>
+                </div>
+                {loadingSnips ? (
+                  <p className="text-sm text-gray-500">Loading snips...</p>
+                ) : contentSnips.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-600 mb-2">No content snips yet.</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/content-snips${companyHQId ? `?companyHQId=${companyHQId}` : ''}`)}
+                      className="text-sm text-amber-700 hover:text-amber-900 font-medium underline"
+                    >
+                      Create your first content snip
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {contentSnips.map((snip) => (
+                      <button
+                        key={snip.id}
+                        type="button"
+                        onClick={() => insertSnip(snip.snipName)}
+                        className="text-left px-4 py-3 rounded-lg bg-white border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-50 transition-all shadow-sm hover:shadow"
+                        title={snip.snipText}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <code className="text-amber-700 font-mono font-semibold text-base">{`{{snippet:${snip.snipName}}}`}</code>
+                          {snip.snipType && (
+                            <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">{snip.snipType}</span>
+                          )}
+                        </div>
+                        <p className="text-gray-600 text-sm line-clamp-2">{snip.snipText}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-4 pt-2 border-t border-gray-200">
