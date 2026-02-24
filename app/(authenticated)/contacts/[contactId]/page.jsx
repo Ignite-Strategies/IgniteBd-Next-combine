@@ -1321,8 +1321,74 @@ export default function ContactDetailPage({ params }) {
 
               {personaSuggestion.suggestedPersonaSlug ? (
                 <div className="space-y-4">
+                  {/* Relationship Context - Source of Truth */}
+                  {personaSuggestion.relationshipContext && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                        Relationship Context <span className="text-xs font-normal text-gray-500">(Source of Truth)</span>
+                      </h3>
+                      <div className="bg-blue-50 rounded-lg border border-blue-200 p-3 space-y-2 text-sm">
+                        {/* Factual extracted data */}
+                        {personaSuggestion.relationshipContext.formerCompany && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Former Company:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.relationshipContext.formerCompany}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.relationshipContext.primaryWork && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Primary Work:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.relationshipContext.primaryWork}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.relationshipContext.relationshipQuality && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Relationship Quality:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.relationshipContext.relationshipQuality}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.relationshipContext.opportunityType && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Opportunity Type:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.relationshipContext.opportunityType}</span>
+                          </div>
+                        )}
+                        
+                        {/* Relationship dimensions */}
+                        {(personaSuggestion.relationshipContext.contextOfRelationship || 
+                          personaSuggestion.relationshipContext.relationshipRecency || 
+                          personaSuggestion.relationshipContext.companyAwareness) && (
+                          <div className="pt-2 mt-2 border-t border-blue-200">
+                            <div className="text-xs font-semibold text-gray-600 mb-1">Relationship Dimensions:</div>
+                            {personaSuggestion.relationshipContext.contextOfRelationship && (
+                              <div className="text-xs">
+                                <span className="font-semibold text-gray-700">Type:</span>{' '}
+                                <span className="text-gray-600">{personaSuggestion.relationshipContext.contextOfRelationship.replace(/_/g, ' ')}</span>
+                              </div>
+                            )}
+                            {personaSuggestion.relationshipContext.relationshipRecency && (
+                              <div className="text-xs">
+                                <span className="font-semibold text-gray-700">Recency:</span>{' '}
+                                <span className="text-gray-600">{personaSuggestion.relationshipContext.relationshipRecency.replace(/_/g, ' ')}</span>
+                              </div>
+                            )}
+                            {personaSuggestion.relationshipContext.companyAwareness && (
+                              <div className="text-xs">
+                                <span className="font-semibold text-gray-700">Awareness:</span>{' '}
+                                <span className="text-gray-600">{personaSuggestion.relationshipContext.companyAwareness.replace(/_/g, ' ')}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Persona - Fills Gaps */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Suggested Persona</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                      Suggested Persona <span className="text-xs font-normal text-gray-500">(Fills Gaps, Drives Templates)</span>
+                    </h3>
                     <div className="rounded-lg bg-purple-50 border border-purple-200 p-3">
                       <div className="font-semibold text-purple-900">{personaSuggestion.suggestedPersonaSlug}</div>
                       {personaSuggestion.confidence !== undefined && (
@@ -1348,38 +1414,6 @@ export default function ContactDetailPage({ params }) {
                       <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
                         {personaSuggestion.reasoning}
                       </p>
-                    </div>
-                  )}
-
-                  {personaSuggestion.extractedInfo && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-2">Extracted Information</h3>
-                      <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
-                        {personaSuggestion.extractedInfo.formerCompany && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Former Company:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.extractedInfo.formerCompany}</span>
-                          </div>
-                        )}
-                        {personaSuggestion.extractedInfo.primaryWork && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Primary Work:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.extractedInfo.primaryWork}</span>
-                          </div>
-                        )}
-                        {personaSuggestion.extractedInfo.relationshipQuality && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Relationship Quality:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.extractedInfo.relationshipQuality}</span>
-                          </div>
-                        )}
-                        {personaSuggestion.extractedInfo.opportunityType && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Opportunity Type:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.extractedInfo.opportunityType}</span>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   )}
 

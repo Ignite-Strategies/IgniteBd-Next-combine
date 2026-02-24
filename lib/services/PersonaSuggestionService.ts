@@ -1,12 +1,19 @@
 /**
  * PersonaSuggestionService
  * 
- * Analyzes contact notes to extract relationship information and suggest
- * appropriate outreach personas based on:
- * - Former company
- * - Primary work/services provided
- * - Relationship quality
- * - Opportunity type (referrals, repeat business, etc.)
+ * Analyzes contact notes to extract TWO things:
+ * 
+ * 1. RELATIONSHIP CONTEXT (Source of Truth) - Factual data extracted from notes:
+ *    - Former company, primary work, relationship quality, opportunity type
+ *    - Maps to relationship_contexts dimensions (contextOfRelationship, relationshipRecency, companyAwareness)
+ *    - This is the factual foundation
+ * 
+ * 2. PERSONA (Fills Gaps) - Classification that helps template matching:
+ *    - Uses relationship context + AI inference to detect patterns
+ *    - Examples: "CompetitorSwitchingProspect", "FormerClientReferralOpportunity"
+ *    - Drives snippet selection in template assembly
+ * 
+ * Together, relationship context + persona drive the outreach note.
  */
 
 import { OpenAI } from 'openai';
@@ -29,18 +36,26 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
-export interface ExtractedInfo {
+export interface RelationshipContextInfo {
+  // Factual extracted data (source of truth)
   formerCompany?: string;
   primaryWork?: string;
   relationshipQuality?: string;
   opportunityType?: string;
+  
+  // Relationship context dimensions (maps to relationship_contexts table)
+  contextOfRelationship?: 'DONT_KNOW' | 'PRIOR_CONVERSATION' | 'PRIOR_COLLEAGUE' | 'PRIOR_SCHOOLMATE' | 'CURRENT_CLIENT' | 'CONNECTED_LINKEDIN_ONLY' | 'REFERRAL' | 'REFERRAL_FROM_WARM_CONTACT' | 'USED_TO_WORK_AT_TARGET_COMPANY';
+  relationshipRecency?: 'NEW' | 'RECENT' | 'STALE' | 'LONG_DORMANT';
+  companyAwareness?: 'NO_CLUE' | 'KNOWS_COMPANY' | 'KNOWS_COMPANY_COMPETITOR' | 'KNOWS_BUT_DISENGAGED';
 }
 
 export interface PersonaSuggestionResult {
   success: boolean;
+  // Relationship Context (source of truth)
+  relationshipContext?: RelationshipContextInfo;
+  // Persona (fills gaps, drives template matching)
   suggestedPersonaSlug?: string;
   confidence?: number;
-  extractedInfo?: ExtractedInfo;
   reasoning?: string;
   error?: string;
 }
@@ -98,7 +113,7 @@ export class PersonaSuggestionService {
         orderBy: { name: 'asc' },
       });
 
-      // Call OpenAI to analyze notes and suggest persona
+      // Call OpenAI to analyze notes and extract BOTH relationship context AND persona
       const openai = getOpenAIClient();
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
@@ -106,21 +121,29 @@ export class PersonaSuggestionService {
         messages: [
           {
             role: 'system',
-            content: `You are an expert at analyzing business relationship notes and suggesting appropriate outreach personas. 
-Your task is to:
-1. Extract key information from contact notes (former company, primary work, relationship quality, opportunity type)
-2. Suggest the most appropriate outreach persona slug from the available personas
-3. Provide a confidence score (0-100) and reasoning
+            content: `You are an expert at analyzing business relationship notes. Your task is to extract TWO things:
+
+1. RELATIONSHIP CONTEXT (Source of Truth) - Factual data from notes:
+   - Extract factual details: formerCompany, primaryWork, relationshipQuality, opportunityType
+   - Classify relationship dimensions:
+     * contextOfRelationship: DONT_KNOW, PRIOR_CONVERSATION, PRIOR_COLLEAGUE, PRIOR_SCHOOLMATE, CURRENT_CLIENT, CONNECTED_LINKEDIN_ONLY, REFERRAL, REFERRAL_FROM_WARM_CONTACT, USED_TO_WORK_AT_TARGET_COMPANY
+     * relationshipRecency: NEW, RECENT, STALE, LONG_DORMANT
+     * companyAwareness: NO_CLUE, KNOWS_COMPANY, KNOWS_COMPANY_COMPETITOR, KNOWS_BUT_DISENGAGED
+
+2. PERSONA (Fills Gaps) - Classification for template matching:
+   - Suggest the most appropriate outreach persona slug from available personas
+   - Use relationship context + AI inference to detect patterns (e.g., competitor switching, referral opportunities)
+   - Provide confidence score (0-100) and reasoning
 
 Return a JSON object with:
-- extractedInfo: { formerCompany?, primaryWork?, relationshipQuality?, opportunityType? }
+- relationshipContext: { formerCompany?, primaryWork?, relationshipQuality?, opportunityType?, contextOfRelationship?, relationshipRecency?, companyAwareness? }
 - suggestedPersonaSlug: string (must match one of the available persona slugs exactly)
 - confidence: number (0-100)
-- reasoning: string (brief explanation of why this persona fits)`,
+- reasoning: string (brief explanation of why this persona fits, considering relationship context)`,
           },
           {
             role: 'user',
-            content: `Analyze these contact notes and suggest an outreach persona:
+            content: `Analyze these contact notes and extract relationship context + suggest persona:
 
 Contact Notes:
 ${notesToAnalyze}
@@ -128,7 +151,7 @@ ${notesToAnalyze}
 Available Outreach Personas:
 ${availablePersonas.map((p) => `- ${p.slug}: ${p.name}${p.description ? ` - ${p.description}` : ''}`).join('\n')}
 
-Return JSON with extractedInfo, suggestedPersonaSlug, confidence, and reasoning.`,
+Return JSON with relationshipContext, suggestedPersonaSlug, confidence, and reasoning.`,
           },
         ],
         temperature: 0.3,
@@ -156,7 +179,7 @@ Return JSON with extractedInfo, suggestedPersonaSlug, confidence, and reasoning.
         }
       }
 
-      const { extractedInfo, suggestedPersonaSlug, confidence, reasoning } = parsedResponse;
+      const { relationshipContext, suggestedPersonaSlug, confidence, reasoning } = parsedResponse;
 
       // Validate that suggested persona exists
       if (suggestedPersonaSlug) {
@@ -168,9 +191,9 @@ Return JSON with extractedInfo, suggestedPersonaSlug, confidence, and reasoning.
 
       return {
         success: true,
+        relationshipContext: relationshipContext || {},
         suggestedPersonaSlug: suggestedPersonaSlug || null,
         confidence: typeof confidence === 'number' ? Math.max(0, Math.min(100, confidence)) : undefined,
-        extractedInfo: extractedInfo || {},
         reasoning: reasoning || 'No reasoning provided',
       };
     } catch (error: any) {

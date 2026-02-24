@@ -43,9 +43,9 @@ export async function POST(request, { params }) {
 
     return NextResponse.json({
       success: true,
+      relationshipContext: result.relationshipContext,
       suggestedPersonaSlug: result.suggestedPersonaSlug,
       confidence: result.confidence,
-      extractedInfo: result.extractedInfo,
       reasoning: result.reasoning,
     });
   } catch (error) {
