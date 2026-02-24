@@ -765,7 +765,7 @@ Best regards"`;
           title="Record Off-Platform Emails"
           subtitle={contact 
             ? `Track emails sent to ${contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email} outside the platform`
-            : "Track emails sent outside the platform (Gmail, Outlook, CSV export, etc.)"
+            : "Track outreach sent outside the platform (Gmail, Outlook, LinkedIn, in-person, etc.)"
           }
           backTo={contactIdFromUrl 
             ? `${companyHQId ? `/contacts/${contactIdFromUrl}?companyHQId=${companyHQId}` : `/contacts/${contactIdFromUrl}`}`
@@ -919,7 +919,7 @@ Best regards"`;
                         <th className="px-3 py-2 text-left font-semibold text-gray-700">Date</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-700">Subject</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-700">Body</th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-700">Platform</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">Delivery Method</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1116,18 +1116,20 @@ Best regards"`;
                 
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-gray-700">
-                    Platform
+                    Delivery Method
                   </label>
                   <select
                     value={manualEntry.platform}
                     onChange={(e) => setManualEntry({ ...manualEntry, platform: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="manual">Manual</option>
                     <option value="gmail">Gmail</option>
                     <option value="outlook">Outlook</option>
+                    <option value="linkedin">LinkedIn</option>
                     <option value="apollo">Apollo</option>
+                    <option value="in-person">In-Person</option>
                     <option value="csv">CSV Export</option>
+                    <option value="manual">Manual</option>
                     <option value="other">Other</option>
                   </select>
                 </div>
