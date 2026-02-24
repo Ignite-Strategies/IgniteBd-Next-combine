@@ -48,8 +48,9 @@ export async function GET(request) {
 
     console.log('🔍 Searching for contact with email:', email.toLowerCase().trim());
     
-    // Use findUnique since email is unique - faster and more accurate
-    const contact = await prisma.contact.findUnique({
+    // Use findFirst since email is not unique (it's part of email_crmId compound key)
+    // We'll find the first contact with this email
+    const contact = await prisma.contact.findFirst({
       where: {
         email: email.toLowerCase().trim(),
       },
