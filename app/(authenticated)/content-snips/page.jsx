@@ -90,24 +90,10 @@ function ContentSnipsLandingPage() {
   // Edit state
   const [editingId, setEditingId] = useState(null);
 
-  useEffect(() => {
-    if (!companyHQId && typeof window !== 'undefined') {
-      const stored = localStorage.getItem('companyHQId');
-      if (stored) {
-        router.replace(`/content-snips?companyHQId=${stored}`);
-      }
-    }
-  }, [companyHQId, router]);
+  // Hydrate filter state (must be declared before useEffect that uses it)
+  const [hydrateFilter, setHydrateFilter] = useState(''); // '' = all, or TEMPLATE_POSITION
 
-  useEffect(() => {
-    if (companyHQId) {
-      loadSnips();
-      loadPersonas();
-    } else {
-      setLoading(false);
-    }
-  }, [companyHQId, hydrateFilter]);
-
+  // Load functions (must be declared before useEffect that calls them)
   const loadPersonas = async () => {
     setLoadingPersonas(true);
     try {
@@ -121,8 +107,6 @@ function ContentSnipsLandingPage() {
       setLoadingPersonas(false);
     }
   };
-
-  const [hydrateFilter, setHydrateFilter] = useState(''); // '' = all, or TEMPLATE_POSITION
 
   const loadSnips = async () => {
     if (!companyHQId) return;
@@ -140,6 +124,24 @@ function ContentSnipsLandingPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!companyHQId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('companyHQId');
+      if (stored) {
+        router.replace(`/content-snips?companyHQId=${stored}`);
+      }
+    }
+  }, [companyHQId, router]);
+
+  useEffect(() => {
+    if (companyHQId) {
+      loadSnips();
+      loadPersonas();
+    } else {
+      setLoading(false);
+    }
+  }, [companyHQId, hydrateFilter]);
 
   const handleManualSave = async () => {
     if (!companyHQId || !form.snipName?.trim() || !form.snipText?.trim()) {
