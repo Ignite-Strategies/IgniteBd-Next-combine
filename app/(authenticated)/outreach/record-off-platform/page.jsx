@@ -489,26 +489,72 @@ Best regards"`;
       result.subject = subjectMatch[1].trim();
     }
     
-    // Extract body (everything after Subject or To, before signature)
-    const bodyStart = blob.search(/(Subject|To):\s*.+?\n\n/i);
-    if (bodyStart !== -1) {
-      const afterHeaders = blob.substring(bodyStart);
-      const bodyMatch = afterHeaders.match(/\n\n(.+?)(?:\n\n|\n[A-Z][a-z]+ [A-Z]|$)/s);
-      if (bodyMatch) {
-        result.body = bodyMatch[1].trim();
-      } else {
-        // Fallback: everything after headers
-        const lines = blob.split('\n');
-        let bodyStartIndex = 0;
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].match(/^(Subject|To|From|Sent):/i)) {
-            bodyStartIndex = i + 1;
-          } else if (bodyStartIndex > 0 && lines[i].trim() && !lines[i].match(/^[A-Z][a-z]+ [A-Z]/)) {
-            break;
+    // Extract body (everything after headers, before signature)
+    const lines = blob.split('\n');
+    let lastHeaderIndex = -1;
+    
+    // Find the last header line (Subject, To, From, Sent, Date)
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].match(/^(From|To|Sent|Date|Subject):\s*/i)) {
+        lastHeaderIndex = i;
+      }
+    }
+    
+    if (lastHeaderIndex >= 0) {
+      // Body starts after the last header
+      // Skip empty lines after headers
+      let bodyStartIndex = lastHeaderIndex + 1;
+      while (bodyStartIndex < lines.length && !lines[bodyStartIndex].trim()) {
+        bodyStartIndex++;
+      }
+      
+      // Extract body - include everything until we hit a clear signature pattern
+      const bodyLines = [];
+      let inSignature = false;
+      
+      for (let i = bodyStartIndex; i < lines.length; i++) {
+        const line = lines[i];
+        const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
+        const nextNextLine = i < lines.length - 2 ? lines[i + 2] : '';
+        
+        // Detect signature patterns more carefully
+        // Signature indicators:
+        // 1. Closing phrases followed by name
+        // 2. Name pattern followed by email/phone/company info
+        if (!inSignature) {
+          // Check for closing phrases
+          if (line.match(/^(Best|Regards|Sincerely|Thanks|Thank you|Cheers),?\s*$/i)) {
+            // If next line looks like a name, this is probably a signature
+            if (nextLine.match(/^[A-Z][a-z]+(\s+[A-Z][a-z]+)?$/i)) {
+              inSignature = true;
+              break;
+            }
+          }
+          
+          // Check for name pattern followed by contact info
+          if (line.match(/^[A-Z][a-z]+(\s+[A-Z][a-z]+)?$/i)) {
+            // Check if next lines contain email, phone, or company info
+            const hasEmail = nextLine.match(/@/) || nextNextLine.match(/@/);
+            const hasPhone = nextLine.match(/\(\d{3}\)|^\d{3}-\d{3}-\d{4}/) || nextNextLine.match(/\(\d{3}\)|^\d{3}-\d{3}-\d{4}/);
+            const hasCompany = nextLine.match(/LLC|Inc|Corp|Law|PLLC/i) || nextNextLine.match(/LLC|Inc|Corp|Law|PLLC/i);
+            
+            // If we have contact info, this is likely a signature
+            // But only if we've already extracted some body content
+            if ((hasEmail || hasPhone || hasCompany) && bodyLines.length > 0) {
+              inSignature = true;
+              break;
+            }
           }
         }
-        result.body = lines.slice(bodyStartIndex).join('\n').trim();
+        
+        bodyLines.push(line);
       }
+      
+      result.body = bodyLines.join('\n').trim();
+    } else {
+      // No headers found - might be just body text
+      // Try to extract any meaningful content
+      result.body = blob.trim();
     }
     
     return result;
