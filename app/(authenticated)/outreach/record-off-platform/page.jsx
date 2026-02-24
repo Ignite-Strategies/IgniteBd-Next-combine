@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Upload, FileText, Plus, X, Check, Loader2, Mail, Calendar, MessageSquare } from 'lucide-react';
+import { Upload, FileText, Plus, X, Check, Loader2, Mail, Calendar, MessageSquare, Download } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector';
 import api from '@/lib/api';
@@ -96,9 +96,12 @@ export default function RecordOffPlatformPage() {
       }
       
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const firstNameIndex = headers.findIndex(h => h.includes('first') && h.includes('name'));
+      const lastNameIndex = headers.findIndex(h => h.includes('last') && h.includes('name'));
       const emailIndex = headers.findIndex(h => h.includes('email'));
       const subjectIndex = headers.findIndex(h => h.includes('subject'));
       const dateIndex = headers.findIndex(h => h.includes('date') || h.includes('sent'));
+      const bodyIndex = headers.findIndex(h => h.includes('body'));
       const platformIndex = headers.findIndex(h => h.includes('platform'));
       const notesIndex = headers.findIndex(h => h.includes('note'));
       
@@ -108,11 +111,55 @@ export default function RecordOffPlatformPage() {
       
       const rows = [];
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
+        // Handle CSV with quoted fields (may contain commas and newlines)
+        // Simple approach: split by comma, but handle quoted fields
+        const values = [];
+        let current = '';
+        let inQuotes = false;
+        let line = lines[i];
+        
+        // Handle multi-line quoted fields by checking if we're still in quotes
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          if (char === '"') {
+            // Check if it's an escaped quote ("")
+            if (j + 1 < line.length && line[j + 1] === '"') {
+              current += '"';
+              j++; // Skip next quote
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            // Remove surrounding quotes from value
+            let value = current.trim();
+            if (value.startsWith('"') && value.endsWith('"')) {
+              value = value.slice(1, -1);
+            }
+            values.push(value);
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        // Add last value
+        let lastValue = current.trim();
+        if (lastValue.startsWith('"') && lastValue.endsWith('"')) {
+          lastValue = lastValue.slice(1, -1);
+        }
+        values.push(lastValue);
+        
+        // Ensure we have enough values (pad with empty strings if needed)
+        while (values.length < headers.length) {
+          values.push('');
+        }
+        
         if (values[emailIndex] && values[emailIndex].includes('@')) {
           rows.push({
+            firstName: firstNameIndex >= 0 ? values[firstNameIndex] : '',
+            lastName: lastNameIndex >= 0 ? values[lastNameIndex] : '',
             email: values[emailIndex],
             subject: subjectIndex >= 0 ? values[subjectIndex] : '',
+            body: bodyIndex >= 0 ? values[bodyIndex] : '',
             emailSent: dateIndex >= 0 ? values[dateIndex] : new Date().toISOString().split('T')[0],
             platform: platformIndex >= 0 ? values[platformIndex] : 'manual',
             notes: notesIndex >= 0 ? values[notesIndex] : '',
@@ -172,6 +219,26 @@ export default function RecordOffPlatformPage() {
     }
   };
   
+  // Download CSV template
+  const handleDownloadTemplate = () => {
+    const template = `first name,last name,email,date of email,subject,body
+John,Doe,john.doe@example.com,2026-02-24,Follow-up on our conversation,"Hi John,
+
+Just following up on our previous discussion about the project. Let me know if you have any questions.
+
+Best regards"`;
+    
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'off-platform-email-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   // Save CSV rows
   const handleSaveCSV = async () => {
     if (csvRows.length === 0) {
@@ -188,7 +255,22 @@ export default function RecordOffPlatformPage() {
     
     for (const row of csvRows) {
       try {
-        const contactId = await findOrCreateContact(row.email);
+        // Find or create contact by email, with firstName/lastName if provided
+        let contactId = await findOrCreateContact(row.email);
+        
+        // If contact was created and we have firstName/lastName, update it
+        if (contactId && (row.firstName || row.lastName)) {
+          try {
+            await api.put(`/api/contacts/${contactId}`, {
+              firstName: row.firstName || undefined,
+              lastName: row.lastName || undefined,
+            });
+          } catch (updateError) {
+            console.warn('Could not update contact name:', updateError);
+            // Continue anyway
+          }
+        }
+        
         if (!contactId) {
           newErrors.push(`Failed to find/create contact for ${row.email}`);
           continue;
@@ -197,6 +279,7 @@ export default function RecordOffPlatformPage() {
         const response = await api.post(`/api/contacts/${contactId}/off-platform-send`, {
           emailSent: row.emailSent,
           subject: row.subject || null,
+          body: row.body || null,
           platform: row.platform || 'manual',
           notes: row.notes || null,
         });
@@ -544,9 +627,19 @@ export default function RecordOffPlatformPage() {
         {mode === 'csv' && (
           <div className="rounded-2xl bg-white p-6 shadow">
             <h3 className="mb-4 text-lg font-semibold text-gray-900">CSV Import</h3>
-            <p className="mb-4 text-sm text-gray-600">
-              Upload a CSV file or paste CSV data with columns: <strong>email</strong> (required), subject, date, platform, notes
-            </p>
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                Upload a CSV file or paste CSV data with columns: <strong>first name, last name, email</strong> (required), <strong>date of email, subject, body</strong>
+              </p>
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="flex items-center gap-2 rounded-lg border border-blue-600 bg-white px-3 py-1.5 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+              >
+                <Download className="h-4 w-4" />
+                Download Template
+              </button>
+            </div>
             
             {/* File Upload */}
             <div className="mb-4">
@@ -597,7 +690,7 @@ export default function RecordOffPlatformPage() {
               <textarea
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
-                placeholder="email,subject,date,platform,notes&#10;john@example.com,Follow up,2025-02-20,gmail,Met at conference&#10;jane@example.com,Introduction,2025-02-21,outlook,"
+                placeholder="first name,last name,email,date of email,subject,body&#10;John,Doe,john.doe@example.com,2026-02-24,Follow-up,&quot;Hi John,&#10;&#10;Just following up...&quot;&#10;Jane,Smith,jane.smith@example.com,2026-02-25,Introduction,&quot;Hi Jane,&#10;&#10;Nice to meet you...&quot;"
                 className="w-full min-h-[200px] rounded-lg border border-gray-300 px-4 py-3 text-sm font-mono focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -629,18 +722,28 @@ export default function RecordOffPlatformPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">Name</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-700">Email</th>
-                        <th className="px-3 py-2 text-left font-semibold text-gray-700">Subject</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-700">Date</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">Subject</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">Body</th>
                         <th className="px-3 py-2 text-left font-semibold text-gray-700">Platform</th>
                       </tr>
                     </thead>
                     <tbody>
                       {csvRows.map((row, idx) => (
                         <tr key={idx} className="border-t border-gray-100">
+                          <td className="px-3 py-2 text-gray-900">
+                            {row.firstName || row.lastName 
+                              ? `${row.firstName || ''} ${row.lastName || ''}`.trim() 
+                              : '—'}
+                          </td>
                           <td className="px-3 py-2 text-gray-900">{row.email}</td>
-                          <td className="px-3 py-2 text-gray-600">{row.subject || '—'}</td>
                           <td className="px-3 py-2 text-gray-600">{row.emailSent}</td>
+                          <td className="px-3 py-2 text-gray-600">{row.subject || '—'}</td>
+                          <td className="px-3 py-2 text-gray-600 max-w-xs truncate" title={row.body || ''}>
+                            {row.body ? (row.body.length > 50 ? `${row.body.substring(0, 50)}...` : row.body) : '—'}
+                          </td>
                           <td className="px-3 py-2 text-gray-600">{row.platform || 'manual'}</td>
                         </tr>
                       ))}
