@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, FileText, Plus, X, Check, Loader2, Mail, Calendar, MessageSquare, Download } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -16,6 +16,7 @@ export default function RecordOffPlatformPage() {
   const [mode, setMode] = useState('manual'); // Default to manual when coming from contact detail
   const [contact, setContact] = useState(null);
   const [loadingContact, setLoadingContact] = useState(false);
+  const loadedContactIdRef = useRef(null); // Track which contact we've loaded to prevent unnecessary reloads
   const [csvText, setCsvText] = useState('');
   const [csvRows, setCsvRows] = useState([]);
   const [parsingError, setParsingError] = useState('');
@@ -25,33 +26,54 @@ export default function RecordOffPlatformPage() {
   const [csvFile, setCsvFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   
-  // Load contact if contactId provided
+  // Load contact if contactId provided (but allow switching)
   useEffect(() => {
+    // Skip if we already have this contact loaded
+    if (contactIdFromUrl && loadedContactIdRef.current === contactIdFromUrl) {
+      return;
+    }
+    
     if (contactIdFromUrl) {
       setLoadingContact(true);
-      api.get(`/api/contacts/${contactIdFromUrl}`)
+      const currentContactId = contactIdFromUrl; // Capture for closure
+      api.get(`/api/contacts/${currentContactId}`)
         .then((response) => {
           if (response.data?.success && response.data.contact) {
-            setContact(response.data.contact);
-            // Pre-fill manual entry with contact email
-            setManualEntry(prev => ({
-              ...prev,
-              email: response.data.contact.email || '',
-            }));
-            // Also set selected contact so ContactSelector shows it
-            if (response.data.contact.email) {
-              setSelectedContactForEmail(response.data.contact);
+            const loadedContact = response.data.contact;
+            // Only update if this is still the current contactId
+            if (currentContactId === loadedContact.id) {
+              loadedContactIdRef.current = loadedContact.id;
+              setContact(loadedContact);
+              setSelectedContactForEmail(loadedContact);
+              // Pre-fill manual entry with contact email
+              setManualEntry(prev => ({
+                ...prev,
+                email: loadedContact.email || '',
+              }));
             }
           }
         })
         .catch((error) => {
           console.error('Error loading contact:', error);
+          // Clear stuck state on error only if this is still the current contactId
+          if (currentContactId === contactIdFromUrl) {
+            loadedContactIdRef.current = null;
+            setContact(null);
+            setSelectedContactForEmail(null);
+          }
         })
         .finally(() => {
-          setLoadingContact(false);
+          if (currentContactId === contactIdFromUrl) {
+            setLoadingContact(false);
+          }
         });
+    } else {
+      // Clear contact state when no contactId in URL
+      loadedContactIdRef.current = null;
+      setContact(null);
+      setSelectedContactForEmail(null);
     }
-  }, [contactIdFromUrl]);
+  }, [contactIdFromUrl]); // Only depend on contactIdFromUrl
   
   // Manual entry form
   const [manualEntry, setManualEntry] = useState({
@@ -87,15 +109,88 @@ export default function RecordOffPlatformPage() {
     }
   };
   
-  // CSV parsing
+  // CSV parsing - properly handles multi-line quoted fields
   const parseCSV = (text) => {
     try {
-      const lines = text.trim().split('\n');
-      if (lines.length < 2) {
+      if (!text || !text.trim()) {
+        throw new Error('CSV text is empty');
+      }
+      
+      // Parse CSV properly handling quoted fields with newlines
+      const rows = [];
+      let currentRow = [];
+      let currentField = '';
+      let inQuotes = false;
+      let i = 0;
+      
+      while (i < text.length) {
+        const char = text[i];
+        const nextChar = i + 1 < text.length ? text[i + 1] : null;
+        
+        if (char === '"') {
+          if (inQuotes && nextChar === '"') {
+            // Escaped quote ("")
+            currentField += '"';
+            i += 2;
+            continue;
+          } else {
+            // Toggle quote state
+            inQuotes = !inQuotes;
+            i++;
+            continue;
+          }
+        }
+        
+        if (char === ',' && !inQuotes) {
+          // End of field
+          currentRow.push(currentField.trim());
+          currentField = '';
+          i++;
+          continue;
+        }
+        
+        if ((char === '\n' || char === '\r') && !inQuotes) {
+          // End of row (but skip \r\n combination)
+          if (char === '\r' && nextChar === '\n') {
+            i += 2;
+          } else {
+            i++;
+          }
+          
+          // Only process if we have content
+          if (currentRow.length > 0 || currentField.trim()) {
+            if (currentField.trim() || currentRow.length > 0) {
+              currentRow.push(currentField.trim());
+              currentField = '';
+            }
+            
+            if (currentRow.length > 0) {
+              rows.push(currentRow);
+              currentRow = [];
+            }
+          }
+          continue;
+        }
+        
+        // Regular character
+        currentField += char;
+        i++;
+      }
+      
+      // Add last field and row if any
+      if (currentField.trim() || currentRow.length > 0) {
+        currentRow.push(currentField.trim());
+      }
+      if (currentRow.length > 0) {
+        rows.push(currentRow);
+      }
+      
+      if (rows.length < 2) {
         throw new Error('CSV must have at least a header row and one data row');
       }
       
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      // Parse headers
+      const headers = rows[0].map(h => h.trim().toLowerCase().replace(/^["']|["']$/g, ''));
       const firstNameIndex = headers.findIndex(h => h.includes('first') && h.includes('name'));
       const lastNameIndex = headers.findIndex(h => h.includes('last') && h.includes('name'));
       const emailIndex = headers.findIndex(h => h.includes('email'));
@@ -109,65 +204,34 @@ export default function RecordOffPlatformPage() {
         throw new Error('CSV must have an "email" column');
       }
       
-      const rows = [];
-      for (let i = 1; i < lines.length; i++) {
-        // Handle CSV with quoted fields (may contain commas and newlines)
-        // Simple approach: split by comma, but handle quoted fields
-        const values = [];
-        let current = '';
-        let inQuotes = false;
-        let line = lines[i];
-        
-        // Handle multi-line quoted fields by checking if we're still in quotes
-        for (let j = 0; j < line.length; j++) {
-          const char = line[j];
-          if (char === '"') {
-            // Check if it's an escaped quote ("")
-            if (j + 1 < line.length && line[j + 1] === '"') {
-              current += '"';
-              j++; // Skip next quote
-            } else {
-              inQuotes = !inQuotes;
-            }
-          } else if (char === ',' && !inQuotes) {
-            // Remove surrounding quotes from value
-            let value = current.trim();
-            if (value.startsWith('"') && value.endsWith('"')) {
-              value = value.slice(1, -1);
-            }
-            values.push(value);
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        // Add last value
-        let lastValue = current.trim();
-        if (lastValue.startsWith('"') && lastValue.endsWith('"')) {
-          lastValue = lastValue.slice(1, -1);
-        }
-        values.push(lastValue);
+      // Parse data rows
+      const parsedRows = [];
+      for (let i = 1; i < rows.length; i++) {
+        const values = rows[i];
         
         // Ensure we have enough values (pad with empty strings if needed)
         while (values.length < headers.length) {
           values.push('');
         }
         
-        if (values[emailIndex] && values[emailIndex].includes('@')) {
-          rows.push({
-            firstName: firstNameIndex >= 0 ? values[firstNameIndex] : '',
-            lastName: lastNameIndex >= 0 ? values[lastNameIndex] : '',
-            email: values[emailIndex],
-            subject: subjectIndex >= 0 ? values[subjectIndex] : '',
-            body: bodyIndex >= 0 ? values[bodyIndex] : '',
-            emailSent: dateIndex >= 0 ? values[dateIndex] : new Date().toISOString().split('T')[0],
-            platform: platformIndex >= 0 ? values[platformIndex] : 'manual',
-            notes: notesIndex >= 0 ? values[notesIndex] : '',
+        // Remove surrounding quotes from email
+        const email = values[emailIndex] ? values[emailIndex].replace(/^["']|["']$/g, '').trim() : '';
+        
+        if (email && email.includes('@')) {
+          parsedRows.push({
+            firstName: firstNameIndex >= 0 && values[firstNameIndex] ? values[firstNameIndex].replace(/^["']|["']$/g, '').trim() : '',
+            lastName: lastNameIndex >= 0 && values[lastNameIndex] ? values[lastNameIndex].replace(/^["']|["']$/g, '').trim() : '',
+            email: email,
+            subject: subjectIndex >= 0 && values[subjectIndex] ? values[subjectIndex].replace(/^["']|["']$/g, '').trim() : '',
+            body: bodyIndex >= 0 && values[bodyIndex] ? values[bodyIndex].replace(/^["']|["']$/g, '').trim() : '',
+            emailSent: dateIndex >= 0 && values[dateIndex] ? values[dateIndex].replace(/^["']|["']$/g, '').trim() : new Date().toISOString().split('T')[0],
+            platform: platformIndex >= 0 && values[platformIndex] ? values[platformIndex].replace(/^["']|["']$/g, '').trim() : 'manual',
+            notes: notesIndex >= 0 && values[notesIndex] ? values[notesIndex].replace(/^["']|["']$/g, '').trim() : '',
           });
         }
       }
       
-      return rows;
+      return parsedRows;
     } catch (error) {
       throw new Error(`Failed to parse CSV: ${error.message}`);
     }
@@ -194,6 +258,10 @@ export default function RecordOffPlatformPage() {
   
   // Find or create contact by email
   const findOrCreateContact = async (email) => {
+    if (!email || !email.includes('@')) {
+      return null;
+    }
+    
     try {
       // Try to find existing contact
       const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(email)}`);
@@ -201,19 +269,34 @@ export default function RecordOffPlatformPage() {
         return response.data.contact.id;
       }
       
-      // Create new contact if not found
-      if (companyHQId) {
-        const createResponse = await api.post('/api/contacts/create', {
-          email,
-          companyHQId,
-        });
-        if (createResponse.data?.success && createResponse.data.contact) {
-          return createResponse.data.contact.id;
+      // If 404 (not found), try to create
+      if (response.status === 404 || !response.data?.success) {
+        // Create new contact if not found
+        if (companyHQId) {
+          try {
+            const createResponse = await api.post('/api/contacts/create', {
+              email,
+              companyHQId,
+            });
+            if (createResponse.data?.success && createResponse.data.contact) {
+              return createResponse.data.contact.id;
+            }
+          } catch (createError) {
+            // Log but don't throw - we'll return null
+            console.error('Error creating contact:', createError);
+          }
         }
       }
       
       return null;
     } catch (error) {
+      // Handle 500 errors gracefully - don't retry or throw
+      if (error.response?.status === 500) {
+        console.error(`Server error finding contact for ${email}:`, error.response?.data?.error || error.message);
+        return null; // Return null instead of throwing to prevent stack overflow
+      }
+      
+      // For other errors, also return null gracefully
       console.error('Error finding/creating contact:', error);
       return null;
     }
@@ -252,11 +335,26 @@ Best regards"`;
     
     const newErrors = [];
     let saved = 0;
+    let skipped = 0;
     
     for (const row of csvRows) {
       try {
+        // Validate email
+        if (!row.email || !row.email.includes('@')) {
+          newErrors.push(`Invalid email for row: ${row.email || 'missing'}`);
+          skipped++;
+          continue;
+        }
+        
         // Find or create contact by email, with firstName/lastName if provided
         let contactId = await findOrCreateContact(row.email);
+        
+        // If contact lookup failed, skip this row
+        if (!contactId) {
+          newErrors.push(`Could not find or create contact for ${row.email}. Please check if the email is valid and try again.`);
+          skipped++;
+          continue;
+        }
         
         // If contact was created and we have firstName/lastName, update it
         if (contactId && (row.firstName || row.lastName)) {
@@ -267,15 +365,11 @@ Best regards"`;
             });
           } catch (updateError) {
             console.warn('Could not update contact name:', updateError);
-            // Continue anyway
+            // Continue anyway - name update is optional
           }
         }
         
-        if (!contactId) {
-          newErrors.push(`Failed to find/create contact for ${row.email}`);
-          continue;
-        }
-        
+        // Save the email record
         const response = await api.post(`/api/contacts/${contactId}/off-platform-send`, {
           emailSent: row.emailSent,
           subject: row.subject || null,
@@ -288,9 +382,16 @@ Best regards"`;
           saved++;
         } else {
           newErrors.push(`Failed to save email for ${row.email}: ${response.data?.error || 'Unknown error'}`);
+          skipped++;
         }
       } catch (error) {
-        newErrors.push(`Error processing ${row.email}: ${error.response?.data?.error || error.message}`);
+        // Handle different error types gracefully
+        if (error.response?.status === 500) {
+          newErrors.push(`Server error processing ${row.email}. Please try again later.`);
+        } else {
+          newErrors.push(`Error processing ${row.email}: ${error.response?.data?.error || error.message}`);
+        }
+        skipped++;
       }
     }
     
@@ -298,12 +399,17 @@ Best regards"`;
     setErrors(newErrors);
     setSaving(false);
     
-    if (saved > 0) {
-      // Clear CSV after successful save
+    // Show summary
+    if (saved > 0 && skipped === 0) {
+      // All saved successfully - clear CSV
       setTimeout(() => {
         setCsvText('');
         setCsvRows([]);
+        setCsvFile(null);
       }, 2000);
+    } else if (saved > 0) {
+      // Some saved, some failed - keep CSV for retry
+      console.log(`Saved ${saved} emails, ${skipped} skipped due to errors`);
     }
   };
   
@@ -470,13 +576,41 @@ Best regards"`;
   
   // Handle contact selection for email blob
   const handleContactSelectForEmail = (contact) => {
-    setSelectedContactForEmail(contact);
-    if (contact && contact.email) {
-      setManualEntry(prev => ({
-        ...prev,
-        email: contact.email,
-      }));
+    if (contact?.id) {
+      loadedContactIdRef.current = contact.id;
+      setSelectedContactForEmail(contact);
+      setContact(contact); // Sync contact state
+      if (contact.email) {
+        setManualEntry(prev => ({
+          ...prev,
+          email: contact.email,
+        }));
+      }
+      // Update URL to include contactId
+      const params = new URLSearchParams(searchParams?.toString() || '');
+      params.set('contactId', contact.id);
+      router.replace(`${window.location.pathname}?${params.toString()}`);
+    } else {
+      // Clear if no contact selected
+      handleClearContact();
     }
+  };
+  
+  // Clear all contact-related state
+  const handleClearContact = () => {
+    loadedContactIdRef.current = null;
+    setContact(null);
+    setSelectedContactForEmail(null);
+    setManualEntry(prev => ({ ...prev, email: '' }));
+    setEmailBlob('');
+    setParsedEmail(null);
+    // Clear contactId from URL
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    params.delete('contactId');
+    const newUrl = params.toString() 
+      ? `${window.location.pathname}?${params.toString()}`
+      : window.location.pathname;
+    router.replace(newUrl);
   };
   
   // Save manual entry
@@ -595,32 +729,45 @@ Best regards"`;
           backLabel={contactIdFromUrl ? 'Back to Contact' : 'Back to Outreach'}
         />
         
-        {/* Mode Toggle */}
-        <div className="mb-6 flex gap-2 rounded-lg border border-gray-200 bg-white p-1">
-          <button
-            type="button"
-            onClick={() => setMode('csv')}
-            className={`flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
-              mode === 'csv'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <FileText className="mr-2 inline h-4 w-4" />
-            CSV Import
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('manual')}
-            className={`flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
-              mode === 'manual'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <Plus className="mr-2 inline h-4 w-4" />
-            Manual Entry
-          </button>
+        {/* Mode Toggle and Reset */}
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex flex-1 gap-2 rounded-lg border border-gray-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setMode('csv')}
+              className={`flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
+                mode === 'csv'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FileText className="mr-2 inline h-4 w-4" />
+              CSV Import
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('manual')}
+              className={`flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
+                mode === 'manual'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Plus className="mr-2 inline h-4 w-4" />
+              Manual Entry
+            </button>
+          </div>
+          {(contact || selectedContactForEmail || contactIdFromUrl) && (
+            <button
+              type="button"
+              onClick={handleClearContact}
+              className="flex items-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+              title="Clear contact and start fresh"
+            >
+              <X className="h-4 w-4" />
+              Reset
+            </button>
+          )}
         </div>
         
         {/* CSV Mode */}
@@ -777,43 +924,6 @@ Best regards"`;
         {mode === 'manual' && (
           <div className="rounded-2xl bg-white p-6 shadow">
             <h3 className="mb-4 text-lg font-semibold text-gray-900">Manual Entry</h3>
-            {contact && (
-              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-blue-900">Recording email for:</div>
-                    <div className="text-blue-700">
-                      {contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
-                      {contact.email && ` (${contact.email})`}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Clear contact and allow selection
-                      setContact(null);
-                      setSelectedContactForEmail(null);
-                      setManualEntry(prev => ({
-                        ...prev,
-                        email: '',
-                      }));
-                      // Update URL to remove contactId
-                      const params = new URLSearchParams(searchParams?.toString() || '');
-                      params.delete('contactId');
-                      const newUrl = params.toString() 
-                        ? `${window.location.pathname}?${params.toString()}`
-                        : window.location.pathname;
-                      router.replace(newUrl);
-                    }}
-                    className="flex items-center gap-1 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                    title="Switch to a different contact"
-                  >
-                    <X className="h-3 w-3" />
-                    Switch Contact
-                  </button>
-                </div>
-              </div>
-            )}
             <p className="mb-4 text-sm text-gray-600">
               Paste email content (Outlook/Gmail format) and we'll auto-extract the details, or fill out the form manually.
             </p>
@@ -862,36 +972,40 @@ Best regards"`;
             </div>
             
             <div className="space-y-4">
-              {/* Contact Selection - Show if no email found from parsing or if no contactId from URL */}
-              {(!parsedEmail?.toEmail || !contactIdFromUrl) && (
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-gray-700">
-                    Select Contact {!parsedEmail?.toEmail && !contactIdFromUrl && <span className="text-red-500">*</span>}
-                  </label>
-                  <ContactSelector
-                    companyHQId={companyHQId || undefined}
-                    onContactSelect={handleContactSelectForEmail}
-                    selectedContact={selectedContactForEmail || contact}
-                    placeholder="Search for contact..."
-                    showLabel={false}
-                  />
-                  {selectedContactForEmail && (
-                    <p className="mt-1 text-xs text-green-600">
+              {/* Contact Selection - ALWAYS show, allow switching */}
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">
+                  Select Contact {!parsedEmail?.toEmail && <span className="text-red-500">*</span>}
+                </label>
+                <ContactSelector
+                  companyHQId={companyHQId || undefined}
+                  onContactSelect={handleContactSelectForEmail}
+                  selectedContact={selectedContactForEmail}
+                  placeholder="Search for contact..."
+                  showLabel={false}
+                />
+                {selectedContactForEmail && (
+                  <div className="mt-2 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-2">
+                    <p className="text-xs text-green-700">
                       ✓ Selected: {selectedContactForEmail.goesBy || `${selectedContactForEmail.firstName} ${selectedContactForEmail.lastName}`.trim() || selectedContactForEmail.email}
+                      {selectedContactForEmail.email && ` (${selectedContactForEmail.email})`}
                     </p>
-                  )}
-                  {contact && !selectedContactForEmail && contactIdFromUrl && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Current contact: {contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
-                    </p>
-                  )}
-                  {parsedEmail?.toEmail && !selectedContactForEmail && !contactIdFromUrl && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Email found in pasted content. Select a contact above to match it, or the email will be used to find/create a contact.
-                    </p>
-                  )}
-                </div>
-              )}
+                    <button
+                      type="button"
+                      onClick={handleClearContact}
+                      className="text-green-700 hover:text-green-900"
+                      title="Clear selection"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                {parsedEmail?.toEmail && !selectedContactForEmail && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Email found in pasted content. Select a contact above to match it, or the email will be used to find/create a contact.
+                  </p>
+                )}
+              </div>
               
               <div>
                 <label className="mb-1 block text-sm font-semibold text-gray-700">
@@ -901,21 +1015,16 @@ Best regards"`;
                   type="email"
                   value={manualEntry.email}
                   onChange={(e) => setManualEntry({ ...manualEntry, email: e.target.value })}
-                  placeholder={parsedEmail?.toEmail ? parsedEmail.toEmail : "john@example.com"}
-                  disabled={!!contactIdFromUrl || !!selectedContactForEmail}
+                  placeholder={parsedEmail?.toEmail ? parsedEmail.toEmail : selectedContactForEmail?.email || "john@example.com"}
+                  disabled={!!selectedContactForEmail}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
-                {contactIdFromUrl && (
+                {selectedContactForEmail && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Email is locked to the selected contact
+                    Email is set from selected contact. Clear contact selection above to edit manually.
                   </p>
                 )}
-                {selectedContactForEmail && !contactIdFromUrl && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Email is set from selected contact
-                  </p>
-                )}
-                {parsedEmail?.toEmail && !contactIdFromUrl && !selectedContactForEmail && (
+                {parsedEmail?.toEmail && !selectedContactForEmail && (
                   <p className="mt-1 text-xs text-blue-600">
                     ✓ Email extracted from pasted content
                   </p>
