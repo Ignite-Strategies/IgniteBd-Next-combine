@@ -23,6 +23,70 @@ import { prisma } from '@/lib/prisma';
 import { EmailTypeDeterminationService, EmailTypeContext } from './EmailTypeDeterminationService';
 import { getLastSendDate } from './followUpCalculator';
 
+/**
+ * Get seasonal and date context for email personalization
+ */
+function getSeasonalContext(month: number, day: number, year: number): string {
+  const contexts: string[] = [];
+  
+  // Seasons (Northern Hemisphere)
+  if (month >= 2 && month <= 4) {
+    contexts.push('Spring season');
+  } else if (month >= 5 && month <= 7) {
+    contexts.push('Summer season');
+  } else if (month >= 8 && month <= 10) {
+    contexts.push('Fall/Autumn season');
+  } else {
+    contexts.push('Winter season');
+  }
+  
+  // Major holidays and occasions
+  if (month === 0 && day === 1) {
+    contexts.push('New Year\'s Day');
+  } else if (month === 0 && (day >= 1 && day <= 7)) {
+    contexts.push('Early January (post-New Year period)');
+  } else if (month === 1 && day === 14) {
+    contexts.push('Valentine\'s Day');
+  } else if (month === 2 && day >= 15 && day <= 21) {
+    // Easter varies, but this covers common range
+    contexts.push('Spring season');
+  } else if (month === 6 && day === 4) {
+    contexts.push('Independence Day (US)');
+  } else if (month === 9 && day === 31) {
+    contexts.push('Halloween');
+  } else if (month === 10 && day >= 20 && day <= 30) {
+    contexts.push('Thanksgiving season');
+  } else if (month === 11 && (day >= 20 && day <= 31)) {
+    contexts.push('Holiday season (December)');
+  } else if (month === 11 && day === 25) {
+    contexts.push('Christmas Day');
+  } else if (month === 11 && day === 31) {
+    contexts.push('New Year\'s Eve');
+  }
+  
+  // Month-specific context
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  contexts.push(`Current month: ${monthNames[month]}`);
+  
+  // Weather references by season
+  let weatherNote = '';
+  if (month >= 2 && month <= 4) {
+    weatherNote = 'Spring weather (warming up, flowers blooming)';
+  } else if (month >= 5 && month <= 7) {
+    weatherNote = 'Summer weather (warm, sunny)';
+  } else if (month >= 8 && month <= 10) {
+    weatherNote = 'Fall weather (cooling down, leaves changing)';
+  } else {
+    weatherNote = 'Winter weather (cold, holiday season)';
+  }
+  
+  return `Date: ${monthNames[month]} ${day}, ${year}
+Seasonal Context: ${contexts.join(', ')}
+Weather Context: ${weatherNote}
+Note: Naturally incorporate appropriate seasonal greetings or weather references when it feels authentic and relevant to the relationship.`;
+}
+
 // Initialize OpenAI client
 let openaiClient: OpenAI | null = null;
 
@@ -160,6 +224,14 @@ export class OutreachEmailBuilderService {
         }
       }
       
+      // Get seasonal/date context
+      const now = new Date();
+      const month = now.getMonth(); // 0-11
+      const day = now.getDate();
+      const year = now.getFullYear();
+      
+      const seasonalContext = getSeasonalContext(month, day, year);
+      
       // Build prompt based on email type
       const openai = getOpenAIClient();
       const systemPrompt = `You are an expert at writing personalized business outreach emails. Your task is to generate a professional, authentic email that feels natural and builds relationships.
@@ -169,7 +241,8 @@ Guidelines:
 - Personalize based on relationship context
 - For followups, reference previous emails naturally
 - Avoid being pushy or salesy
-- Match the tone to the relationship type`;
+- Match the tone to the relationship type
+- Naturally incorporate seasonal greetings and context when appropriate (e.g., "Happy New Year", "hope you're enjoying the nice weather", holiday wishes)`;
 
       let userPrompt = '';
       
@@ -187,11 +260,15 @@ ${companyContext ? `${companyContext}\n` : ''}
 ${personaSlug ? `Persona: ${personaSlug}\n` : ''}
 ${relationshipContext ? `Relationship Context:\n${JSON.stringify(relationshipContext, null, 2)}\n` : ''}
 
+Current Date Context:
+${seasonalContext}
+
 Generate a subject line and email body that:
 - Introduces yourself/your company naturally
 - References any relationship context (former colleague, prior conversation, etc.)
 - Provides value or opens a conversation
-- Has a clear but soft call-to-action`;
+- Has a clear but soft call-to-action
+- Naturally incorporates seasonal greetings or weather references when appropriate (e.g., "Happy New Year", "hope you're enjoying the spring weather")`;
       } else {
         // FOLLOWUP email
         const lastEmail = previousEmails[0];
@@ -218,6 +295,9 @@ ${hasResponse && responseText ? `- Contact responded: "${responseText.substring(
 Email Type Context:
 ${emailTypeContext.reasoning}
 
+Current Date Context:
+${seasonalContext}
+
 Generate a subject line and email body that:
 ${hasResponse && responseText
   ? '- Acknowledges their response and continues the conversation naturally'
@@ -229,7 +309,8 @@ ${hasResponse && responseText
 }
 ${hasResponse && responseText ? '- References their response appropriately' : '- References the previous email naturally if relevant'}
 - Continues the conversation without being pushy
-- Has a soft call-to-action`;
+- Has a soft call-to-action
+- Naturally incorporates seasonal greetings or weather references when appropriate (e.g., "Happy New Year", "hope you're enjoying the nice weather")`;
       }
       
       const completion = await openai.chat.completions.create({
