@@ -200,8 +200,8 @@ function OutreachContent() {
           />
         </div>
 
-        {/* Two Main Actions */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Three Main Actions */}
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* 1:1 Compose */}
           <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 p-8 shadow-sm transition hover:border-blue-400">
             <div className="flex flex-col gap-6">
@@ -300,6 +300,58 @@ function OutreachContent() {
                 className="self-start rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
               >
                 Launch Campaign →
+              </button>
+            </div>
+          </div>
+
+          {/* Add Off-platform Emails */}
+          <div className="rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-slate-50 p-8 shadow-sm transition hover:border-gray-400">
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gray-500 text-white">
+                  <FileText className="h-8 w-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Add Off-platform Emails
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    Track emails sent outside the platform (Gmail, Outlook, CSV export, etc.)
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm text-gray-700">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-gray-600" />
+                  <span>Upload CSV or paste email</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-gray-600" />
+                  <span>Auto-match to contacts</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-gray-600" />
+                  <span>Track in email history</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-gray-600" />
+                  <span>Backwards compatible</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const companyHQId = typeof window !== 'undefined' 
+                    ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') || ''
+                    : '';
+                  const url = companyHQId 
+                    ? `/outreach/record-off-platform?companyHQId=${companyHQId}`
+                    : '/outreach/record-off-platform';
+                  router.push(url);
+                }}
+                className="self-start rounded-lg bg-gray-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
+              >
+                Add Emails →
               </button>
             </div>
           </div>
