@@ -152,6 +152,7 @@ export default function ContactDetailPage({ params }) {
   const [lastEmail, setLastEmail] = useState(null);
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
   const [buildingEmail, setBuildingEmail] = useState(false);
+  const [emailHistory, setEmailHistory] = useState([]);
   
   // Load last email send info
   useEffect(() => {
