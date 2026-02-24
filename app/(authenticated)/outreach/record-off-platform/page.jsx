@@ -321,7 +321,7 @@ export default function RecordOffPlatformPage() {
     return result;
   };
   
-  const handleParseEmailBlob = () => {
+  const handleParseEmailBlob = async () => {
     if (!emailBlob.trim()) {
       setParsingError('Please paste email content');
       return;
@@ -340,8 +340,26 @@ export default function RecordOffPlatformPage() {
           platform: 'manual',
           notes: parsed.body || '',
         });
-        // Clear selected contact if we found email
-        setSelectedContactForEmail(null);
+        
+        // If no contactId from URL, try to find contact by email automatically
+        if (!contactIdFromUrl && parsed.toEmail) {
+          try {
+            const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(parsed.toEmail)}`);
+            if (response.data?.success && response.data.contact) {
+              setSelectedContactForEmail(response.data.contact);
+              setParsingError('');
+              return; // Found contact, exit early
+            }
+          } catch (error) {
+            // Contact not found - that's okay, user can select manually
+            console.log('Contact not found by email, user can select manually');
+          }
+        }
+        
+        // Clear selected contact if we found email but no contactId
+        if (!contactIdFromUrl) {
+          setSelectedContactForEmail(null);
+        }
       } else {
         // If no email found, keep current manual entry but clear email field
         // User will need to select contact manually
@@ -647,10 +665,38 @@ export default function RecordOffPlatformPage() {
             <h3 className="mb-4 text-lg font-semibold text-gray-900">Manual Entry</h3>
             {contact && (
               <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                <div className="font-semibold text-blue-900">Recording email for:</div>
-                <div className="text-blue-700">
-                  {contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
-                  {contact.email && ` (${contact.email})`}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-blue-900">Recording email for:</div>
+                    <div className="text-blue-700">
+                      {contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
+                      {contact.email && ` (${contact.email})`}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Clear contact and allow selection
+                      setContact(null);
+                      setSelectedContactForEmail(null);
+                      setManualEntry(prev => ({
+                        ...prev,
+                        email: '',
+                      }));
+                      // Update URL to remove contactId
+                      const params = new URLSearchParams(searchParams?.toString() || '');
+                      params.delete('contactId');
+                      const newUrl = params.toString() 
+                        ? `${window.location.pathname}?${params.toString()}`
+                        : window.location.pathname;
+                      router.replace(newUrl);
+                    }}
+                    className="flex items-center gap-1 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                    title="Switch to a different contact"
+                  >
+                    <X className="h-3 w-3" />
+                    Switch Contact
+                  </button>
                 </div>
               </div>
             )}
@@ -702,11 +748,11 @@ export default function RecordOffPlatformPage() {
             </div>
             
             <div className="space-y-4">
-              {/* Contact Selection - Show if no email found in parsed blob or if no contactId from URL */}
-              {(!parsedEmail?.toEmail && !contactIdFromUrl) && (
+              {/* Contact Selection - Show if no contactId from URL (contact can be selected or found via parsing) */}
+              {!contactIdFromUrl && (
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-gray-700">
-                    Select Contact <span className="text-red-500">*</span>
+                    Select Contact {!parsedEmail?.toEmail && <span className="text-red-500">*</span>}
                   </label>
                   <ContactSelector
                     companyHQId={companyHQId || undefined}
@@ -718,6 +764,11 @@ export default function RecordOffPlatformPage() {
                   {selectedContactForEmail && (
                     <p className="mt-1 text-xs text-green-600">
                       ✓ Selected: {selectedContactForEmail.goesBy || `${selectedContactForEmail.firstName} ${selectedContactForEmail.lastName}`.trim() || selectedContactForEmail.email}
+                    </p>
+                  )}
+                  {parsedEmail?.toEmail && !selectedContactForEmail && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Email found in pasted content. Select a contact above to match it, or the email will be used to find/create a contact.
                     </p>
                   )}
                 </div>

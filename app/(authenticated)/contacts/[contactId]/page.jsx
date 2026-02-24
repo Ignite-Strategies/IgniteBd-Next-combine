@@ -153,6 +153,8 @@ export default function ContactDetailPage({ params }) {
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
   const [buildingEmail, setBuildingEmail] = useState(false);
   const [emailHistory, setEmailHistory] = useState([]);
+  const [relationshipContext, setRelationshipContext] = useState(null);
+  const [generatingRelationshipContext, setGeneratingRelationshipContext] = useState(false);
   
   // Load last email send info
   useEffect(() => {
@@ -238,6 +240,10 @@ export default function ContactDetailPage({ params }) {
       
       if (response.data?.success) {
         setPersonaSuggestion(response.data);
+        // Also update relationship context if it was generated
+        if (response.data.relationshipContext) {
+          setRelationshipContext(response.data.relationshipContext);
+        }
         setShowPersonaSuggestionModal(true);
       } else {
         alert(response.data?.error || 'Failed to suggest persona');
@@ -247,6 +253,28 @@ export default function ContactDetailPage({ params }) {
       alert(error.response?.data?.error || 'Failed to suggest persona');
     } finally {
       setSuggestingPersona(false);
+    }
+  };
+
+  const handleGenerateRelationshipContext = async () => {
+    if (!contactId) return;
+    
+    setGeneratingRelationshipContext(true);
+    try {
+      const response = await api.post(`/api/contacts/${contactId}/suggest-persona`, {
+        note: editingNotes ? notesText : undefined, // Use current notes text if editing
+      });
+      
+      if (response.data?.success && response.data.relationshipContext) {
+        setRelationshipContext(response.data.relationshipContext);
+      } else {
+        alert(response.data?.error || 'Failed to generate relationship context');
+      }
+    } catch (error) {
+      console.error('Error generating relationship context:', error);
+      alert(error.response?.data?.error || 'Failed to generate relationship context');
+    } finally {
+      setGeneratingRelationshipContext(false);
     }
   };
 
@@ -1009,6 +1037,127 @@ export default function ContactDetailPage({ params }) {
             )}
           </section>
 
+          {/* Relationship Context Section */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Relationship Context</h3>
+              {!relationshipContext && (
+                <button
+                  onClick={handleGenerateRelationshipContext}
+                  disabled={generatingRelationshipContext || !contact?.notes}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Generate relationship context from notes"
+                >
+                  {generatingRelationshipContext ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Generate
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+            {relationshipContext ? (
+              <div className="space-y-3">
+                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 space-y-2 text-sm">
+                  {/* Factual extracted data */}
+                  {relationshipContext.formerCompany && (
+                    <div>
+                      <span className="font-semibold text-gray-700">Former Company:</span>{' '}
+                      <span className="text-gray-600">{relationshipContext.formerCompany}</span>
+                    </div>
+                  )}
+                  {relationshipContext.primaryWork && (
+                    <div>
+                      <span className="font-semibold text-gray-700">Primary Work:</span>{' '}
+                      <span className="text-gray-600">{relationshipContext.primaryWork}</span>
+                    </div>
+                  )}
+                  {relationshipContext.relationshipQuality && (
+                    <div>
+                      <span className="font-semibold text-gray-700">Relationship Quality:</span>{' '}
+                      <span className="text-gray-600">{relationshipContext.relationshipQuality}</span>
+                    </div>
+                  )}
+                  {relationshipContext.opportunityType && (
+                    <div>
+                      <span className="font-semibold text-gray-700">Opportunity Type:</span>{' '}
+                      <span className="text-gray-600">{relationshipContext.opportunityType}</span>
+                    </div>
+                  )}
+                  
+                  {/* Relationship dimensions */}
+                  {(relationshipContext.contextOfRelationship || 
+                    relationshipContext.relationshipRecency || 
+                    relationshipContext.companyAwareness) && (
+                    <div className="pt-2 mt-2 border-t border-blue-200">
+                      <div className="text-xs font-semibold text-gray-600 mb-1">Relationship Dimensions:</div>
+                      {relationshipContext.contextOfRelationship && (
+                        <div className="text-xs">
+                          <span className="font-semibold text-gray-700">Type:</span>{' '}
+                          <span className="text-gray-600">{relationshipContext.contextOfRelationship.replace(/_/g, ' ')}</span>
+                        </div>
+                      )}
+                      {relationshipContext.relationshipRecency && (
+                        <div className="text-xs">
+                          <span className="font-semibold text-gray-700">Recency:</span>{' '}
+                          <span className="text-gray-600">{relationshipContext.relationshipRecency.replace(/_/g, ' ')}</span>
+                        </div>
+                      )}
+                      {relationshipContext.companyAwareness && (
+                        <div className="text-xs">
+                          <span className="font-semibold text-gray-700">Awareness:</span>{' '}
+                          <span className="text-gray-600">{relationshipContext.companyAwareness.replace(/_/g, ' ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleGenerateRelationshipContext}
+                    disabled={generatingRelationshipContext}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Regenerate relationship context"
+                  >
+                    {generatingRelationshipContext ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Regenerating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Regenerate
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setRelationshipContext(null)}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    title="Clear relationship context"
+                  >
+                    <XIcon className="h-4 w-4" />
+                    Clear
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-gray-400 italic mb-3">
+                  {contact?.notes 
+                    ? 'Generate relationship context from notes to extract key relationship details.'
+                    : 'Add notes to generate relationship context.'}
+                </p>
+              </div>
+            )}
+          </section>
+
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Notes</h3>
@@ -1156,9 +1305,7 @@ export default function ContactDetailPage({ params }) {
                       // Build email with persona and relationship context
                       const response = await api.post(`/api/contacts/${contactId}/build-email`, {
                         personaSlug: contact.outreachPersonaSlug || null,
-                        relationshipContext: contact.outreachPersonaSlug ? {
-                          // We could fetch relationship context here if stored, but for now use persona
-                        } : undefined,
+                        relationshipContext: relationshipContext || undefined,
                         companyHQId: companyHQId || undefined,
                       });
                       
