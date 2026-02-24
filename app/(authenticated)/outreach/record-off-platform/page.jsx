@@ -666,7 +666,7 @@ export default function RecordOffPlatformPage() {
               <textarea
                 value={emailBlob}
                 onChange={(e) => setEmailBlob(e.target.value)}
-                placeholder="From: Joel Gulick&#10;Sent: Thursday, February 19, 2026 1:38 PM&#10;To: Dhakad, Aashish <aashish.dhakad@citi.com>&#10;Subject: NDA Check-In&#10;&#10;Hi Aashish,&#10;&#10;Congratulations again..."
+                placeholder="From: Your Name <your.email@example.com>&#10;Sent: Monday, January 15, 2024 2:30 PM&#10;To: Contact Name <contact@example.com>&#10;Subject: Follow-up on our conversation&#10;&#10;Hi there,&#10;&#10;Just following up on our previous discussion..."
                 className="w-full min-h-[200px] rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-mono focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               />
               <button
