@@ -36,6 +36,7 @@ export async function GET(request, { params }) {
           pipelines: true, // Pipeline relation
           companies: true, // Company relation via contactCompanyId
           contact_lists: true, // Contact lists relation
+          outreach_personas: true, // Outreach persona relation
         },
       });
       
@@ -185,6 +186,7 @@ export async function PUT(request, { params }) {
       notes,
       pipeline,
       stage,
+      outreachPersonaSlug,
     } = body ?? {};
 
     // Validate pipeline and stage if provided
@@ -219,6 +221,24 @@ export async function PUT(request, { params }) {
     if (buyerDecision !== undefined) updateData.buyerDecision = buyerDecision;
     if (howMet !== undefined) updateData.howMet = howMet;
     if (notes !== undefined) updateData.notes = notes;
+    if (outreachPersonaSlug !== undefined) {
+      // Allow null to unset persona, or validate slug exists if provided
+      if (outreachPersonaSlug === null || outreachPersonaSlug === '') {
+        updateData.outreachPersonaSlug = null;
+      } else {
+        // Validate persona exists
+        const persona = await prisma.outreach_personas.findUnique({
+          where: { slug: outreachPersonaSlug },
+        });
+        if (!persona) {
+          return NextResponse.json(
+            { success: false, error: `Outreach persona with slug "${outreachPersonaSlug}" not found` },
+            { status: 400 },
+          );
+        }
+        updateData.outreachPersonaSlug = outreachPersonaSlug;
+      }
+    }
 
     const contact = await prisma.contact.update({
       where: { id: contactId },
@@ -265,6 +285,7 @@ export async function PUT(request, { params }) {
         pipelines: true,
         companies: true,
         contact_lists: true,
+        outreach_personas: true, // Outreach persona relation
       },
     });
     

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2 } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
@@ -141,6 +141,14 @@ export default function ContactDetailPage({ params }) {
   const [savingNotes, setSavingNotes] = useState(false);
   const [showAddToListModal, setShowAddToListModal] = useState(false);
   const [showEnrichmentDetails, setShowEnrichmentDetails] = useState(false);
+  const [editingPersona, setEditingPersona] = useState(false);
+  const [selectedPersonaSlug, setSelectedPersonaSlug] = useState(null);
+  const [savingPersona, setSavingPersona] = useState(false);
+  const [suggestingPersona, setSuggestingPersona] = useState(false);
+  const [personaSuggestion, setPersonaSuggestion] = useState(null);
+  const [showPersonaSuggestionModal, setShowPersonaSuggestionModal] = useState(false);
+  const [availablePersonas, setAvailablePersonas] = useState([]);
+  const [loadingPersonas, setLoadingPersonas] = useState(false);
   
   // Load contact lists when modal opens
   useEffect(() => {
@@ -160,6 +168,83 @@ export default function ContactDetailPage({ params }) {
         });
     }
   }, [showAddToListModal, lists.length, loadingLists]);
+
+  // Load available personas when editing persona
+  useEffect(() => {
+    if (editingPersona && availablePersonas.length === 0 && !loadingPersonas) {
+      setLoadingPersonas(true);
+      api.get('/api/outreach-personas')
+        .then((response) => {
+          if (response.data?.success && Array.isArray(response.data.personas)) {
+            setAvailablePersonas(response.data.personas);
+          }
+        })
+        .catch((error) => {
+          console.error('Error loading personas:', error);
+        })
+        .finally(() => {
+          setLoadingPersonas(false);
+        });
+    }
+  }, [editingPersona, availablePersonas.length, loadingPersonas]);
+
+  // Set selected persona when contact loads
+  useEffect(() => {
+    if (contact?.outreachPersonaSlug) {
+      setSelectedPersonaSlug(contact.outreachPersonaSlug);
+    }
+  }, [contact?.outreachPersonaSlug]);
+
+  const handleSuggestPersona = async () => {
+    if (!contactId) return;
+    
+    setSuggestingPersona(true);
+    try {
+      const response = await api.post(`/api/contacts/${contactId}/suggest-persona`, {
+        note: editingNotes ? notesText : undefined, // Use current notes text if editing
+      });
+      
+      if (response.data?.success) {
+        setPersonaSuggestion(response.data);
+        setShowPersonaSuggestionModal(true);
+      } else {
+        alert(response.data?.error || 'Failed to suggest persona');
+      }
+    } catch (error) {
+      console.error('Error suggesting persona:', error);
+      alert(error.response?.data?.error || 'Failed to suggest persona');
+    } finally {
+      setSuggestingPersona(false);
+    }
+  };
+
+  const handleApplySuggestedPersona = async () => {
+    if (!personaSuggestion?.suggestedPersonaSlug || !contactId) return;
+    
+    setSavingPersona(true);
+    try {
+      const response = await api.put(`/api/contacts/${contactId}`, {
+        outreachPersonaSlug: personaSuggestion.suggestedPersonaSlug,
+      });
+      
+      if (response.data?.success) {
+        setContact(response.data.contact);
+        setSelectedPersonaSlug(personaSuggestion.suggestedPersonaSlug);
+        setShowPersonaSuggestionModal(false);
+        setPersonaSuggestion(null);
+        if (refreshContacts) {
+          refreshContacts();
+        }
+      } else {
+        alert(response.data?.error || 'Failed to apply persona');
+      }
+    } catch (error) {
+      console.error('Error applying persona:', error);
+      alert(error.response?.data?.error || 'Failed to apply persona');
+    } finally {
+      setSavingPersona(false);
+    }
+  };
 
   const displayName = useMemo(() => {
     if (!contact) return 'Contact';
@@ -789,21 +874,137 @@ export default function ContactDetailPage({ params }) {
             </dl>
           </section>
 
+          {/* Outreach Persona Section */}
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Notes</h3>
-              {!editingNotes && (
+              <h3 className="text-lg font-semibold text-gray-900">Outreach Persona</h3>
+              {!editingPersona && (
                 <button
                   onClick={() => {
-                    setEditingNotes(true);
-                    setNotesText(contact.notes || '');
+                    setEditingPersona(true);
+                    setSelectedPersonaSlug(contact.outreachPersonaSlug || null);
                   }}
                   className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                  title="Edit notes"
+                  title="Edit persona"
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
               )}
+            </div>
+            {!editingPersona ? (
+              <div>
+                {contact.outreachPersonaSlug ? (
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-semibold text-purple-700">
+                      {contact.outreachPersonaSlug}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No outreach persona assigned. Generate one from notes or select manually.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <select
+                  value={selectedPersonaSlug || ''}
+                  onChange={(e) => setSelectedPersonaSlug(e.target.value || null)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  disabled={loadingPersonas}
+                >
+                  <option value="">No persona (unassigned)</option>
+                  {loadingPersonas ? (
+                    <option>Loading personas...</option>
+                  ) : (
+                    availablePersonas.map((persona) => (
+                      <option key={persona.slug} value={persona.slug}>
+                        {persona.name} ({persona.slug})
+                      </option>
+                    ))
+                  )}
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setSavingPersona(true);
+                      try {
+                        const response = await api.put(`/api/contacts/${contactId}`, {
+                          outreachPersonaSlug: selectedPersonaSlug || null,
+                        });
+                        if (response.data?.success) {
+                          setContact(response.data.contact);
+                          setEditingPersona(false);
+                          if (refreshContacts) {
+                            refreshContacts();
+                          }
+                        } else {
+                          alert(response.data?.error || 'Failed to save persona');
+                        }
+                      } catch (error) {
+                        console.error('Error saving persona:', error);
+                        alert(error.response?.data?.error || 'Failed to save persona');
+                      } finally {
+                        setSavingPersona(false);
+                      }
+                    }}
+                    disabled={savingPersona}
+                    className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Check className="h-4 w-4" />
+                    {savingPersona ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingPersona(false);
+                      setSelectedPersonaSlug(contact.outreachPersonaSlug || null);
+                    }}
+                    disabled={savingPersona}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <XIcon className="h-4 w-4" />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Notes</h3>
+              <div className="flex items-center gap-2">
+                {!editingNotes && contact.notes && (
+                  <button
+                    onClick={handleSuggestPersona}
+                    disabled={suggestingPersona}
+                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Generate persona from notes"
+                  >
+                    {suggestingPersona ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4" />
+                        Generate Persona
+                      </>
+                    )}
+                  </button>
+                )}
+                {!editingNotes && (
+                  <button
+                    onClick={() => {
+                      setEditingNotes(true);
+                      setNotesText(contact.notes || '');
+                    }}
+                    className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                    title="Edit notes"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
             {!editingNotes ? (
               <div>
@@ -822,7 +1023,7 @@ export default function ContactDetailPage({ params }) {
                   className="w-full min-h-[120px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 resize-y"
                   autoFocus
                 />
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={async () => {
                       setSavingNotes(true);
@@ -852,6 +1053,26 @@ export default function ContactDetailPage({ params }) {
                     <Check className="h-4 w-4" />
                     {savingNotes ? 'Saving...' : 'Save'}
                   </button>
+                  {notesText.trim() && (
+                    <button
+                      onClick={handleSuggestPersona}
+                      disabled={suggestingPersona || savingNotes}
+                      className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Generate persona from these notes"
+                    >
+                      {suggestingPersona ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="h-4 w-4" />
+                          Generate Persona
+                        </>
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setEditingNotes(false);
@@ -1077,6 +1298,135 @@ export default function ContactDetailPage({ params }) {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Persona Suggestion Modal */}
+        {showPersonaSuggestionModal && personaSuggestion && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Persona Suggestion</h2>
+                <button
+                  onClick={() => {
+                    setShowPersonaSuggestionModal(false);
+                    setPersonaSuggestion(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {personaSuggestion.suggestedPersonaSlug ? (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Suggested Persona</h3>
+                    <div className="rounded-lg bg-purple-50 border border-purple-200 p-3">
+                      <div className="font-semibold text-purple-900">{personaSuggestion.suggestedPersonaSlug}</div>
+                      {personaSuggestion.confidence !== undefined && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                            <span>Confidence</span>
+                            <span>{personaSuggestion.confidence}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-purple-600 h-2 rounded-full transition-all"
+                              style={{ width: `${personaSuggestion.confidence}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {personaSuggestion.reasoning && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">Reasoning</h3>
+                      <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+                        {personaSuggestion.reasoning}
+                      </p>
+                    </div>
+                  )}
+
+                  {personaSuggestion.extractedInfo && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">Extracted Information</h3>
+                      <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+                        {personaSuggestion.extractedInfo.formerCompany && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Former Company:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.extractedInfo.formerCompany}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.extractedInfo.primaryWork && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Primary Work:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.extractedInfo.primaryWork}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.extractedInfo.relationshipQuality && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Relationship Quality:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.extractedInfo.relationshipQuality}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.extractedInfo.opportunityType && (
+                          <div>
+                            <span className="font-semibold text-gray-700">Opportunity Type:</span>{' '}
+                            <span className="text-gray-600">{personaSuggestion.extractedInfo.opportunityType}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-4 border-t">
+                    <button
+                      onClick={handleApplySuggestedPersona}
+                      disabled={savingPersona}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {savingPersona ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Applying...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Apply Persona
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowPersonaSuggestionModal(false);
+                        setPersonaSuggestion(null);
+                      }}
+                      disabled={savingPersona}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">Unable to suggest a persona from the notes.</p>
+                  <button
+                    onClick={() => {
+                      setShowPersonaSuggestionModal(false);
+                      setPersonaSuggestion(null);
+                    }}
+                    className="mt-4 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

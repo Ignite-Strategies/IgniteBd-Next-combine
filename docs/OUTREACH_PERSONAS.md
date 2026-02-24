@@ -100,6 +100,109 @@ This helps with:
 
 ---
 
+## AI-Generated Persona Suggestions from Contact Notes
+
+### Overview
+
+Use AI to analyze contact notes and automatically suggest appropriate outreach personas. The system extracts key relationship information and recommends the best persona match.
+
+### Information Extraction
+
+When analyzing a contact note, the AI extracts:
+
+1. **Former Company** - Previous company/organization the contact worked with
+2. **Primary Work** - Type of work/services provided (e.g., "NDA work", "contract review", "compliance")
+3. **Relationship Quality** - Nature of the relationship (e.g., "great relationship", "positive", "neutral", "challenging")
+4. **Opportunity Type** - Client's desire or potential for:
+   - Referrals/recommendations
+   - Repeat business
+   - Introductions
+   - Partnership opportunities
+   - Other business development activities
+
+### Example Contact Note Analysis
+
+**Input Note:**
+```
+Did NDA work for him for Ares Infrastructure and we had a great relationship; may be opportunities for him to recommend my firm to clients that want to save on NDA work.
+```
+
+**Extracted Information:**
+- **Former Company:** Ares Infrastructure
+- **Primary Work:** NDA work
+- **Relationship Quality:** Great relationship
+- **Opportunity Type:** Referral/recommendation opportunities (client wants to recommend firm to others)
+
+**Suggested Persona:** `FormerClientReferralOpportunity` or similar persona that captures:
+- Past client relationship
+- Positive relationship history
+- Referral/recommendation potential
+
+### Persona Suggestion Logic
+
+The AI analyzes the extracted information to suggest personas based on:
+
+1. **Relationship Type**
+   - Former client → `FormerClient*` personas
+   - Former colleague → `FormerColleague*` personas
+   - Current client → `CurrentClient*` personas
+   - Competitor → `CompetitorSwitchingProspect`
+
+2. **Relationship Quality**
+   - Positive/great relationship → Opportunities for referrals, repeat business
+   - Neutral → Standard follow-up personas
+   - Challenging → May need different approach
+
+3. **Opportunity Signals**
+   - Referral mentions → `*ReferralOpportunity` personas
+   - Repeat business potential → `*RepeatBusiness` personas
+   - Partnership mentions → `*PartnershipOpportunity` personas
+   - No clear opportunity → Standard relationship personas
+
+### Implementation
+
+**API Endpoint:**
+- **POST** `/api/contacts/[id]/suggest-persona` - Analyze contact notes and suggest persona
+  - Input: `{ note: string }`
+  - Output: `{ suggestedPersonaSlug: string, confidence: number, extractedInfo: { formerCompany?, primaryWork?, relationshipQuality?, opportunityType? } }`
+
+**UI Integration:**
+- **Contact edit/view pages** - "Generate Persona from Notes" button
+  - Analyzes existing notes or allows input of new note
+  - Displays suggested persona with confidence score
+  - Shows extracted information for review
+  - One-click to apply suggested persona
+
+**Workflow:**
+1. User views/edits contact
+2. Clicks "Generate Persona from Notes" or "Suggest Persona"
+3. System analyzes contact notes (or prompts for note input)
+4. AI extracts key information and suggests persona
+5. User reviews suggestion and extracted info
+6. User accepts or manually selects different persona
+
+### Example Persona Suggestions
+
+Based on note patterns, common suggestions:
+
+| Note Pattern | Suggested Persona |
+|--------------|-------------------|
+| "Did [work] for [company], great relationship, may recommend" | `FormerClientReferralOpportunity` |
+| "Former colleague at [company], haven't talked in years" | `FormerColleagueNowReachingoutAgainAfterLongTime` |
+| "Currently at [competitor], interested in switching" | `CompetitorSwitchingProspect` |
+| "Previous client, may need more [work type]" | `FormerClientRepeatBusiness` |
+| "Met at [event], potential partnership" | `NewContactPartnershipOpportunity` |
+
+### Best Practices
+
+1. **Review suggestions** - AI suggestions are recommendations; always review extracted info before applying
+2. **Update notes** - Keep contact notes detailed and up-to-date for better AI analysis
+3. **Refine personas** - If AI frequently suggests similar patterns, consider creating new personas
+4. **Manual override** - Users can always manually select a different persona if the suggestion doesn't fit
+5. **Confidence scores** - Use confidence scores to identify when manual review is especially important
+
+---
+
 ## API Endpoints
 
 ### Outreach Personas
@@ -115,6 +218,12 @@ This helps with:
 - **GET** `/api/outreach/content-snips?companyHQId=xxx` - List snippets (includes `personaSlug`, `bestUsedWhen`)
 - **POST** `/api/outreach/content-snips` - Create snippet with optional `personaSlug` and `bestUsedWhen`
 - **GET** `/api/outreach/content-snips/hydrate?companyHQId=xxx` - Get hydrated snippet map for template resolution
+
+### AI Persona Suggestions
+
+- **POST** `/api/contacts/[id]/suggest-persona` - Analyze contact notes and suggest persona
+  - Request body: `{ note?: string }` (optional - uses existing notes if not provided)
+  - Response: `{ suggestedPersonaSlug: string, confidence: number, extractedInfo: { formerCompany?, primaryWork?, relationshipQuality?, opportunityType? }, reasoning: string }`
 
 ---
 
@@ -132,6 +241,9 @@ This helps with:
 
 ### Assigning Personas to Contacts
 - **Contact edit/view pages** - Can assign `outreachPersonaSlug` to contacts
+  - **"Generate Persona from Notes"** button - AI analyzes notes and suggests persona
+  - Shows suggested persona with confidence score and extracted information
+  - One-click to apply suggested persona or manual override
 - Used by template assembly to match snippets to contacts
 
 ---
@@ -187,9 +299,12 @@ ContentSnip's `personaSlug` references **`outreach_personas`**, not the full `pe
 - **ContentSnip:** `prisma/schema.prisma` - `ContentSnip.personaSlug` field (line ~1359)
 - **Contact:** `prisma/schema.prisma` - `Contact.outreachPersonaSlug` field (line ~545)
 - **API:** `app/api/outreach-personas/route.js`
+- **API:** `app/api/contacts/[id]/suggest-persona/route.js` - AI persona suggestion endpoint
+- **Service:** `lib/services/personaSuggestionService.js` - AI analysis and persona matching logic
 - **Assembly:** `lib/services/snippetAssemblyService.js` - `selectBestMatch()` function uses `personaSlug`
 - **UI:** `app/(authenticated)/content-snips/page.jsx` - Form and table for persona fields
 - **UI:** `app/(authenticated)/personas/page.jsx` - Management page for personas
+- **UI:** `app/(authenticated)/contacts/[id]/edit/page.jsx` - Contact edit page with persona suggestion feature
 
 ---
 
