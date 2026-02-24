@@ -113,7 +113,10 @@ function OutreachTrackerContent() {
   const getStatusBadge = (contact) => {
     const daysUntilDue = getDaysUntilDue(contact.nextSendDate);
     
-    if (contact.hasResponded) {
+    // Check if any email has been responded to
+    const hasAnyResponse = contact.emails?.some(e => e.hasResponded);
+    
+    if (hasAnyResponse) {
       return <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-800">Responded</span>;
     }
     

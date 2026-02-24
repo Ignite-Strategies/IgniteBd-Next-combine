@@ -69,9 +69,9 @@ export default function AppShell({ children }) {
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
-  // App routes always get the shell so users can navigate back (e.g. /contacts/view)
+  // App routes always get the shell (e.g. /contacts/view). When pathname is null (hydration), treat as app route.
   const isAppRoute = useMemo(() => {
-    if (!pathname) return false;
+    if (!pathname) return true;
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
@@ -97,7 +97,7 @@ export default function AppShell({ children }) {
   const shouldHideContext = pathname && HIDE_CONTEXT_ROUTES.some(route => pathname.startsWith(route));
 
   // Show shell when: not public/bill, and (auth not checked yet, or authenticated, or on an app route).
-  // App routes always get the shell so users are never stuck without nav.
+  // isAppRoute is true when pathname is null (hydration) so we don't flash no-shell.
   const shouldShowShell = !isPublicRoute && !isBillRoute && (!authChecked || isAuthenticated || isAppRoute);
   
   if (shouldShowShell) {

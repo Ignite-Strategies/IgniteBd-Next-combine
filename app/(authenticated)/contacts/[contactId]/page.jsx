@@ -333,15 +333,22 @@ export default function ContactDetailPage({ params }) {
         contactId,
       });
 
-      if (!enrichResponse.data?.success || !enrichResponse.data?.redisKey) {
+      if (!enrichResponse.data?.success) {
         throw new Error(enrichResponse.data?.error || 'Enrichment failed');
       }
 
-      // Step 2: Automatically save the enrichment
-      const saveResponse = await api.post('/api/contacts/enrich/save', {
+      // Step 2: Save the enrichment (use Redis key if present, otherwise pass raw payload when Redis failed)
+      const redisKey = enrichResponse.data?.redisKey || null;
+      const rawApolloResponse = enrichResponse.data?.rawApolloResponse || null;
+      if (!redisKey && !rawApolloResponse) {
+        throw new Error('No enrichment data returned. Please try again.');
+      }
+
+      const savePayload = {
         contactId,
-        redisKey: enrichResponse.data.redisKey,
-      });
+        ...(redisKey ? { redisKey } : { rawEnrichmentPayload: rawApolloResponse }),
+      };
+      const saveResponse = await api.post('/api/contacts/enrich/save', savePayload);
 
       if (!saveResponse.data?.success) {
         throw new Error(saveResponse.data?.error || 'Failed to save enrichment');
@@ -808,6 +815,7 @@ export default function ContactDetailPage({ params }) {
                         }}
                         showLabel={false}
                         placeholder="Search or create company..."
+                        companyHQId={companyHQId || undefined}
                       />
                       <div className="flex gap-2">
                         <button

@@ -17,6 +17,7 @@ export default function CompanySelector({
   className = '',
   placeholder = 'Search companies...',
   allowCreate = true,
+  companyHQId: companyHQIdProp, // Optional: use when localStorage doesn't have it (e.g. contact page)
 }) {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -37,8 +38,9 @@ export default function CompanySelector({
     }
   }, []);
 
-  // Get companyHQId from localStorage
+  // Get companyHQId: prop first, then localStorage
   const getCompanyHQId = () => {
+    if (companyHQIdProp) return companyHQIdProp;
     if (typeof window === 'undefined') return null;
     return (
       window.localStorage.getItem('companyHQId') ||
@@ -87,7 +89,7 @@ export default function CompanySelector({
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [companySearch, ownerId]); // Wait for auth before searching
+  }, [companySearch, ownerId, companyHQIdProp]); // Wait for auth and companyHQId before searching
 
   // Set initial search value if company is selected
   const selectedCompanyObj = useMemo(() => {

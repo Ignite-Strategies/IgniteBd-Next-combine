@@ -387,6 +387,13 @@ function ContactsViewPageContent() {
               </button>
               <button
                 type="button"
+                onClick={() => router.push(companyHQId ? `/growth-dashboard?companyHQId=${companyHQId}` : '/growth-dashboard')}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              >
+                Dashboard
+              </button>
+              <button
+                type="button"
                 onClick={() => router.push(companyHQId ? `/people?companyHQId=${companyHQId}` : '/people')}
                 className="rounded-lg bg-gray-600 px-4 py-2 text-white transition hover:bg-gray-700"
               >
