@@ -1907,8 +1907,9 @@ model emails {
   body      String?     @db.Text // Full email body
   source    EmailSource // PLATFORM | OFF_PLATFORM
   platform  String? // "sendgrid", "gmail", "outlook", "apollo", "manual"
+  emailType EmailType? // FIRST_TIME | FOLLOWUP
 
-  // Response tracking
+  // Response tracking - contact response is stored as string on original email record
   contactResponse String?   @db.Text // The actual reply text from contact
   respondedAt     DateTime? // When contact responded
   responseSubject String? // Subject of their reply

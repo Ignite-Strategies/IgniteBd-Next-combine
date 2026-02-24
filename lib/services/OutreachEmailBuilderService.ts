@@ -105,51 +105,44 @@ export class OutreachEmailBuilderService {
         relationshipContext
       );
       
-      // Get previous email history for followups
+      // Get previous email history for followups (use unified emails table)
       let previousEmails: any[] = [];
+      let lastEmailResponse: string | null = null;
       if (emailTypeContext.emailType === 'FOLLOWUP') {
-        // Get platform sends
-        const platformSends = await prisma.email_activities.findMany({
-          where: {
-            contact_id: contactId,
-            event: 'sent',
-          },
-          orderBy: { createdAt: 'desc' },
+        // Get emails from unified emails table (includes responses)
+        const emails = await prisma.emails.findMany({
+          where: { contactId },
+          orderBy: { sendDate: 'desc' },
           take: 3,
           select: {
             id: true,
-            createdAt: true,
+            sendDate: true,
             subject: true,
-            email: true,
-            event: true,
+            body: true,
+            source: true,
+            platform: true,
+            hasResponded: true,
+            contactResponse: true,
+            responseSubject: true,
           },
         });
         
-        // Get off-platform sends
-        const offPlatformSends = await prisma.off_platform_email_sends.findMany({
-          where: { contactId },
-          orderBy: { emailSent: 'desc' },
-          take: 3,
-        });
+        previousEmails = emails.map(email => ({
+          id: email.id,
+          type: email.source === 'PLATFORM' ? 'platform' : 'off-platform',
+          date: email.sendDate.toISOString(),
+          subject: email.subject,
+          body: email.body,
+          platform: email.platform,
+          hasResponded: email.hasResponded,
+          contactResponse: email.contactResponse,
+          responseSubject: email.responseSubject,
+        }));
         
-        // Combine and sort
-        previousEmails = [
-          ...platformSends.map(send => ({
-            id: send.id,
-            type: 'platform',
-            date: send.createdAt.toISOString(),
-            subject: send.subject,
-            email: send.email,
-            event: send.event,
-          })),
-          ...offPlatformSends.map(send => ({
-            id: send.id,
-            type: 'off-platform',
-            date: send.emailSent.toISOString(),
-            subject: send.subject,
-            platform: send.platform,
-          })),
-        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 3);
+        // Get last email's response text if available
+        if (emails.length > 0 && emails[0].hasResponded && emails[0].contactResponse) {
+          lastEmailResponse = emails[0].contactResponse;
+        }
       }
       
       // Get company context if available
@@ -180,8 +173,9 @@ Guidelines:
 
       let userPrompt = '';
       
+      // Build prompt based on email type and conversation state
       if (emailTypeContext.emailType === 'FIRST_TIME') {
-        userPrompt = `Write a FIRST-TIME outreach email for:
+        userPrompt = `Write a FIRST-OUTBOUND outreach email for:
 
 Contact:
 - Name: ${contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
@@ -202,6 +196,8 @@ Generate a subject line and email body that:
         // FOLLOWUP email
         const lastEmail = previousEmails[0];
         const daysSince = emailTypeContext.daysSinceLastSend || 0;
+        const hasResponse = emailTypeContext.lastEmailHadResponse === true;
+        const responseText = emailTypeContext.lastEmailResponseText;
         
         userPrompt = `Write a FOLLOWUP outreach email for:
 
@@ -216,19 +212,22 @@ ${personaSlug ? `Persona: ${personaSlug}\n` : ''}
 ${relationshipContext ? `Relationship Context:\n${JSON.stringify(relationshipContext, null, 2)}\n` : ''}
 
 Previous Email History:
-${lastEmail ? `- Last email sent ${daysSince} days ago\n- Subject: ${lastEmail.subject || 'No subject'}\n- Type: ${lastEmail.type}\n` : 'No previous emails found'}
+${lastEmail ? `- Last email sent ${daysSince} days ago\n- Subject: ${lastEmail.subject || 'No subject'}\n- Type: ${lastEmail.type || 'unknown'}\n` : 'No previous emails found'}
+${hasResponse && responseText ? `- Contact responded: "${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}"\n` : hasResponse ? '- Contact responded (response text available)\n' : '- No response to last email yet\n'}
 
 Email Type Context:
 ${emailTypeContext.reasoning}
 
 Generate a subject line and email body that:
-${daysSince >= 90 
+${hasResponse && responseText
+  ? '- Acknowledges their response and continues the conversation naturally'
+  : daysSince >= 90 
   ? '- Is a quarterly check-in ("Checking in - I know when we last spoke, you were still using your previous service - wanted to just continue the conversation")'
   : daysSince >= 7
   ? '- Is a follow-up checking back ("Hey just checking back did you see my email")'
   : '- Is a recent follow-up with appropriate tone'
 }
-- References the previous email naturally if relevant
+${hasResponse && responseText ? '- References their response appropriately' : '- References the previous email naturally if relevant'}
 - Continues the conversation without being pushy
 - Has a soft call-to-action`;
       }

@@ -14,6 +14,7 @@
  */
 
 import { getLastSendDate } from './followUpCalculator';
+import { prisma } from '@/lib/prisma';
 
 export type EmailType = 'FIRST_TIME' | 'FOLLOWUP';
 
@@ -21,6 +22,8 @@ export interface EmailTypeContext {
   emailType: EmailType;
   lastSendDate: Date | null;
   daysSinceLastSend: number | null;
+  lastEmailHadResponse: boolean | null;
+  lastEmailResponseText: string | null;
   personaSlug?: string | null;
   relationshipContext?: {
     contextOfRelationship?: string;
@@ -32,7 +35,7 @@ export interface EmailTypeContext {
 
 export class EmailTypeDeterminationService {
   /**
-   * Determine email type for a contact
+   * Determine email type and conversation state for a contact
    */
   static async determineEmailType(
     contactId: string,
@@ -46,12 +49,29 @@ export class EmailTypeDeterminationService {
     // Get last send date
     const lastSendDate = await getLastSendDate(contactId);
     
+    // Check if last email had a response
+    let lastEmailHadResponse: boolean | null = null;
+    if (lastSendDate) {
+      // Get the most recent email to check response status
+      const lastEmail = await prisma.emails.findFirst({
+        where: { contactId },
+        orderBy: { sendDate: 'desc' },
+        select: {
+          hasResponded: true,
+          contactResponse: true,
+        },
+      });
+      lastEmailHadResponse = lastEmail?.hasResponded || false;
+    }
+    
     // If no last email, it's first time
     if (!lastSendDate) {
       return {
         emailType: 'FIRST_TIME',
         lastSendDate: null,
         daysSinceLastSend: null,
+        lastEmailHadResponse: null,
+        lastEmailResponseText: null,
         personaSlug: personaSlug || null,
         relationshipContext,
         reasoning: 'No previous emails sent to this contact. This is a first-time outreach.',
@@ -65,8 +85,30 @@ export class EmailTypeDeterminationService {
     lastSend.setHours(0, 0, 0, 0);
     const daysSinceLastSend = Math.floor((today.getTime() - lastSend.getTime()) / (1000 * 60 * 60 * 24));
     
+    // Get last email response text if available
+    let lastEmailResponseText: string | null = null;
+    if (lastEmailHadResponse === true) {
+      const lastEmail = await prisma.emails.findFirst({
+        where: { contactId },
+        orderBy: { sendDate: 'desc' },
+        select: {
+          contactResponse: true,
+        },
+      });
+      lastEmailResponseText = lastEmail?.contactResponse || null;
+    }
+    
     // Determine followup type based on time and context
     let reasoning = `Last email sent ${daysSinceLastSend} day${daysSinceLastSend !== 1 ? 's' : ''} ago.`;
+    
+    if (lastEmailHadResponse === true) {
+      reasoning += ' Contact responded to last email.';
+      if (lastEmailResponseText) {
+        reasoning += ' Response available for context.';
+      }
+    } else {
+      reasoning += ' No response to last email yet.';
+    }
     
     // Check if it's a quarterly check-in (90+ days)
     if (daysSinceLastSend >= 90) {
@@ -93,6 +135,8 @@ export class EmailTypeDeterminationService {
       emailType: 'FOLLOWUP',
       lastSendDate,
       daysSinceLastSend,
+      lastEmailHadResponse,
+      lastEmailResponseText,
       personaSlug: personaSlug || null,
       relationshipContext,
       reasoning,
