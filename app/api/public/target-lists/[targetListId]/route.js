@@ -34,6 +34,17 @@ export async function GET(request, { params }) {
       );
     }
 
+    // Calculate week bounds for response (used for both query and response)
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const weekStart = new Date(today.setDate(diff));
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    const todayDateString = today.toISOString().split('T')[0];
+
     // Get target list data from Redis
     let contactIds = null;
     try {
@@ -72,16 +83,6 @@ export async function GET(request, { params }) {
       });
     } else {
       // Fallback: Get contacts for this company that have nextSendDate this week
-      const today = new Date();
-      const dayOfWeek = today.getDay();
-      const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-      const weekStart = new Date(today.setDate(diff));
-      weekStart.setHours(0, 0, 0, 0);
-
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
       contacts = await prisma.contacts.findMany({
         where: {
           companyHQId: companyHQId,
@@ -106,12 +107,11 @@ export async function GET(request, { params }) {
 
     // Group by date (use today's date if no nextSendDate)
     const contactsByDate = {};
-    const today = new Date().toISOString().split('T')[0];
     
     contacts.forEach((contact) => {
       const date = contact.nextSendDate 
         ? new Date(contact.nextSendDate).toISOString().split('T')[0]
-        : today;
+        : todayDateString;
       
       if (!contactsByDate[date]) {
         contactsByDate[date] = [];
@@ -125,16 +125,6 @@ export async function GET(request, { params }) {
     });
 
     const sortedDates = Object.keys(contactsByDate).sort();
-
-    // Calculate week bounds for response
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    const weekStart = new Date(today.setDate(diff));
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    weekEnd.setHours(23, 59, 59, 999);
 
     return NextResponse.json({
       success: true,
