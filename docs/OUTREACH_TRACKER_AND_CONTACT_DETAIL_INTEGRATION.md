@@ -92,6 +92,25 @@ The page should be accessible via:
 
 ## Contact Detail Page Integration
 
+### Generate from Notes (Persona + Relationship Context)
+
+**Layout:** Notes section is placed above Relationship Context. Both actions live on the Notes card; results hydrate in different places (persona at top of page, relationship context in its own section below Notes).
+
+- **Generate Persona** – Calls `POST /api/contacts/[contactId]/suggest-persona` (with optional `note`). Opens a modal with suggested persona; user must **Apply** in the modal to persist the persona to the contact (no inline save).
+- **Generate Context** – Same API; relationship context is written to local React state only and **is not persisted**. It is used for "Build email" and template logic on this page but is lost on refresh. Regenerate/Clear only affect in-memory state.
+
+**Save behavior:**
+
+| What | Saves inline? | What to do |
+|------|----------------|------------|
+| **Notes** | No | Click **Save** after editing notes to persist. |
+| **Outreach Persona** | No | After "Generate Persona", click **Apply** in the modal to save the selected persona to the contact. |
+| **Relationship Context** | No (not stored) | No save. Generate/Regenerate only update the UI for this session; refresh loses it. |
+
+So: save notes with **Save**; apply persona in the **modal**; relationship context is session-only. There is no single "Save" that commits everything.
+
+---
+
 ### Feature 1: Hydrate Last Email
 
 **Purpose:** Show the most recent email sent to this contact on the contact detail page.

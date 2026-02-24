@@ -34,7 +34,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { companyHQId, intent, ownerId } = body ?? {};
+    const { companyHQId, intent, ownerId, relationshipContext, personaSlug, contactId } = body ?? {};
 
     if (!companyHQId || !intent || intent.trim() === '') {
       return NextResponse.json(
@@ -123,20 +123,50 @@ SNIPPET SELECTION STRATEGY (use templatePosition to order):
 - OPENING_GREETING then CATCH_UP, BUSINESS_CONTEXT, VALUE_PROPOSITION, COMPETITOR_FRAME (if relevant), TARGET_ASK, SOFT_CLOSE
 - Order body snippets by template position: opening → catch up → context → value → ask → close`;
 
+    // Build relationship context description for AI
+    let relationshipContextDesc = '';
+    if (relationshipContext) {
+      const parts = [];
+      if (relationshipContext.formerCompany) {
+        parts.push(`Former company: ${relationshipContext.formerCompany}`);
+      }
+      if (relationshipContext.primaryWork) {
+        parts.push(`Current work: ${relationshipContext.primaryWork}`);
+      }
+      if (relationshipContext.relationshipQuality) {
+        parts.push(`Relationship quality: ${relationshipContext.relationshipQuality}`);
+      }
+      if (relationshipContext.opportunityType) {
+        parts.push(`Opportunity type: ${relationshipContext.opportunityType}`);
+      }
+      if (relationshipContext.contextOfRelationship) {
+        parts.push(`Relationship type: ${relationshipContext.contextOfRelationship.replace(/_/g, ' ')}`);
+      }
+      if (relationshipContext.relationshipRecency) {
+        parts.push(`Recency: ${relationshipContext.relationshipRecency.replace(/_/g, ' ')}`);
+      }
+      if (parts.length > 0) {
+        relationshipContextDesc = `\n\n=== RELATIONSHIP CONTEXT ===\n${parts.join('\n')}`;
+      }
+    }
+
+    const personaDesc = personaSlug ? `\n\n=== PERSONA ===\nOutreach persona: ${personaSlug.replace(/([A-Z])/g, ' $1').trim()}` : '';
+
     const userPrompt = `=== USER'S INTENT ===
-${intent.trim()}
+${intent.trim()}${relationshipContextDesc}${personaDesc}
 
 === AVAILABLE SNIPPETS ===
 ${JSON.stringify(snippetsList, null, 2)}
 
 === YOUR TASK ===
-1. Analyze the user's intent and select the most relevant snippets (typically 2-4 snippets)
-2. Determine the best order for these snippets
-3. Create a complete email template that:
+1. Analyze the user's intent${relationshipContext ? ' and relationship context' : ''}${personaSlug ? ' and persona' : ''} to select the most relevant snippets (typically 2-4 snippets)
+2. Consider relationship context when selecting snippets - match snippets to relationship type, recency, and opportunity
+3. Determine the best order for these snippets
+4. Create a complete email template that:
    - Uses selected snippets in format {{snippet:snippetSlug}} (the "name" field)
    - Adds connecting text between snippets for natural flow
    - Includes variables like {{firstName}}, {{companyName}} where appropriate
-   - Has a warm, human tone
+   - Has a warm, human tone appropriate for the relationship context
    - Ends with signature: "${ownerName}"
 
 Return ONLY valid JSON in this exact format:

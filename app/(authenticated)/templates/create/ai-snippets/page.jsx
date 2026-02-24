@@ -10,6 +10,9 @@ function AISnippetsTemplateBuilder() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
+  const contactId = searchParams?.get('contactId') || '';
+  const personaSlug = searchParams?.get('personaSlug') || '';
+  const relationshipContextParam = searchParams?.get('relationshipContext') || '';
 
   const [intent, setIntent] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -19,20 +22,56 @@ function AISnippetsTemplateBuilder() {
   const [reasoning, setReasoning] = useState('');
   const [availableSnippetsCount, setAvailableSnippetsCount] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [relationshipContext, setRelationshipContext] = useState(null);
 
   // Template state
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
 
+  // Parse relationship context from URL
+  useEffect(() => {
+    if (relationshipContextParam) {
+      try {
+        const parsed = JSON.parse(relationshipContextParam);
+        setRelationshipContext(parsed);
+        // Pre-fill intent based on relationship context
+        if (!intent.trim() && parsed) {
+          const intentParts = [];
+          if (parsed.formerCompany) {
+            intentParts.push(`Former ${parsed.formerCompany} contact`);
+          }
+          if (parsed.primaryWork) {
+            intentParts.push(`now at ${parsed.primaryWork}`);
+          }
+          if (parsed.relationshipQuality) {
+            intentParts.push(`(${parsed.relationshipQuality})`);
+          }
+          if (parsed.opportunityType) {
+            intentParts.push(`- ${parsed.opportunityType}`);
+          }
+          if (intentParts.length > 0) {
+            setIntent(intentParts.join(' ') + '. Reaching out to reconnect and explore potential collaboration.');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse relationship context:', e);
+      }
+    }
+  }, [relationshipContextParam]);
+
   useEffect(() => {
     if (!companyHQId && typeof window !== 'undefined') {
       const stored = localStorage.getItem('companyHQId');
       if (stored) {
-        router.replace(`/templates/create/ai-snippets?companyHQId=${stored}`);
+        const params = new URLSearchParams({ companyHQId: stored });
+        if (contactId) params.append('contactId', contactId);
+        if (personaSlug) params.append('personaSlug', personaSlug);
+        if (relationshipContextParam) params.append('relationshipContext', relationshipContextParam);
+        router.replace(`/templates/create/ai-snippets?${params.toString()}`);
       }
     }
-  }, [companyHQId, router]);
+  }, [companyHQId, router, contactId, personaSlug, relationshipContextParam]);
 
   useEffect(() => {
     if (companyHQId) {
@@ -79,6 +118,9 @@ function AISnippetsTemplateBuilder() {
         companyHQId,
         intent: intent.trim(),
         ownerId,
+        ...(relationshipContext && { relationshipContext }),
+        ...(personaSlug && { personaSlug }),
+        ...(contactId && { contactId }),
       });
 
       if (res.data?.success) {

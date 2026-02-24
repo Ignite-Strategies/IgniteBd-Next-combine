@@ -151,7 +151,6 @@ export default function ContactDetailPage({ params }) {
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [lastEmail, setLastEmail] = useState(null);
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
-  const [buildingEmail, setBuildingEmail] = useState(false);
   const [emailHistory, setEmailHistory] = useState([]);
   const [relationshipContext, setRelationshipContext] = useState(null);
   const [generatingRelationshipContext, setGeneratingRelationshipContext] = useState(false);
@@ -1037,30 +1036,172 @@ export default function ContactDetailPage({ params }) {
             )}
           </section>
 
-          {/* Relationship Context Section */}
+          {/* Notes Section (source for both persona and relationship context) */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Notes</h3>
+              <div className="flex items-center gap-2">
+                {!editingNotes && (contact?.notes || notesText.trim()) && (
+                  <>
+                    <button
+                      onClick={handleSuggestPersona}
+                      disabled={suggestingPersona}
+                      className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Generate persona from notes"
+                    >
+                      {suggestingPersona ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="h-4 w-4" />
+                          Generate Persona
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleGenerateRelationshipContext}
+                      disabled={generatingRelationshipContext}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Generate relationship context from notes"
+                    >
+                      {generatingRelationshipContext ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Generate Context
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+                {!editingNotes && (
+                  <button
+                    onClick={() => {
+                      setEditingNotes(true);
+                      setNotesText(contact.notes || '');
+                    }}
+                    className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                    title="Edit notes"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            {!editingNotes ? (
+              <div>
+                {contact.notes ? (
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{contact.notes}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Add notes from meetings, emails, and relationship updates. Then use Generate Persona and Generate Context to fill the sections above and below.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <textarea
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  placeholder="Add notes from meetings, emails, and relationship updates..."
+                  className="w-full min-h-[120px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 resize-y"
+                  autoFocus
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={async () => {
+                      setSavingNotes(true);
+                      try {
+                        const response = await api.put(`/api/contacts/${contactId}`, {
+                          notes: notesText.trim() || null,
+                        });
+                        if (response.data?.success) {
+                          setContact(response.data.contact);
+                          setEditingNotes(false);
+                          if (refreshContacts) {
+                            refreshContacts();
+                          }
+                        } else {
+                          alert(response.data?.error || 'Failed to save notes');
+                        }
+                      } catch (error) {
+                        console.error('Error saving notes:', error);
+                        alert(error.response?.data?.error || 'Failed to save notes');
+                      } finally {
+                        setSavingNotes(false);
+                      }
+                    }}
+                    disabled={savingNotes}
+                    className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Check className="h-4 w-4" />
+                    {savingNotes ? 'Saving...' : 'Save'}
+                  </button>
+                  {notesText.trim() && (
+                    <>
+                      <button
+                        onClick={handleSuggestPersona}
+                        disabled={suggestingPersona || savingNotes}
+                        className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Generate persona from these notes"
+                      >
+                        {suggestingPersona ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="h-4 w-4" />
+                            Generate Persona
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleGenerateRelationshipContext}
+                        disabled={generatingRelationshipContext || savingNotes}
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Generate relationship context from these notes"
+                      >
+                        {generatingRelationshipContext ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            Generate Context
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => {
+                      setEditingNotes(false);
+                      setNotesText(contact.notes || '');
+                    }}
+                    disabled={savingNotes}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <XIcon className="h-4 w-4" />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Relationship Context Section (hydrated from Notes buttons above) */}
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Relationship Context</h3>
-              {!relationshipContext && (
-                <button
-                  onClick={handleGenerateRelationshipContext}
-                  disabled={generatingRelationshipContext || !contact?.notes}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Generate relationship context from notes"
-                >
-                  {generatingRelationshipContext ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Generate
-                    </>
-                  )}
-                </button>
-              )}
             </div>
             {relationshipContext ? (
               <div className="space-y-3">
@@ -1150,131 +1291,10 @@ export default function ContactDetailPage({ params }) {
             ) : (
               <div>
                 <p className="text-sm text-gray-400 italic mb-3">
-                  {contact?.notes 
-                    ? 'Generate relationship context from notes to extract key relationship details.'
-                    : 'Add notes to generate relationship context.'}
+                  {contact?.notes
+                    ? 'Use "Generate Context" on the Notes section above to extract relationship details here.'
+                    : 'Add notes above, then use Generate Persona and Generate Context to fill this section.'}
                 </p>
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-2xl bg-white p-6 shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Notes</h3>
-              <div className="flex items-center gap-2">
-                {!editingNotes && contact.notes && (
-                  <button
-                    onClick={handleSuggestPersona}
-                    disabled={suggestingPersona}
-                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Generate persona from notes"
-                  >
-                    {suggestingPersona ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Wand2 className="h-4 w-4" />
-                        Generate Persona
-                      </>
-                    )}
-                  </button>
-                )}
-                {!editingNotes && (
-                  <button
-                    onClick={() => {
-                      setEditingNotes(true);
-                      setNotesText(contact.notes || '');
-                    }}
-                    className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                    title="Edit notes"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-            {!editingNotes ? (
-              <div>
-                {contact.notes ? (
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{contact.notes}</p>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">Add notes from meetings, emails, and relationship updates.</p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <textarea
-                  value={notesText}
-                  onChange={(e) => setNotesText(e.target.value)}
-                  placeholder="Add notes from meetings, emails, and relationship updates..."
-                  className="w-full min-h-[120px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 resize-y"
-                  autoFocus
-                />
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={async () => {
-                      setSavingNotes(true);
-                      try {
-                        const response = await api.put(`/api/contacts/${contactId}`, {
-                          notes: notesText.trim() || null,
-                        });
-                        if (response.data?.success) {
-                          setContact(response.data.contact);
-                          setEditingNotes(false);
-                          if (refreshContacts) {
-                            refreshContacts();
-                          }
-                        } else {
-                          alert(response.data?.error || 'Failed to save notes');
-                        }
-                      } catch (error) {
-                        console.error('Error saving notes:', error);
-                        alert(error.response?.data?.error || 'Failed to save notes');
-                      } finally {
-                        setSavingNotes(false);
-                      }
-                    }}
-                    disabled={savingNotes}
-                    className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Check className="h-4 w-4" />
-                    {savingNotes ? 'Saving...' : 'Save'}
-                  </button>
-                  {notesText.trim() && (
-                    <button
-                      onClick={handleSuggestPersona}
-                      disabled={suggestingPersona || savingNotes}
-                      className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Generate persona from these notes"
-                    >
-                      {suggestingPersona ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 className="h-4 w-4" />
-                          Generate Persona
-                        </>
-                      )}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setEditingNotes(false);
-                      setNotesText(contact.notes || '');
-                    }}
-                    disabled={savingNotes}
-                    className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <XIcon className="h-4 w-4" />
-                    Cancel
-                  </button>
-                </div>
               </div>
             )}
           </section>
@@ -1299,58 +1319,22 @@ export default function ContactDetailPage({ params }) {
                   </button>
                 )}
                 <button
-                  onClick={async () => {
-                    setBuildingEmail(true);
-                    try {
-                      // Build email with persona and relationship context
-                      const response = await api.post(`/api/contacts/${contactId}/build-email`, {
-                        personaSlug: contact.outreachPersonaSlug || null,
-                        relationshipContext: relationshipContext || undefined,
-                        companyHQId: companyHQId || undefined,
-                      });
-                      
-                      if (response.data?.success) {
-                        // Navigate to compose with generated email
-                        const params = new URLSearchParams({
-                          contactId,
-                          ...(companyHQId && { companyHQId }),
-                          ...(response.data.subject && { subject: response.data.subject }),
-                          ...(response.data.body && { body: response.data.body }),
-                          emailType: response.data.emailType || 'FIRST_TIME',
-                        });
-                        router.push(`/outreach/compose?${params.toString()}`);
-                      } else {
-                        // If generation fails, still navigate to compose
-                        const url = companyHQId 
-                          ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
-                          : `/outreach/compose?contactId=${contactId}`;
-                        router.push(url);
-                      }
-                    } catch (error) {
-                      console.error('Error building email:', error);
-                      // On error, still navigate to compose
-                      const url = companyHQId 
-                        ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
-                        : `/outreach/compose?contactId=${contactId}`;
-                      router.push(url);
-                    } finally {
-                      setBuildingEmail(false);
-                    }
+                  onClick={() => {
+                    // Navigate to AI template builder with relationship context and persona
+                    const params = new URLSearchParams({
+                      ...(companyHQId && { companyHQId }),
+                      ...(contactId && { contactId }),
+                      ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
+                      ...(relationshipContext && { 
+                        relationshipContext: JSON.stringify(relationshipContext)
+                      }),
+                    });
+                    router.push(`/templates/create/ai-snippets?${params.toString()}`);
                   }}
-                  disabled={buildingEmail}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                 >
-                  {buildingEmail ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Building...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="h-4 w-4" />
-                      Build Outreach Email
-                    </>
-                  )}
+                  <Sparkles className="h-4 w-4" />
+                  Build Template
                 </button>
               </div>
             </div>
