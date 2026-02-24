@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Calendar, User, Loader2, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
 
-export default function ContactsToTargetThisWeekPage() {
+function ContactsToTargetThisWeekContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
@@ -168,5 +168,20 @@ export default function ContactsToTargetThisWeekPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ContactsToTargetThisWeekPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
+          <div className="mt-4 text-gray-600">Loading...</div>
+        </div>
+      </div>
+    }>
+      <ContactsToTargetThisWeekContent />
+    </Suspense>
   );
 }

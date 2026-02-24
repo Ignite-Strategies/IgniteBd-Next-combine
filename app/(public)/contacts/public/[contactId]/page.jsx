@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   User, 
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 
-export default function PublicContactDetailForSendPage({ params }) {
+function PublicContactDetailForSendContent({ params }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
@@ -274,5 +274,20 @@ export default function PublicContactDetailForSendPage({ params }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PublicContactDetailForSendPage({ params }) {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
+          <div className="mt-4 text-gray-600">Loading...</div>
+        </div>
+      </div>
+    }>
+      <PublicContactDetailForSendContent params={params} />
+    </Suspense>
   );
 }
