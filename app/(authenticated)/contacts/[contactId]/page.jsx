@@ -149,6 +149,33 @@ export default function ContactDetailPage({ params }) {
   const [showPersonaSuggestionModal, setShowPersonaSuggestionModal] = useState(false);
   const [availablePersonas, setAvailablePersonas] = useState([]);
   const [loadingPersonas, setLoadingPersonas] = useState(false);
+  const [lastEmail, setLastEmail] = useState(null);
+  const [loadingLastEmail, setLoadingLastEmail] = useState(false);
+  const [buildingEmail, setBuildingEmail] = useState(false);
+  
+  // Load last email send info
+  useEffect(() => {
+    if (!contactId) return;
+    
+    setLoadingLastEmail(true);
+    api.get(`/api/contacts/${contactId}/email-history`)
+      .then((response) => {
+        if (response.data?.success && response.data.activities?.length > 0) {
+          // Get most recent email
+          const mostRecent = response.data.activities[0];
+          setLastEmail(mostRecent);
+        } else {
+          setLastEmail(null);
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading email history:', error);
+        setLastEmail(null);
+      })
+      .finally(() => {
+        setLoadingLastEmail(false);
+      });
+  }, [contactId]);
   
   // Load contact lists when modal opens
   useEffect(() => {
@@ -1094,6 +1121,97 @@ export default function ContactDetailPage({ params }) {
                   </button>
                 </div>
               </div>
+            )}
+          </section>
+
+          {/* Last Email Section */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Last Email Sent</h3>
+              <button
+                onClick={async () => {
+                  setBuildingEmail(true);
+                  try {
+                    // Build email with persona and relationship context
+                    const response = await api.post(`/api/contacts/${contactId}/build-email`, {
+                      personaSlug: contact.outreachPersonaSlug || null,
+                      relationshipContext: contact.outreachPersonaSlug ? {
+                        // We could fetch relationship context here if stored, but for now use persona
+                      } : undefined,
+                      companyHQId: companyHQId || undefined,
+                    });
+                    
+                    if (response.data?.success) {
+                      // Navigate to compose with generated email
+                      const params = new URLSearchParams({
+                        contactId,
+                        ...(companyHQId && { companyHQId }),
+                        ...(response.data.subject && { subject: response.data.subject }),
+                        ...(response.data.body && { body: response.data.body }),
+                        emailType: response.data.emailType || 'FIRST_TIME',
+                      });
+                      router.push(`/outreach/compose?${params.toString()}`);
+                    } else {
+                      // If generation fails, still navigate to compose
+                      const url = companyHQId 
+                        ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
+                        : `/outreach/compose?contactId=${contactId}`;
+                      router.push(url);
+                    }
+                  } catch (error) {
+                    console.error('Error building email:', error);
+                    // On error, still navigate to compose
+                    const url = companyHQId 
+                      ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
+                      : `/outreach/compose?contactId=${contactId}`;
+                    router.push(url);
+                  } finally {
+                    setBuildingEmail(false);
+                  }
+                }}
+                disabled={buildingEmail}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {buildingEmail ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Building...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4" />
+                    Build Outreach Email
+                  </>
+                )}
+              </button>
+            </div>
+            {loadingLastEmail ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading email history...
+              </div>
+            ) : lastEmail ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>{new Date(lastEmail.date).toLocaleDateString()}</span>
+                  <span>•</span>
+                  <span className="capitalize">{lastEmail.type === 'platform' ? 'Platform' : 'Off-Platform'}</span>
+                  {lastEmail.platform && (
+                    <>
+                      <span>•</span>
+                      <span>{lastEmail.platform}</span>
+                    </>
+                  )}
+                </div>
+                <div className="font-medium text-gray-900">{lastEmail.subject || 'No subject'}</div>
+                {lastEmail.type === 'platform' && (
+                  <div className="text-sm text-gray-500">
+                    {lastEmail.hasResponded ? '✓ Contact responded' : 'No response yet'}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No emails sent yet. Click "Build Outreach Email" to send your first email.</p>
             )}
           </section>
 

@@ -1894,6 +1894,11 @@ enum EmailSource {
   OFF_PLATFORM
 }
 
+enum EmailType {
+  FIRST_TIME
+  FOLLOWUP
+}
+
 model emails {
   id        String      @id @default(cuid())
   contactId String // FK to Contact
