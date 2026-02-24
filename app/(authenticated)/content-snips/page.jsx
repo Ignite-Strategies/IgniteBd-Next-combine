@@ -92,6 +92,7 @@ function ContentSnipsLandingPage() {
 
   // Hydrate filter state (must be declared before useEffect that uses it)
   const [hydrateFilter, setHydrateFilter] = useState(''); // '' = all, or TEMPLATE_POSITION
+  const [listViewAll, setListViewAll] = useState(false); // true = flat list for bulk delete, false = segmented
 
   // Load functions (must be declared before useEffect that calls them)
   const loadPersonas = async () => {
@@ -932,7 +933,7 @@ function ContentSnipsLandingPage() {
         {/* Snips List */}
         {!showCreateOptions && (
           <div className="space-y-6">
-            {/* Show / Hydrate toggle */}
+            {/* Show / Hydrate toggle + List view */}
             {snips.length > 0 && (
               <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
                 <span className="text-sm font-medium text-gray-700">Show:</span>
@@ -947,8 +948,19 @@ function ContentSnipsLandingPage() {
                     <option key={p} value={p}>Hydrate {TEMPLATE_POSITION_LABELS[p].toLowerCase()} only</option>
                   ))}
                 </select>
+                {!hydrateFilter && (
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={listViewAll}
+                      onChange={(e) => setListViewAll(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <span>List view all (for bulk delete)</span>
+                  </label>
+                )}
                 <span className="text-xs text-gray-500">
-                  {hydrateFilter ? `Showing ${TEMPLATE_POSITION_LABELS[hydrateFilter] || hydrateFilter} only` : 'Showing all positions (segmented below)'}
+                  {hydrateFilter ? `Showing ${TEMPLATE_POSITION_LABELS[hydrateFilter] || hydrateFilter} only` : listViewAll ? 'Showing all snippets in one list' : 'Showing all positions (segmented below)'}
                 </span>
               </div>
             )}
@@ -1022,7 +1034,9 @@ function ContentSnipsLandingPage() {
                         </th>
                         <th className="py-2 text-left font-medium text-gray-700">Name</th>
                         <th className="py-2 text-left font-medium text-gray-700">Slug</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Persona / Best used when</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Position</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Persona</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Best used when</th>
                         <th className="py-2 text-left font-medium text-gray-700">Text</th>
                         <th className="py-2 text-right font-medium text-gray-700">Actions</th>
                       </tr>
@@ -1033,7 +1047,54 @@ function ContentSnipsLandingPage() {
                           <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
                           <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
                           <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
-                          <td className="py-2 text-gray-600">{[s.personaSlug, s.bestUsedWhen].filter(Boolean).join(' · ') || '—'}</td>
+                          <td className="py-2">
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs" title={s.templatePosition}>{TEMPLATE_POSITION_LABELS[s.templatePosition] || s.templatePosition}</span>
+                          </td>
+                          <td className="py-2 text-gray-600">{s.personaSlug || '—'}</td>
+                          <td className="py-2 text-gray-600">{s.bestUsedWhen || '—'}</td>
+                          <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
+                          <td className="py-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
+                              <button type="button" onClick={() => handleDelete(s.snipId)} className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : listViewAll ? (
+              /* List view all: flat table for bulk delete */
+              <div className="rounded-xl bg-white p-6 shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead>
+                      <tr>
+                        <th className="py-2 text-left font-medium text-gray-700 w-8">
+                          <input type="checkbox" checked={snips.length > 0 && snips.every((s) => selectedSnips.has(s.snipId))} onChange={() => selectAllSnips(snips)} className="rounded border-gray-300" />
+                        </th>
+                        <th className="py-2 text-left font-medium text-gray-700">Name</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Slug</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Position</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Persona</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Best used when</th>
+                        <th className="py-2 text-left font-medium text-gray-700">Text</th>
+                        <th className="py-2 text-right font-medium text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {snips.map((s) => (
+                        <tr key={s.snipId}>
+                          <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
+                          <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
+                          <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
+                          <td className="py-2">
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs" title={s.templatePosition}>{TEMPLATE_POSITION_LABELS[s.templatePosition] || s.templatePosition}</span>
+                          </td>
+                          <td className="py-2 text-gray-600">{s.personaSlug || '—'}</td>
+                          <td className="py-2 text-gray-600">{s.bestUsedWhen || '—'}</td>
                           <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
                           <td className="py-2 text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -1075,7 +1136,8 @@ function ContentSnipsLandingPage() {
                               </th>
                               <th className="py-2 text-left font-medium text-gray-700">Name</th>
                               <th className="py-2 text-left font-medium text-gray-700">Slug</th>
-                              <th className="py-2 text-left font-medium text-gray-700">Persona / Best used when</th>
+                              <th className="py-2 text-left font-medium text-gray-700">Persona</th>
+                              <th className="py-2 text-left font-medium text-gray-700">Best used when</th>
                               <th className="py-2 text-left font-medium text-gray-700">Text</th>
                               <th className="py-2 text-right font-medium text-gray-700">Actions</th>
                             </tr>
@@ -1086,7 +1148,8 @@ function ContentSnipsLandingPage() {
                                 <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
                                 <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
                                 <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
-                                <td className="py-2 text-gray-600">{[s.personaSlug, s.bestUsedWhen].filter(Boolean).join(' · ') || '—'}</td>
+                                <td className="py-2 text-gray-600">{s.personaSlug || '—'}</td>
+                                <td className="py-2 text-gray-600">{s.bestUsedWhen || '—'}</td>
                                 <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
                                 <td className="py-2 text-right">
                                   <div className="flex items-center justify-end gap-1">
