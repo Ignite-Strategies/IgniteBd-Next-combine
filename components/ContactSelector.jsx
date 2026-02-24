@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Users } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -127,6 +127,10 @@ export default function ContactSelector({
     return () => clearTimeout(timeoutId);
   }, [contactSearch, companyHQId, companyId, ownerId, ownerHydrated]);
 
+  // Track if user is actively typing to prevent clearing
+  const isTypingRef = useRef(false);
+  const typingTimeoutRef = useRef(null);
+  
   // Initialize from props only - but don't clear if user is typing
   useEffect(() => {
     if (contactId) {
@@ -140,7 +144,8 @@ export default function ContactSelector({
     }
     
     // Only sync if selectedContact is provided AND different from current
-    if (selectedContact?.id) {
+    // AND user is not actively typing
+    if (selectedContact?.id && !isTypingRef.current) {
       // Only update if it's actually different
       if (selectedContactId !== selectedContact.id) {
         setSelectedContactId(selectedContact.id);
@@ -150,14 +155,8 @@ export default function ContactSelector({
     }
     
     // Don't clear search if user is actively typing
-    // Only clear if selectedContact prop was removed AND search is empty AND we had a selection
-    // This prevents clearing while user is typing
-    if (!selectedContact && selectedContactId) {
-      // Use a ref or state to check current search value - but we can't access it here
-      // So we'll use a different approach: only clear if explicitly reset via prop change
-      // Actually, don't auto-clear - let the user clear manually or via handleClearContact
-    }
-  }, [contactId, selectedContact?.id]); // Only sync when these change, don't auto-clear
+    // Never auto-clear - let the user clear manually or via handleClearContact
+  }, [contactId, selectedContact?.id, selectedContactId]); // Include selectedContactId to track changes
 
   // Get selected contact object (computed from selectedContactId)
   const selectedContactObj = useMemo(() => {
@@ -240,7 +239,22 @@ export default function ContactSelector({
           <input
             type="text"
             value={contactSearch}
-            onChange={(e) => setContactSearch(e.target.value)}
+            onChange={(e) => {
+              // Mark that user is typing
+              isTypingRef.current = true;
+              setContactSearch(e.target.value);
+              
+              // Clear typing flag after 1 second of no typing
+              if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+              }
+              typingTimeoutRef.current = setTimeout(() => {
+                isTypingRef.current = false;
+              }, 1000);
+            }}
+            onFocus={() => {
+              isTypingRef.current = true;
+            }}
             placeholder={loading ? "Loading contacts..." : companyId ? "Search contacts from this company..." : "Search contacts by name, email, or company..."}
             disabled={loading}
             className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
