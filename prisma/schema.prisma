@@ -543,6 +543,7 @@ model Contact {
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
   remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
   outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
+  outreachPipelineStatus                                    OutreachPipelineStatus? @default(NEED_TO_ENGAGE) // Pipeline status for tracking outreach progress
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
   companies                                                 companies?                 @relation(fields: [contactCompanyId], references: [id])
@@ -569,6 +570,7 @@ model Contact {
   @@index([role])
   @@index([prior_relationship])
   @@index([remindMeOn])
+  @@index([outreachPipelineStatus])
   @@map("contacts")
 }
 
@@ -1897,6 +1899,12 @@ enum EmailSource {
 enum EmailType {
   FIRST_TIME
   FOLLOWUP
+}
+
+enum OutreachPipelineStatus {
+  NEED_TO_ENGAGE          // Not yet contacted - needs initial outreach
+  ENGAGED_AWAITING_RESPONSE // Email sent, waiting for response
+  RESPONDED                // Contact has responded
 }
 
 model emails {

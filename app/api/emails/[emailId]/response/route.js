@@ -79,10 +79,22 @@ export async function PUT(request, { params }) {
             firstName: true,
             lastName: true,
             email: true,
+            outreachPipelineStatus: true,
           },
         },
       },
     });
+
+    // Update contact pipeline status to RESPONDED
+    if (updatedEmail.contacts) {
+      await prisma.contact.update({
+        where: { id: updatedEmail.contacts.id },
+        data: { outreachPipelineStatus: 'RESPONDED' },
+      }).catch(err => {
+        console.warn('Failed to update pipeline status:', err);
+        // Don't fail the request if status update fails
+      });
+    }
 
     console.log('✅ Response recorded for email:', emailId);
 

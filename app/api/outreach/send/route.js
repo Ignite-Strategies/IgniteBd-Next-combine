@@ -221,8 +221,27 @@ export async function POST(request) {
             emailActivityId: emailActivityId,
             sendDate: new Date(), // Update to actual send time
           },
+          include: {
+            contacts: {
+              select: {
+                id: true,
+                outreachPipelineStatus: true,
+              },
+            },
+          },
         });
         createdEmailId = updatedEmail.id;
+        
+        // Update contact pipeline status to ENGAGED_AWAITING_RESPONSE if currently NEED_TO_ENGAGE
+        if (updatedEmail.contacts?.outreachPipelineStatus === 'NEED_TO_ENGAGE') {
+          await prisma.contact.update({
+            where: { id: updatedEmail.contacts.id },
+            data: { outreachPipelineStatus: 'ENGAGED_AWAITING_RESPONSE' },
+          }).catch(err => {
+            console.warn('Failed to update pipeline status:', err);
+          });
+        }
+        
         console.log('✅ Email record updated:', createdEmailId);
       } else if (customArgs.contactId) {
         // Create new email record (backward compatibility)
@@ -239,8 +258,27 @@ export async function POST(request) {
             campaignId: customArgs.campaignId || null,
             sequenceId: customArgs.sequenceId || null,
           },
+          include: {
+            contacts: {
+              select: {
+                id: true,
+                outreachPipelineStatus: true,
+              },
+            },
+          },
         });
         createdEmailId = email.id;
+        
+        // Update contact pipeline status to ENGAGED_AWAITING_RESPONSE if currently NEED_TO_ENGAGE
+        if (email.contacts?.outreachPipelineStatus === 'NEED_TO_ENGAGE') {
+          await prisma.contact.update({
+            where: { id: customArgs.contactId },
+            data: { outreachPipelineStatus: 'ENGAGED_AWAITING_RESPONSE' },
+          }).catch(err => {
+            console.warn('Failed to update pipeline status:', err);
+          });
+        }
+        
         console.log('✅ Email record created:', createdEmailId);
       }
     } catch (dbError) {

@@ -95,10 +95,22 @@ export async function POST(request) {
             firstName: true,
             lastName: true,
             email: true,
+            outreachPipelineStatus: true,
           },
         },
       },
     });
+
+    // Update contact pipeline status to ENGAGED_AWAITING_RESPONSE if currently NEED_TO_ENGAGE
+    if (email.contacts?.outreachPipelineStatus === 'NEED_TO_ENGAGE') {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: { outreachPipelineStatus: 'ENGAGED_AWAITING_RESPONSE' },
+      }).catch(err => {
+        console.warn('Failed to update pipeline status:', err);
+        // Don't fail the request if status update fails
+      });
+    }
 
     console.log('✅ Email record created:', email.id);
 

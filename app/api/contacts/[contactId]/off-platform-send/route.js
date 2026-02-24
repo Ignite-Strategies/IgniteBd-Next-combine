@@ -76,6 +76,21 @@ export async function POST(request, { params }) {
       },
     });
 
+    // Update contact pipeline status to ENGAGED_AWAITING_RESPONSE if currently NEED_TO_ENGAGE
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { outreachPipelineStatus: true },
+    });
+    
+    if (contact?.outreachPipelineStatus === 'NEED_TO_ENGAGE') {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: { outreachPipelineStatus: 'ENGAGED_AWAITING_RESPONSE' },
+      }).catch(err => {
+        console.warn('Failed to update pipeline status:', err);
+      });
+    }
+
     console.log('✅ Off-platform email send tracked:', offPlatformSend.id);
 
     return NextResponse.json({
