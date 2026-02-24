@@ -285,6 +285,7 @@ function ContactListPreviewContent() {
               <div>
                 <CompanySelector
                   companyId={selectedCompanyId}
+                  companyHQId={companyHQId}
                   onCompanyChange={(company) => {
                     setSelectedCompanyId(company?.id || '');
                     setSelectedContacts(new Set()); // Reset selection when company changes

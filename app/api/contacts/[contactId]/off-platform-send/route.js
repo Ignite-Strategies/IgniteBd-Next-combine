@@ -78,6 +78,20 @@ export async function POST(request, { params }) {
 
     console.log('✅ Off-platform email send tracked:', offPlatformSend.id);
 
+    // Move contact deal pipeline to engaged-awaiting-response when first outreach sent (prospect + need-to-engage only)
+    try {
+      const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
+      if (pipe?.pipeline === 'prospect' && pipe?.stage === 'need-to-engage') {
+        await prisma.pipelines.update({
+          where: { contactId },
+          data: { stage: 'engaged-awaiting-response', updatedAt: new Date() },
+        });
+        console.log('✅ Deal pipeline stage → engaged-awaiting-response for contact:', contactId);
+      }
+    } catch (pipeErr) {
+      console.warn('⚠️ Could not update deal pipeline stage:', pipeErr.message);
+    }
+
     return NextResponse.json({
       success: true,
       offPlatformSend: {

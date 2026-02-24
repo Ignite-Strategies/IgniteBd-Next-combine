@@ -248,6 +248,23 @@ export async function POST(request) {
       // Don't fail the send if logging fails
     }
 
+    // Move contact deal pipeline to engaged-awaiting-response when first outreach sent (prospect + need-to-engage only)
+    const contactIdForPipeline = customArgs.contactId || null;
+    if (contactIdForPipeline) {
+      try {
+        const pipe = await prisma.pipelines.findUnique({ where: { contactId: contactIdForPipeline } });
+        if (pipe?.pipeline === 'prospect' && pipe?.stage === 'need-to-engage') {
+          await prisma.pipelines.update({
+            where: { contactId: contactIdForPipeline },
+            data: { stage: 'engaged-awaiting-response', updatedAt: new Date() },
+          });
+          console.log('✅ Deal pipeline stage → engaged-awaiting-response for contact:', contactIdForPipeline);
+        }
+      } catch (pipeErr) {
+        console.warn('⚠️ Could not update deal pipeline stage:', pipeErr.message);
+      }
+    }
+
     // Step 6: Delete payload from Redis (cleanup)
     await deletePayload(owner.id, requestId);
 

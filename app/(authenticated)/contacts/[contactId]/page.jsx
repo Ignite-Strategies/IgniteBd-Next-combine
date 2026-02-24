@@ -521,6 +521,7 @@ export default function ContactDetailPage({ params }) {
                   {selectedPipeline === 'prospect' && (
                     <>
                       <option value="need-to-engage">Need to Engage</option>
+                      <option value="engaged-awaiting-response">Engaged Awaiting Response</option>
                       <option value="interest">Interest</option>
                       <option value="meeting">Meeting</option>
                       <option value="proposal">Proposal</option>

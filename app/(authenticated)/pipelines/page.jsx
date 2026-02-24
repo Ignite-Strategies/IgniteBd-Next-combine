@@ -8,7 +8,7 @@ import api from '@/lib/api';
 
 const FALLBACK_PIPELINES = {
   unassigned: [],
-  prospect: ['need-to-engage', 'interest', 'meeting', 'proposal', 'contract', 'contract-signed'],
+  prospect: ['need-to-engage', 'engaged-awaiting-response', 'interest', 'meeting', 'proposal', 'contract', 'contract-signed'],
   client: ['kickoff', 'work-started', 'work-delivered', 'sustainment', 'renewal'],
   collaborator: ['interest', 'meeting', 'agreement'],
   institution: ['interest', 'meeting', 'agreement'],

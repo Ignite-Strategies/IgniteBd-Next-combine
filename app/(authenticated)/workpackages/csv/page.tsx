@@ -244,6 +244,7 @@ function WorkPackageCSVUploadContent() {
             <div className="max-w-md">
               <CompanySelector
                 companyId={companyId}
+                companyHQId={typeof window !== 'undefined' ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || null) : null}
                 onCompanySelect={(company: Company | null) => {
                   setSelectedCompany(company);
                   setCompanyId(company?.id || '');

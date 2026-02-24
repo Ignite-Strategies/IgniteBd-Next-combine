@@ -10,11 +10,12 @@
 
 **Prospect stages (first = “awaiting outreach”):**
 1. `need-to-engage` — Contact in CRM but hasn’t been emailed yet (**use as default for new CSV uploads**)
-2. `interest`
-3. `meeting`
-4. `proposal`
-5. `contract`
-6. `contract-signed`
+2. `engaged-awaiting-response` — Outreach sent, waiting for response (auto-set when you send; so we know an action was taken)
+3. `interest`
+4. `meeting`
+5. `proposal`
+6. `contract`
+7. `contract-signed`
 
 **Client stages:** kickoff, work-started, work-delivered, sustainment, renewal, terminated-contract  
 **Collaborator/Institution stages:** interest, meeting, moa, agreement
@@ -43,6 +44,7 @@ CSV may have human-friendly or inconsistent values. Map them to the slugs above:
 
 **Stage normalizer (prospect) – “close” variants:**
 - "need-to-engage", "need to engage", "Need to Engage", "awaiting outreach", "Awaiting Outreach", "not contacted", "to contact" → `need-to-engage`
+- "engaged-awaiting-response", "engaged awaiting response", "awaiting response", "Awaiting Response" → `engaged-awaiting-response`
 - "interest", "Interest", "interested" → `interest`
 - "meeting", "Meeting", "meeting scheduled" → `meeting`
 - "proposal", "Proposal" → `proposal`

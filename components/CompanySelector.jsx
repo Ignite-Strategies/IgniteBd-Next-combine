@@ -12,13 +12,16 @@ import api from '@/lib/api';
 export default function CompanySelector({ 
   companyId, 
   onCompanySelect,
+  onCompanyChange = null, // Alias for onCompanySelect for backward compatibility
   selectedCompany,
   showLabel = true,
   className = '',
   placeholder = 'Search companies...',
   allowCreate = true,
-  companyHQId: companyHQIdProp, // Optional: use when localStorage doesn't have it (e.g. contact page)
+  companyHQId: companyHQIdProp = null, // Optional: use when localStorage doesn't have it (e.g. contact page)
 }) {
+  // Use onCompanyChange if provided, otherwise fall back to onCompanySelect
+  const handleCompanySelect = onCompanyChange || onCompanySelect;
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companySearch, setCompanySearch] = useState('');
@@ -144,8 +147,8 @@ export default function CompanySelector({
     setSelectedCompanyId(company.id);
     setCompanySearch(company.companyName);
     setCompanies([]);
-    if (onCompanySelect) {
-      onCompanySelect(company);
+    if (handleCompanySelect) {
+      handleCompanySelect(company);
     }
   };
 
@@ -214,8 +217,8 @@ export default function CompanySelector({
             // Clear selected company if user is typing something different
             if (selectedCompanyObj && newValue.toLowerCase().trim() !== (selectedCompanyObj.companyName || '').toLowerCase().trim()) {
               setSelectedCompanyId(null);
-              if (onCompanySelect) {
-                onCompanySelect(null);
+              if (handleCompanySelect) {
+                handleCompanySelect(null);
               }
             }
             // Hide create form when typing

@@ -86,6 +86,23 @@ export async function PUT(request, { params }) {
 
     console.log('✅ Response recorded for email:', emailId);
 
+    // Move contact deal pipeline from engaged-awaiting-response → interest when they respond
+    const contactId = updatedEmail.contactId;
+    if (contactId) {
+      try {
+        const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
+        if (pipe?.pipeline === 'prospect' && pipe?.stage === 'engaged-awaiting-response') {
+          await prisma.pipelines.update({
+            where: { contactId },
+            data: { stage: 'interest', updatedAt: new Date() },
+          });
+          console.log('✅ Deal pipeline stage → interest for contact:', contactId);
+        }
+      } catch (pipeErr) {
+        console.warn('⚠️ Could not update deal pipeline stage:', pipeErr.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       email: {
