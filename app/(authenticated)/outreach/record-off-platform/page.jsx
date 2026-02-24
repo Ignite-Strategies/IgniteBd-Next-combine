@@ -13,16 +13,16 @@ export default function RecordOffPlatformPage() {
   const companyHQId = searchParams?.get('companyHQId') || (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : '') || '';
   const contactIdFromUrl = searchParams?.get('contactId') || '';
   
-  const [mode, setMode] = useState<'csv' | 'manual'>('manual'); // Default to manual when coming from contact detail
-  const [contact, setContact] = useState<any>(null);
+  const [mode, setMode] = useState('manual'); // Default to manual when coming from contact detail
+  const [contact, setContact] = useState(null);
   const [loadingContact, setLoadingContact] = useState(false);
   const [csvText, setCsvText] = useState('');
-  const [csvRows, setCsvRows] = useState<any[]>([]);
+  const [csvRows, setCsvRows] = useState([]);
   const [parsingError, setParsingError] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState([]);
+  const [csvFile, setCsvFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   
   // Load contact if contactId provided
@@ -58,11 +58,11 @@ export default function RecordOffPlatformPage() {
     notes: '',
   });
   const [emailBlob, setEmailBlob] = useState('');
-  const [parsedEmail, setParsedEmail] = useState<any>(null);
-  const [selectedContactForEmail, setSelectedContactForEmail] = useState<any>(null);
+  const [parsedEmail, setParsedEmail] = useState(null);
+  const [selectedContactForEmail, setSelectedContactForEmail] = useState(null);
   
   // Handle file upload
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = async (file) => {
     setUploading(true);
     setParsingError('');
     setErrors([]);
@@ -74,7 +74,7 @@ export default function RecordOffPlatformPage() {
       setCsvRows(rows);
       setCsvFile(file);
       setParsingError('');
-    } catch (error: any) {
+    } catch (error) {
       setParsingError(error.message);
       setCsvRows([]);
     } finally {
@@ -83,7 +83,7 @@ export default function RecordOffPlatformPage() {
   };
   
   // CSV parsing
-  const parseCSV = (text: string) => {
+  const parseCSV = (text) => {
     try {
       const lines = text.trim().split('\n');
       if (lines.length < 2) {
@@ -116,7 +116,7 @@ export default function RecordOffPlatformPage() {
       }
       
       return rows;
-    } catch (error: any) {
+    } catch (error) {
       throw new Error(`Failed to parse CSV: ${error.message}`);
     }
   };
@@ -134,14 +134,14 @@ export default function RecordOffPlatformPage() {
       const rows = parseCSV(csvText);
       setCsvRows(rows);
       setParsingError('');
-    } catch (error: any) {
+    } catch (error) {
       setParsingError(error.message);
       setCsvRows([]);
     }
   };
   
   // Find or create contact by email
-  const findOrCreateContact = async (email: string) => {
+  const findOrCreateContact = async (email) => {
     try {
       // Try to find existing contact
       const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(email)}`);
@@ -178,7 +178,7 @@ export default function RecordOffPlatformPage() {
     setErrors([]);
     setSavedCount(0);
     
-    const newErrors: string[] = [];
+    const newErrors = [];
     let saved = 0;
     
     for (const row of csvRows) {
@@ -201,7 +201,7 @@ export default function RecordOffPlatformPage() {
         } else {
           newErrors.push(`Failed to save email for ${row.email}: ${response.data?.error || 'Unknown error'}`);
         }
-      } catch (error: any) {
+      } catch (error) {
         newErrors.push(`Error processing ${row.email}: ${error.response?.data?.error || error.message}`);
       }
     }
@@ -220,8 +220,8 @@ export default function RecordOffPlatformPage() {
   };
   
   // Parse email blob (Outlook/Gmail format)
-  const parseEmailBlob = (blob: string) => {
-    const result: any = {
+  const parseEmailBlob = (blob) => {
+    const result = {
       from: '',
       fromEmail: '',
       to: '',
@@ -355,14 +355,14 @@ export default function RecordOffPlatformPage() {
       }
       
       setParsingError('');
-    } catch (error: any) {
+    } catch (error) {
       setParsingError(`Failed to parse email: ${error.message}`);
       setParsedEmail(null);
     }
   };
   
   // Handle contact selection for email blob
-  const handleContactSelectForEmail = (contact: any) => {
+  const handleContactSelectForEmail = (contact) => {
     setSelectedContactForEmail(contact);
     setManualEntry(prev => ({
       ...prev,
@@ -415,7 +415,7 @@ export default function RecordOffPlatformPage() {
         } else {
           setErrors([response.data?.error || 'Failed to save email']);
         }
-      } catch (error: any) {
+      } catch (error) {
         setErrors([error.response?.data?.error || error.message || 'Failed to save email']);
       } finally {
         setSaving(false);
@@ -460,7 +460,7 @@ export default function RecordOffPlatformPage() {
       } else {
         setErrors([response.data?.error || 'Failed to save email']);
       }
-    } catch (error: any) {
+    } catch (error) {
       setErrors([error.response?.data?.error || error.message || 'Failed to save email']);
     } finally {
       setSaving(false);

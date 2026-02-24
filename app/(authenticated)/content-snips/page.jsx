@@ -1032,27 +1032,27 @@ function ContentSnipsLandingPage() {
                         <th className="py-2 text-left font-medium text-gray-700 w-8">
                           <input type="checkbox" checked={snips.length > 0 && snips.every((s) => selectedSnips.has(s.snipId))} onChange={() => selectAllSnips(snips)} className="rounded border-gray-300" />
                         </th>
-                        <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Slug</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Position</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Persona</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Best used when</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Text</th>
-                        <th className="py-2 text-right font-medium text-gray-700">Actions</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-32">Name</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-40">Slug</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-28">Position</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-36">Persona</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-48">Best used when</th>
+                        <th className="py-2 text-left font-medium text-gray-700 min-w-[200px]">Text</th>
+                        <th className="py-2 text-right font-medium text-gray-700 w-20">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {snips.map((s) => (
                         <tr key={s.snipId}>
                           <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
-                          <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
-                          <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
+                          <td className="py-2 font-mono text-gray-900 break-words">{s.snipName}</td>
+                          <td className="py-2 font-mono text-gray-700 break-words text-xs">{s.snipSlug}</td>
                           <td className="py-2">
-                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs" title={s.templatePosition}>{TEMPLATE_POSITION_LABELS[s.templatePosition] || s.templatePosition}</span>
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs whitespace-nowrap" title={s.templatePosition}>{TEMPLATE_POSITION_LABELS[s.templatePosition] || s.templatePosition}</span>
                           </td>
-                          <td className="py-2 text-gray-600">{s.personaSlug || '—'}</td>
-                          <td className="py-2 text-gray-600">{s.bestUsedWhen || '—'}</td>
-                          <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
+                          <td className="py-2 text-gray-600 break-words text-xs">{s.personaSlug || '—'}</td>
+                          <td className="py-2 text-gray-600 break-words text-xs pr-2">{s.bestUsedWhen || '—'}</td>
+                          <td className="py-2 text-gray-600 break-words pr-4" title={s.snipText}>{s.snipText}</td>
                           <td className="py-2 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
@@ -1075,27 +1075,27 @@ function ContentSnipsLandingPage() {
                         <th className="py-2 text-left font-medium text-gray-700 w-8">
                           <input type="checkbox" checked={snips.length > 0 && snips.every((s) => selectedSnips.has(s.snipId))} onChange={() => selectAllSnips(snips)} className="rounded border-gray-300" />
                         </th>
-                        <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Slug</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Position</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Persona</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Best used when</th>
-                        <th className="py-2 text-left font-medium text-gray-700">Text</th>
-                        <th className="py-2 text-right font-medium text-gray-700">Actions</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-32">Name</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-40">Slug</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-28">Position</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-36">Persona</th>
+                        <th className="py-2 text-left font-medium text-gray-700 w-48">Best used when</th>
+                        <th className="py-2 text-left font-medium text-gray-700 min-w-[200px]">Text</th>
+                        <th className="py-2 text-right font-medium text-gray-700 w-20">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {snips.map((s) => (
                         <tr key={s.snipId}>
                           <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
-                          <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
-                          <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
+                          <td className="py-2 font-mono text-gray-900 break-words">{s.snipName}</td>
+                          <td className="py-2 font-mono text-gray-700 break-words text-xs">{s.snipSlug}</td>
                           <td className="py-2">
-                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs" title={s.templatePosition}>{TEMPLATE_POSITION_LABELS[s.templatePosition] || s.templatePosition}</span>
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs whitespace-nowrap" title={s.templatePosition}>{TEMPLATE_POSITION_LABELS[s.templatePosition] || s.templatePosition}</span>
                           </td>
-                          <td className="py-2 text-gray-600">{s.personaSlug || '—'}</td>
-                          <td className="py-2 text-gray-600">{s.bestUsedWhen || '—'}</td>
-                          <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
+                          <td className="py-2 text-gray-600 break-words text-xs">{s.personaSlug || '—'}</td>
+                          <td className="py-2 text-gray-600 break-words text-xs pr-2">{s.bestUsedWhen || '—'}</td>
+                          <td className="py-2 text-gray-600 break-words pr-4" title={s.snipText}>{s.snipText}</td>
                           <td className="py-2 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
@@ -1134,23 +1134,23 @@ function ContentSnipsLandingPage() {
                               <th className="py-2 text-left font-medium text-gray-700 w-8">
                                 <input type="checkbox" checked={positionSnips.every((s) => selectedSnips.has(s.snipId))} onChange={() => selectAllSnips(positionSnips)} className="rounded border-gray-300" />
                               </th>
-                              <th className="py-2 text-left font-medium text-gray-700">Name</th>
-                              <th className="py-2 text-left font-medium text-gray-700">Slug</th>
-                              <th className="py-2 text-left font-medium text-gray-700">Persona</th>
-                              <th className="py-2 text-left font-medium text-gray-700">Best used when</th>
-                              <th className="py-2 text-left font-medium text-gray-700">Text</th>
-                              <th className="py-2 text-right font-medium text-gray-700">Actions</th>
+                              <th className="py-2 text-left font-medium text-gray-700 w-32">Name</th>
+                              <th className="py-2 text-left font-medium text-gray-700 w-40">Slug</th>
+                              <th className="py-2 text-left font-medium text-gray-700 w-36">Persona</th>
+                              <th className="py-2 text-left font-medium text-gray-700 w-48">Best used when</th>
+                              <th className="py-2 text-left font-medium text-gray-700 min-w-[200px]">Text</th>
+                              <th className="py-2 text-right font-medium text-gray-700 w-20">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {positionSnips.map((s) => (
                               <tr key={s.snipId}>
                                 <td className="py-2"><input type="checkbox" checked={selectedSnips.has(s.snipId)} onChange={() => toggleSelectSnip(s.snipId)} className="rounded border-gray-300" /></td>
-                                <td className="py-2 font-mono text-gray-900">{s.snipName}</td>
-                                <td className="py-2 font-mono text-gray-700">{s.snipSlug}</td>
-                                <td className="py-2 text-gray-600">{s.personaSlug || '—'}</td>
-                                <td className="py-2 text-gray-600">{s.bestUsedWhen || '—'}</td>
-                                <td className="max-w-xs py-2 text-gray-600 line-clamp-2" title={s.snipText}>{s.snipText}</td>
+                                <td className="py-2 font-mono text-gray-900 break-words">{s.snipName}</td>
+                                <td className="py-2 font-mono text-gray-700 break-words text-xs">{s.snipSlug}</td>
+                                <td className="py-2 text-gray-600 break-words text-xs">{s.personaSlug || '—'}</td>
+                                <td className="py-2 text-gray-600 break-words text-xs pr-2">{s.bestUsedWhen || '—'}</td>
+                                <td className="py-2 text-gray-600 break-words pr-4" title={s.snipText}>{s.snipText}</td>
                                 <td className="py-2 text-right">
                                   <div className="flex items-center justify-end gap-1">
                                     <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700" title="Edit"><Pencil className="h-4 w-4" /></button>
