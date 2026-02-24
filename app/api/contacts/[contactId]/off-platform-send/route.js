@@ -47,7 +47,7 @@ export async function POST(request, { params }) {
     }
 
     const body = await request.json();
-    const { emailSent, subject, platform, notes } = body ?? {};
+    const { emailSent, subject, body: emailBody, platform, notes } = body ?? {};
 
     if (!emailSent) {
       return NextResponse.json(
@@ -66,13 +66,24 @@ export async function POST(request, { params }) {
     }
 
     // Create off-platform send record
+    // Store body in notes field (schema doesn't have separate body field yet)
+    // Format: "BODY:\n{body}\n\nNOTES:\n{notes}" if both exist, or just body/notes if one exists
+    let notesField = null;
+    if (emailBody && notes) {
+      notesField = `BODY:\n${emailBody}\n\nNOTES:\n${notes}`;
+    } else if (emailBody) {
+      notesField = emailBody;
+    } else if (notes) {
+      notesField = notes;
+    }
+    
     const offPlatformSend = await prisma.off_platform_email_sends.create({
       data: {
         contactId,
         emailSent: emailSentDate,
         subject: subject || null,
         platform: platform || null,
-        notes: notes || null,
+        notes: notesField,
       },
     });
 

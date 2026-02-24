@@ -38,6 +38,10 @@ export default function RecordOffPlatformPage() {
               ...prev,
               email: response.data.contact.email || '',
             }));
+            // Also set selected contact so ContactSelector shows it
+            if (response.data.contact.email) {
+              setSelectedContactForEmail(response.data.contact);
+            }
           }
         })
         .catch((error) => {
@@ -53,6 +57,7 @@ export default function RecordOffPlatformPage() {
   const [manualEntry, setManualEntry] = useState({
     email: '',
     subject: '',
+    body: '',
     emailSent: new Date().toISOString().split('T')[0],
     platform: 'manual',
     notes: '',
@@ -336,9 +341,10 @@ export default function RecordOffPlatformPage() {
         setManualEntry({
           email: parsed.toEmail,
           subject: parsed.subject || '',
+          body: parsed.body || '',
           emailSent: parsed.sent || new Date().toISOString().split('T')[0],
           platform: 'manual',
-          notes: parsed.body || '',
+          notes: '',
         });
         
         // If no contactId from URL, try to find contact by email automatically
@@ -367,8 +373,8 @@ export default function RecordOffPlatformPage() {
           ...prev,
           email: '',
           subject: parsed.subject || prev.subject,
+          body: parsed.body || prev.body,
           emailSent: parsed.sent || prev.emailSent,
-          notes: parsed.body || prev.notes,
         }));
       }
       
@@ -382,10 +388,12 @@ export default function RecordOffPlatformPage() {
   // Handle contact selection for email blob
   const handleContactSelectForEmail = (contact) => {
     setSelectedContactForEmail(contact);
-    setManualEntry(prev => ({
-      ...prev,
-      email: contact.email || '',
-    }));
+    if (contact && contact.email) {
+      setManualEntry(prev => ({
+        ...prev,
+        email: contact.email,
+      }));
+    }
   };
   
   // Save manual entry
@@ -415,6 +423,7 @@ export default function RecordOffPlatformPage() {
         const response = await api.post(`/api/contacts/${targetContactId}/off-platform-send`, {
           emailSent: manualEntry.emailSent,
           subject: manualEntry.subject || null,
+          body: manualEntry.body || null,
           platform: manualEntry.platform || 'manual',
           notes: manualEntry.notes || null,
         });
@@ -461,6 +470,7 @@ export default function RecordOffPlatformPage() {
       const response = await api.post(`/api/contacts/${contactId}/off-platform-send`, {
         emailSent: manualEntry.emailSent,
         subject: manualEntry.subject || null,
+        body: manualEntry.body || null,
         platform: manualEntry.platform || 'manual',
         notes: manualEntry.notes || null,
       });
@@ -471,6 +481,7 @@ export default function RecordOffPlatformPage() {
         setManualEntry({
           email: '',
           subject: '',
+          body: '',
           emailSent: new Date().toISOString().split('T')[0],
           platform: 'manual',
           notes: '',
@@ -748,16 +759,16 @@ export default function RecordOffPlatformPage() {
             </div>
             
             <div className="space-y-4">
-              {/* Contact Selection - Show if no contactId from URL (contact can be selected or found via parsing) */}
-              {!contactIdFromUrl && (
+              {/* Contact Selection - Show if no email found from parsing or if no contactId from URL */}
+              {(!parsedEmail?.toEmail || !contactIdFromUrl) && (
                 <div>
                   <label className="mb-1 block text-sm font-semibold text-gray-700">
-                    Select Contact {!parsedEmail?.toEmail && <span className="text-red-500">*</span>}
+                    Select Contact {!parsedEmail?.toEmail && !contactIdFromUrl && <span className="text-red-500">*</span>}
                   </label>
                   <ContactSelector
                     companyHQId={companyHQId || undefined}
                     onContactSelect={handleContactSelectForEmail}
-                    selectedContact={selectedContactForEmail}
+                    selectedContact={selectedContactForEmail || contact}
                     placeholder="Search for contact..."
                     showLabel={false}
                   />
@@ -766,7 +777,12 @@ export default function RecordOffPlatformPage() {
                       ✓ Selected: {selectedContactForEmail.goesBy || `${selectedContactForEmail.firstName} ${selectedContactForEmail.lastName}`.trim() || selectedContactForEmail.email}
                     </p>
                   )}
-                  {parsedEmail?.toEmail && !selectedContactForEmail && (
+                  {contact && !selectedContactForEmail && contactIdFromUrl && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Current contact: {contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
+                    </p>
+                  )}
+                  {parsedEmail?.toEmail && !selectedContactForEmail && !contactIdFromUrl && (
                     <p className="mt-1 text-xs text-gray-500">
                       Email found in pasted content. Select a contact above to match it, or the email will be used to find/create a contact.
                     </p>
@@ -813,6 +829,18 @@ export default function RecordOffPlatformPage() {
                   onChange={(e) => setManualEntry({ ...manualEntry, subject: e.target.value })}
                   placeholder="Email subject line"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-gray-700">
+                  Email Body <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={manualEntry.body}
+                  onChange={(e) => setManualEntry({ ...manualEntry, body: e.target.value })}
+                  placeholder="Paste or type the email body content here..."
+                  className="w-full min-h-[200px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
@@ -863,7 +891,7 @@ export default function RecordOffPlatformPage() {
               <button
                 type="button"
                 onClick={handleSaveManual}
-                disabled={saving || !manualEntry.email}
+                disabled={saving || !manualEntry.email || !manualEntry.body}
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? (
