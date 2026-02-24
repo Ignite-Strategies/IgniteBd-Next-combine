@@ -368,7 +368,7 @@ function OutreachContent() {
             <button
               type="button"
               onClick={() => router.push('/outreach/campaigns')}
-              className="text-sm font-semibold text-red-600 transition hover:text-red-700"
+              className="text-sm font-semibold text-red-600 transition hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
             >
               View all campaigns
             </button>
