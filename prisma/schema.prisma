@@ -1361,8 +1361,8 @@ model ContentSnip {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  @@map("content_snips")
   @@index([templatePosition])
+  @@map("content_snips")
 }
 
 model template_variables {
