@@ -127,7 +127,7 @@ export default function ContactSelector({
     return () => clearTimeout(timeoutId);
   }, [contactSearch, companyHQId, companyId, ownerId, ownerHydrated]);
 
-  // Initialize from props only
+  // Initialize from props only - but don't clear if user is typing
   useEffect(() => {
     if (contactId) {
       setSelectedContactId(contactId);
@@ -139,16 +139,25 @@ export default function ContactSelector({
       return;
     }
     
+    // Only sync if selectedContact is provided AND different from current
     if (selectedContact?.id) {
-      setSelectedContactId(selectedContact.id);
-      setContactSearch(`${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || selectedContact.email || '');
+      // Only update if it's actually different
+      if (selectedContactId !== selectedContact.id) {
+        setSelectedContactId(selectedContact.id);
+        setContactSearch(`${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || selectedContact.email || '');
+      }
       return;
     }
     
-    // NO auto-select - search-first
-    setSelectedContactId(null);
-    setContactSearch('');
-  }, [contactId, selectedContact, contacts]);
+    // Don't clear search if user is actively typing
+    // Only clear if selectedContact prop was removed AND search is empty AND we had a selection
+    // This prevents clearing while user is typing
+    if (!selectedContact && selectedContactId) {
+      // Use a ref or state to check current search value - but we can't access it here
+      // So we'll use a different approach: only clear if explicitly reset via prop change
+      // Actually, don't auto-clear - let the user clear manually or via handleClearContact
+    }
+  }, [contactId, selectedContact?.id]); // Only sync when these change, don't auto-clear
 
   // Get selected contact object (computed from selectedContactId)
   const selectedContactObj = useMemo(() => {

@@ -27,52 +27,51 @@ export default function RecordOffPlatformPage() {
   const [uploading, setUploading] = useState(false);
   
   // Load contact if contactId provided (but allow switching)
+  // Only runs when contactIdFromUrl changes and is present
   useEffect(() => {
+    // Only load if we have a contactId and haven't loaded it yet
+    if (!contactIdFromUrl) {
+      return; // Don't clear state - let user type freely
+    }
+    
     // Skip if we already have this contact loaded
-    if (contactIdFromUrl && loadedContactIdRef.current === contactIdFromUrl) {
+    if (loadedContactIdRef.current === contactIdFromUrl) {
       return;
     }
     
-    if (contactIdFromUrl) {
-      setLoadingContact(true);
-      const currentContactId = contactIdFromUrl; // Capture for closure
-      api.get(`/api/contacts/${currentContactId}`)
-        .then((response) => {
-          if (response.data?.success && response.data.contact) {
-            const loadedContact = response.data.contact;
-            // Only update if this is still the current contactId
-            if (currentContactId === loadedContact.id) {
-              loadedContactIdRef.current = loadedContact.id;
-              setContact(loadedContact);
-              setSelectedContactForEmail(loadedContact);
-              // Pre-fill manual entry with contact email
-              setManualEntry(prev => ({
-                ...prev,
-                email: loadedContact.email || '',
-              }));
-            }
+    setLoadingContact(true);
+    const currentContactId = contactIdFromUrl; // Capture for closure
+    api.get(`/api/contacts/${currentContactId}`)
+      .then((response) => {
+        if (response.data?.success && response.data.contact) {
+          const loadedContact = response.data.contact;
+          // Only update if this is still the current contactId
+          if (currentContactId === contactIdFromUrl && loadedContact.id === currentContactId) {
+            loadedContactIdRef.current = loadedContact.id;
+            setContact(loadedContact);
+            setSelectedContactForEmail(loadedContact);
+            // Pre-fill manual entry with contact email
+            setManualEntry(prev => ({
+              ...prev,
+              email: loadedContact.email || '',
+            }));
           }
-        })
-        .catch((error) => {
-          console.error('Error loading contact:', error);
-          // Clear stuck state on error only if this is still the current contactId
-          if (currentContactId === contactIdFromUrl) {
-            loadedContactIdRef.current = null;
-            setContact(null);
-            setSelectedContactForEmail(null);
-          }
-        })
-        .finally(() => {
-          if (currentContactId === contactIdFromUrl) {
-            setLoadingContact(false);
-          }
-        });
-    } else {
-      // Clear contact state when no contactId in URL
-      loadedContactIdRef.current = null;
-      setContact(null);
-      setSelectedContactForEmail(null);
-    }
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading contact:', error);
+        // Only clear if this is still the current contactId
+        if (currentContactId === contactIdFromUrl) {
+          loadedContactIdRef.current = null;
+          setContact(null);
+          setSelectedContactForEmail(null);
+        }
+      })
+      .finally(() => {
+        if (currentContactId === contactIdFromUrl) {
+          setLoadingContact(false);
+        }
+      });
   }, [contactIdFromUrl]); // Only depend on contactIdFromUrl
   
   // Manual entry form
@@ -980,7 +979,7 @@ Best regards"`;
                 <ContactSelector
                   companyHQId={companyHQId || undefined}
                   onContactSelect={handleContactSelectForEmail}
-                  selectedContact={selectedContactForEmail}
+                  {...(selectedContactForEmail ? { selectedContact: selectedContactForEmail } : {})}
                   placeholder="Search for contact..."
                   showLabel={false}
                 />
