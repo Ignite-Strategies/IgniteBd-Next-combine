@@ -626,11 +626,8 @@ Best regards"`;
         {/* CSV Mode */}
         {mode === 'csv' && (
           <div className="rounded-2xl bg-white p-6 shadow">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">CSV Import</h3>
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm text-gray-600">
-                Upload a CSV file or paste CSV data with columns: <strong>first name, last name, email</strong> (required), <strong>date of email, subject, body</strong>
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900">CSV Import</h3>
               <button
                 type="button"
                 onClick={handleDownloadTemplate}
@@ -640,6 +637,9 @@ Best regards"`;
                 Download Template
               </button>
             </div>
+            <p className="mb-4 text-sm text-gray-600">
+              Upload a CSV file or paste CSV data with columns: <strong>first name, last name, email</strong> (required), <strong>date of email, subject, body</strong>
+            </p>
             
             {/* File Upload */}
             <div className="mb-4">
