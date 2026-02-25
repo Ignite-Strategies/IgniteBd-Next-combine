@@ -543,7 +543,8 @@ model Contact {
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
   remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
   outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
-  relationshipContext                                       Json? // Generated relationship context from notes (formerCompany, primaryWork, relationshipQuality, etc.)
+  relationshipContextId                                     String? @unique // FK to relationship_contexts (one per contact)
+  relationship_contexts                                     relationship_contexts? @relation(fields: [relationshipContextId], references: [relationshipContextId], onDelete: SetNull)
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
   companies                                                 companies?                 @relation(fields: [contactCompanyId], references: [id])
@@ -1321,17 +1322,27 @@ model template_snippets {
   @@index([companyHQId])
 }
 
-// Relationship context - foundational info about WHO the persona is
+// Relationship context - foundational info about WHO the persona is (one per contact)
 model relationship_contexts {
-  relationshipContextId String                @id @default(cuid())
-  contextOfRelationship ContextOfRelationship
-  relationshipRecency   RelationshipRecency
-  companyAwareness      CompanyAwareness
-  contextKey            String                @unique // e.g., PRIOR_COLLEAGUE_LONG_DORMANT_KNOWS_COMPANY
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
+  relationshipContextId     String                @id @default(cuid())
+  contactId                 String                @unique // FK to Contact (one relationship context per contact)
+  contacts                  Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  // Relationship dimensions (enums)
+  contextOfRelationship     ContextOfRelationship?
+  relationshipRecency       RelationshipRecency?
+  companyAwareness          CompanyAwareness?
+  
+  // Factual extracted data (from notes)
+  formerCompany            String?
+  primaryWork              String?
+  relationshipQuality      String?
+  opportunityType          String?
+  
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
 
-  @@index([contextKey])
+  @@index([contactId])
   @@index([contextOfRelationship, relationshipRecency, companyAwareness])
 }
 

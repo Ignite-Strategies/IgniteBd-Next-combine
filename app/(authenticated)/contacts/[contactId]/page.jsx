@@ -61,16 +61,18 @@ export default function ContactDetailPage({ params }) {
           if (response.data?.success && response.data.contact) {
             setContact(response.data.contact);
             setNotesText(response.data.contact.notes || '');
-            // Load saved relationship context if it exists
-            if (response.data.contact.relationshipContext) {
-              try {
-                const parsed = typeof response.data.contact.relationshipContext === 'string' 
-                  ? JSON.parse(response.data.contact.relationshipContext)
-                  : response.data.contact.relationshipContext;
-                setRelationshipContext(parsed);
-              } catch (e) {
-                console.error('Failed to parse relationship context:', e);
-              }
+            // Load saved relationship context if it exists (from relationship_contexts relation)
+            if (response.data.contact.relationship_contexts) {
+              const rc = response.data.contact.relationship_contexts;
+              setRelationshipContext({
+                contextOfRelationship: rc.contextOfRelationship,
+                relationshipRecency: rc.relationshipRecency,
+                companyAwareness: rc.companyAwareness,
+                formerCompany: rc.formerCompany,
+                primaryWork: rc.primaryWork,
+                relationshipQuality: rc.relationshipQuality,
+                opportunityType: rc.opportunityType,
+              });
             }
             setLoading(false);
             // Don't call refreshContacts here - it causes infinite loops

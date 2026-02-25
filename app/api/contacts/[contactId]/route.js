@@ -37,6 +37,7 @@ export async function GET(request, { params }) {
           companies: true, // Company relation via contactCompanyId
           contact_lists: true, // Contact lists relation
           outreach_personas: true, // Outreach persona relation
+          relationship_contexts: true, // Relationship context relation
         },
       });
       
@@ -48,6 +49,11 @@ export async function GET(request, { params }) {
       // Ensure pipelines relation is always an object (even if null) to prevent undefined errors
       if (contact && !contact.pipelines) {
         contact.pipelines = null;
+      }
+      
+      // Ensure relationship_contexts relation is always an object (even if null) to prevent undefined errors
+      if (contact && !contact.relationship_contexts) {
+        contact.relationship_contexts = null;
       }
     } catch (prismaError) {
       console.error('❌ Prisma query error:', prismaError);
@@ -241,20 +247,50 @@ export async function PUT(request, { params }) {
       }
     }
     if (relationshipContext !== undefined) {
-      // Parse JSON string if provided as string, otherwise use as-is
+      // Parse JSON if provided as string, otherwise use as-is
+      let parsedContext = relationshipContext;
       if (typeof relationshipContext === 'string') {
         try {
-          updateData.relationshipContext = JSON.parse(relationshipContext);
+          parsedContext = JSON.parse(relationshipContext);
         } catch (e) {
           return NextResponse.json(
             { success: false, error: 'Invalid relationshipContext JSON format' },
             { status: 400 },
           );
         }
-      } else if (relationshipContext === null) {
-        updateData.relationshipContext = null;
-      } else {
-        updateData.relationshipContext = relationshipContext;
+      }
+      
+      if (parsedContext === null) {
+        // Delete relationship context if null
+        const existingContext = await prisma.relationship_contexts.findUnique({
+          where: { contactId },
+        });
+        if (existingContext) {
+          await prisma.relationship_contexts.delete({
+            where: { relationshipContextId: existingContext.relationshipContextId },
+          });
+        }
+        updateData.relationshipContextId = null;
+      } else if (parsedContext && typeof parsedContext === 'object') {
+        // Upsert relationship context record
+        const contextData = {
+          contactId,
+          contextOfRelationship: parsedContext.contextOfRelationship || null,
+          relationshipRecency: parsedContext.relationshipRecency || null,
+          companyAwareness: parsedContext.companyAwareness || null,
+          formerCompany: parsedContext.formerCompany || null,
+          primaryWork: parsedContext.primaryWork || null,
+          relationshipQuality: parsedContext.relationshipQuality || null,
+          opportunityType: parsedContext.opportunityType || null,
+        };
+        
+        const relationshipContextRecord = await prisma.relationship_contexts.upsert({
+          where: { contactId },
+          update: contextData,
+          create: contextData,
+        });
+        
+        updateData.relationshipContextId = relationshipContextRecord.relationshipContextId;
       }
     }
 
@@ -304,6 +340,7 @@ export async function PUT(request, { params }) {
         companies: true,
         contact_lists: true,
         outreach_personas: true, // Outreach persona relation
+        relationship_contexts: true, // Relationship context relation
       },
     });
     
@@ -311,6 +348,7 @@ export async function PUT(request, { params }) {
     if (updatedContact) {
       if (!updatedContact.companies) updatedContact.companies = null;
       if (!updatedContact.pipelines) updatedContact.pipelines = null;
+      if (!updatedContact.relationship_contexts) updatedContact.relationship_contexts = null;
     }
 
     console.log('✅ Contact updated:', updatedContact.id);
