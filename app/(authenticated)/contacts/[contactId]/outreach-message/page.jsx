@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, ArrowLeft, RefreshCw, Check, Save, Wand2, User, Tag, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, ArrowLeft, RefreshCw, Check, Save, User, Tag, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 
 const DONT_KNOW = 'DONT_KNOW';
@@ -225,38 +225,38 @@ export default function OutreachMessagePage({ params }) {
     }
   };
 
-  const fillWithData = useCallback(() => {
-    if (!result) return;
-
-    // Build variable map from contact — keep {{variable}} if value unknown
+  // Pure function — can be called with fresh data from handleGenerate without waiting for state
+  const applyFill = useCallback((rawBody, snippetMap, resolvedSenderName, resolvedSenderCompany) => {
     const firstName = contact?.goesBy || contact?.firstName || '{{firstName}}';
     const lastName = contact?.lastName || '{{lastName}}';
     const fullName = [contact?.goesBy || contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || '{{fullName}}';
     const companyName = contact?.companyName || '{{companyName}}';
     const title = contact?.title || '{{title}}';
-    const resolvedSenderName = senderName || '{{senderName}}';
-    const resolvedSenderCompany = senderCompany || '{{senderCompany}}';
 
-    let filled = result.rawBody || result.body;
+    let filled = rawBody;
 
     // 1. Expand {{snippet:slug}} → actual snippet text
     filled = filled.replace(/\{\{snippet:([^}]+)\}\}/g, (_, slug) => {
-      return snippetContentMap[slug] || `[${slug}]`;
+      return snippetMap[slug] || `[${slug}]`;
     });
 
-    // 2. Replace all known contact variables
-    filled = filled
+    // 2. Replace all known variables
+    return filled
       .replace(/\{\{firstName\}\}/gi, firstName)
       .replace(/\{\{lastName\}\}/gi, lastName)
       .replace(/\{\{fullName\}\}/gi, fullName)
       .replace(/\{\{companyName\}\}/gi, companyName)
       .replace(/\{\{title\}\}/gi, title)
-      .replace(/\{\{senderName\}\}/gi, resolvedSenderName)
-      .replace(/\{\{senderCompany\}\}/gi, resolvedSenderCompany);
+      .replace(/\{\{senderName\}\}/gi, resolvedSenderName || '{{senderName}}')
+      .replace(/\{\{senderCompany\}\}/gi, resolvedSenderCompany || '{{senderCompany}}');
+  }, [contact]);
 
+  const fillWithData = useCallback(() => {
+    if (!result) return;
+    const filled = applyFill(result.rawBody || result.body, snippetContentMap, senderName, senderCompany);
     setResult((r) => ({ ...r, body: filled }));
     setIsFilled(true);
-  }, [result, contact, snippetContentMap, senderName, senderCompany]);
+  }, [result, snippetContentMap, senderName, senderCompany, applyFill]);
 
   const handleGenerate = async () => {
     if (!notes.trim() && !additionalContext.trim()) {
@@ -290,17 +290,24 @@ export default function OutreachMessagePage({ params }) {
 
       if (res.data?.success) {
         const rawBody = res.data.template.body;
+        const freshSnippetMap = res.data.snippetContentMap || {};
+        const freshSenderName = res.data.senderName || '';
+        const freshSenderCompany = res.data.senderCompany || '';
+
+        // Auto-fill immediately — user never sees raw template with {{snippet:...}} refs
+        const filledBody = applyFill(rawBody, freshSnippetMap, freshSenderName, freshSenderCompany);
+
+        setSnippetContentMap(freshSnippetMap);
+        setSenderName(freshSenderName);
+        setSenderCompany(freshSenderCompany);
         setResult({
           subject: res.data.template.subject,
-          body: rawBody,
-          rawBody, // preserve original for template save
+          body: filledBody,       // show hydrated version
+          rawBody,                // keep original for template save
           reasoning: res.data.reasoning,
           selectedSnippets: res.data.selectedSnippets || [],
         });
-        setSnippetContentMap(res.data.snippetContentMap || {});
-        setSenderName(res.data.senderName || '');
-        setSenderCompany(res.data.senderCompany || '');
-        setIsFilled(false);
+        setIsFilled(true);
       } else {
         setError(res.data?.error || 'Generation failed');
       }
@@ -463,17 +470,7 @@ export default function OutreachMessagePage({ params }) {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">Body</label>
-                  {!isFilled ? (
-                    <button
-                      type="button"
-                      onClick={fillWithData}
-                      className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 transition"
-                      title="Expand snippets and fill contact variables — ready to copy and send"
-                    >
-                      <Wand2 className="h-3 w-3" />
-                      Fill with Data
-                    </button>
-                  ) : (
+                  {isFilled ? (
                     <span className="flex items-center gap-1 text-xs font-medium text-green-700">
                       <Check className="h-3 w-3" />
                       Filled — ready to copy
@@ -486,10 +483,6 @@ export default function OutreachMessagePage({ params }) {
                   rows={14}
                   className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 ${isFilled ? 'border-green-300 bg-green-50 focus:border-green-400 focus:ring-green-400' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-400'}`}
                 />
-                {!isFilled && (
-                  <p className="mt-1 text-xs text-gray-400">Click <strong>Fill with Data</strong> to expand snippets and replace variables with real contact info.</p>
-                )}
-
                 {/* Variable Bank */}
                 {result && (
                   <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
