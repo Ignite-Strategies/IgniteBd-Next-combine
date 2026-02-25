@@ -1972,7 +1972,7 @@ enum RelationshipRecency {
 }
 
 enum CompanyAwareness {
-  NO_CLUE
+  DONT_KNOW
   KNOWS_COMPANY
   KNOWS_COMPANY_COMPETITOR
   KNOWS_BUT_DISENGAGED

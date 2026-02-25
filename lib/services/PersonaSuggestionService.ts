@@ -46,7 +46,7 @@ export interface RelationshipContextInfo {
   // Relationship context dimensions (maps to relationship_contexts table)
   contextOfRelationship?: 'DONT_KNOW' | 'PRIOR_CONVERSATION' | 'PRIOR_COLLEAGUE' | 'PRIOR_SCHOOLMATE' | 'CURRENT_CLIENT' | 'CONNECTED_LINKEDIN_ONLY' | 'REFERRAL' | 'REFERRAL_FROM_WARM_CONTACT' | 'USED_TO_WORK_AT_TARGET_COMPANY';
   relationshipRecency?: 'NEW' | 'RECENT' | 'STALE' | 'LONG_DORMANT';
-  companyAwareness?: 'NO_CLUE' | 'KNOWS_COMPANY' | 'KNOWS_COMPANY_COMPETITOR' | 'KNOWS_BUT_DISENGAGED';
+  companyAwareness?: 'DONT_KNOW' | 'KNOWS_COMPANY' | 'KNOWS_COMPANY_COMPETITOR' | 'KNOWS_BUT_DISENGAGED';
 }
 
 export interface PersonaSuggestionResult {
@@ -128,7 +128,7 @@ export class PersonaSuggestionService {
    - Classify relationship dimensions:
      * contextOfRelationship: DONT_KNOW, PRIOR_CONVERSATION, PRIOR_COLLEAGUE, PRIOR_SCHOOLMATE, CURRENT_CLIENT, CONNECTED_LINKEDIN_ONLY, REFERRAL, REFERRAL_FROM_WARM_CONTACT, USED_TO_WORK_AT_TARGET_COMPANY
      * relationshipRecency: NEW, RECENT, STALE, LONG_DORMANT
-     * companyAwareness: NO_CLUE, KNOWS_COMPANY, KNOWS_COMPANY_COMPETITOR, KNOWS_BUT_DISENGAGED
+     * companyAwareness: DONT_KNOW, KNOWS_COMPANY, KNOWS_COMPANY_COMPETITOR, KNOWS_BUT_DISENGAGED
 
 2. PERSONA (Fills Gaps) - Classification for template matching:
    - Suggest the most appropriate outreach persona slug from available personas

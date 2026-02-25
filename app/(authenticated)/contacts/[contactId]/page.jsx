@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
@@ -715,37 +715,44 @@ export default function ContactDetailPage({ params }) {
                 Contact Information
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Build Email - uses snippets + context + persona */}
+                {/* Enrich - by email; after success, Build Persona is offered in modal only */}
+                <button
+                  onClick={handleEnrichContact}
+                  disabled={enriching || !contact?.email}
+                  className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Enrich contact by email; then optionally build persona"
+                >
+                  {enriching ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Enriching...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4" />
+                      Enrich
+                    </>
+                  )}
+                </button>
+                {/* Build Persona - only offered after Enrich (in success modal), not standalone here */}
+                {/* Build Email - not enrich-dependent; uses snippets + context + persona when available */}
                 <button
                   onClick={() => {
-                    // Navigate to AI template builder with snippets + relationship context + persona
                     const params = new URLSearchParams({
                       ...(companyHQId && { companyHQId }),
                       ...(contactId && { contactId }),
                       ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
-                      ...(relationshipContext && { 
-                        relationshipContext: JSON.stringify(relationshipContext)
+                      ...(relationshipContext && {
+                        relationshipContext: JSON.stringify(relationshipContext),
                       }),
                     });
                     router.push(`/templates/create/ai-snippets?${params.toString()}`);
                   }}
                   className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                  title="Build email using snippets, relationship context, and persona"
+                  title="Build email from snippets and context (no enrichment required)"
                 >
                   <Sparkles className="h-4 w-4" />
                   Build Email
-                </button>
-                {/* Build Persona - deeper dive persona builder */}
-                <button
-                  onClick={() => {
-                    const companyHQId = typeof window !== 'undefined' ? localStorage.getItem('companyHQId') || localStorage.getItem('companyId') : '';
-                    router.push(`/personas/build-from-contact?companyHQId=${companyHQId}&contactId=${contactId}`);
-                  }}
-                  className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
-                  title="Build deeper persona from contact"
-                >
-                  <UserCircle className="h-4 w-4" />
-                  Build Persona
                 </button>
                 {/* Email */}
                 {contact?.email && (
@@ -1061,7 +1068,7 @@ export default function ContactDetailPage({ params }) {
                 {contact.notes ? (
                   <p className="text-sm text-gray-600 whitespace-pre-wrap">{contact.notes}</p>
                 ) : (
-                  <p className="text-sm text-gray-400 italic">Add notes from meetings, emails, and relationship updates. Then use Generate Persona and Generate Context to fill the sections above and below.</p>
+                  <p className="text-sm text-gray-400 italic">Add notes from meetings, emails, and relationship updates. Then use Build Persona Slug and Generate Context to fill the sections above and below.</p>
                 )}
               </div>
             ) : (
@@ -1109,7 +1116,7 @@ export default function ContactDetailPage({ params }) {
                         onClick={handleSuggestPersona}
                         disabled={suggestingPersona || savingNotes}
                         className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Generate persona from these notes"
+                        title="Suggest persona slug from these notes"
                       >
                         {suggestingPersona ? (
                           <>
@@ -1119,7 +1126,7 @@ export default function ContactDetailPage({ params }) {
                         ) : (
                           <>
                             <Wand2 className="h-4 w-4" />
-                            Generate Persona
+                            Build Persona Slug
                           </>
                         )}
                       </button>
@@ -1440,7 +1447,7 @@ export default function ContactDetailPage({ params }) {
                       <UserCircle className="h-5 w-5 text-purple-600" />
                       <div>
                         <div className="font-semibold text-gray-900">Build Persona</div>
-                        <div className="text-sm text-gray-600">Create a persona from this enriched contact</div>
+                        <div className="text-sm text-gray-600">Create a persona from this enriched contact (persona builder)</div>
                       </div>
                     </div>
                     <ArrowLeft className="h-5 w-5 text-purple-600 rotate-180" />

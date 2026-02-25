@@ -92,11 +92,18 @@ The page should be accessible via:
 
 ## Contact Detail Page Integration
 
-### Generate from Notes (Persona + Relationship Context)
+### Differentiations: Enrich, Build Email, Build Persona, Build Persona Slug
+
+- **Enrich** – Contact Information bar. Enrich by email; after success, a modal offers **Build Persona** (deeper persona builder from enriched contact). Build Persona is **only** offered in that post-Enrich flow, not as a standalone button.
+- **Build Email** – Contact Information bar. **Not enrich-dependent.** Builds email from snippets, relationship context, and persona when available; works without having run Enrich.
+- **Build Persona Slug** – Notes card. Suggests an outreach persona slug from notes via `POST /api/contacts/[contactId]/suggest-persona`. User applies in modal to persist to contact. This is the *slug* that drives snippet assembly, distinct from the full "Build Persona" flow after Enrich.
+- **Generate Context** – Notes card. Same API; relationship context is in-memory only (not persisted). Used for Build Email and template logic on this page.
+
+### Generate from Notes (Persona Slug + Relationship Context)
 
 **Layout:** Notes section is placed above Relationship Context. Both actions live on the Notes card; results hydrate in different places (persona at top of page, relationship context in its own section below Notes).
 
-- **Generate Persona** – Calls `POST /api/contacts/[contactId]/suggest-persona` (with optional `note`). Opens a modal with suggested persona; user must **Apply** in the modal to persist the persona to the contact (no inline save).
+- **Build Persona Slug** – Calls `POST /api/contacts/[contactId]/suggest-persona` (with optional `note`). Opens a modal with suggested persona slug; user must **Apply** in the modal to persist to the contact (no inline save).
 - **Generate Context** – Same API; relationship context is written to local React state only and **is not persisted**. It is used for "Build email" and template logic on this page but is lost on refresh. Regenerate/Clear only affect in-memory state.
 
 **Save behavior:**
@@ -104,7 +111,7 @@ The page should be accessible via:
 | What | Saves inline? | What to do |
 |------|----------------|------------|
 | **Notes** | No | Click **Save** after editing notes to persist. |
-| **Outreach Persona** | No | After "Generate Persona", click **Apply** in the modal to save the selected persona to the contact. |
+| **Outreach Persona** | No | After "Build Persona Slug", click **Apply** in the modal to save the selected persona to the contact. |
 | **Relationship Context** | No (not stored) | No save. Generate/Regenerate only update the UI for this session; refresh loses it. |
 
 So: save notes with **Save**; apply persona in the **modal**; relationship context is session-only. There is no single "Save" that commits everything.
