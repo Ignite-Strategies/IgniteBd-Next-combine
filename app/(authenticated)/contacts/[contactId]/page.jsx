@@ -145,6 +145,9 @@ export default function ContactDetailPage({ params }) {
   const [editingCompany, setEditingCompany] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [savingCompany, setSavingCompany] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailText, setEmailText] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
   const [editingStage, setEditingStage] = useState(false);
   const [selectedPipeline, setSelectedPipeline] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
@@ -788,11 +791,78 @@ export default function ContactDetailPage({ params }) {
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="h-5 w-5 text-gray-400" />
-                <div>
-                  <dt className="text-sm font-semibold text-gray-500">Email</dt>
-                  <dd className="mt-1 text-base text-gray-900">
-                    {contact.email || '—'}
-                  </dd>
+                <div className="flex-1">
+                  <dt className="text-sm font-semibold text-gray-500 mb-1">Email</dt>
+                  {!editingEmail ? (
+                    <div className="flex items-center gap-2">
+                      <dd className="text-base text-gray-900">
+                        {contact.email || '—'}
+                      </dd>
+                      <button
+                        onClick={() => {
+                          setEditingEmail(true);
+                          setEmailText(contact.email || '');
+                        }}
+                        className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                        title="Edit email"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="email"
+                        value={emailText}
+                        onChange={(e) => setEmailText(e.target.value)}
+                        placeholder="email@example.com"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            setSavingEmail(true);
+                            try {
+                              const response = await api.put(`/api/contacts/${contactId}`, {
+                                email: emailText.trim() || null,
+                              });
+                              if (response.data?.success) {
+                                setContact(response.data.contact);
+                                setEditingEmail(false);
+                                if (refreshContacts) {
+                                  refreshContacts();
+                                }
+                              } else {
+                                alert(response.data?.error || 'Failed to save email');
+                              }
+                            } catch (error) {
+                              console.error('Error saving email:', error);
+                              alert(error.response?.data?.error || 'Failed to save email');
+                            } finally {
+                              setSavingEmail(false);
+                            }
+                          }}
+                          disabled={savingEmail}
+                          className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Check className="h-4 w-4" />
+                          {savingEmail ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingEmail(false);
+                            setEmailText(contact.email || '');
+                          }}
+                          disabled={savingEmail}
+                          className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          <XIcon className="h-4 w-4" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
