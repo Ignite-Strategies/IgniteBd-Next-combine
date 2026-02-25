@@ -738,18 +738,10 @@ export default function ContactDetailPage({ params }) {
                 {/* Build Email - not enrich-dependent; uses snippets + context + persona when available */}
                 <button
                   onClick={() => {
-                    const params = new URLSearchParams({
-                      ...(companyHQId && { companyHQId }),
-                      ...(contactId && { contactId }),
-                      ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
-                      ...(relationshipContext && {
-                        relationshipContext: JSON.stringify(relationshipContext),
-                      }),
-                    });
-                    router.push(`/templates/create/ai-snippets?${params.toString()}`);
+                    router.push(`/contacts/${contactId}/outreach-message?companyHQId=${companyHQId}`);
                   }}
                   className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                  title="Build email from snippets and context (no enrichment required)"
+                  title="Build outreach email from contact context and snippets"
                 >
                   <Sparkles className="h-4 w-4" />
                   Build Email
