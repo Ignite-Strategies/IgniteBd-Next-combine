@@ -34,7 +34,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { companyHQId, intent, ownerId, relationshipContext, personaSlug, contactId } = body ?? {};
+    const { companyHQId, intent, ownerId, relationshipContext, personaSlug, contactId, additionalContext } = body ?? {};
 
     if (!companyHQId || !intent || intent.trim() === '') {
       return NextResponse.json(
@@ -55,6 +55,22 @@ export async function POST(request) {
     const { membership } = await resolveMembership(owner.id, companyHQId);
     if (!membership) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Fetch contact notes if contactId provided - enriches AI context
+    let contactNotes = null;
+    if (contactId) {
+      try {
+        const contactRecord = await prisma.contact.findUnique({
+          where: { id: contactId },
+          select: { notes: true },
+        });
+        if (contactRecord?.notes) {
+          contactNotes = contactRecord.notes;
+        }
+      } catch (err) {
+        console.warn('Could not fetch contact notes:', err);
+      }
     }
 
     // Load available content snippets (global library)
@@ -152,17 +168,21 @@ SNIPPET SELECTION STRATEGY (use templatePosition to order):
 
     const personaDesc = personaSlug ? `\n\n=== PERSONA ===\nOutreach persona: ${personaSlug.replace(/([A-Z])/g, ' $1').trim()}` : '';
 
+    const contactNotesDesc = contactNotes ? `\n\n=== CONTACT NOTES ===\n${contactNotes}` : '';
+    const additionalContextDesc = additionalContext?.trim() ? `\n\n=== ADDITIONAL CONTEXT ===\n${additionalContext.trim()}` : '';
+
     const userPrompt = `=== USER'S INTENT ===
-${intent.trim()}${relationshipContextDesc}${personaDesc}
+${intent.trim()}${contactNotesDesc}${additionalContextDesc}${relationshipContextDesc}${personaDesc}
 
 === AVAILABLE SNIPPETS ===
 ${JSON.stringify(snippetsList, null, 2)}
 
 === YOUR TASK ===
-1. Analyze the user's intent${relationshipContext ? ' and relationship context' : ''}${personaSlug ? ' and persona' : ''} to select the most relevant snippets (typically 2-4 snippets)
-2. Consider relationship context when selecting snippets - match snippets to relationship type, recency, and opportunity
-3. Determine the best order for these snippets
-4. Create a complete email template that:
+1. Analyze the user's intent${contactNotes ? ', contact notes' : ''}${additionalContext?.trim() ? ', additional context' : ''}${relationshipContext ? ', and relationship context' : ''}${personaSlug ? ' and persona' : ''} to select the most relevant snippets (typically 2-4 snippets)
+2. Use contact notes and any additional context to personalise the connecting text between snippets (specific details, shared history, recent events, etc.)
+3. Consider relationship context when selecting snippets - match snippets to relationship type, recency, and opportunity
+4. Determine the best order for these snippets
+5. Create a complete email template that:
    - Uses selected snippets in format {{snippet:snippetSlug}} (the "name" field)
    - Adds connecting text between snippets for natural flow
    - Includes variables like {{firstName}}, {{companyName}} where appropriate
