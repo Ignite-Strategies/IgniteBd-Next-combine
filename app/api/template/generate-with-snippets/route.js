@@ -109,6 +109,13 @@ export async function POST(request) {
     const { membership } = await resolveMembership(owner.id, companyHQId);
     if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+    // ── Fetch sender's company name ──────────────────────────────────────────
+    const companyHQRecord = await prisma.company_hqs.findUnique({
+      where: { id: companyHQId },
+      select: { companyName: true },
+    });
+    const senderCompanyName = companyHQRecord?.companyName ?? null;
+
     // ── Hydrate contact data from DB ────────────────────────────────────────
     let contactNotes = null;
     let contactInfo = null;
@@ -276,6 +283,20 @@ export async function POST(request) {
       }
     }
 
+    // Sender info (the person writing the email)
+    let senderInfoDesc = '';
+    {
+      const parts = [];
+      if (ownerName) parts.push(`Name: ${ownerName} — use {{senderName}} variable (do not write literally)`);
+      if (senderCompanyName) {
+        parts.push(`Company: ${senderCompanyName} — use {{senderCompany}} variable (do not write literally)`);
+        parts.push(`Note: if the relationship context shows this recipient used to work at the sender's company, that shared history is "{{senderCompany}}" — do not repeat it as a literal name`);
+      }
+      if (parts.length > 0) {
+        senderInfoDesc = `\n\n=== SENDER ===\n${parts.join('\n')}`;
+      }
+    }
+
     // Tone guidance — derived from persona + relationship context
     const toneGuidance = buildToneGuidance(effectivePersonaSlug, effectiveRelationshipContext);
 
@@ -300,14 +321,15 @@ AVAILABLE VARIABLES (always use these — they get replaced with real data befor
 - {{companyName}} — recipient's CURRENT company (use this, never write the company name literally)
 - {{title}} — recipient's job title
 - {{senderName}} — the sender's name (for sign-off)
+- {{senderCompany}} — the SENDER'S company (e.g. the company the sender and former colleague both worked at)
 
-IMPORTANT: If the RECIPIENT section provides a company name, still use {{companyName}} in the email body — do not write it as literal text. The variable will be filled in before sending.
+IMPORTANT: Always use variables — never write company names, person names, or titles as literal text in the email body. If the RECIPIENT or SENDER sections provide company names, still use the variables; they get filled in before sending.
 
 === TONE GUIDANCE ===
 ${toneGuidance}`;
 
     const userPrompt = `=== USER'S INTENT / NOTES ===
-${intent.trim()}${contactInfoDesc}${contactNotesDesc}${additionalContextDesc}${relationshipContextDesc}${personaDesc}
+${intent.trim()}${contactInfoDesc}${senderInfoDesc}${contactNotesDesc}${additionalContextDesc}${relationshipContextDesc}${personaDesc}
 
 === AVAILABLE SNIPPETS ===
 ${JSON.stringify(snippetsList, null, 2)}
@@ -380,6 +402,7 @@ Return ONLY valid JSON:
       selectedSnippets: validSelectedSlugs,
       snippetContentMap, // { slug: text } for client-side hydration
       senderName: ownerName, // for {{senderName}} variable resolution
+      senderCompany: senderCompanyName, // for {{senderCompany}} variable resolution
       reasoning: generated.reasoning || 'Snippets selected based on intent and relationship context',
       availableSnippets: snippets.length,
     });

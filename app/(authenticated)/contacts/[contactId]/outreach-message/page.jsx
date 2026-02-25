@@ -124,6 +124,7 @@ export default function OutreachMessagePage({ params }) {
   const [result, setResult] = useState(null);
   const [snippetContentMap, setSnippetContentMap] = useState({}); // { slug: text }
   const [senderName, setSenderName] = useState('');
+  const [senderCompany, setSenderCompany] = useState('');
   const [isFilled, setIsFilled] = useState(false); // whether Fill with Data has been applied
   const [snippetCount, setSnippetCount] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -234,6 +235,7 @@ export default function OutreachMessagePage({ params }) {
     const companyName = contact?.companyName || '{{companyName}}';
     const title = contact?.title || '{{title}}';
     const resolvedSenderName = senderName || '{{senderName}}';
+    const resolvedSenderCompany = senderCompany || '{{senderCompany}}';
 
     let filled = result.rawBody || result.body;
 
@@ -249,11 +251,12 @@ export default function OutreachMessagePage({ params }) {
       .replace(/\{\{fullName\}\}/gi, fullName)
       .replace(/\{\{companyName\}\}/gi, companyName)
       .replace(/\{\{title\}\}/gi, title)
-      .replace(/\{\{senderName\}\}/gi, resolvedSenderName);
+      .replace(/\{\{senderName\}\}/gi, resolvedSenderName)
+      .replace(/\{\{senderCompany\}\}/gi, resolvedSenderCompany);
 
     setResult((r) => ({ ...r, body: filled }));
     setIsFilled(true);
-  }, [result, contact, snippetContentMap, senderName]);
+  }, [result, contact, snippetContentMap, senderName, senderCompany]);
 
   const handleGenerate = async () => {
     if (!notes.trim() && !additionalContext.trim()) {
@@ -296,6 +299,7 @@ export default function OutreachMessagePage({ params }) {
         });
         setSnippetContentMap(res.data.snippetContentMap || {});
         setSenderName(res.data.senderName || '');
+        setSenderCompany(res.data.senderCompany || '');
         setIsFilled(false);
       } else {
         setError(res.data?.error || 'Generation failed');
