@@ -261,18 +261,12 @@ export async function PUT(request, { params }) {
       }
       
       if (parsedContext === null) {
-        // Delete relationship context if null
-        const existingContext = await prisma.relationship_contexts.findUnique({
+        // Delete relationship context if null (one per contact, keyed by contactId)
+        await prisma.relationship_contexts.deleteMany({
           where: { contactId },
         });
-        if (existingContext) {
-          await prisma.relationship_contexts.delete({
-            where: { relationshipContextId: existingContext.relationshipContextId },
-          });
-        }
-        updateData.relationshipContextId = null;
       } else if (parsedContext && typeof parsedContext === 'object') {
-        // Upsert relationship context record
+        // Upsert relationship context record (one per contact, keyed by contactId)
         const contextData = {
           contactId,
           contextOfRelationship: parsedContext.contextOfRelationship || null,
@@ -283,14 +277,11 @@ export async function PUT(request, { params }) {
           relationshipQuality: parsedContext.relationshipQuality || null,
           opportunityType: parsedContext.opportunityType || null,
         };
-        
-        const relationshipContextRecord = await prisma.relationship_contexts.upsert({
+        await prisma.relationship_contexts.upsert({
           where: { contactId },
           update: contextData,
           create: contextData,
         });
-        
-        updateData.relationshipContextId = relationshipContextRecord.relationshipContextId;
       }
     }
 
