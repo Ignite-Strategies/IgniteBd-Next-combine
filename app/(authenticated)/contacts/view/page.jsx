@@ -15,6 +15,9 @@ import {
   X,
   Check,
   Edit2,
+  Copy,
+  CheckCheck,
+  Loader2,
 } from 'lucide-react';
 import api from '@/lib/api';
 import CompanySelector from '@/components/CompanySelector';
@@ -34,6 +37,10 @@ function ContactsViewPageContent() {
   const [selectedContacts, setSelectedContacts] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [gettingEmails, setGettingEmails] = useState(false);
+  const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 });
+  const [emailModal, setEmailModal] = useState(null); // { results: [...], emails: [...] }
+  const [copied, setCopied] = useState(false);
   const [assigningCompanyId, setAssigningCompanyId] = useState(null);
   const [selectedCompanyForAssign, setSelectedCompanyForAssign] = useState(null);
   const [savingCompanyAssignment, setSavingCompanyAssignment] = useState(false);
@@ -239,6 +246,83 @@ function ContactsViewPageContent() {
     }
   };
 
+  const handleGetEmails = async () => {
+    if (selectedContacts.size === 0) return;
+
+    const selected = filteredContacts.filter((c) => selectedContacts.has(c.id));
+    const withEmail = selected.filter((c) => c.email);
+    const needsEnrich = selected.filter((c) => !c.email && c.linkedinUrl);
+    const noData = selected.filter((c) => !c.email && !c.linkedinUrl);
+
+    setGettingEmails(true);
+    setEmailProgress({ current: 0, total: needsEnrich.length });
+
+    const results = [];
+
+    // Include contacts that already have emails
+    for (const c of withEmail) {
+      results.push({
+        name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed',
+        email: c.email,
+        status: 'existing',
+      });
+    }
+
+    // Enrich contacts without emails via Apollo
+    for (let i = 0; i < needsEnrich.length; i++) {
+      const c = needsEnrich[i];
+      setEmailProgress({ current: i + 1, total: needsEnrich.length });
+      try {
+        const response = await api.post('/api/contacts/bulk-enrich', {
+          contactId: c.id,
+          linkedinUrl: c.linkedinUrl,
+          companyHQId,
+        });
+        const email = response.data?.email || null;
+        if (email) {
+          // Update local state so table reflects new email
+          setContacts((prev) =>
+            prev.map((contact) =>
+              contact.id === c.id ? { ...contact, email } : contact,
+            ),
+          );
+        }
+        results.push({
+          name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed',
+          email,
+          status: email ? 'enriched' : 'not-found',
+        });
+      } catch {
+        results.push({
+          name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed',
+          email: null,
+          status: 'error',
+        });
+      }
+    }
+
+    // Contacts with no email and no LinkedIn
+    for (const c of noData) {
+      results.push({
+        name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed',
+        email: null,
+        status: 'no-linkedin',
+      });
+    }
+
+    const emails = results.filter((r) => r.email).map((r) => r.email);
+    setEmailModal({ results, emails });
+    setGettingEmails(false);
+    setEmailProgress({ current: 0, total: 0 });
+  };
+
+  const handleCopyEmails = async () => {
+    if (!emailModal?.emails?.length) return;
+    await navigator.clipboard.writeText(emailModal.emails.join(', '));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleDelete = async (contactId, event) => {
     event.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this contact?')) {
@@ -335,19 +419,45 @@ function ContactsViewPageContent() {
             </div>
             <div className="flex gap-3">
               {selectedContacts.size > 0 && (
-                <button
-                  type="button"
-                  onClick={handleBulkDelete}
-                  disabled={bulkDeleting}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 transition ${
-                    bulkDeleting
-                      ? 'cursor-not-allowed bg-gray-400 text-white'
-                      : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
-                >
-                  <Trash2 className="h-5 w-5" />
-                  Delete {selectedContacts.size}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleGetEmails}
+                    disabled={gettingEmails}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition ${
+                      gettingEmails
+                        ? 'cursor-not-allowed bg-green-400 text-white'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    {gettingEmails ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {emailProgress.total > 0
+                          ? `Enriching ${emailProgress.current}/${emailProgress.total}…`
+                          : 'Getting Emails…'}
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4" />
+                        Get Emails ({selectedContacts.size})
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 transition ${
+                      bulkDeleting
+                        ? 'cursor-not-allowed bg-gray-400 text-white'
+                        : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                    Delete {selectedContacts.size}
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -703,6 +813,84 @@ function ContactsViewPageContent() {
           </div>
         )}
       </div>
+
+      {/* Email Results Modal */}
+      {emailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 p-5">
+              <h2 className="text-lg font-bold text-gray-900">Email Results</h2>
+              <button
+                type="button"
+                onClick={() => { setEmailModal(null); setCopied(false); }}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto p-5">
+              <ul className="space-y-2">
+                {emailModal.results.map((r, i) => (
+                  <li key={i} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-medium text-gray-800 truncate">{r.name}</span>
+                    {r.email ? (
+                      <span className="text-gray-600 truncate">{r.email}</span>
+                    ) : (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        r.status === 'no-linkedin'
+                          ? 'bg-gray-100 text-gray-500'
+                          : r.status === 'error'
+                            ? 'bg-red-100 text-red-600'
+                            : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {r.status === 'no-linkedin' ? 'No LinkedIn' : r.status === 'error' ? 'Error' : 'Not found'}
+                      </span>
+                    )}
+                    {r.status === 'enriched' && (
+                      <span className="ml-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">New</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {emailModal.emails.length > 0 && (
+              <div className="border-t border-gray-200 p-5 space-y-3">
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 break-all select-all font-mono leading-relaxed">
+                  {emailModal.emails.join(', ')}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyEmails}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                      copied
+                        ? 'bg-green-600 text-white'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {copied ? (
+                      <><CheckCheck className="h-4 w-4" /> Copied!</>
+                    ) : (
+                      <><Copy className="h-4 w-4" /> Copy {emailModal.emails.length} Email{emailModal.emails.length !== 1 ? 's' : ''}</>
+                    )}
+                  </button>
+                </div>
+                <p className="text-center text-xs text-gray-400">
+                  {emailModal.results.length - emailModal.emails.length} contact{emailModal.results.length - emailModal.emails.length !== 1 ? 's' : ''} had no email found
+                </p>
+              </div>
+            )}
+
+            {emailModal.emails.length === 0 && (
+              <div className="border-t border-gray-200 p-5 text-center text-sm text-gray-500">
+                No emails found. Add LinkedIn URLs to contacts to enable Apollo enrichment.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
