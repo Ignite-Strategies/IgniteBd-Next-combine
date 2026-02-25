@@ -489,6 +489,44 @@ export default function OutreachMessagePage({ params }) {
                 {!isFilled && (
                   <p className="mt-1 text-xs text-gray-400">Click <strong>Fill with Data</strong> to expand snippets and replace variables with real contact info.</p>
                 )}
+
+                {/* Variable Bank */}
+                {result && (
+                  <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Variable Bank</p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {[
+                        { label: '{{firstName}}', value: contact?.goesBy || contact?.firstName },
+                        { label: '{{lastName}}', value: contact?.lastName },
+                        { label: '{{fullName}}', value: [contact?.goesBy || contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || null },
+                        { label: '{{companyName}}', value: contact?.companyName },
+                        { label: '{{title}}', value: contact?.title },
+                        { label: '{{senderName}}', value: senderName },
+                        { label: '{{senderCompany}}', value: senderCompany },
+                      ].map(({ label, value }) => (
+                        <div key={label} className={`flex flex-col rounded-md border px-2 py-1.5 ${value ? 'border-green-200 bg-white' : 'border-amber-200 bg-amber-50'}`}>
+                          <span className="font-mono text-[10px] text-gray-500">{label}</span>
+                          <span className={`mt-0.5 truncate text-xs font-medium ${value ? 'text-gray-800' : 'text-amber-600'}`}>
+                            {value || 'not set'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {snippetContentMap && Object.keys(snippetContentMap).length > 0 && (
+                      <div className="mt-2 border-t border-gray-200 pt-2">
+                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Snippets</p>
+                        <div className="flex flex-col gap-1">
+                          {Object.entries(snippetContentMap).map(([slug, text]) => (
+                            <div key={slug} className="flex items-start gap-2 rounded-md border border-blue-100 bg-white px-2 py-1.5">
+                              <span className="font-mono text-[10px] text-blue-500 shrink-0 mt-0.5">{'{{snippet:' + slug + '}}'}</span>
+                              <span className="text-xs text-gray-600 line-clamp-2">{text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

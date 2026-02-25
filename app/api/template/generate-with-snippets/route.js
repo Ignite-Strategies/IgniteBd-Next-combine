@@ -63,7 +63,7 @@ function buildToneGuidance(personaSlug, rc) {
   }
 
   if (rc?.primaryWork && isDefined(rc.primaryWork)) {
-    lines.push(`The recipient now works at a ${rc.primaryWork}. Reference this naturally if relevant (e.g. "congrats on the new role" or "knowing you are now on the fund side").`);
+    lines.push(`The recipient works in a ${rc.primaryWork} role/context. Use {{companyName}} when referencing their employer — do NOT write "${rc.primaryWork}" as a company name in the email. You can reference their industry context naturally (e.g. "knowing you're on the fund side now") but always use {{companyName}} for the actual employer.`);
   }
 
   if (lines.length === 0) {
@@ -250,7 +250,7 @@ export async function POST(request) {
       if (rc.contextOfRelationship) parts.push(`Relationship type: ${humanize(rc.contextOfRelationship)}`);
       if (rc.relationshipRecency) parts.push(`Recency: ${humanize(rc.relationshipRecency)}`);
       if (rc.formerCompany) parts.push(`Former company connection: ${rc.formerCompany}`);
-      if (rc.primaryWork) parts.push(`Recipient now works at: ${rc.primaryWork}`);
+      if (rc.primaryWork) parts.push(`Recipient's industry/work type: ${rc.primaryWork} — this is a category descriptor, NOT the company name. Use {{companyName}} when referencing their employer; do NOT write "${rc.primaryWork}" as the company name in the email.`);
       if (rc.companyAwareness) parts.push(`Company awareness: ${humanize(rc.companyAwareness)}`);
       if (rc.relationshipQuality) parts.push(`Relationship quality: ${humanize(rc.relationshipQuality)}`);
       if (rc.opportunityType) parts.push(`Opportunity type: ${humanize(rc.opportunityType)}`);
