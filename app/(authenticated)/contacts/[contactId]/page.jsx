@@ -713,7 +713,7 @@ export default function ContactDetailPage({ params }) {
                 Contact Information
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Build Email - always available (uses snippets + context + persona) */}
+                {/* Build Email - uses snippets + context + persona */}
                 <button
                   onClick={() => {
                     // Navigate to AI template builder with snippets + relationship context + persona
@@ -733,116 +733,42 @@ export default function ContactDetailPage({ params }) {
                   <Sparkles className="h-4 w-4" />
                   Build Email
                 </button>
-                {isEnriched ? (
-                  // Show "Build Persona" as primary, other actions as secondary if enriched
-                  <>
-                    <button
-                      onClick={() => {
-                        const companyHQId = typeof window !== 'undefined' ? localStorage.getItem('companyHQId') || localStorage.getItem('companyId') : '';
-                        router.push(`/personas/build-from-contact?companyHQId=${companyHQId}&contactId=${contactId}`);
-                      }}
-                      className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
-                    >
-                      <UserCircle className="h-4 w-4" />
-                      Build Persona
-                    </button>
-                    {contact?.email && (
-                      <button
-                        onClick={() => {
-                          const url = companyHQId 
-                            ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
-                            : `/outreach/compose?contactId=${contactId}`;
-                          router.push(url);
-                        }}
-                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                        title="Send Email"
-                      >
-                        <Mail className="h-4 w-4" />
-                        Email
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setShowAddToListModal(true)}
-                      className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                      title="Add to List"
-                    >
-                      <List className="h-4 w-4" />
-                      Add to List
-                    </button>
-                    {contact?.enrichmentPayload && (
-                      <button
-                        onClick={() => setShowEnrichmentDetails(true)}
-                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                        title="View Enrichment Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Details
-                      </button>
-                    )}
-                    <button
-                      onClick={handleEnrichCareer}
-                      disabled={enrichingCareer || (!contact?.linkedinUrl && !contact?.email)}
-                      className="flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Get Full Career History"
-                    >
-                      {enrichingCareer ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4" />
-                          Get Full Career History
-                        </>
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  // Show "Enrich Contact" as primary, other actions as secondary if not enriched
-                  <>
-                    <button
-                      onClick={handleEnrichContact}
-                      disabled={enriching || !contact?.email}
-                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {enriching ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Enriching...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4" />
-                          Enrich Contact
-                        </>
-                      )}
-                    </button>
-                    {contact?.email && (
-                      <button
-                        onClick={() => {
-                          const url = companyHQId 
-                            ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
-                            : `/outreach/compose?contactId=${contactId}`;
-                          router.push(url);
-                        }}
-                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                        title="Send Email"
-                      >
-                        <Mail className="h-4 w-4" />
-                        Email
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setShowAddToListModal(true)}
-                      className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                      title="Add to List"
-                    >
-                      <List className="h-4 w-4" />
-                      Add to List
-                    </button>
-                  </>
+                {/* Build Persona */}
+                <button
+                  onClick={() => {
+                    const companyHQId = typeof window !== 'undefined' ? localStorage.getItem('companyHQId') || localStorage.getItem('companyId') : '';
+                    router.push(`/personas/build-from-contact?companyHQId=${companyHQId}&contactId=${contactId}`);
+                  }}
+                  className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+                >
+                  <UserCircle className="h-4 w-4" />
+                  Build Persona
+                </button>
+                {/* Email */}
+                {contact?.email && (
+                  <button
+                    onClick={() => {
+                      const url = companyHQId 
+                        ? `/outreach/compose?contactId=${contactId}&companyHQId=${companyHQId}`
+                        : `/outreach/compose?contactId=${contactId}`;
+                      router.push(url);
+                    }}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                    title="Send Email"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </button>
                 )}
+                {/* Add to List */}
+                <button
+                  onClick={() => setShowAddToListModal(true)}
+                  className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  title="Add to List"
+                >
+                  <List className="h-4 w-4" />
+                  Add to List
+                </button>
               </div>
             </div>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
