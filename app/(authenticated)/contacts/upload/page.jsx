@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, User, X, ChevronRight } from 'lucide-react';
+import { Upload, User, X, ChevronRight, Download } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { auth } from '@/lib/firebase';
 
@@ -232,6 +232,7 @@ export default function ContactUploadPage() {
   const [mapping, setMapping] = useState([]);
   const [mappedRows, setMappedRows] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [successResult, setSuccessResult] = useState(null);
 
@@ -366,6 +367,43 @@ export default function ContactUploadPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const downloadCurrentContacts = async () => {
+    const companyHQId = typeof window !== 'undefined' ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId')) : null;
+    if (!companyHQId) {
+      alert('Company context required. Please set your company first.');
+      router.push('/company/create-or-choose');
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      alert('Please sign in to download contacts.');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/contacts/export?companyHQId=${encodeURIComponent(companyHQId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contacts_export_${companyHQId.slice(0, 8)}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Download failed. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
@@ -417,13 +455,24 @@ export default function ContactUploadPage() {
                 Required: First Name, Last Name. Optional: URL, Email, Company, Position, Connected On, Notes, Pipeline, Stage.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={downloadTemplate}
-              className="text-sm font-semibold text-blue-600 hover:text-blue-800"
-            >
-              Download CSV Template
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={downloadCurrentContacts}
+                disabled={downloading}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                {downloading ? 'Downloading…' : 'Download current contacts'}
+              </button>
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                className="text-sm font-semibold text-blue-600 hover:text-blue-800"
+              >
+                Download CSV Template
+              </button>
+            </div>
           </div>
 
           {noFile ? (
@@ -645,6 +694,9 @@ export default function ContactUploadPage() {
                 <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
                   <p className="text-lg font-semibold text-green-800">
                     Processed {successResult.total ?? 0} rows: {successResult.created ?? 0} created, {successResult.updated ?? 0} updated.
+                  </p>
+                  <p className="mt-1 text-sm text-green-700">
+                    Rows that matched an existing contact by email were updated; others were added as new contacts.
                   </p>
                   {successResult.errors?.length > 0 && (
                     <p className="mt-2 text-sm text-amber-700">

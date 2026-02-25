@@ -246,37 +246,20 @@ export async function POST(request) {
           linkedinConnectedOn: normalizedRow.linkedinConnectedOn || null,
         };
 
-        // Step 1: Create or update contact
+        // Step 1: Create or update contact (match by email + crmId so we update, not duplicate)
         let contact;
         if (contactData.email) {
-          // Email is globally unique, so use findUnique
           const normalizedEmail = contactData.email.toLowerCase().trim();
-          let existingContact = null;
-          
-          try {
-            existingContact = await prisma.contact.findUnique({
-              where: {
-                email: normalizedEmail,
-              },
-            });
-          } catch (error) {
-            // findUnique throws P2025 if not found, which is fine
-            if (error.code !== 'P2025') {
-              throw error;
-            }
-          }
+          // Match within this tenant only: same email + same company = update existing
+          const existingContact = await prisma.contact.findFirst({
+            where: {
+              email: normalizedEmail,
+              crmId: companyHQId,
+            },
+          });
 
           if (existingContact) {
-            // Verify it's in the same tenant
-            if (existingContact.crmId !== companyHQId) {
-              // Email exists in different tenant - this shouldn't happen but handle gracefully
-              console.warn(`⚠️ Email ${normalizedEmail} exists in different tenant (${existingContact.crmId} vs ${companyHQId})`);
-              // Can't create with same email - skip this row
-              results.errors.push(`Row ${rowNum}: Email ${normalizedEmail} already exists in another tenant`);
-              continue;
-            }
-            
-            // Update existing contact (name, email, title, phone, notes)
+            // Update existing contact (name, email, title, phone, notes) — no duplicate created
             const updateData = {
               firstName: contactData.firstName,
               lastName: contactData.lastName,
@@ -312,12 +295,12 @@ export async function POST(request) {
             } catch (createError) {
               // Handle unique constraint violation (race condition)
               if (createError.code === 'P2002' && createError.meta?.target?.includes('email')) {
-                // Email was created between our check and create - try to find it
+                // Email was created between our check and create - try to find it in this tenant
                 try {
-                  const raceContact = await prisma.contact.findUnique({
-                    where: { email: normalizedEmail },
+                  const raceContact = await prisma.contact.findFirst({
+                    where: { email: normalizedEmail, crmId: companyHQId },
                   });
-                  if (raceContact && raceContact.crmId === companyHQId) {
+                  if (raceContact) {
                     // Found it, update instead - only update name (simple fields)
                     const raceUpdateData = {
                       firstName: contactData.firstName,
@@ -334,10 +317,10 @@ export async function POST(request) {
                     });
                     results.updated++;
                   } else {
-                    throw createError; // Re-throw if tenant mismatch
+                    throw createError;
                   }
                 } catch (findError) {
-                  throw createError; // Re-throw original error
+                  throw createError;
                 }
               } else {
                 throw createError;
