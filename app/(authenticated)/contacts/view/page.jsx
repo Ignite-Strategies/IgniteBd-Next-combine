@@ -279,6 +279,7 @@ function ContactsViewPageContent() {
           companyHQId,
         });
         const email = response.data?.email || null;
+        const emailAlreadyExists = response.data?.emailAlreadyExists === true;
         if (email) {
           // Update local state so table reflects new email
           setContacts((prev) =>
@@ -289,8 +290,8 @@ function ContactsViewPageContent() {
         }
         results.push({
           name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed',
-          email,
-          status: email ? 'enriched' : 'not-found',
+          email: emailAlreadyExists ? null : email,
+          status: emailAlreadyExists ? 'duplicate' : (email ? 'enriched' : 'not-found'),
         });
       } catch {
         results.push({
@@ -840,11 +841,13 @@ function ContactsViewPageContent() {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         r.status === 'no-linkedin'
                           ? 'bg-gray-100 text-gray-500'
-                          : r.status === 'error'
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-yellow-100 text-yellow-700'
+                          : r.status === 'duplicate'
+                            ? 'bg-amber-100 text-amber-700'
+                            : r.status === 'error'
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-yellow-100 text-yellow-700'
                       }`}>
-                        {r.status === 'no-linkedin' ? 'No LinkedIn' : r.status === 'error' ? 'Error' : 'Not found'}
+                        {r.status === 'no-linkedin' ? 'No LinkedIn' : r.status === 'duplicate' ? 'Duplicate (email exists)' : r.status === 'error' ? 'Error' : 'Not found'}
                       </span>
                     )}
                     {r.status === 'enriched' && (

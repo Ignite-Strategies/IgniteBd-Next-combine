@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
@@ -801,6 +801,26 @@ export default function ContactDetailPage({ params }) {
                   <dt className="text-sm font-semibold text-gray-500">Phone</dt>
                   <dd className="mt-1 text-base text-gray-900">
                     {contact.phone || '—'}
+                  </dd>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Linkedin className="h-5 w-5 text-gray-400" />
+                <div>
+                  <dt className="text-sm font-semibold text-gray-500">LinkedIn</dt>
+                  <dd className="mt-1 text-base text-gray-900">
+                    {contact.linkedinUrl ? (
+                      <a
+                        href={contact.linkedinUrl.startsWith('http') ? contact.linkedinUrl : `https://${contact.linkedinUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {contact.linkedinUrl}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
                   </dd>
                 </div>
               </div>

@@ -52,11 +52,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get contact
-    const contact = await prisma.contacts.findUnique({
+    // Get contact (need crmId for company-scoped email uniqueness)
+    const contact = await prisma.contact.findUnique({
       where: { id: contactId },
       select: {
         id: true,
+        crmId: true,
         email: true,
         linkedinUrl: true,
         firstName: true,
@@ -112,10 +113,24 @@ export async function POST(request: Request) {
       enrichmentPayload: enrichmentPayload,
     };
 
-    // Only update email if we found one and contact doesn't already have one
+    // Company-scoped: emails must be unique per crmId. Check if another contact already has this email.
+    let emailAlreadyExists = false;
     if (enrichedEmail && !contact.email) {
-      updateData.email = enrichedEmail;
-      console.log(`✅ Updating contact ${contactId} with email: ${enrichedEmail}`);
+      const existingWithEmail = await prisma.contact.findFirst({
+        where: {
+          crmId: contact.crmId,
+          email: enrichedEmail.toLowerCase().trim(),
+          id: { not: contactId },
+        },
+        select: { id: true },
+      });
+      if (existingWithEmail) {
+        emailAlreadyExists = true;
+        console.warn(`⚠️ Email ${enrichedEmail} already exists for another contact in this company - skipping to avoid duplicate`);
+      } else {
+        updateData.email = enrichedEmail;
+        console.log(`✅ Updating contact ${contactId} with email: ${enrichedEmail}`);
+      }
     } else if (enrichedEmail && contact.email) {
       console.log(`ℹ️ Contact ${contactId} already has email, keeping existing: ${contact.email}`);
     } else {
@@ -123,7 +138,7 @@ export async function POST(request: Request) {
     }
 
     // Update contact - safe to do even if no email
-    const updatedContact = await prisma.contacts.update({
+    const updatedContact = await prisma.contact.update({
       where: { id: contactId },
       data: updateData,
       select: {
@@ -138,11 +153,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       contact: updatedContact,
-      emailFound: !!enrichedEmail,
-      email: enrichedEmail || null,
-      message: enrichedEmail 
-        ? `Successfully enriched contact. Email: ${enrichedEmail}`
-        : 'Contact updated. No email found in Apollo response.',
+      emailFound: !!enrichedEmail && !emailAlreadyExists,
+      email: emailAlreadyExists ? null : (enrichedEmail || null),
+      emailAlreadyExists: emailAlreadyExists,
+      message: emailAlreadyExists
+        ? `Email ${enrichedEmail} already exists for another contact in this company (possible duplicate).`
+        : enrichedEmail
+          ? `Successfully enriched contact. Email: ${enrichedEmail}`
+          : 'Contact updated. No email found in Apollo response.',
     });
   } catch (error: any) {
     console.error('❌ Bulk enrich error:', error);

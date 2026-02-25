@@ -345,20 +345,45 @@ export async function POST(request) {
             }
           }
         } else {
-          // Create contact without email
-          contact = await prisma.contact.create({
-            data: {
+          // Create contact without email - check for duplicate by name in same company
+          // (Company-scoped: same person added twice = update existing to avoid duplicates)
+          const existingByName = await prisma.contact.findFirst({
+            where: {
               crmId: companyHQId,
               firstName: contactData.firstName,
               lastName: contactData.lastName,
-              title: contactData.title,
-              phone: contactData.phone,
-              notes: contactData.notes,
-              linkedinUrl: contactData.linkedinUrl,
-              linkedinConnectedOn: contactData.linkedinConnectedOn,
+              email: null,
             },
+            select: { id: true },
           });
-          results.created++;
+
+          if (existingByName) {
+            const updateData = {};
+            if (contactData.title !== undefined) updateData.title = contactData.title;
+            if (contactData.phone !== undefined) updateData.phone = contactData.phone;
+            if (contactData.notes !== undefined) updateData.notes = contactData.notes;
+            if (contactData.linkedinUrl !== undefined) updateData.linkedinUrl = contactData.linkedinUrl;
+            if (contactData.linkedinConnectedOn !== undefined) updateData.linkedinConnectedOn = contactData.linkedinConnectedOn;
+            contact = await prisma.contact.update({
+              where: { id: existingByName.id },
+              data: updateData,
+            });
+            results.updated++;
+          } else {
+            contact = await prisma.contact.create({
+              data: {
+                crmId: companyHQId,
+                firstName: contactData.firstName,
+                lastName: contactData.lastName,
+                title: contactData.title,
+                phone: contactData.phone,
+                notes: contactData.notes,
+                linkedinUrl: contactData.linkedinUrl,
+                linkedinConnectedOn: contactData.linkedinConnectedOn,
+              },
+            });
+            results.created++;
+          }
         }
 
         // Step 2: Handle company association (simple - companyName only)
