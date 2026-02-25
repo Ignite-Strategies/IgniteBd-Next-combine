@@ -728,7 +728,7 @@ export default function ContactDetailPage({ params }) {
                     </button>
                     <button
                       onClick={() => {
-                        // Navigate to AI template builder with relationship context and persona
+                        // Navigate to AI template builder with snippets + relationship context + persona
                         const params = new URLSearchParams({
                           ...(companyHQId && { companyHQId }),
                           ...(contactId && { contactId }),
@@ -740,10 +740,10 @@ export default function ContactDetailPage({ params }) {
                         router.push(`/templates/create/ai-snippets?${params.toString()}`);
                       }}
                       className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                      title="Build email template using AI and snippets"
+                      title="Build email using snippets, relationship context, and persona"
                     >
                       <Sparkles className="h-4 w-4" />
-                      Build Template
+                      Build Email
                     </button>
                     {contact?.email && (
                       <button
