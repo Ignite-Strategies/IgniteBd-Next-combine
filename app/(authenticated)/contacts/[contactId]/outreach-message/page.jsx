@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, ArrowLeft, RefreshCw, Check, User, Tag, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, ArrowLeft, RefreshCw, Check, Save, User, Tag, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 
 const DONT_KNOW = 'DONT_KNOW';
@@ -122,6 +122,8 @@ export default function OutreachMessagePage({ params }) {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // { subject, body, reasoning, selectedSnippets }
   const [snippetCount, setSnippetCount] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Load contact + snippet count
   useEffect(() => {
@@ -159,6 +161,32 @@ export default function OutreachMessagePage({ params }) {
         .catch(() => {});
     }
   }, [contactId, companyHQId]);
+
+  const handleSave = async () => {
+    if (!result || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
+      const res = await api.post('/api/templates', {
+        companyHQId,
+        ownerId,
+        title: result.subject, // use subject as title — clean enough
+        subject: result.subject,
+        body: result.body,
+        ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
+      });
+      if (res.data?.success) {
+        setSaved(true);
+      } else {
+        setError(res.data?.error || 'Failed to save template');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to save template');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!notes.trim() && !additionalContext.trim()) {
@@ -369,13 +397,26 @@ export default function OutreachMessagePage({ params }) {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-1">
+            <div className="flex items-center gap-3 pt-1">
+              {saved ? (
+                <span className="flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm font-semibold text-green-700">
+                  <Check className="h-4 w-4" />
+                  Saved to templates
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                >
+                  {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {saving ? 'Saving…' : 'Save as Template'}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  setResult(null);
-                  setError('');
-                }}
+                onClick={() => { setResult(null); setError(''); setSaved(false); }}
                 className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
               >
                 <RefreshCw className="h-4 w-4" />

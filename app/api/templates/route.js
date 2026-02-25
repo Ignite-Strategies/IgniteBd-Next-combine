@@ -42,7 +42,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { companyHQId, ownerId, title, subject, body: bodyText } = body;
+    const { companyHQId, ownerId, title, subject, body: bodyText, personaSlug } = body;
 
     // Validate required fields
     if (!companyHQId) {
@@ -86,10 +86,11 @@ export async function POST(request) {
     const template = await prisma.templates.create({
       data: {
         companyHQId,
-        ownerId: ownerId || owner.id, // Use provided ownerId or current owner as creator
+        ownerId: ownerId || owner.id,
         title: title.trim(),
         subject: subject.trim(),
         body: bodyText.trim(),
+        ...(personaSlug && { personaSlug }),
       },
     });
 

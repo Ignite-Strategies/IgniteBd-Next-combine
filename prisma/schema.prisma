@@ -1298,12 +1298,14 @@ model templates {
   companyHQId String // Required - company-scoped (matches phase_templates pattern)
   title       String
   ownerId     String? // Optional - creator/audit trail
+  personaSlug String? // Optional - links AI-generated templates to an outreach persona type (no FK to contact)
   campaigns   campaigns[]
   company_hqs company_hqs @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   owners      owners?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   @@index([companyHQId])
   @@index([ownerId])
+  @@index([personaSlug])
 }
 
 model template_snippets {
