@@ -463,7 +463,7 @@ export default function ContactUploadPage() {
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
               >
                 <Download className="h-4 w-4" />
-                {downloading ? 'Downloading…' : 'Download current contacts'}
+                {downloading ? 'Downloading…' : 'Download current contacts (see what\'s there)'}
               </button>
               <button
                 type="button"
@@ -696,7 +696,7 @@ export default function ContactUploadPage() {
                     Processed {successResult.total ?? 0} rows: {successResult.created ?? 0} created, {successResult.updated ?? 0} updated.
                   </p>
                   <p className="mt-1 text-sm text-green-700">
-                    Rows that matched an existing contact by email were updated; others were added as new contacts.
+                    Rows that matched an existing contact (by email, or by name when adding email to a contact) were updated; others were added as new contacts.
                   </p>
                   {successResult.errors?.length > 0 && (
                     <p className="mt-2 text-sm text-amber-700">

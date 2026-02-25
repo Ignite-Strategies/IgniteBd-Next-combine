@@ -169,18 +169,21 @@ export class OutreachEmailBuilderService {
         relationshipContext
       );
       
-      // Get previous email history for followups (use unified emails table)
+      // Get previous email history for followups (single email_activities table)
       let previousEmails: any[] = [];
       let lastEmailResponse: string | null = null;
       if (emailTypeContext.emailType === 'FOLLOWUP') {
-        // Get emails from unified emails table (includes responses)
-        const emails = await prisma.emails.findMany({
-          where: { contactId },
-          orderBy: { sendDate: 'desc' },
+        const activities = await prisma.email_activities.findMany({
+          where: {
+            contact_id: contactId,
+            OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM', sentAt: { not: null } }],
+          },
+          orderBy: { createdAt: 'desc' },
           take: 3,
           select: {
             id: true,
-            sendDate: true,
+            sentAt: true,
+            createdAt: true,
             subject: true,
             body: true,
             source: true,
@@ -190,22 +193,21 @@ export class OutreachEmailBuilderService {
             responseSubject: true,
           },
         });
-        
-        previousEmails = emails.map(email => ({
-          id: email.id,
-          type: email.source === 'PLATFORM' ? 'platform' : 'off-platform',
-          date: email.sendDate.toISOString(),
-          subject: email.subject,
-          body: email.body,
-          platform: email.platform,
-          hasResponded: email.hasResponded,
-          contactResponse: email.contactResponse,
-          responseSubject: email.responseSubject,
+
+        previousEmails = activities.map(a => ({
+          id: a.id,
+          type: a.source === 'PLATFORM' ? 'platform' : 'off-platform',
+          date: (a.sentAt ?? a.createdAt).toISOString(),
+          subject: a.subject,
+          body: a.body,
+          platform: a.platform,
+          hasResponded: a.hasResponded,
+          contactResponse: a.contactResponse,
+          responseSubject: a.responseSubject,
         }));
         
-        // Get last email's response text if available
-        if (emails.length > 0 && emails[0].hasResponded && emails[0].contactResponse) {
-          lastEmailResponse = emails[0].contactResponse;
+        if (activities.length > 0 && activities[0].hasResponded && activities[0].contactResponse) {
+          lastEmailResponse = activities[0].contactResponse;
         }
       }
       

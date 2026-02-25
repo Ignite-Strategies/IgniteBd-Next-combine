@@ -251,12 +251,25 @@ export async function POST(request) {
         if (contactData.email) {
           const normalizedEmail = contactData.email.toLowerCase().trim();
           // Match within this tenant only: same email + same company = update existing
-          const existingContact = await prisma.contact.findFirst({
+          let existingContact = await prisma.contact.findFirst({
             where: {
               email: normalizedEmail,
               crmId: companyHQId,
             },
           });
+
+          // Fallback: if no match by email, try matching by name when existing contact has no email
+          // (avoids creating duplicate when adding email to a contact that previously had none)
+          if (!existingContact) {
+            existingContact = await prisma.contact.findFirst({
+              where: {
+                crmId: companyHQId,
+                firstName: contactData.firstName,
+                lastName: contactData.lastName,
+                email: null,
+              },
+            });
+          }
 
           if (existingContact) {
             // Update existing contact (name, email, title, phone, notes) — no duplicate created
@@ -264,6 +277,7 @@ export async function POST(request) {
               firstName: contactData.firstName,
               lastName: contactData.lastName,
             };
+            if (normalizedEmail) updateData.email = normalizedEmail;
             if (contactData.title !== undefined) updateData.title = contactData.title;
             if (contactData.phone !== undefined) updateData.phone = contactData.phone;
             if (contactData.notes !== undefined) updateData.notes = contactData.notes;

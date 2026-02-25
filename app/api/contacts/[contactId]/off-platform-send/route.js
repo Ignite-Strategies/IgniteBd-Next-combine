@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { snapContactLastContactedAt } from '@/lib/services/followUpCalculator';
 
 /**
  * POST /api/contacts/[contactId]/off-platform-send
@@ -14,8 +15,9 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * }
  */
 export async function POST(request, { params }) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -24,6 +26,17 @@ export async function POST(request, { params }) {
   }
 
   try {
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: { id: true },
+    });
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const resolvedParams = await params;
     const { contactId } = resolvedParams || {};
     
@@ -34,11 +47,9 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Verify contact exists
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
     });
-
     if (!contact) {
       return NextResponse.json(
         { success: false, error: 'Contact not found' },
@@ -49,7 +60,6 @@ export async function POST(request, { params }) {
     const body = await request.json();
     const { emailSent, subject, body: emailBody, platform, notes } = body ?? {};
 
-    // emailSent is now optional — null/omitted means this is a saved draft
     let emailSentDate = null;
     if (emailSent) {
       emailSentDate = new Date(emailSent);
@@ -62,30 +72,35 @@ export async function POST(request, { params }) {
     }
 
     const isDraft = !emailSentDate;
+    const bodyContent = emailBody && notes
+      ? `BODY:\n${emailBody}\n\nNOTES:\n${notes}`
+      : emailBody || notes || null;
 
-    // Combine body + notes into notes field
-    let notesField = null;
-    if (emailBody && notes) {
-      notesField = `BODY:\n${emailBody}\n\nNOTES:\n${notes}`;
-    } else if (emailBody) {
-      notesField = emailBody;
-    } else if (notes) {
-      notesField = notes;
-    }
-    
-    const offPlatformSend = await prisma.off_platform_email_sends.create({
+    const activity = await prisma.email_activities.create({
       data: {
-        contactId,
-        emailSent: emailSentDate, // null = draft
+        owner_id: owner.id,
+        contact_id: contactId,
+        email: contact.email || '',
         subject: subject || null,
-        platform: platform || null,
-        notes: notesField,
+        body: bodyContent,
+        event: isDraft ? null : 'sent',
+        messageId: null,
+        source: 'OFF_PLATFORM',
+        platform: platform || 'manual',
+        sentAt: emailSentDate,
       },
     });
 
-    console.log(`✅ Off-platform email ${isDraft ? 'draft saved' : 'send tracked'}:`, offPlatformSend.id);
+    console.log(`✅ Off-platform email ${isDraft ? 'draft saved' : 'send tracked'}:`, activity.id);
 
-    // Only advance pipeline stage on actual sends (not drafts)
+    if (!isDraft && emailSentDate) {
+      try {
+        await snapContactLastContactedAt(contactId, emailSentDate);
+      } catch (snapErr) {
+        console.warn('⚠️ Could not snap lastContactedAt:', snapErr.message);
+      }
+    }
+
     if (!isDraft) {
       try {
         const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
@@ -105,14 +120,14 @@ export async function POST(request, { params }) {
       success: true,
       isDraft,
       offPlatformSend: {
-        id: offPlatformSend.id,
-        contactId: offPlatformSend.contactId,
-        emailSent: offPlatformSend.emailSent?.toISOString() ?? null,
+        id: activity.id,
+        contactId: contactId,
+        emailSent: activity.sentAt?.toISOString() ?? null,
         isDraft,
-        subject: offPlatformSend.subject,
-        platform: offPlatformSend.platform,
-        notes: offPlatformSend.notes,
-        createdAt: offPlatformSend.createdAt.toISOString(),
+        subject: activity.subject,
+        platform: activity.platform,
+        notes: activity.body,
+        createdAt: activity.createdAt.toISOString(),
       },
     });
   } catch (error) {
@@ -153,21 +168,24 @@ export async function GET(request, { params }) {
       );
     }
 
-    const offPlatformSends = await prisma.off_platform_email_sends.findMany({
-      where: { contactId },
-      orderBy: { emailSent: 'desc' },
+    const activities = await prisma.email_activities.findMany({
+      where: {
+        contact_id: contactId,
+        source: 'OFF_PLATFORM',
+      },
+      orderBy: { createdAt: 'desc' },
     });
 
     return NextResponse.json({
       success: true,
-      offPlatformSends: offPlatformSends.map(send => ({
+      offPlatformSends: activities.map(send => ({
         id: send.id,
-        contactId: send.contactId,
-        emailSent: send.emailSent?.toISOString() ?? null,
-        isDraft: !send.emailSent,
+        contactId: send.contact_id,
+        emailSent: send.sentAt?.toISOString() ?? null,
+        isDraft: !send.sentAt,
         subject: send.subject,
         platform: send.platform,
-        notes: send.notes,
+        notes: send.body,
         createdAt: send.createdAt.toISOString(),
         updatedAt: send.updatedAt.toISOString(),
       })),

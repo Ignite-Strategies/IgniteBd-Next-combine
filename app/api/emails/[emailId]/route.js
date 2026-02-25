@@ -27,7 +27,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    const email = await prisma.emails.findUnique({
+    const activity = await prisma.email_activities.findUnique({
       where: { id: emailId },
       include: {
         contacts: {
@@ -41,7 +41,7 @@ export async function GET(request, { params }) {
       },
     });
 
-    if (!email) {
+    if (!activity) {
       return NextResponse.json(
         { success: false, error: 'Email not found' },
         { status: 404 },
@@ -51,25 +51,23 @@ export async function GET(request, { params }) {
     return NextResponse.json({
       success: true,
       email: {
-        id: email.id,
-        contactId: email.contactId,
-        sendDate: email.sendDate.toISOString(),
-        subject: email.subject,
-        body: email.body,
-        source: email.source,
-        platform: email.platform,
-        hasResponded: email.hasResponded,
-        contactResponse: email.contactResponse,
-        respondedAt: email.respondedAt ? email.respondedAt.toISOString() : null,
-        responseSubject: email.responseSubject,
-        messageId: email.messageId,
-        campaignId: email.campaignId,
-        sequenceId: email.sequenceId,
-        emailActivityId: email.emailActivityId,
-        offPlatformSendId: email.offPlatformSendId,
-        createdAt: email.createdAt.toISOString(),
-        updatedAt: email.updatedAt.toISOString(),
-        contact: email.contacts,
+        id: activity.id,
+        contactId: activity.contact_id,
+        sendDate: (activity.sentAt ?? activity.createdAt).toISOString(),
+        subject: activity.subject,
+        body: activity.body,
+        source: activity.source,
+        platform: activity.platform,
+        hasResponded: activity.hasResponded,
+        contactResponse: activity.contactResponse,
+        respondedAt: activity.respondedAt ? activity.respondedAt.toISOString() : null,
+        responseSubject: activity.responseSubject,
+        messageId: activity.messageId,
+        campaignId: activity.campaign_id,
+        sequenceId: activity.sequence_id,
+        createdAt: activity.createdAt.toISOString(),
+        updatedAt: activity.updatedAt.toISOString(),
+        contact: activity.contacts,
       },
     });
   } catch (error) {
@@ -93,8 +91,7 @@ export async function GET(request, { params }) {
  *   subject?: string
  *   body?: string
  *   messageId?: string (SendGrid message ID after sending)
- *   emailActivityId?: string (link to email_activities)
- *   offPlatformSendId?: string (link to off_platform_email_sends)
+ *   messageId?: string (SendGrid message ID after sending)
  * }
  */
 export async function PUT(request, { params }) {
@@ -118,11 +115,11 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const email = await prisma.emails.findUnique({
+    const activity = await prisma.email_activities.findUnique({
       where: { id: emailId },
     });
 
-    if (!email) {
+    if (!activity) {
       return NextResponse.json(
         { success: false, error: 'Email not found' },
         { status: 404 },
@@ -130,22 +127,14 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const {
-      subject,
-      body: emailBody,
-      messageId,
-      emailActivityId,
-      offPlatformSendId,
-    } = body ?? {};
+    const { subject, body: emailBody, messageId } = body ?? {};
 
     const updateData = {};
     if (subject !== undefined) updateData.subject = subject;
     if (emailBody !== undefined) updateData.body = emailBody;
     if (messageId !== undefined) updateData.messageId = messageId;
-    if (emailActivityId !== undefined) updateData.emailActivityId = emailActivityId;
-    if (offPlatformSendId !== undefined) updateData.offPlatformSendId = offPlatformSendId;
 
-    const updatedEmail = await prisma.emails.update({
+    const updated = await prisma.email_activities.update({
       where: { id: emailId },
       data: updateData,
     });
@@ -153,12 +142,10 @@ export async function PUT(request, { params }) {
     return NextResponse.json({
       success: true,
       email: {
-        id: updatedEmail.id,
-        subject: updatedEmail.subject,
-        body: updatedEmail.body,
-        messageId: updatedEmail.messageId,
-        emailActivityId: updatedEmail.emailActivityId,
-        offPlatformSendId: updatedEmail.offPlatformSendId,
+        id: updated.id,
+        subject: updated.subject,
+        body: updated.body,
+        messageId: updated.messageId,
       },
     });
   } catch (error) {

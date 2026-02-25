@@ -53,15 +53,15 @@ export class EmailTypeDeterminationService {
     let lastEmailHadResponse: boolean | null = null;
     if (lastSendDate) {
       // Get the most recent email to check response status
-      const lastEmail = await prisma.emails.findFirst({
-        where: { contactId },
-        orderBy: { sendDate: 'desc' },
-        select: {
-          hasResponded: true,
-          contactResponse: true,
+      const lastActivity = await prisma.email_activities.findFirst({
+        where: {
+          contact_id: contactId,
+          OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM', sentAt: { not: null } }],
         },
+        orderBy: { createdAt: 'desc' },
+        select: { hasResponded: true, contactResponse: true },
       });
-      lastEmailHadResponse = lastEmail?.hasResponded || false;
+      lastEmailHadResponse = lastActivity?.hasResponded || false;
     }
     
     // If no last email, it's first time
@@ -88,14 +88,16 @@ export class EmailTypeDeterminationService {
     // Get last email response text if available
     let lastEmailResponseText: string | null = null;
     if (lastEmailHadResponse === true) {
-      const lastEmail = await prisma.emails.findFirst({
-        where: { contactId },
-        orderBy: { sendDate: 'desc' },
-        select: {
-          contactResponse: true,
+      const lastActivityWithResponse = await prisma.email_activities.findFirst({
+        where: {
+          contact_id: contactId,
+          hasResponded: true,
+          OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM', sentAt: { not: null } }],
         },
+        orderBy: { createdAt: 'desc' },
+        select: { contactResponse: true },
       });
-      lastEmailResponseText = lastEmail?.contactResponse || null;
+      lastEmailResponseText = lastActivityWithResponse?.contactResponse || null;
     }
     
     // Determine followup type based on time and context

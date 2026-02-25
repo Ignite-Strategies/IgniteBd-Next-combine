@@ -57,23 +57,34 @@ export async function GET(request) {
       );
     }
 
-    // Build email filter
-    const emailWhere = {};
-    if (sendDateFrom || sendDateTo) {
-      emailWhere.sendDate = {};
-      if (sendDateFrom) emailWhere.sendDate.gte = new Date(sendDateFrom);
-      if (sendDateTo) emailWhere.sendDate.lte = new Date(sendDateTo);
+    // Contacts that have at least one "send" (platform sent or off-platform with sentAt)
+    const activityWhere = {
+      OR: [
+        { event: 'sent' },
+        { source: 'OFF_PLATFORM', sentAt: { not: null } },
+      ],
+    };
+    if (sendDateFrom) {
+      activityWhere.AND = [
+        ...(activityWhere.AND || []),
+        { OR: [{ sentAt: { gte: new Date(sendDateFrom) } }, { sentAt: null, createdAt: { gte: new Date(sendDateFrom) } }] },
+      ];
     }
-    if (hasResponded !== null) {
-      emailWhere.hasResponded = hasResponded === 'true';
+    if (sendDateTo) {
+      activityWhere.AND = [
+        ...(activityWhere.AND || []),
+        { OR: [{ sentAt: { lte: new Date(sendDateTo) } }, { sentAt: null, createdAt: { lte: new Date(sendDateTo) } }] },
+      ];
+    }
+    if (hasResponded === 'true' || hasResponded === 'false') {
+      activityWhere.hasResponded = hasResponded === 'true';
     }
 
-    // Get contacts that have emails matching the filter
-    const contactsWithEmails = await prisma.contact.findMany({
+    const contactsWithActivities = await prisma.contact.findMany({
       where: {
         crmId: companyHQId,
-        emails: {
-          some: emailWhere,
+        email_activities: {
+          some: activityWhere,
         },
       },
       select: {
@@ -85,24 +96,37 @@ export async function GET(request) {
         persona_type: true,
         remindMeOn: true,
       },
-      take: limit * 2, // Get more than needed, we'll filter by follow-up date
+      take: limit * 2,
       skip: offset,
     });
 
-    // Enrich each contact with email history and follow-up info
     const enrichedContacts = await Promise.all(
-      contactsWithEmails.map(async (contact) => {
+      contactsWithActivities.map(async (contact) => {
         try {
-          // Get email history
-          const emails = await prisma.emails.findMany({
-            where: {
-              contactId: contact.id,
-              ...emailWhere,
-            },
-            orderBy: { sendDate: 'desc' },
+          const activityFilter = {
+            contact_id: contact.id,
+            OR: [
+              { event: 'sent' },
+              { source: 'OFF_PLATFORM', sentAt: { not: null } },
+            ],
+          };
+          if (sendDateFrom) {
+            activityFilter.AND = activityFilter.AND || [];
+            activityFilter.AND.push({ OR: [{ sentAt: { gte: new Date(sendDateFrom) } }, { sentAt: null, createdAt: { gte: new Date(sendDateFrom) } }] });
+          }
+          if (sendDateTo) {
+            activityFilter.AND = activityFilter.AND || [];
+            activityFilter.AND.push({ OR: [{ sentAt: { lte: new Date(sendDateTo) } }, { sentAt: null, createdAt: { lte: new Date(sendDateTo) } }] });
+          }
+          if (hasResponded === 'true' || hasResponded === 'false') activityFilter.hasResponded = hasResponded === 'true';
+
+          const activities = await prisma.email_activities.findMany({
+            where: activityFilter,
+            orderBy: { createdAt: 'desc' },
             select: {
               id: true,
-              sendDate: true,
+              sentAt: true,
+              createdAt: true,
               subject: true,
               source: true,
               platform: true,
@@ -111,23 +135,17 @@ export async function GET(request) {
             },
           });
 
-          // Get last send date
           const lastSendDate = await getLastSendDate(contact.id);
-
-          // Calculate next send date
           const followUpInfo = await calculateNextSendDate(contact.id);
           const nextSendDate = followUpInfo.nextSendDate;
 
-          // Filter by follow-up date if specified
           if (followUpDateFrom || followUpDateTo) {
-            if (!nextSendDate) return null; // No follow-up date, exclude
-            
+            if (!nextSendDate) return null;
             const followUpDate = new Date(nextSendDate);
             if (followUpDateFrom && followUpDate < new Date(followUpDateFrom)) return null;
             if (followUpDateTo && followUpDate > new Date(followUpDateTo)) return null;
           }
 
-          // Check manual reminder
           let effectiveNextSendDate = nextSendDate;
           if (contact.remindMeOn) {
             const remindDate = new Date(contact.remindMeOn);
@@ -136,8 +154,8 @@ export async function GET(request) {
             }
           }
 
-          // Check if any email has been responded to
-          const hasAnyResponse = emails.some(e => e.hasResponded);
+          const hasAnyResponse = activities.some(a => a.hasResponded);
+          const sendDate = (a) => (a.sentAt ?? a.createdAt).toISOString();
 
           return {
             ...contact,
@@ -146,11 +164,14 @@ export async function GET(request) {
             daysUntilDue: followUpInfo.daysUntilDue,
             relationship: followUpInfo.relationship,
             cadenceDays: followUpInfo.cadenceDays,
-            emailCount: emails.length,
-            hasResponded: hasAnyResponse, // Add this for easy filtering in UI
-            emails: emails.map(e => ({
+            emailCount: activities.length,
+            hasResponded: hasAnyResponse,
+            isManualOverride: followUpInfo.isManualOverride ?? false,
+            doNotContactAgain: followUpInfo.doNotContactAgain ?? false,
+            nextContactNote: followUpInfo.nextContactNote ?? null,
+            emails: activities.map(e => ({
               id: e.id,
-              sendDate: e.sendDate.toISOString(),
+              sendDate: sendDate(e),
               subject: e.subject,
               source: e.source,
               platform: e.platform,
@@ -166,11 +187,9 @@ export async function GET(request) {
       })
     );
 
-    // Filter out nulls and sort by next send date (most urgent first)
     const filteredContacts = enrichedContacts
       .filter(contact => contact !== null)
       .sort((a, b) => {
-        // Sort by next send date (nulls last)
         if (!a.nextSendDate && !b.nextSendDate) return 0;
         if (!a.nextSendDate) return 1;
         if (!b.nextSendDate) return -1;
@@ -178,13 +197,10 @@ export async function GET(request) {
       })
       .slice(0, limit);
 
-    // Get total count (for pagination)
     const totalCount = await prisma.contact.count({
       where: {
         crmId: companyHQId,
-        emails: {
-          some: emailWhere,
-        },
+        email_activities: { some: activityWhere },
       },
     });
 

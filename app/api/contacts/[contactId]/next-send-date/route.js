@@ -73,6 +73,9 @@ export async function GET(request, { params }) {
       relationship: result.relationship,
       cadenceDays: result.cadenceDays,
       isDue: result.daysUntilDue !== null && result.daysUntilDue <= 0,
+      isManualOverride: result.isManualOverride ?? false,
+      doNotContactAgain: result.doNotContactAgain ?? false,
+      nextContactNote: result.nextContactNote ?? null,
     });
   } catch (error) {
     console.error('❌ Calculate next send date error:', error);

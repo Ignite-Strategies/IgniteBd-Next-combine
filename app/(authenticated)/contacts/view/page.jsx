@@ -18,8 +18,10 @@ import {
   Copy,
   CheckCheck,
   Loader2,
+  Download,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { auth } from '@/lib/firebase';
 import CompanySelector from '@/components/CompanySelector';
 
 function ContactsViewPageContent() {
@@ -44,6 +46,7 @@ function ContactsViewPageContent() {
   const [assigningCompanyId, setAssigningCompanyId] = useState(null);
   const [selectedCompanyForAssign, setSelectedCompanyForAssign] = useState(null);
   const [savingCompanyAssignment, setSavingCompanyAssignment] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const lastValidatedCompanyHQId = useRef(null);
 
   // Redirect if no companyHQId in URL
@@ -143,6 +146,41 @@ function ContactsViewPageContent() {
       }
       return updated;
     });
+  };
+
+  const handleDownloadContacts = async () => {
+    if (!companyHQId) {
+      alert('Company context required. Please select a company first.');
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      alert('Please sign in to download contacts.');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/contacts/export?companyHQId=${encodeURIComponent(companyHQId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contacts_export_${companyHQId.slice(0, 8)}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Download failed. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const filteredContacts = useMemo(() => {
@@ -495,6 +533,16 @@ function ContactsViewPageContent() {
               >
                 <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Syncing...' : 'Sync'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadContacts}
+                disabled={downloading || !companyHQId}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Download contacts as CSV (see what's there, re-upload to update)"
+              >
+                <Download className="h-5 w-5" />
+                {downloading ? 'Downloading…' : 'Download CSV'}
               </button>
               <button
                 type="button"

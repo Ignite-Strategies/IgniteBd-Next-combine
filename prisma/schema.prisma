@@ -255,7 +255,6 @@ model campaigns {
   templates        templates?         @relation(fields: [template_id], references: [id])
   email_activities email_activities[]
   email_sequences  email_sequences[]
-  emails           emails[]
 
   @@index([company_hq_id])
   @@index([contact_list_id])
@@ -537,11 +536,19 @@ model Contact {
   urgencyScore                                              Int?
   buyingReadiness                                           BuyingReadiness?
   buyerPerson                                               BuyerPerson?
+  // Position intro within target company (where they sit in the path to a buyer)
+  introPositionInTarget                                     IntroPositionInTarget?
   // Manual outreach tracking fields
   persona_type                                              PersonaType?
   prior_relationship                                        RelationshipEnum?
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
   remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
+  // Snapped / manual contact dates (off-platform friendly)
+  lastContactedAt                                           DateTime? // Snap: last time we contacted (from emails/off-platform sends or manual)
+  lastRespondedAt                                           DateTime? // Snap: last time they replied (set when recording a response)
+  nextContactedAt                                           DateTime? // When to contact next: computed (cadence) or manual (e.g. follow next quarter)
+  nextContactNote                                            String?  // e.g. "Follow next quarter", "Do not call - asked to reach out in March"
+  doNotContactAgain                                         Boolean  @default(false) // If true, no follow-up; ignore nextContactedAt
   outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
   relationship_contexts                                     relationship_contexts?
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
@@ -557,8 +564,7 @@ model Contact {
   work_packages_work_packages_workPackageClientIdTocontacts work_packages[]            @relation("work_packages_workPackageClientIdTocontacts")
   work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]            @relation("work_packages_workPackageMemberIdTocontacts")
   contact_analyses                                          contact_analyses?
-  off_platform_email_sends                                  off_platform_email_sends[]
-  emails                                                    emails[]
+  email_activities                                          email_activities[]
 
   @@unique([email, crmId])
   @@index([companyDomain])
@@ -570,6 +576,11 @@ model Contact {
   @@index([role])
   @@index([prior_relationship])
   @@index([remindMeOn])
+  @@index([lastContactedAt])
+  @@index([lastRespondedAt])
+  @@index([nextContactedAt])
+  @@index([doNotContactAgain])
+  @@index([introPositionInTarget])
   @@map("contacts")
 }
 
@@ -627,27 +638,38 @@ model ecosystem_orgs {
   @@index([name])
 }
 
+// Single model for all email sends (platform + off-platform). Campaign/sequence nullable.
 model email_activities {
   id                  String           @id @default(cuid())
   owner_id            String
   contact_id          String?
   tenant_id           String?
-  email               String
-  subject             String
-  body                String
-  event               String?
-  messageId           String           @unique
+  email               String?          // Recipient email (optional for off-platform; use contact)
+  subject             String?
+  body                String?          @db.Text
+  event               String?          // sent, delivered, opened, clicked, etc.
+  messageId           String?          @unique // SendGrid message ID; null for off-platform
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
+  // Campaign/sequence — nullable; only set when sent via campaign/sequence
   campaign_id         String?
   sequence_id         String?
   sequence_step_id    String?
   reply_to_message_id String?
+  // Source: platform (SendGrid) vs off-platform (manual, gmail, etc.)
+  source              EmailSource?     @default(PLATFORM)
+  platform            String?         // "sendgrid", "gmail", "outlook", "apollo", "manual", "ai-draft"
+  sentAt              DateTime?        // When actually sent; null = use createdAt
+  // Response tracking (contact replied)
+  hasResponded        Boolean          @default(false)
+  contactResponse     String?          @db.Text
+  respondedAt         DateTime?
+  responseSubject     String?
   campaigns           campaigns?       @relation(fields: [campaign_id], references: [id])
   owners              owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   email_sequences     email_sequences? @relation(fields: [sequence_id], references: [id])
   sequence_steps      sequence_steps?  @relation(fields: [sequence_step_id], references: [id])
-  emails              emails?          @relation("EmailActivityToEmail")
+  contacts            Contact?         @relation(fields: [contact_id], references: [id], onDelete: Cascade)
 
   @@index([campaign_id])
   @@index([contact_id, createdAt])
@@ -655,6 +677,9 @@ model email_activities {
   @@index([messageId])
   @@index([owner_id])
   @@index([sequence_id])
+  @@index([source])
+  @@index([sentAt])
+  @@index([hasResponded])
 }
 
 model email_sequences {
@@ -1601,6 +1626,15 @@ enum BuyerPerson {
   PRODUCT_USER
 }
 
+/// Where this contact sits in the path to a buyer at the target company (not pipeline stage).
+enum IntroPositionInTarget {
+  DECISION_MAKER   // They are the buyer / can say yes
+  INTRO_WITHIN_TARGET  // Warm intro at the company; can pass to the buyer (e.g. "I'll check with internal counsel")
+  GATEKEEPER       // Controls access; may need to get past first
+  INFLUENCER       // Influences the decision
+  OTHER
+}
+
 enum BuyingReadiness {
   NOT_READY
   READY_NO_MONEY
@@ -1912,48 +1946,6 @@ enum EmailType {
   FOLLOWUP
 }
 
-model emails {
-  id        String      @id @default(cuid())
-  contactId String // FK to Contact
-  sendDate  DateTime // When email was sent
-  subject   String?
-  body      String?     @db.Text // Full email body
-  source    EmailSource // PLATFORM | OFF_PLATFORM
-  platform  String? // "sendgrid", "gmail", "outlook", "apollo", "manual"
-  emailType EmailType? // FIRST_TIME | FOLLOWUP
-
-  // Response tracking - contact response is stored as string on original email record
-  contactResponse String?   @db.Text // The actual reply text from contact
-  respondedAt     DateTime? // When contact responded
-  responseSubject String? // Subject of their reply
-  hasResponded    Boolean   @default(false)
-
-  // References to original records (if applicable)
-  emailActivityId   String? @unique // If from email_activities
-  offPlatformSendId String? @unique // If from off_platform_email_sends
-
-  // Metadata
-  messageId  String? @unique // SendGrid message ID (if platform)
-  campaignId String?
-  sequenceId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  contacts           Contact                   @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  email_activities   email_activities?         @relation("EmailActivityToEmail", fields: [emailActivityId], references: [id], onDelete: SetNull)
-  off_platform_sends off_platform_email_sends? @relation("OffPlatformSendToEmail", fields: [offPlatformSendId], references: [id], onDelete: SetNull)
-  campaigns          campaigns?                @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-
-  @@index([contactId])
-  @@index([contactId, sendDate])
-  @@index([sendDate])
-  @@index([hasResponded])
-  @@index([source])
-  @@index([messageId])
-  @@map("emails")
-}
-
 enum ContextOfRelationship {
   DONT_KNOW
   PRIOR_CONVERSATION
@@ -1990,23 +1982,4 @@ enum TemplatePosition {
   COMPETITOR_FRAME
   TARGET_ASK
   SOFT_CLOSE
-}
-
-model off_platform_email_sends {
-  id        String    @id @default(cuid())
-  contactId String
-  emailSent DateTime? // Null = draft (generated but not yet sent); set when actually sent
-  subject   String?   // Optional: what was the subject?
-  platform  String?   // Optional: "gmail", "outlook", "apollo", "manual", "ai-draft", etc.
-  notes     String?   // Optional: any notes or the email body
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  contacts Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  emails   emails? @relation("OffPlatformSendToEmail")
-
-  @@index([contactId])
-  @@index([contactId, emailSent])
-  @@index([emailSent])
-  @@map("off_platform_email_sends")
 }

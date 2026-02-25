@@ -1,4 +1,4 @@
-# Outreach Message Architecture
+but# Outreach Message Architecture
 
 > Last updated: Feb 2026  
 > Context: [Outreach Tracker + Contact Detail integration](./OUTREACH_TRACKER_AND_CONTACT_DETAIL_INTEGRATION.md)
@@ -132,6 +132,48 @@ Contact Detail "Build Email"
 | Persona tone/description | `outreach_personas` table (already exists) |
 | Snippet library | `ContentSnip` table (already exists) |
 | Saved reusable template | `templates` table + `personaSlug` field (migration pending) |
+
+---
+
+## Response handling: snap, pipeline, and not‑decision‑maker
+
+### 1. If they respond — snap on Contact
+
+When you record a response (e.g. `PUT /api/emails/[emailId]/response`), we:
+
+- Update the **email_activities** row (contactResponse, respondedAt, hasResponded).
+- **Snap `lastRespondedAt`** on the **Contact** model to the response date.
+
+So Contact has both **lastContactedAt** (when we last reached out) and **lastRespondedAt** (when they last replied). Tracker and contact detail can show “they responded” and sort/filter without joining to activities.
+
+### 2. Positive response → pipeline stage
+
+When you mark a response and the contact is in **prospect** pipeline, stage **engaged-awaiting-response**, we automatically move them to stage **interest**. So “they responded (positively)” = pipeline update. This is the default when recording a response with no disposition (or `responseDisposition: 'positive'`).
+
+### 3. Not the decision maker / “I’ll forward to someone” — pipeline vs position
+
+**Pipeline** = deal stage (are they in the funnel or not). **Position intro within target** = where they sit in the path to a buyer (decision maker vs warm intro at that company). So someone can be *out* of the prospect funnel but still **a warm intro to a buyer** — that’s first-class.
+
+When the reply is “not the buyer” or “I’ll forward to someone,” we:
+
+- **Pipeline:** They live on the **unassigned** pipeline. We set `pipeline = 'unassigned'`, `stage = null` (unassigned has no stages). So: out of the buying path, but still in the CRM.
+- **Position:** Set **`introPositionInTarget`** = **`INTRO_WITHIN_TARGET`** so they’re findable as “warm intro to a buyer at this company” (e.g. “I’ll check with internal counsel”).
+- **Notes:** Append a short line, e.g. `[Response] Not the decision maker.` or `[Response] Said they’ll forward to someone who may care.`
+- **Next step:** When they refer someone, add that person as a **new contact** (prospect); in notes, “Introduced by [Name].” See [Pipeline Deep Dive: Non‑buyers](./PIPELINE_DEEP_DIVE_NON_BUYERS.md).
+
+**Contact field:** `introPositionInTarget` (enum: `DECISION_MAKER` | `INTRO_WITHIN_TARGET` | `GATEKEEPER` | `INFLUENCER` | `OTHER`). Use it to filter “all intros within target” without overloading pipeline.
+
+To trigger this when recording the response, send **`responseDisposition`** in the body:
+
+| Value | Effect |
+|-------|--------|
+| `positive` (default) | Move prospect engaged-awaiting-response → interest. |
+| `not_decision_maker` | Unassigned + `introPositionInTarget=INTRO_WITHIN_TARGET` + append note. |
+| `forwarding` | Unassigned + `introPositionInTarget=INTRO_WITHIN_TARGET` + append note. |
+| `not_interested` | Set **doNotContactAgain** on the contact (no pipeline change). |
+
+**API:** `PUT /api/emails/[emailId]/response`  
+Body: `{ contactResponse, respondedAt?, responseSubject?, responseDisposition? }`.
 
 ---
 

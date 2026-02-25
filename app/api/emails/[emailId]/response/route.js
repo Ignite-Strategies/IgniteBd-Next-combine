@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { ensureContactPipeline } from '@/lib/services/pipelineService';
 
 /**
  * PUT /api/emails/[emailId]/response
  * Record a response from the contact
- * 
+ *
  * Body: {
  *   contactResponse: string (the reply text)
  *   respondedAt?: string (ISO date, defaults to now)
  *   responseSubject?: string
+ *   responseDisposition?: 'positive' | 'not_decision_maker' | 'forwarding' | 'not_interested'
+ *     - positive (default): move prospect engaged-awaiting-response → interest
+ *     - not_decision_maker | forwarding: move to unassigned, optionally append note
+ *     - not_interested: set doNotContactAgain on contact
  * }
  */
 export async function PUT(request, { params }) {
@@ -33,11 +38,11 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const email = await prisma.emails.findUnique({
+    const activity = await prisma.email_activities.findUnique({
       where: { id: emailId },
     });
 
-    if (!email) {
+    if (!activity) {
       return NextResponse.json(
         { success: false, error: 'Email not found' },
         { status: 404 },
@@ -45,7 +50,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { contactResponse, respondedAt, responseSubject } = body ?? {};
+    const { contactResponse, respondedAt, responseSubject, responseDisposition } = body ?? {};
 
     if (!contactResponse) {
       return NextResponse.json(
@@ -54,7 +59,6 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Parse respondedAt or use now
     const responseDate = respondedAt ? new Date(respondedAt) : new Date();
     if (isNaN(responseDate.getTime())) {
       return NextResponse.json(
@@ -63,8 +67,7 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Update email with response
-    const updatedEmail = await prisma.emails.update({
+    const updated = await prisma.email_activities.update({
       where: { id: emailId },
       data: {
         contactResponse,
@@ -86,32 +89,66 @@ export async function PUT(request, { params }) {
 
     console.log('✅ Response recorded for email:', emailId);
 
-    // Move contact deal pipeline from engaged-awaiting-response → interest when they respond
-    const contactId = updatedEmail.contactId;
+    const contactId = updated.contact_id;
     if (contactId) {
+      // Snap lastRespondedAt on Contact
       try {
-        const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
-        if (pipe?.pipeline === 'prospect' && pipe?.stage === 'engaged-awaiting-response') {
-          await prisma.pipelines.update({
-            where: { contactId },
-            data: { stage: 'interest', updatedAt: new Date() },
+        await prisma.contacts.update({
+          where: { id: contactId },
+          data: { lastRespondedAt: responseDate },
+        });
+      } catch (e) {
+        console.warn('⚠️ Could not snap lastRespondedAt:', e?.message);
+      }
+
+      const disposition = responseDisposition || 'positive';
+      try {
+        if (disposition === 'not_decision_maker' || disposition === 'forwarding') {
+          await ensureContactPipeline(contactId, { pipeline: 'unassigned' });
+          const noteSuffix = disposition === 'forwarding'
+            ? '\n\n[Response] Said they’ll forward to someone who may care.'
+            : '\n\n[Response] Not the decision maker.';
+          const contact = await prisma.contacts.findUnique({ where: { id: contactId }, select: { notes: true } });
+          const newNotes = (contact?.notes || '').trim() + noteSuffix;
+          await prisma.contacts.update({
+            where: { id: contactId },
+            data: {
+              notes: newNotes.trim() || null,
+              introPositionInTarget: 'INTRO_WITHIN_TARGET', // warm intro to a buyer at target company
+            },
           });
-          console.log('✅ Deal pipeline stage → interest for contact:', contactId);
+          console.log('✅ Contact → unassigned + introPositionInTarget=INTRO_WITHIN_TARGET (', disposition, ')');
+        } else if (disposition === 'not_interested') {
+          await prisma.contacts.update({
+            where: { id: contactId },
+            data: { doNotContactAgain: true },
+          });
+          console.log('✅ Contact marked doNotContactAgain (not_interested)');
+        } else {
+          // positive (default): move prospect engaged-awaiting-response → interest
+          const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
+          if (pipe?.pipeline === 'prospect' && pipe?.stage === 'engaged-awaiting-response') {
+            await prisma.pipelines.update({
+              where: { contactId },
+              data: { stage: 'interest', updatedAt: new Date() },
+            });
+            console.log('✅ Deal pipeline stage → interest for contact:', contactId);
+          }
         }
       } catch (pipeErr) {
-        console.warn('⚠️ Could not update deal pipeline stage:', pipeErr.message);
+        console.warn('⚠️ Could not update pipeline/contact:', pipeErr.message);
       }
     }
 
     return NextResponse.json({
       success: true,
       email: {
-        id: updatedEmail.id,
-        hasResponded: updatedEmail.hasResponded,
-        contactResponse: updatedEmail.contactResponse,
-        respondedAt: updatedEmail.respondedAt.toISOString(),
-        responseSubject: updatedEmail.responseSubject,
-        contact: updatedEmail.contacts,
+        id: updated.id,
+        hasResponded: updated.hasResponded,
+        contactResponse: updated.contactResponse,
+        respondedAt: updated.respondedAt.toISOString(),
+        responseSubject: updated.responseSubject,
+        contact: updated.contacts,
       },
     });
   } catch (error) {

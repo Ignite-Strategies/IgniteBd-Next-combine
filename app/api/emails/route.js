@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { snapContactLastContactedAt } from '@/lib/services/followUpCalculator';
 
 /**
  * POST /api/emails
@@ -19,8 +20,9 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
  * }
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -29,6 +31,17 @@ export async function POST(request) {
   }
 
   try {
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: { id: true },
+    });
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
     const payload = await request.json();
     const {
       contactId,
@@ -55,11 +68,9 @@ export async function POST(request) {
       );
     }
 
-    // Verify contact exists
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
     });
-
     if (!contact) {
       return NextResponse.json(
         { success: false, error: 'Contact not found' },
@@ -67,7 +78,6 @@ export async function POST(request) {
       );
     }
 
-    // Parse sendDate or use now
     const emailSendDate = sendDate ? new Date(sendDate) : new Date();
     if (isNaN(emailSendDate.getTime())) {
       return NextResponse.json(
@@ -76,44 +86,43 @@ export async function POST(request) {
       );
     }
 
-    // Create email record
-    const email = await prisma.emails.create({
+    const activity = await prisma.email_activities.create({
       data: {
-        contactId,
-        sendDate: emailSendDate,
+        owner_id: owner.id,
+        contact_id: contactId,
+        email: contact.email || '',
         subject: subject || null,
         body: bodyText || null,
-        source: source,
+        event: null,
+        messageId: null,
+        source,
         platform: platform || null,
-        campaignId: campaignId || null,
-        sequenceId: sequenceId || null,
-      },
-      include: {
-        contacts: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
+        sentAt: emailSendDate,
+        campaign_id: campaignId || null,
+        sequence_id: sequenceId || null,
       },
     });
 
-    console.log('✅ Email record created:', email.id);
+    try {
+      await snapContactLastContactedAt(contactId, emailSendDate);
+    } catch (snapErr) {
+      console.warn('⚠️ Could not snap lastContactedAt:', snapErr.message);
+    }
+
+    console.log('✅ Email activity created:', activity.id);
 
     return NextResponse.json({
       success: true,
       email: {
-        id: email.id,
-        contactId: email.contactId,
-        sendDate: email.sendDate.toISOString(),
-        subject: email.subject,
-        body: email.body,
-        source: email.source,
-        platform: email.platform,
-        hasResponded: email.hasResponded,
-        createdAt: email.createdAt.toISOString(),
+        id: activity.id,
+        contactId: contactId,
+        sendDate: (activity.sentAt ?? activity.createdAt).toISOString(),
+        subject: activity.subject,
+        body: activity.body,
+        source: activity.source,
+        platform: activity.platform,
+        hasResponded: activity.hasResponded,
+        createdAt: activity.createdAt.toISOString(),
       },
     });
   } catch (error) {
@@ -157,13 +166,13 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
     const where = {};
-    if (contactId) where.contactId = contactId;
-    if (hasResponded !== null) where.hasResponded = hasResponded === 'true';
+    if (contactId) where.contact_id = contactId;
+    if (hasResponded === 'true' || hasResponded === 'false') where.hasResponded = hasResponded === 'true';
     if (source) where.source = source;
 
-    const emails = await prisma.emails.findMany({
+    const activities = await prisma.email_activities.findMany({
       where,
-      orderBy: { sendDate: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
         contacts: {
@@ -179,24 +188,24 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      emails: emails.map(email => ({
-        id: email.id,
-        contactId: email.contactId,
-        sendDate: email.sendDate.toISOString(),
-        subject: email.subject,
-        body: email.body,
-        source: email.source,
-        platform: email.platform,
-        hasResponded: email.hasResponded,
-        contactResponse: email.contactResponse,
-        respondedAt: email.respondedAt ? email.respondedAt.toISOString() : null,
-        responseSubject: email.responseSubject,
-        messageId: email.messageId,
-        campaignId: email.campaignId,
-        createdAt: email.createdAt.toISOString(),
-        contact: email.contacts,
+      emails: activities.map(a => ({
+        id: a.id,
+        contactId: a.contact_id,
+        sendDate: (a.sentAt ?? a.createdAt).toISOString(),
+        subject: a.subject,
+        body: a.body,
+        source: a.source,
+        platform: a.platform,
+        hasResponded: a.hasResponded,
+        contactResponse: a.contactResponse,
+        respondedAt: a.respondedAt ? a.respondedAt.toISOString() : null,
+        responseSubject: a.responseSubject,
+        messageId: a.messageId,
+        campaignId: a.campaign_id,
+        createdAt: a.createdAt.toISOString(),
+        contact: a.contacts,
       })),
-      count: emails.length,
+      count: activities.length,
     });
   } catch (error) {
     console.error('❌ Get emails error:', error);

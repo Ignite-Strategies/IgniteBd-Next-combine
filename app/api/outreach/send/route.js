@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { readPayload, deletePayload } from '@/lib/redis';
 import sgMail from '@sendgrid/mail';
 import { handleServerError, getErrorStatusCode } from '@/lib/serverError';
+import { snapContactLastContactedAt } from '@/lib/services/followUpCalculator';
 
 // Initialize SendGrid (lazy)
 let sendGridInitialized = false;
@@ -180,72 +181,63 @@ export async function POST(request) {
       );
     }
 
-    // Step 5: Log email activity and create unified email record
     const toEmail = msg.personalizations[0]?.to[0]?.email || '';
     const subject = msg.personalizations[0]?.subject || '';
     const emailBody = msg.content[0]?.value || '';
-    // custom_args is now inside personalizations[0]
     const customArgs = msg.personalizations[0]?.custom_args || {};
-    const emailId = customArgs.emailId || null; // Optional: emailId from compose UX
-    
+    const draftActivityId = customArgs.emailId || null;
+
     let emailActivityId = null;
     let createdEmailId = null;
-    
+
     try {
-      // Create email_activities record (existing behavior)
-      const emailActivity = await prisma.email_activities.create({
-        data: {
-          owner_id: owner.id,
-          contact_id: customArgs.contactId || null,
-          tenant_id: customArgs.tenantId || null,
-          campaign_id: customArgs.campaignId || null,
-          sequence_id: customArgs.sequenceId || null,
-          sequence_step_id: customArgs.sequenceStepId || null,
-          email: toEmail,
-          subject: subject,
-          body: emailBody,
-          messageId: messageId || '',
-          event: 'sent',
-        },
-      });
-      emailActivityId = emailActivity.id;
-      console.log('✅ Email activity logged:', emailActivityId);
-      
-      // Create or update unified emails record
-      if (emailId) {
-        // Update existing email record (created by compose UX)
-        const updatedEmail = await prisma.emails.update({
-          where: { id: emailId },
+      if (draftActivityId) {
+        const updated = await prisma.email_activities.update({
+          where: { id: draftActivityId },
           data: {
             messageId: messageId || null,
-            emailActivityId: emailActivityId,
-            sendDate: new Date(), // Update to actual send time
+            event: 'sent',
+            sentAt: new Date(),
           },
         });
-        createdEmailId = updatedEmail.id;
-        console.log('✅ Email record updated:', createdEmailId);
-      } else if (customArgs.contactId) {
-        // Create new email record (backward compatibility)
-        const email = await prisma.emails.create({
+        emailActivityId = updated.id;
+        createdEmailId = updated.id;
+        console.log('✅ Draft email activity updated and sent:', emailActivityId);
+      } else {
+        const emailActivity = await prisma.email_activities.create({
           data: {
-            contactId: customArgs.contactId,
-            sendDate: new Date(),
-            subject: subject || null,
-            body: emailBody || null,
+            owner_id: owner.id,
+            contact_id: customArgs.contactId || null,
+            tenant_id: customArgs.tenantId || null,
+            campaign_id: customArgs.campaignId || null,
+            sequence_id: customArgs.sequenceId || null,
+            sequence_step_id: customArgs.sequenceStepId || null,
+            email: toEmail,
+            subject: subject,
+            body: emailBody,
+            messageId: messageId || null,
+            event: 'sent',
             source: 'PLATFORM',
             platform: 'sendgrid',
-            messageId: messageId || null,
-            emailActivityId: emailActivityId,
-            campaignId: customArgs.campaignId || null,
-            sequenceId: customArgs.sequenceId || null,
+            sentAt: new Date(),
           },
         });
-        createdEmailId = email.id;
-        console.log('✅ Email record created:', createdEmailId);
+        emailActivityId = emailActivity.id;
+        createdEmailId = emailActivity.id;
+        console.log('✅ Email activity logged:', emailActivityId);
       }
     } catch (dbError) {
       console.warn('⚠️ Could not log email activity:', dbError.message);
-      // Don't fail the send if logging fails
+    }
+
+    // Snap lastContactedAt on contact (off-platform friendly)
+    const contactIdForSnap = customArgs.contactId || null;
+    if (contactIdForSnap) {
+      try {
+        await snapContactLastContactedAt(contactIdForSnap, new Date());
+      } catch (snapErr) {
+        console.warn('⚠️ Could not snap lastContactedAt:', snapErr.message);
+      }
     }
 
     // Move contact deal pipeline to engaged-awaiting-response when first outreach sent (prospect + need-to-engage only)

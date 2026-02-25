@@ -40,75 +40,45 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Get platform sends (email_activities)
-    const platformSends = await prisma.email_activities.findMany({
-      where: {
-        contact_id: contactId,
-        event: 'sent', // Only actual sends
-      },
+    // Single table: all sends (platform + off-platform) in email_activities
+    const allSends = await prisma.email_activities.findMany({
+      where: { contact_id: contactId },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         createdAt: true,
+        sentAt: true,
         subject: true,
         email: true,
+        body: true,
         event: true,
         campaign_id: true,
+        source: true,
+        platform: true,
+        hasResponded: true,
       },
     });
 
-    // Get off-platform sends (including drafts — emailSent is now nullable)
-    const offPlatformSends = await prisma.off_platform_email_sends.findMany({
-      where: { contactId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const drafts = allSends.filter(s => s.source === 'OFF_PLATFORM' && !s.sentAt);
+    const sent = allSends.filter(s => s.event === 'sent' || (s.source === 'OFF_PLATFORM' && s.sentAt));
 
-    const drafts = offPlatformSends.filter(s => !s.emailSent);
-    const sent = offPlatformSends.filter(s => !!s.emailSent);
-
-    // Combine and sort — drafts float to the top, sent sorted by date
-    const activities = [
-      // Drafts first (sorted by createdAt desc)
-      ...drafts.map(send => ({
+    const activities = allSends.map(send => {
+      const isDraft = send.source === 'OFF_PLATFORM' && !send.sentAt;
+      const date = (send.sentAt ?? send.createdAt).toISOString();
+      return {
         id: send.id,
-        type: 'draft',
-        isDraft: true,
-        date: send.createdAt.toISOString(),
-        subject: send.subject,
-        email: null,
-        event: null,
-        campaignId: null,
-        platform: send.platform,
-        notes: send.notes,
-      })),
-      // Platform sends
-      ...platformSends.map(send => ({
-        id: send.id,
-        type: 'platform',
-        isDraft: false,
-        date: send.createdAt.toISOString(),
+        type: send.source === 'OFF_PLATFORM' ? (isDraft ? 'draft' : 'off-platform') : 'platform',
+        isDraft,
+        date,
         subject: send.subject,
         email: send.email,
         event: send.event,
         campaignId: send.campaign_id,
-        platform: null,
-        notes: null,
-      })),
-      // Off-platform sent (has a date)
-      ...sent.map(send => ({
-        id: send.id,
-        type: 'off-platform',
-        isDraft: false,
-        date: send.emailSent.toISOString(),
-        subject: send.subject,
-        email: null,
-        event: null,
-        campaignId: null,
         platform: send.platform,
-        notes: send.notes,
-      })),
-    ].sort((a, b) => {
-      // Drafts always first
+        notes: send.body,
+        hasResponded: send.hasResponded,
+      };
+    }).sort((a, b) => {
       if (a.isDraft && !b.isDraft) return -1;
       if (!a.isDraft && b.isDraft) return 1;
       return new Date(b.date) - new Date(a.date);
@@ -118,8 +88,8 @@ export async function GET(request, { params }) {
       success: true,
       activities,
       totalCount: activities.length,
-      platformCount: platformSends.length,
-      offPlatformCount: sent.length,
+      platformCount: sent.filter(a => a.type === 'platform').length,
+      offPlatformCount: sent.filter(a => a.type === 'off-platform').length,
       draftCount: drafts.length,
     });
   } catch (error) {
