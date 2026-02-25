@@ -53,7 +53,30 @@ Several relationship context fields are stored as `"DONT_KNOW"` when the user ha
 
 ---
 
-## Downstream: Saving Generated Messages as Templates
+## Saving Generated Messages — Two Paths
+
+When the user hits **Save as Template** on the outreach-message page, two things happen in parallel:
+
+### 1. Draft on the contact (`off_platform_email_sends`, `emailSent = null`)
+
+The generated message is saved as a draft email record directly on the contact. `emailSent` is nullable — `null` means draft, a date means sent.
+
+- **Fast lookup path:** Contact → Email History → see draft → "Edit & Send"
+- No template lookup, no personaSlug matching — the message is right there on the person
+- `platform = "ai-draft"` distinguishes it from manually-recorded sends
+- Contact detail Email History shows drafts at the top with an amber "Draft" badge + "Edit & Send" link
+- Only actual sends (non-null `emailSent`) advance the pipeline stage
+
+### 2. Template in the library (`templates`, keyed by `personaSlug`)
+
+Simultaneously saved to the templates table with `personaSlug` for future reuse across contacts with the same persona type.
+
+- **Slow lookup path (future):** Template → match personaSlug → suggest to next contact with same persona
+- Already wired, `personaSlug` column live in DB
+
+---
+
+## Downstream: Template Reuse by Persona
 
 ### The question
 Should a generated outreach message be saved as:

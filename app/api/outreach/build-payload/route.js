@@ -103,12 +103,13 @@ export async function POST(request) {
     
     // Step 3.6: ALWAYS hydrate variables in content (regardless of template or manual entry)
     // Body field is single source of truth - variables get resolved from database
-    // This works whether content came from template or was manually typed
+    // companyHQId enables same-company snippet logic (omit "as you may remember" when contact is at our company)
     const context = {
       contactId: contactId || undefined,
       contactEmail: undefined, // Will be inferred from 'to' if contactId is missing
       to: to, // Pass 'to' field so variable mapper can extract email if needed
       ownerId: owner.id,
+      companyHQId: tenantId || undefined,
     };
     
     // Hydrate variables in subject and body using variable mapper service

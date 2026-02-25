@@ -6,7 +6,17 @@ import { Upload, User, X, ChevronRight } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { auth } from '@/lib/firebase';
 
-// Client-side CSV parse: preserve original header casing, strip BOM so headers match
+// Known header phrases: if the first line has any of these (lowercased), we treat it as a header row
+const HEADER_ROW_HINTS = new Set([
+  'first name', 'last name', 'firstname', 'lastname', 'first', 'last', 'fname', 'lname',
+  'given name', 'family name', 'surname', 'email', 'email address', 'company', 'company name',
+  'companyname', 'organization', 'org', 'title', 'job title', 'jobtitle', 'position', 'role',
+  'url', 'linkedin', 'linkedin url', 'linkedinurl', 'profile url', 'profileurl', 'profile',
+  'connected on', 'connectedon', 'date connected', 'phone', 'phone number', 'phonenumber', 'mobile',
+  'notes', 'note', 'description', 'pipeline', 'stage',
+]);
+
+// Client-side CSV parse: preserve original header casing, strip BOM. If first line doesn't look like headers, treat it as data and use Column 1, Column 2, ...
 function parseCSVClient(csvText) {
   const normalized = (typeof csvText === 'string' ? csvText : '').replace(/^\uFEFF/, '');
   const lines = normalized.split(/\r?\n/).filter((line) => line.trim());
@@ -31,11 +41,17 @@ function parseCSVClient(csvText) {
     out.push(cur.trim());
     return out;
   };
-  const rawHeaders = parseLine(lines[0]);
-  const headers = rawHeaders.map((h) => h.trim()).filter(Boolean);
+  const firstLineVals = parseLine(lines[0]).map((h) => h.trim()).filter(Boolean);
+  const firstLineLower = firstLineVals.map((c) => c.toLowerCase());
+  const looksLikeHeader = firstLineLower.some((cell) => cell && HEADER_ROW_HINTS.has(cell));
+  const noHeaderRow = !looksLikeHeader;
+  const headers = looksLikeHeader
+    ? firstLineVals
+    : firstLineVals.map((_, i) => `Column ${i + 1}`);
+  const dataStartIndex = looksLikeHeader ? 1 : 0;
   const rows = [];
   const errors = [];
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = dataStartIndex; i < lines.length; i++) {
     const vals = parseLine(lines[i]);
     if (vals.every((v) => !v.trim())) continue;
     if (vals.length !== headers.length) {
@@ -48,7 +64,7 @@ function parseCSVClient(csvText) {
     });
     rows.push(row);
   }
-  return { headers, rows, errors };
+  return { headers, rows, errors, noHeaderRow };
 }
 
 // Same as batch API: CSV header (any case) → our field key
@@ -436,6 +452,11 @@ export default function ContactUploadPage() {
               {step === 0 && (
                 <>
                   <p className="mb-2 text-gray-600">Preview: first rows from your file.</p>
+                  {parsed.noHeaderRow && (
+                    <p className="mb-2 text-sm text-blue-700 bg-blue-50 rounded-lg px-3 py-2">
+                      No header row detected — your first line was used as data. Columns are named Column 1, Column 2, … and will be inferred from content on the next step.
+                    </p>
+                  )}
                   <div className="overflow-x-auto border rounded-lg max-h-80 overflow-y-auto">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-100 sticky top-0">

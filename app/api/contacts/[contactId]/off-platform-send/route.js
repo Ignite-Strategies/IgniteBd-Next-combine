@@ -49,25 +49,21 @@ export async function POST(request, { params }) {
     const body = await request.json();
     const { emailSent, subject, body: emailBody, platform, notes } = body ?? {};
 
-    if (!emailSent) {
-      return NextResponse.json(
-        { success: false, error: 'emailSent is required' },
-        { status: 400 },
-      );
+    // emailSent is now optional — null/omitted means this is a saved draft
+    let emailSentDate = null;
+    if (emailSent) {
+      emailSentDate = new Date(emailSent);
+      if (isNaN(emailSentDate.getTime())) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid emailSent date format' },
+          { status: 400 },
+        );
+      }
     }
 
-    // Parse and validate date
-    const emailSentDate = new Date(emailSent);
-    if (isNaN(emailSentDate.getTime())) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid emailSent date format' },
-        { status: 400 },
-      );
-    }
+    const isDraft = !emailSentDate;
 
-    // Create off-platform send record
-    // Store body in notes field (schema doesn't have separate body field yet)
-    // Format: "BODY:\n{body}\n\nNOTES:\n{notes}" if both exist, or just body/notes if one exists
+    // Combine body + notes into notes field
     let notesField = null;
     if (emailBody && notes) {
       notesField = `BODY:\n${emailBody}\n\nNOTES:\n${notes}`;
@@ -80,35 +76,39 @@ export async function POST(request, { params }) {
     const offPlatformSend = await prisma.off_platform_email_sends.create({
       data: {
         contactId,
-        emailSent: emailSentDate,
+        emailSent: emailSentDate, // null = draft
         subject: subject || null,
         platform: platform || null,
         notes: notesField,
       },
     });
 
-    console.log('✅ Off-platform email send tracked:', offPlatformSend.id);
+    console.log(`✅ Off-platform email ${isDraft ? 'draft saved' : 'send tracked'}:`, offPlatformSend.id);
 
-    // Move contact deal pipeline to engaged-awaiting-response when first outreach sent (prospect + need-to-engage only)
-    try {
-      const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
-      if (pipe?.pipeline === 'prospect' && pipe?.stage === 'need-to-engage') {
-        await prisma.pipelines.update({
-          where: { contactId },
-          data: { stage: 'engaged-awaiting-response', updatedAt: new Date() },
-        });
-        console.log('✅ Deal pipeline stage → engaged-awaiting-response for contact:', contactId);
+    // Only advance pipeline stage on actual sends (not drafts)
+    if (!isDraft) {
+      try {
+        const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
+        if (pipe?.pipeline === 'prospect' && pipe?.stage === 'need-to-engage') {
+          await prisma.pipelines.update({
+            where: { contactId },
+            data: { stage: 'engaged-awaiting-response', updatedAt: new Date() },
+          });
+          console.log('✅ Deal pipeline stage → engaged-awaiting-response for contact:', contactId);
+        }
+      } catch (pipeErr) {
+        console.warn('⚠️ Could not update deal pipeline stage:', pipeErr.message);
       }
-    } catch (pipeErr) {
-      console.warn('⚠️ Could not update deal pipeline stage:', pipeErr.message);
     }
 
     return NextResponse.json({
       success: true,
+      isDraft,
       offPlatformSend: {
         id: offPlatformSend.id,
         contactId: offPlatformSend.contactId,
-        emailSent: offPlatformSend.emailSent.toISOString(),
+        emailSent: offPlatformSend.emailSent?.toISOString() ?? null,
+        isDraft,
         subject: offPlatformSend.subject,
         platform: offPlatformSend.platform,
         notes: offPlatformSend.notes,
@@ -163,7 +163,8 @@ export async function GET(request, { params }) {
       offPlatformSends: offPlatformSends.map(send => ({
         id: send.id,
         contactId: send.contactId,
-        emailSent: send.emailSent.toISOString(),
+        emailSent: send.emailSent?.toISOString() ?? null,
+        isDraft: !send.emailSent,
         subject: send.subject,
         platform: send.platform,
         notes: send.notes,

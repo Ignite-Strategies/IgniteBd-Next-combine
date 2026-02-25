@@ -1993,14 +1993,14 @@ enum TemplatePosition {
 }
 
 model off_platform_email_sends {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   contactId String
-  emailSent DateTime // When the email was actually sent (off-platform)
-  subject   String? // Optional: what was the subject?
-  platform  String? // Optional: "gmail", "outlook", "apollo", "manual", etc.
-  notes     String? // Optional: any notes about the send
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  emailSent DateTime? // Null = draft (generated but not yet sent); set when actually sent
+  subject   String?   // Optional: what was the subject?
+  platform  String?   // Optional: "gmail", "outlook", "apollo", "manual", "ai-draft", etc.
+  notes     String?   // Optional: any notes or the email body
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   contacts Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   emails   emails? @relation("OffPlatformSendToEmail")

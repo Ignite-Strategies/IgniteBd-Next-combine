@@ -1324,37 +1324,52 @@ export default function ContactDetailPage({ params }) {
                 Loading email history...
               </div>
             ) : emailHistory.length > 0 ? (
-              <div className="space-y-4">
-                {emailHistory.slice(0, 5).map((email, idx) => (
-                  <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <span>{new Date(email.date).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span className="capitalize">{email.type === 'platform' ? 'Platform' : 'Off-Platform'}</span>
-                        {email.platform && (
-                          <>
-                            <span>•</span>
-                            <span>{email.platform}</span>
-                          </>
+              <div className="space-y-3">
+                {emailHistory.slice(0, 6).map((email, idx) => {
+                  const isDraft = email.isDraft || email.type === 'draft';
+                  return (
+                    <div
+                      key={idx}
+                      className={`rounded-lg border p-4 ${isDraft ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}
+                    >
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {isDraft ? (
+                            <span className="rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                              Draft
+                            </span>
+                          ) : (
+                            <span>{new Date(email.date).toLocaleDateString()}</span>
+                          )}
+                          <span>•</span>
+                          <span className="capitalize">
+                            {isDraft ? (email.platform === 'ai-draft' ? 'AI Generated' : 'Draft') : email.type === 'platform' ? 'Platform' : 'Off-Platform'}
+                          </span>
+                          {!isDraft && email.platform && email.platform !== 'ai-draft' && (
+                            <>
+                              <span>•</span>
+                              <span className="capitalize">{email.platform}</span>
+                            </>
+                          )}
+                        </div>
+                        {isDraft && (
+                          <button
+                            onClick={() => router.push(`/contacts/${contactId}/outreach-message?companyHQId=${companyHQId}`)}
+                            className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+                          >
+                            Edit &amp; Send
+                          </button>
                         )}
                       </div>
-                      {email.type === 'platform' && email.hasResponded && (
-                        <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
-                          ✓ Responded
-                        </span>
+                      <div className="font-medium text-gray-900 text-sm">{email.subject || 'No subject'}</div>
+                      {email.notes && (
+                        <div className="mt-1 text-xs text-gray-600 line-clamp-2">{email.notes}</div>
                       )}
                     </div>
-                    <div className="mb-2 font-medium text-gray-900">{email.subject || 'No subject'}</div>
-                    {email.notes && (
-                      <div className="text-sm text-gray-600 line-clamp-2">{email.notes}</div>
-                    )}
-                  </div>
-                ))}
-                {emailHistory.length > 5 && (
-                  <p className="text-sm text-gray-500 italic">
-                    Showing 5 of {emailHistory.length} emails
-                  </p>
+                  );
+                })}
+                {emailHistory.length > 6 && (
+                  <p className="text-sm text-gray-500 italic">Showing 6 of {emailHistory.length} emails</p>
                 )}
               </div>
             ) : (

@@ -124,6 +124,9 @@ export default function OutreachMessagePage({ params }) {
   const [snippetCount, setSnippetCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [showTemplatPrompt, setShowTemplatePrompt] = useState(false);
 
   // Load contact + snippet count
   useEffect(() => {
@@ -167,24 +170,51 @@ export default function OutreachMessagePage({ params }) {
     setSaving(true);
     setError('');
     try {
+      // Step 1: always save as a draft on the contact (no emailSent = draft)
+      const draftRes = await api.post(`/api/contacts/${contactId}/off-platform-send`, {
+        subject: result.subject,
+        body: result.body,
+        platform: 'ai-draft',
+        // no emailSent → null → draft
+      });
+
+      if (draftRes.data?.success) {
+        setSaved(true);
+        // Step 2: prompt user if they also want to save as a reusable template
+        setShowTemplatePrompt(true);
+      } else {
+        setError(draftRes.data?.error || 'Failed to save draft');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    setSavingTemplate(true);
+    setError('');
+    try {
       const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
       const res = await api.post('/api/templates', {
         companyHQId,
         ownerId,
-        title: result.subject, // use subject as title — clean enough
+        title: result.subject,
         subject: result.subject,
         body: result.body,
         ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
       });
       if (res.data?.success) {
-        setSaved(true);
+        setTemplateSaved(true);
+        setShowTemplatePrompt(false);
       } else {
         setError(res.data?.error || 'Failed to save template');
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to save template');
     } finally {
-      setSaving(false);
+      setSavingTemplate(false);
     }
   };
 
@@ -397,38 +427,71 @@ export default function OutreachMessagePage({ params }) {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-3 pt-1">
-              {saved ? (
-                <span className="flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm font-semibold text-green-700">
-                  <Check className="h-4 w-4" />
-                  Saved to templates
-                </span>
-              ) : (
+            <div className="space-y-3 pt-1">
+              {/* Primary actions row */}
+              <div className="flex items-center gap-3">
+                {saved ? (
+                  <span className="flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm font-semibold text-green-700">
+                    <Check className="h-4 w-4" />
+                    Draft saved to contact
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                  >
+                    {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    {saving ? 'Saving…' : 'Save Draft'}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                  onClick={() => { setResult(null); setError(''); setSaved(false); setShowTemplatePrompt(false); setTemplateSaved(false); }}
+                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
                 >
-                  {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {saving ? 'Saving…' : 'Save as Template'}
+                  <RefreshCw className="h-4 w-4" />
+                  Regenerate
                 </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/contacts/${contactId}?companyHQId=${companyHQId}`)}
+                  className="text-sm text-gray-500 hover:text-gray-700 px-2 py-2"
+                >
+                  Back to contact
+                </button>
+              </div>
+
+              {/* Template prompt — appears after draft is saved */}
+              {showTemplatPrompt && !templateSaved && (
+                <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <span className="text-sm text-gray-700">Save this as a reusable template?</span>
+                  <button
+                    type="button"
+                    onClick={handleSaveTemplate}
+                    disabled={savingTemplate}
+                    className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50 transition"
+                  >
+                    {savingTemplate ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplatePrompt(false)}
+                    className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition"
+                  >
+                    No
+                  </button>
+                </div>
               )}
-              <button
-                type="button"
-                onClick={() => { setResult(null); setError(''); setSaved(false); }}
-                className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Regenerate
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push(`/contacts/${contactId}?companyHQId=${companyHQId}`)}
-                className="text-sm text-gray-500 hover:text-gray-700 px-2 py-2"
-              >
-                Back to contact
-              </button>
+
+              {templateSaved && (
+                <span className="flex items-center gap-1.5 text-sm text-purple-700 font-medium">
+                  <Check className="h-4 w-4" />
+                  Saved to template library
+                </span>
+              )}
             </div>
           </div>
         )}
