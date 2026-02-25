@@ -543,6 +543,7 @@ model Contact {
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
   remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
   outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
+  relationshipContext                                       Json? // Generated relationship context from notes (formerCompany, primaryWork, relationshipQuality, etc.)
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
   companies                                                 companies?                 @relation(fields: [contactCompanyId], references: [id])

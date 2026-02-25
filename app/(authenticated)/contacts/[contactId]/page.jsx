@@ -1224,7 +1224,7 @@ export default function ContactDetailPage({ params }) {
                       setSavingRelationshipContext(true);
                       try {
                         const response = await api.put(`/api/contacts/${contactId}`, {
-                          relationshipContext: JSON.stringify(relationshipContext),
+                          relationshipContext: relationshipContext, // Send as object, API will handle JSON
                         });
                         if (response.data?.success) {
                           setContact(response.data.contact);

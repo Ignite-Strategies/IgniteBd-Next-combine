@@ -187,6 +187,7 @@ export async function PUT(request, { params }) {
       pipeline,
       stage,
       outreachPersonaSlug,
+      relationshipContext, // JSON field for relationship context
     } = body ?? {};
 
     // Validate pipeline and stage if provided
@@ -237,6 +238,23 @@ export async function PUT(request, { params }) {
           );
         }
         updateData.outreachPersonaSlug = outreachPersonaSlug;
+      }
+    }
+    if (relationshipContext !== undefined) {
+      // Parse JSON string if provided as string, otherwise use as-is
+      if (typeof relationshipContext === 'string') {
+        try {
+          updateData.relationshipContext = JSON.parse(relationshipContext);
+        } catch (e) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid relationshipContext JSON format' },
+            { status: 400 },
+          );
+        }
+      } else if (relationshipContext === null) {
+        updateData.relationshipContext = null;
+      } else {
+        updateData.relationshipContext = relationshipContext;
       }
     }
 
