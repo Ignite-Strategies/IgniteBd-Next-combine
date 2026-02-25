@@ -123,6 +123,7 @@ export default function OutreachMessagePage({ params }) {
   // result.rawBody = original with {{snippet:slug}} refs; result.body = current editable (may be filled)
   const [result, setResult] = useState(null);
   const [snippetContentMap, setSnippetContentMap] = useState({}); // { slug: text }
+  const [senderName, setSenderName] = useState('');
   const [isFilled, setIsFilled] = useState(false); // whether Fill with Data has been applied
   const [snippetCount, setSnippetCount] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -225,27 +226,34 @@ export default function OutreachMessagePage({ params }) {
 
   const fillWithData = useCallback(() => {
     if (!result) return;
+
+    // Build variable map from contact — keep {{variable}} if value unknown
     const firstName = contact?.goesBy || contact?.firstName || '{{firstName}}';
     const lastName = contact?.lastName || '{{lastName}}';
+    const fullName = [contact?.goesBy || contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || '{{fullName}}';
     const companyName = contact?.companyName || '{{companyName}}';
+    const title = contact?.title || '{{title}}';
+    const resolvedSenderName = senderName || '{{senderName}}';
 
     let filled = result.rawBody || result.body;
 
-    // Expand {{snippet:slug}} with actual snippet text
+    // 1. Expand {{snippet:slug}} → actual snippet text
     filled = filled.replace(/\{\{snippet:([^}]+)\}\}/g, (_, slug) => {
       return snippetContentMap[slug] || `[${slug}]`;
     });
 
-    // Replace contact variables
+    // 2. Replace all known contact variables
     filled = filled
-      .replace(/\{\{firstName\}\}/g, firstName)
-      .replace(/\{\{lastName\}\}/g, lastName)
-      .replace(/\{\{fullName\}\}/g, `${firstName} ${lastName}`.trim())
-      .replace(/\{\{companyName\}\}/g, companyName);
+      .replace(/\{\{firstName\}\}/gi, firstName)
+      .replace(/\{\{lastName\}\}/gi, lastName)
+      .replace(/\{\{fullName\}\}/gi, fullName)
+      .replace(/\{\{companyName\}\}/gi, companyName)
+      .replace(/\{\{title\}\}/gi, title)
+      .replace(/\{\{senderName\}\}/gi, resolvedSenderName);
 
     setResult((r) => ({ ...r, body: filled }));
     setIsFilled(true);
-  }, [result, contact, snippetContentMap]);
+  }, [result, contact, snippetContentMap, senderName]);
 
   const handleGenerate = async () => {
     if (!notes.trim() && !additionalContext.trim()) {
@@ -287,6 +295,7 @@ export default function OutreachMessagePage({ params }) {
           selectedSnippets: res.data.selectedSnippets || [],
         });
         setSnippetContentMap(res.data.snippetContentMap || {});
+        setSenderName(res.data.senderName || '');
         setIsFilled(false);
       } else {
         setError(res.data?.error || 'Generation failed');

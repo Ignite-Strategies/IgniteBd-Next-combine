@@ -269,8 +269,7 @@ export async function POST(request) {
       if (contactInfo.name) parts.push(`Name: ${contactInfo.name}`);
       if (contactInfo.title) parts.push(`Title: ${contactInfo.title}`);
       if (contactInfo.companyName) {
-        parts.push(`Current company: ${contactInfo.companyName}`);
-        parts.push(`IMPORTANT: Use "${contactInfo.companyName}" as the company name in the email — do NOT use generic terms like "fund sponsor" or descriptors from the relationship context.`);
+        parts.push(`Current company: ${contactInfo.companyName} — use {{companyName}} variable in the email body (do not write the company name as literal text)`);
       }
       if (parts.length > 0) {
         contactInfoDesc = `\n\n=== RECIPIENT ===\n${parts.join('\n')}`;
@@ -290,9 +289,19 @@ Your task: given context about the recipient and the relationship, select the mo
 CRITICAL RULES:
 1. Use provided snippets in the format {{snippet:snippetSlug}} — do not invent content
 2. Write connecting text between snippets that sounds like a real person, not a template
-3. Add variables like {{firstName}}, {{companyName}} where appropriate
+3. ALWAYS use the standard variables below for recipient details — never hardcode names, companies, or roles as literal text
 4. Natural flow: greeting → context/connection → value → ask → close
 5. Select snippets that match the persona and relationship type (check personaSlug and bestUsedWhen fields)
+
+AVAILABLE VARIABLES (always use these — they get replaced with real data before sending):
+- {{firstName}} — recipient's first name
+- {{lastName}} — recipient's last name  
+- {{fullName}} — recipient's full name
+- {{companyName}} — recipient's CURRENT company (use this, never write the company name literally)
+- {{title}} — recipient's job title
+- {{senderName}} — the sender's name (for sign-off)
+
+IMPORTANT: If the RECIPIENT section provides a company name, still use {{companyName}} in the email body — do not write it as literal text. The variable will be filled in before sending.
 
 === TONE GUIDANCE ===
 ${toneGuidance}`;
@@ -310,7 +319,7 @@ ${JSON.stringify(snippetsList, null, 2)}
    - Opens appropriately for the relationship (casual if warm reconnect, professional if cold)
    - Weaves snippets in naturally with your own connecting text
    - Uses {{firstName}} and other variables where they help personalisation
-   - Ends with: ${ownerName}
+   - Ends with: {{senderName}} (the variable, not the literal name)
 4. Keep it concise — people skim long emails
 
 Return ONLY valid JSON:
@@ -370,6 +379,7 @@ Return ONLY valid JSON:
       },
       selectedSnippets: validSelectedSlugs,
       snippetContentMap, // { slug: text } for client-side hydration
+      senderName: ownerName, // for {{senderName}} variable resolution
       reasoning: generated.reasoning || 'Snippets selected based on intent and relationship context',
       availableSnippets: snippets.length,
     });
