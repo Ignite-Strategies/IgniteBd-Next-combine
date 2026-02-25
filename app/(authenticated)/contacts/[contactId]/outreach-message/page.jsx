@@ -120,12 +120,9 @@ export default function OutreachMessagePage({ params }) {
   // Generation
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
-  // result.rawBody = original with {{snippet:slug}} refs; result.body = current editable (may be filled)
+  // result.body = hydrated by server; result.rawBody = original with {{snippet:...}} refs for template save
   const [result, setResult] = useState(null);
-  const [snippetContentMap, setSnippetContentMap] = useState({}); // { slug: text }
-  const [senderName, setSenderName] = useState('');
-  const [senderCompany, setSenderCompany] = useState('');
-  const [isFilled, setIsFilled] = useState(false); // whether Fill with Data has been applied
+  const [snippetContentMap, setSnippetContentMap] = useState({}); // { slug: text } for variable bank display
   const [snippetCount, setSnippetCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -225,38 +222,6 @@ export default function OutreachMessagePage({ params }) {
     }
   };
 
-  // Pure function — can be called with fresh data from handleGenerate without waiting for state
-  const applyFill = useCallback((rawBody, snippetMap, resolvedSenderName, resolvedSenderCompany) => {
-    const firstName = contact?.goesBy || contact?.firstName || '{{firstName}}';
-    const lastName = contact?.lastName || '{{lastName}}';
-    const fullName = [contact?.goesBy || contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || '{{fullName}}';
-    const companyName = contact?.companyName || '{{companyName}}';
-    const title = contact?.title || '{{title}}';
-
-    let filled = rawBody;
-
-    // 1. Expand {{snippet:slug}} → actual snippet text
-    filled = filled.replace(/\{\{snippet:([^}]+)\}\}/g, (_, slug) => {
-      return snippetMap[slug] || `[${slug}]`;
-    });
-
-    // 2. Replace all known variables
-    return filled
-      .replace(/\{\{firstName\}\}/gi, firstName)
-      .replace(/\{\{lastName\}\}/gi, lastName)
-      .replace(/\{\{fullName\}\}/gi, fullName)
-      .replace(/\{\{companyName\}\}/gi, companyName)
-      .replace(/\{\{title\}\}/gi, title)
-      .replace(/\{\{senderName\}\}/gi, resolvedSenderName || '{{senderName}}')
-      .replace(/\{\{senderCompany\}\}/gi, resolvedSenderCompany || '{{senderCompany}}');
-  }, [contact]);
-
-  const fillWithData = useCallback(() => {
-    if (!result) return;
-    const filled = applyFill(result.rawBody || result.body, snippetContentMap, senderName, senderCompany);
-    setResult((r) => ({ ...r, body: filled }));
-    setIsFilled(true);
-  }, [result, snippetContentMap, senderName, senderCompany, applyFill]);
 
   const handleGenerate = async () => {
     if (!notes.trim() && !additionalContext.trim()) {
@@ -289,25 +254,17 @@ export default function OutreachMessagePage({ params }) {
       });
 
       if (res.data?.success) {
-        const rawBody = res.data.template.body;
-        const freshSnippetMap = res.data.snippetContentMap || {};
-        const freshSenderName = res.data.senderName || '';
-        const freshSenderCompany = res.data.senderCompany || '';
-
-        // Auto-fill immediately — user never sees raw template with {{snippet:...}} refs
-        const filledBody = applyFill(rawBody, freshSnippetMap, freshSenderName, freshSenderCompany);
-
-        setSnippetContentMap(freshSnippetMap);
-        setSenderName(freshSenderName);
-        setSenderCompany(freshSenderCompany);
+        // Server already hydrated body/subject via variableMapperService (same as compose/campaigns).
+        // rawBody keeps {{snippet:...}} refs intact for the optional "Save as Template" path.
+        setSnippetContentMap(res.data.snippetContentMap || {});
         setResult({
-          subject: res.data.template.subject,
-          body: filledBody,       // show hydrated version
-          rawBody,                // keep original for template save
+          subject: res.data.template.subject,       // hydrated
+          body: res.data.template.body,             // hydrated — ready to copy/send
+          rawBody: res.data.template.rawBody,       // original — for template save
+          rawSubject: res.data.template.rawSubject,
           reasoning: res.data.reasoning,
           selectedSnippets: res.data.selectedSnippets || [],
         });
-        setIsFilled(true);
       } else {
         setError(res.data?.error || 'Generation failed');
       }
@@ -470,48 +427,43 @@ export default function OutreachMessagePage({ params }) {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">Body</label>
-                  {isFilled ? (
-                    <span className="flex items-center gap-1 text-xs font-medium text-green-700">
-                      <Check className="h-3 w-3" />
-                      Filled — ready to copy
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1 text-xs font-medium text-green-700">
+                    <Check className="h-3 w-3" />
+                    Ready to copy
+                  </span>
                 </div>
                 <textarea
                   value={result.body}
                   onChange={(e) => setResult((r) => ({ ...r, body: e.target.value }))}
                   rows={14}
-                  className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 ${isFilled ? 'border-green-300 bg-green-50 focus:border-green-400 focus:ring-green-400' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-400'}`}
+                  className="w-full rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:border-green-400 focus:ring-green-400"
                 />
-                {/* Variable Bank */}
+                {/* Variable Bank — shows what was resolved server-side */}
                 {result && (
                   <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Variable Bank</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Resolved Variables</p>
                     <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                       {[
                         { label: '{{firstName}}', value: contact?.goesBy || contact?.firstName },
                         { label: '{{lastName}}', value: contact?.lastName },
-                        { label: '{{fullName}}', value: [contact?.goesBy || contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || null },
                         { label: '{{companyName}}', value: contact?.companyName },
                         { label: '{{title}}', value: contact?.title },
-                        { label: '{{senderName}}', value: senderName },
-                        { label: '{{senderCompany}}', value: senderCompany },
                       ].map(({ label, value }) => (
                         <div key={label} className={`flex flex-col rounded-md border px-2 py-1.5 ${value ? 'border-green-200 bg-white' : 'border-amber-200 bg-amber-50'}`}>
                           <span className="font-mono text-[10px] text-gray-500">{label}</span>
                           <span className={`mt-0.5 truncate text-xs font-medium ${value ? 'text-gray-800' : 'text-amber-600'}`}>
-                            {value || 'not set'}
+                            {value || 'not set on contact'}
                           </span>
                         </div>
                       ))}
                     </div>
                     {snippetContentMap && Object.keys(snippetContentMap).length > 0 && (
                       <div className="mt-2 border-t border-gray-200 pt-2">
-                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Snippets</p>
+                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Snippets used</p>
                         <div className="flex flex-col gap-1">
                           {Object.entries(snippetContentMap).map(([slug, text]) => (
                             <div key={slug} className="flex items-start gap-2 rounded-md border border-blue-100 bg-white px-2 py-1.5">
-                              <span className="font-mono text-[10px] text-blue-500 shrink-0 mt-0.5">{'{{snippet:' + slug + '}}'}</span>
+                              <span className="font-mono text-[10px] text-blue-500 shrink-0 mt-0.5">{slug}</span>
                               <span className="text-xs text-gray-600 line-clamp-2">{text}</span>
                             </div>
                           ))}

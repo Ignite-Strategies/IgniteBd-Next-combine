@@ -3,6 +3,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { OpenAI } from 'openai';
 import { prisma } from '@/lib/prisma';
 import { resolveMembership } from '@/lib/membership';
+import { hydrateTemplateFromDatabase } from '@/lib/services/variableMapperService';
 
 let openaiClient = null;
 function getOpenAIClient() {
@@ -382,27 +383,54 @@ Return ONLY valid JSON:
 
     const selectedSnippets = generated.selectedSnippets || [];
     const validSnippets = snippets.map((s) => s.snipSlug);
-
     const validSelectedSlugs = selectedSnippets.filter((name) => validSnippets.includes(name));
 
-    // Return snippet content map so page can do client-side Fill with Data
+    // Build snippet content map for variable bank display
     const snippetContentMap = {};
     for (const slug of validSelectedSlugs) {
       const snip = snippets.find((s) => s.snipSlug === slug);
       if (snip) snippetContentMap[slug] = snip.snipText;
     }
 
+    // Hydrate the generated body server-side using the same service as compose/campaigns.
+    // Passes contactId for standard contact variables (firstName, companyName, title, etc.)
+    // and metadata for variables not in the catalogue (senderName, senderCompany).
+    const rawBody = generated.body;
+    const rawSubject = generated.subject;
+    let hydratedBody = rawBody;
+    let hydratedSubject = rawSubject;
+    try {
+      const hydrateContext = {
+        contactId: contactId || undefined,
+        ownerId: owner.id,
+        companyHQId,
+      };
+      const metadata = {
+        ...(ownerName && { senderName: ownerName }),
+        ...(senderCompanyName && { senderCompany: senderCompanyName }),
+      };
+      [hydratedBody, hydratedSubject] = await Promise.all([
+        hydrateTemplateFromDatabase(rawBody, hydrateContext, metadata),
+        hydrateTemplateFromDatabase(rawSubject, hydrateContext, metadata),
+      ]);
+    } catch (hydrateErr) {
+      console.warn('⚠️ Hydration failed, returning raw body:', hydrateErr.message);
+      // Non-fatal — page still gets the raw body with visible variables
+    }
+
     return NextResponse.json({
       success: true,
       template: {
         title: generated.title,
-        subject: generated.subject,
-        body: generated.body,
+        subject: hydratedSubject,  // hydrated for display
+        body: hydratedBody,        // hydrated for display
+        rawBody,                   // original with {{snippet:...}} refs — for template save
+        rawSubject,
       },
       selectedSnippets: validSelectedSlugs,
-      snippetContentMap, // { slug: text } for client-side hydration
-      senderName: ownerName, // for {{senderName}} variable resolution
-      senderCompany: senderCompanyName, // for {{senderCompany}} variable resolution
+      snippetContentMap, // for variable bank display
+      senderName: ownerName,
+      senderCompany: senderCompanyName,
       reasoning: generated.reasoning || 'Snippets selected based on intent and relationship context',
       availableSnippets: snippets.length,
     });
