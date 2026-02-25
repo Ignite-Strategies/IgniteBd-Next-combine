@@ -713,6 +713,26 @@ export default function ContactDetailPage({ params }) {
                 Contact Information
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Build Email - always available (uses snippets + context + persona) */}
+                <button
+                  onClick={() => {
+                    // Navigate to AI template builder with snippets + relationship context + persona
+                    const params = new URLSearchParams({
+                      ...(companyHQId && { companyHQId }),
+                      ...(contactId && { contactId }),
+                      ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
+                      ...(relationshipContext && { 
+                        relationshipContext: JSON.stringify(relationshipContext)
+                      }),
+                    });
+                    router.push(`/templates/create/ai-snippets?${params.toString()}`);
+                  }}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  title="Build email using snippets, relationship context, and persona"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Build Email
+                </button>
                 {isEnriched ? (
                   // Show "Build Persona" as primary, other actions as secondary if enriched
                   <>
@@ -725,25 +745,6 @@ export default function ContactDetailPage({ params }) {
                     >
                       <UserCircle className="h-4 w-4" />
                       Build Persona
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Navigate to AI template builder with snippets + relationship context + persona
-                        const params = new URLSearchParams({
-                          ...(companyHQId && { companyHQId }),
-                          ...(contactId && { contactId }),
-                          ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
-                          ...(relationshipContext && { 
-                            relationshipContext: JSON.stringify(relationshipContext)
-                          }),
-                        });
-                        router.push(`/templates/create/ai-snippets?${params.toString()}`);
-                      }}
-                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                      title="Build email using snippets, relationship context, and persona"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Build Email
                     </button>
                     {contact?.email && (
                       <button
