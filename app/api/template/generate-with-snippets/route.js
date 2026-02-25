@@ -37,6 +37,12 @@ function buildToneGuidance(personaSlug, rc) {
     ctx.includes('used_to_work') ||
     ctx.includes('former');
 
+  const isOwnerSubordinate =
+    slug.includes('owner') ||
+    slug.includes('subordinate') ||
+    slug.includes('former_subordinate') ||
+    slug.includes('formerowner');
+
   const isLongDormant =
     recency.includes('long_dormant') ||
     recency.includes('dormant') ||
@@ -47,8 +53,12 @@ function buildToneGuidance(personaSlug, rc) {
 
   const lines = [];
 
+  if (isOwnerSubordinate) {
+    lines.push('CRITICAL — Owner/subordinate relationship: The SENDER (you) stayed at the company. The RECIPIENT left. Do NOT use "since then" or "since I left" or similar — you did not leave, they did. Do not over-explain what happened. No need to explain the situation — they lived it. Write naturally as the person who stayed.');
+  }
+
   if (isWarmReconnect) {
-    lines.push('TONE: This is a warm reconnect with someone you already know personally. Write like a real person reaching out to an old colleague — casual, genuine, short.');
+    lines.push('TONE: This is a warm reconnect with someone you already know personally. Write like a real person reaching out — casual, genuine, short.');
     lines.push('DO NOT introduce yourself or explain your company — they know you.');
     lines.push('DO NOT say things like "as you may remember when you were at [company]" — that sounds weird and clinical. Just check in naturally.');
     lines.push('DO start with something like "Hey {{firstName}}!" or "{{firstName}}!" — not "Dear {{firstName}}".');
@@ -67,7 +77,9 @@ function buildToneGuidance(personaSlug, rc) {
     lines.push(`The recipient works in a ${rc.primaryWork} role/context. Use {{companyName}} when referencing their employer — do NOT write "${rc.primaryWork}" as a company name in the email. You can reference their industry context naturally (e.g. "knowing you're on the fund side now") but always use {{companyName}} for the actual employer.`);
   }
 
-  if (lines.length === 0) {
+  lines.push('Do NOT repeat the same phrase or snippet twice. Each piece of content should appear once.');
+
+  if (lines.length === 1) {
     lines.push('Tone should be warm, professional, and human — not stiff or generic.');
   }
 
@@ -278,6 +290,8 @@ export async function POST(request) {
       if (contactInfo.title) parts.push(`Title: ${contactInfo.title}`);
       if (contactInfo.companyName) {
         parts.push(`Current company: ${contactInfo.companyName} — use {{companyName}} variable in the email body (do not write the company name as literal text)`);
+      } else {
+        parts.push('Current company: unknown — do NOT write "at ." or "at {{companyName}}" (would render as "at "). Use "at your new role" or skip the company reference.');
       }
       if (parts.length > 0) {
         contactInfoDesc = `\n\n=== RECIPIENT ===\n${parts.join('\n')}`;
@@ -324,7 +338,7 @@ AVAILABLE VARIABLES (always use these — they get replaced with real data befor
 - {{senderName}} — the sender's name (for sign-off)
 - {{senderCompany}} — the SENDER'S company (e.g. the company the sender and former colleague both worked at)
 
-IMPORTANT: Always use variables — never write company names, person names, or titles as literal text in the email body. If the RECIPIENT or SENDER sections provide company names, still use the variables; they get filled in before sending.
+IMPORTANT: Always use variables — never write company names, person names, or titles as literal text in the email body. If the RECIPIENT or SENDER sections provide company names, still use the variables; they get filled in before sending. If the recipient's company name is unknown (empty), do NOT write "at ." or "at {{companyName}}" — either skip the company reference or use a phrase like "at your new role" or "in your new role".
 
 === TONE GUIDANCE ===
 ${toneGuidance}`;

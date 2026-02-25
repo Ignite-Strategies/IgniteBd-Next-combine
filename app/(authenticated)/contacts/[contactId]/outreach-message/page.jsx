@@ -502,6 +502,18 @@ export default function OutreachMessagePage({ params }) {
               </div>
             </div>
 
+            {/* Regenerate with additional context */}
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <label className="block text-xs font-semibold text-gray-500 mb-2">Regenerate with more context</label>
+              <textarea
+                value={additionalContext}
+                onChange={(e) => setAdditionalContext(e.target.value)}
+                rows={2}
+                placeholder="e.g. no need to explain what happened — the owner stayed, they left · keep it short · mention X"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+              />
+            </div>
+
             {/* Actions */}
             <div className="space-y-3 pt-1">
               {/* Primary actions row */}
@@ -524,10 +536,11 @@ export default function OutreachMessagePage({ params }) {
                 )}
                 <button
                   type="button"
-                  onClick={() => { setResult(null); setError(''); setSaved(false); setShowTemplatePrompt(false); setTemplateSaved(false); setIsFilled(false); setSnippetContentMap({}); }}
-                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                  onClick={handleGenerate}
+                  disabled={generating || (!notes.trim() && !additionalContext.trim())}
+                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  {generating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   Regenerate
                 </button>
                 <button
