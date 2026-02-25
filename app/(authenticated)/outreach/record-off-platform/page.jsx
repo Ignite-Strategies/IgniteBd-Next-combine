@@ -86,6 +86,8 @@ export default function RecordOffPlatformPage() {
   const [emailBlob, setEmailBlob] = useState('');
   const [parsedEmail, setParsedEmail] = useState(null);
   const [selectedContactForEmail, setSelectedContactForEmail] = useState(null);
+  const [emailCandidates, setEmailCandidates] = useState([]); // Multiple domain-match candidates
+  const [fuzzyContact, setFuzzyContact] = useState(null); // Single domain-match suggestion
   
   // Handle file upload
   const handleFileUpload = async (file) => {
@@ -583,12 +585,28 @@ Best regards"`;
         
         // If no contactId from URL, try to find contact by email automatically
         if (!contactIdFromUrl && parsed.toEmail) {
+          setEmailCandidates([]);
+          setFuzzyContact(null);
           try {
-            const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(parsed.toEmail)}`);
+            const params = new URLSearchParams({ email: parsed.toEmail });
+            if (companyHQId) params.set('companyHQId', companyHQId);
+            const response = await api.get(`/api/contacts/by-email?${params.toString()}`);
+
             if (response.data?.success && response.data.contact) {
-              setSelectedContactForEmail(response.data.contact);
+              if (response.data.fuzzy) {
+                // Domain-based single match — surface as a suggestion, don't auto-select
+                setFuzzyContact(response.data.contact);
+              } else {
+                // Exact match — auto-select
+                setSelectedContactForEmail(response.data.contact);
+              }
               setParsingError('');
-              return; // Found contact, exit early
+              return;
+            } else if (response.data?.fuzzy && response.data?.candidates?.length > 0) {
+              // Multiple domain-match candidates — let user pick
+              setEmailCandidates(response.data.candidates);
+              setParsingError('');
+              return;
             }
           } catch (error) {
             // Contact not found - that's okay, user can select manually
@@ -596,9 +614,11 @@ Best regards"`;
           }
         }
         
-        // Clear selected contact if we found email but no contactId
+        // Clear fuzzy state and selected contact if we found email but no contactId
         if (!contactIdFromUrl) {
           setSelectedContactForEmail(null);
+          setEmailCandidates([]);
+          setFuzzyContact(null);
         }
       } else {
         // If no email found, keep current manual entry but clear email field
@@ -624,20 +644,32 @@ Best regards"`;
     if (contact?.id) {
       loadedContactIdRef.current = contact.id;
       setSelectedContactForEmail(contact);
-      setContact(contact); // Sync contact state
+      setContact(contact);
+      setFuzzyContact(null);
+      setEmailCandidates([]);
       if (contact.email) {
         setManualEntry(prev => ({
           ...prev,
           email: contact.email,
         }));
       }
-      // Update URL to include contactId
-      const params = new URLSearchParams(searchParams?.toString() || '');
-      params.set('contactId', contact.id);
-      router.replace(`${window.location.pathname}?${params.toString()}`);
+      // Don't push contactId into the URL here — that would trigger the
+      // useEffect fetch loop and cause re-renders while the user is typing.
+      // contactId in the URL is only meaningful when navigating TO this page.
     } else {
-      // Clear if no contact selected
       handleClearContact();
+    }
+  };
+  
+  // Confirm a fuzzy-matched contact as the selected contact
+  const handleConfirmFuzzyContact = (candidate) => {
+    loadedContactIdRef.current = candidate.id;
+    setSelectedContactForEmail(candidate);
+    setContact(candidate);
+    setFuzzyContact(null);
+    setEmailCandidates([]);
+    if (candidate.email) {
+      setManualEntry(prev => ({ ...prev, email: candidate.email }));
     }
   };
   
@@ -646,6 +678,8 @@ Best regards"`;
     loadedContactIdRef.current = null;
     setContact(null);
     setSelectedContactForEmail(null);
+    setFuzzyContact(null);
+    setEmailCandidates([]);
     setManualEntry(prev => ({ ...prev, email: '' }));
     setEmailBlob('');
     setParsedEmail(null);
@@ -663,6 +697,12 @@ Best regards"`;
     // Determine which contact to use
     let targetContactId = contactIdFromUrl;
     let targetEmail = manualEntry.email;
+    
+    // If we have fuzzy candidates pending confirmation, block save and prompt user
+    if (!selectedContactForEmail && (fuzzyContact || emailCandidates.length > 0)) {
+      setParsingError('Please confirm the contact match below before saving.');
+      return;
+    }
     
     // Priority: selected contact > contactId from URL > email lookup
     if (selectedContactForEmail?.id) {
@@ -1008,6 +1048,75 @@ Best regards"`;
                   </div>
                 </div>
               )}
+              
+              {/* Fuzzy single match suggestion */}
+              {fuzzyContact && !selectedContactForEmail && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <div className="mb-2 font-semibold text-amber-800">Contact match found by domain</div>
+                  <p className="mb-2 text-amber-700">
+                    No contact has this exact email on file, but we found someone at the same company. Is this the right person?
+                  </p>
+                  <div className="mb-3 rounded-md border border-amber-200 bg-white p-2">
+                    <span className="font-semibold text-gray-900">
+                      {fuzzyContact.goesBy || `${fuzzyContact.firstName || ''} ${fuzzyContact.lastName || ''}`.trim() || fuzzyContact.email}
+                    </span>
+                    {fuzzyContact.title && <span className="ml-2 text-gray-500">&mdash; {fuzzyContact.title}</span>}
+                    {fuzzyContact.companyName && <span className="ml-1 text-gray-500">at {fuzzyContact.companyName}</span>}
+                    {fuzzyContact.email && <div className="mt-0.5 text-xs text-gray-400">{fuzzyContact.email}</div>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmFuzzyContact(fuzzyContact)}
+                      className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+                    >
+                      <Check className="h-3 w-3" />
+                      Yes, use this contact
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFuzzyContact(null)}
+                      className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                    >
+                      No, search manually
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Multiple domain-match candidates */}
+              {emailCandidates.length > 0 && !selectedContactForEmail && !fuzzyContact && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <div className="mb-2 font-semibold text-amber-800">Multiple contacts found at this domain</div>
+                  <p className="mb-2 text-amber-700">No exact email match. Select the correct contact:</p>
+                  <div className="space-y-1.5">
+                    {emailCandidates.map((candidate) => (
+                      <button
+                        key={candidate.id}
+                        type="button"
+                        onClick={() => handleConfirmFuzzyContact(candidate)}
+                        className="flex w-full items-center justify-between rounded-md border border-amber-200 bg-white px-3 py-2 text-left hover:bg-amber-50"
+                      >
+                        <span>
+                          <span className="font-semibold text-gray-900">
+                            {candidate.goesBy || `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() || candidate.email}
+                          </span>
+                          {candidate.title && <span className="ml-2 text-xs text-gray-500">{candidate.title}</span>}
+                          {candidate.email && <div className="text-xs text-gray-400">{candidate.email}</div>}
+                        </span>
+                        <Check className="ml-2 h-4 w-4 shrink-0 text-amber-600" />
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEmailCandidates([])}
+                    className="mt-2 text-xs text-amber-600 underline hover:text-amber-800"
+                  >
+                    Dismiss — I&apos;ll search manually
+                  </button>
+                </div>
+              )}
             </div>
             
             <div className="mb-4 flex items-center gap-4">
@@ -1150,8 +1259,9 @@ Best regards"`;
               <button
                 type="button"
                 onClick={handleSaveManual}
-                disabled={saving || !manualEntry.email || !manualEntry.body}
+                disabled={saving || !manualEntry.email || !manualEntry.body || (!selectedContactForEmail && (fuzzyContact !== null || emailCandidates.length > 0))}
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                title={(!selectedContactForEmail && (fuzzyContact !== null || emailCandidates.length > 0)) ? 'Confirm the contact match above before saving' : undefined}
               >
                 {saving ? (
                   <>

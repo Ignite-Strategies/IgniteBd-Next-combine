@@ -35,6 +35,7 @@ export async function GET(request) {
     
     const { searchParams } = request.nextUrl;
     const email = searchParams.get('email');
+    const companyHQId = searchParams.get('companyHQId') || null;
     
     console.log('📧 Email from query:', email);
 
@@ -46,41 +47,114 @@ export async function GET(request) {
       );
     }
 
-    console.log('🔍 Searching for contact with email:', email.toLowerCase().trim());
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('🔍 Searching for contact with email:', normalizedEmail);
     
     // Use findFirst since email is not unique (it's part of email_crmId compound key)
-    // We'll find the first contact with this email
     const contact = await prisma.contact.findFirst({
       where: {
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
       },
     });
     
-    console.log('✅ Contact found:', contact ? contact.id : 'null');
+    console.log('✅ Contact found (exact):', contact ? contact.id : 'null');
 
-    if (!contact) {
+    if (contact) {
       return corsResponse(
-        { success: false, error: 'Contact not found' },
-        404,
+        {
+          success: true,
+          fuzzy: false,
+          contact: {
+            id: contact.id,
+            firstName: contact.firstName || null,
+            lastName: contact.lastName || null,
+            goesBy: contact.goesBy || null,
+            email: contact.email,
+            companyName: contact.companyName || null,
+            title: contact.title || null,
+            crmId: contact.crmId,
+            contactCompanyId: contact.contactCompanyId || null,
+          },
+        },
+        200,
         request,
       );
     }
 
-    // Return only the essential fields - don't try to access relations that might not exist
-    return corsResponse(
-      {
-        success: true,
-        contact: {
-          id: contact.id,
-          firstName: contact.firstName || null,
-          lastName: contact.lastName || null,
-          email: contact.email,
-          crmId: contact.crmId,
-          contactCompanyId: contact.contactCompanyId || null,
-          // Don't include relations - they can be fetched separately if needed
+    // --- Domain-based fallback ---
+    // Extract domain from email (e.g. "citi.com" from "aashish.dhakad@citi.com")
+    const emailDomain = normalizedEmail.split('@')[1] || null;
+
+    if (emailDomain) {
+      console.log('🔍 Falling back to domain search:', emailDomain, 'companyHQId:', companyHQId);
+
+      const domainWhere = {
+        OR: [
+          { domain: emailDomain },
+          { companyDomain: emailDomain },
+        ],
+      };
+
+      // Narrow to the company HQ if provided
+      if (companyHQId) {
+        domainWhere.crmId = companyHQId;
+      }
+
+      const domainCandidates = await prisma.contact.findMany({
+        where: domainWhere,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          goesBy: true,
+          email: true,
+          companyName: true,
+          title: true,
+          crmId: true,
+          contactCompanyId: true,
         },
-      },
-      200,
+        take: 10,
+      });
+
+      console.log('🔍 Domain candidates found:', domainCandidates.length);
+
+      if (domainCandidates.length === 0) {
+        return corsResponse(
+          { success: false, error: 'Contact not found' },
+          404,
+          request,
+        );
+      }
+
+      // Single candidate — return as a confident fuzzy match
+      if (domainCandidates.length === 1) {
+        return corsResponse(
+          {
+            success: true,
+            fuzzy: true,
+            contact: domainCandidates[0],
+          },
+          200,
+          request,
+        );
+      }
+
+      // Multiple candidates — return all so the UI can prompt the user to pick
+      return corsResponse(
+        {
+          success: false,
+          fuzzy: true,
+          candidates: domainCandidates,
+          error: 'Multiple contacts found at this domain — please select one',
+        },
+        200,
+        request,
+      );
+    }
+
+    return corsResponse(
+      { success: false, error: 'Contact not found' },
+      404,
       request,
     );
   } catch (error) {
