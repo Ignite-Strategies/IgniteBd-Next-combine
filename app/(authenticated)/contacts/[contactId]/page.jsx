@@ -733,6 +733,18 @@ export default function ContactDetailPage({ params }) {
                   <Sparkles className="h-4 w-4" />
                   Build Email
                 </button>
+                {/* Build Persona - deeper dive persona builder */}
+                <button
+                  onClick={() => {
+                    const companyHQId = typeof window !== 'undefined' ? localStorage.getItem('companyHQId') || localStorage.getItem('companyId') : '';
+                    router.push(`/personas/build-from-contact?companyHQId=${companyHQId}&contactId=${contactId}`);
+                  }}
+                  className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+                  title="Build deeper persona from contact"
+                >
+                  <UserCircle className="h-4 w-4" />
+                  Build Persona
+                </button>
                 {/* Email */}
                 {contact?.email && (
                   <button
