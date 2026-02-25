@@ -6,9 +6,10 @@ import { Upload, User, X, ChevronRight } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { auth } from '@/lib/firebase';
 
-// Client-side CSV parse: preserve original header casing
+// Client-side CSV parse: preserve original header casing, strip BOM so headers match
 function parseCSVClient(csvText) {
-  const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
+  const normalized = (typeof csvText === 'string' ? csvText : '').replace(/^\uFEFF/, '');
+  const lines = normalized.split(/\r?\n/).filter((line) => line.trim());
   if (lines.length === 0) return { headers: [], rows: [], errors: [] };
   const parseLine = (line) => {
     const out = [];
@@ -55,31 +56,44 @@ const HEADER_TO_FIELD = {
   'first name': 'firstName',
   firstname: 'firstName',
   first: 'firstName',
+  fname: 'firstName',
+  'given name': 'firstName',
+  givenname: 'firstName',
   'last name': 'lastName',
   lastname: 'lastName',
   last: 'lastName',
+  lname: 'lastName',
+  'family name': 'lastName',
+  surname: 'lastName',
   email: 'email',
   'email address': 'email',
   'company name': 'companyName',
   companyname: 'companyName',
   company: 'companyName',
+  organization: 'companyName',
+  org: 'companyName',
   title: 'title',
   'job title': 'title',
   jobtitle: 'title',
   position: 'title',
+  role: 'title',
   url: 'linkedinUrl',
   linkedin: 'linkedinUrl',
   'linkedin url': 'linkedinUrl',
   linkedinurl: 'linkedinUrl',
   'profile url': 'linkedinUrl',
+  profileurl: 'linkedinUrl',
+  'profile': 'linkedinUrl',
   'connected on': 'linkedinConnectedOn',
   connectedon: 'linkedinConnectedOn',
+  'date connected': 'linkedinConnectedOn',
   phone: 'phone',
   'phone number': 'phone',
   phonenumber: 'phone',
   mobile: 'phone',
   notes: 'notes',
   note: 'notes',
+  description: 'notes',
   pipeline: 'pipeline',
   stage: 'stage',
 };
@@ -99,11 +113,52 @@ const FIELD_LABELS = {
 };
 
 
-function suggestMapping(csvHeaders) {
-  return csvHeaders.map((h) => {
-    const key = (h || '').toLowerCase().trim();
-    const field = HEADER_TO_FIELD[key] || null;
-    return { csvHeader: h, field, label: field ? FIELD_LABELS[field] || field : '—' };
+// Infer field from header name only
+function inferFieldFromHeader(header) {
+  const key = (header || '').toLowerCase().trim();
+  return HEADER_TO_FIELD[key] || null;
+}
+
+// Infer field from sample values (first N rows of this column)
+function inferFieldFromValues(values) {
+  if (!values?.length) return null;
+  const joined = values.slice(0, 10).join(' ').trim();
+  const first = (values[0] || '').trim();
+  if (!first) return null;
+  // LinkedIn or profile URL
+  if (/linkedin\.com|profile.*url|^https?:\/\//i.test(first) || /linkedin\.com/i.test(joined)) return 'linkedinUrl';
+  // Email
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(first)) return 'email';
+  // Date (e.g. "22 Feb 2024", "2024-02-22", "Feb 22, 2024")
+  if (/^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(first) ||
+      /^\d{4}-\d{2}-\d{2}$/.test(first) ||
+      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}$/i.test(first)) return 'linkedinConnectedOn';
+  // Long text → notes
+  if (first.length > 80 || (first.includes('.') && first.split(/[.!?]/).length >= 2)) return 'notes';
+  // Job title keywords (position/title)
+  if (/\b(VP|Vice President|Director|Manager|Counsel|General Counsel|Chief|CEO|CFO|COO|President|Partner|Associate|Analyst|Engineer|Lead|Head of)\b/i.test(first) ||
+      /\b(Deputy|Senior|Junior|Principal|Staff)\s+\w+/i.test(first)) return 'title';
+  // Multi-word or longer string, no @, no URL → likely company name
+  const wordCount = first.split(/\s+/).length;
+  if (!first.includes('@') && !/^https?:\/\//i.test(first) && first.length > 10 && first.length < 80 && wordCount >= 2 && wordCount <= 5) return 'companyName';
+  return null;
+}
+
+// Build full mapping: prefer header match, then infer from column values for unmapped columns
+function inferMapping(csvHeaders, rows) {
+  const headerBased = csvHeaders.map((h) => {
+    const field = inferFieldFromHeader(h);
+    return { csvHeader: h, field, label: field ? FIELD_LABELS[field] || field : null };
+  });
+  const usedFields = new Set(headerBased.map((m) => m.field).filter(Boolean));
+  const columnValues = csvHeaders.map((h) => rows.map((r) => r[h]).filter((v) => v != null && String(v).trim() !== ''));
+  return headerBased.map((m, i) => {
+    if (m.field) return { ...m, label: m.label || FIELD_LABELS[m.field] || m.field };
+    const inferred = inferFieldFromValues(columnValues[i]);
+    const field = inferred && !usedFields.has(inferred) ? inferred : null;
+    if (field) usedFields.add(field);
+    const label = field ? FIELD_LABELS[field] || field : '—';
+    return { csvHeader: m.csvHeader, field, label };
   });
 }
 
@@ -138,6 +193,18 @@ function buildCSVFromMappedRows(mappedRows) {
   return lines.join('\n');
 }
 
+// Recompute mapped rows from parsed data + mapping (single source of truth for save)
+function computeMappedRows(rows, headers, mapping) {
+  if (!rows?.length || !headers?.length || !mapping?.length) return [];
+  return rows.map((row) => {
+    const out = {};
+    mapping.forEach((m) => {
+      if (m.field && row[m.csvHeader] !== undefined) out[m.field] = row[m.csvHeader] ?? '';
+    });
+    return out;
+  });
+}
+
 const STEPS = ['View', 'Confirm mapping', 'Edit data', 'Looks good — Save', 'Success'];
 
 export default function ContactUploadPage() {
@@ -168,11 +235,12 @@ export default function ContactUploadPage() {
     setCsvText(text);
     const result = parseCSVClient(text);
     setParsed(result);
-    setMapping(suggestMapping(result.headers));
+    const inferred = inferMapping(result.headers, result.rows);
+    setMapping(inferred);
     const mapped = result.rows.map((row) => {
       const out = {};
       result.headers.forEach((csvH, i) => {
-        const m = suggestMapping(result.headers)[i];
+        const m = inferred[i];
         if (m?.field) out[m.field] = row[csvH] ?? '';
       });
       return out;
@@ -204,6 +272,15 @@ export default function ContactUploadPage() {
     });
   };
 
+  // When leaving preview (step 0), sync mappedRows from parsed data so we never lose rows
+  const goToNextStep = () => {
+    if (step === 0 && parsed.rows.length > 0 && mapping.length > 0) {
+      const nextMapped = computeMappedRows(parsed.rows, parsed.headers, mapping);
+      setMappedRows(nextMapped);
+    }
+    setStep((s) => s + 1);
+  };
+
   const handleSave = async () => {
     const companyHQId = typeof window !== 'undefined' ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId')) : null;
     if (!companyHQId) {
@@ -216,10 +293,18 @@ export default function ContactUploadPage() {
       alert('Please sign in to upload contacts.');
       return;
     }
+    // Use in-memory rows (with edits) when we have them; otherwise recompute from parsed + mapping so we don't send 0 rows by mistake
+    const rowsToSave = mappedRows.length > 0
+      ? mappedRows
+      : computeMappedRows(parsed.rows, parsed.headers, mapping);
+    if (rowsToSave.length === 0) {
+      alert('No contact data to save. If you had rows in the preview, go back to "Confirm mapping" and click Next again, then try saving.');
+      return;
+    }
     setUploading(true);
     try {
       const token = await user.getIdToken();
-      const csv = buildCSVFromMappedRows(mappedRows);
+      const csv = buildCSVFromMappedRows(rowsToSave);
       const blob = new Blob([csv], { type: 'text/csv' });
       const uploadFile = new File([blob], file?.name || 'contacts.csv', { type: 'text/csv' });
       const formData = new FormData();
@@ -389,6 +474,11 @@ export default function ContactUploadPage() {
 
               {step === 1 && (
                 <>
+                  {parsed.rows.length === 0 && (
+                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      This file has no data rows—only headers. You can still confirm mapping for future uploads, but there will be nothing to edit or save until you use a CSV with at least one row of data.
+                    </div>
+                  )}
                   <p className="mb-3 text-gray-600">Confirm how your columns map to contact fields. Change any dropdown if needed.</p>
                   <div className="overflow-x-auto border rounded-lg">
                     <table className="min-w-full text-sm">
@@ -431,76 +521,101 @@ export default function ContactUploadPage() {
 
               {step === 2 && (
                 <>
-                  <p className="mb-3 text-gray-600">Edit any cell below, then click “Looks good — Save”.</p>
-                  <div className="overflow-x-auto border rounded-lg max-h-96 overflow-y-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-100 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-8">#</th>
-                          {Object.keys(FIELD_LABELS).filter((f) => mapping.some((m) => m.field === f)).map((field) => (
-                            <th key={field} className="px-2 py-1.5 text-left font-semibold text-gray-700 whitespace-nowrap">
-                              {FIELD_LABELS[field]}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mappedRows.map((row, ri) => (
-                          <tr key={ri} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="px-2 py-1 text-gray-500">{ri + 1}</td>
-                            {Object.keys(FIELD_LABELS)
-                              .filter((f) => mapping.some((m) => m.field === f))
-                              .map((field) => (
-                                <td key={field} className="px-2 py-1">
-                                  <input
-                                    type="text"
-                                    value={row[field] ?? ''}
-                                    onChange={(e) => handleCellEdit(ri, field, e.target.value)}
-                                    className="w-full min-w-[8rem] rounded border border-gray-300 px-2 py-1 text-gray-800 text-sm"
-                                  />
-                                </td>
+                  {mappedRows.length === 0 ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+                      <p className="font-semibold text-amber-800">No data rows in this file</p>
+                      <p className="mt-2 text-sm text-amber-700">
+                        Your CSV has column headers but no data rows, or all rows were empty. There’s nothing to edit or save.
+                      </p>
+                      <p className="mt-2 text-sm text-amber-700">
+                        Use <strong>Back</strong> to check the mapping, or <strong>Start over</strong> to upload a different file (one that has at least one row of contact data).
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mb-3 text-gray-600">Edit any cell below, then click “Looks good — Save”.</p>
+                      <div className="overflow-x-auto border rounded-lg max-h-96 overflow-y-auto">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-8">#</th>
+                              {Object.keys(FIELD_LABELS).filter((f) => mapping.some((m) => m.field === f)).map((field) => (
+                                <th key={field} className="px-2 py-1.5 text-left font-semibold text-gray-700 whitespace-nowrap">
+                                  {FIELD_LABELS[field]}
+                                </th>
                               ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mappedRows.map((row, ri) => (
+                              <tr key={ri} className="border-t border-gray-200 hover:bg-gray-50">
+                                <td className="px-2 py-1 text-gray-500">{ri + 1}</td>
+                                {Object.keys(FIELD_LABELS)
+                                  .filter((f) => mapping.some((m) => m.field === f))
+                                  .map((field) => (
+                                    <td key={field} className="px-2 py-1">
+                                      <input
+                                        type="text"
+                                        value={row[field] ?? ''}
+                                        onChange={(e) => handleCellEdit(ri, field, e.target.value)}
+                                        className="w-full min-w-[8rem] rounded border border-gray-300 px-2 py-1 text-gray-800 text-sm"
+                                      />
+                                    </td>
+                                  ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
               {step === 3 && (
                 <>
-                  <p className="mb-3 text-gray-600">Ready to save {mappedRows.length} contacts. Click below to upload.</p>
-                  <div className="overflow-x-auto border rounded-lg max-h-64 overflow-y-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-100 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-8">#</th>
-                          {Object.keys(FIELD_LABELS).filter((f) => mapping.some((m) => m.field === f)).map((field) => (
-                            <th key={field} className="px-2 py-1.5 text-left font-semibold text-gray-700 whitespace-nowrap">
-                              {FIELD_LABELS[field]}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mappedRows.slice(0, 10).map((row, ri) => (
-                          <tr key={ri} className="border-t border-gray-200">
-                            <td className="px-2 py-1 text-gray-500">{ri + 1}</td>
-                            {Object.keys(FIELD_LABELS)
-                              .filter((f) => mapping.some((m) => m.field === f))
-                              .map((field) => (
-                                <td key={field} className="px-2 py-1 text-gray-800 max-w-xs truncate">
-                                  {row[field] ?? ''}
-                                </td>
+                  {mappedRows.length === 0 ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+                      <p className="font-semibold text-amber-800">No contacts to save</p>
+                      <p className="mt-2 text-sm text-amber-700">
+                        This file has no data rows. Use <strong>Back</strong> or <strong>Start over</strong> to upload a CSV with at least one row of contact data.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mb-3 text-gray-600">Ready to save {mappedRows.length} contacts. Click below to upload.</p>
+                      <div className="overflow-x-auto border rounded-lg max-h-64 overflow-y-auto">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-8">#</th>
+                              {Object.keys(FIELD_LABELS).filter((f) => mapping.some((m) => m.field === f)).map((field) => (
+                                <th key={field} className="px-2 py-1.5 text-left font-semibold text-gray-700 whitespace-nowrap">
+                                  {FIELD_LABELS[field]}
+                                </th>
                               ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {mappedRows.length > 10 && (
-                    <p className="mt-2 text-sm text-gray-500">Showing first 10 of {mappedRows.length} rows.</p>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mappedRows.slice(0, 10).map((row, ri) => (
+                              <tr key={ri} className="border-t border-gray-200">
+                                <td className="px-2 py-1 text-gray-500">{ri + 1}</td>
+                                {Object.keys(FIELD_LABELS)
+                                  .filter((f) => mapping.some((m) => m.field === f))
+                                  .map((field) => (
+                                    <td key={field} className="px-2 py-1 text-gray-800 max-w-xs truncate">
+                                      {row[field] ?? ''}
+                                    </td>
+                                  ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {mappedRows.length > 10 && (
+                        <p className="mt-2 text-sm text-gray-500">Showing first 10 of {mappedRows.length} rows.</p>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -540,7 +655,7 @@ export default function ContactUploadPage() {
                     {step < 3 && (
                       <button
                         type="button"
-                        onClick={() => setStep((s) => s + 1)}
+                        onClick={goToNextStep}
                         className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
                       >
                         Next: {stepTitles[step + 1]}
@@ -550,10 +665,10 @@ export default function ContactUploadPage() {
                       <button
                         type="button"
                         onClick={handleSave}
-                        disabled={uploading}
+                        disabled={uploading || mappedRows.length === 0}
                         className="rounded-lg bg-green-600 px-6 py-2 font-semibold text-white hover:bg-green-700 disabled:opacity-60"
                       >
-                        {uploading ? 'Saving…' : 'Yes, save these contacts'}
+                        {uploading ? 'Saving…' : mappedRows.length === 0 ? 'No contacts to save' : 'Yes, save these contacts'}
                       </button>
                     )}
                   </>
