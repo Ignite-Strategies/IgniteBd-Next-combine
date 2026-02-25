@@ -117,6 +117,9 @@ export default function OutreachMessagePage({ params }) {
   const [additionalContext, setAdditionalContext] = useState('');
   const [notesExpanded, setNotesExpanded] = useState(true);
 
+  // Variable schema — all catalogue variables with resolved values for this context
+  const [variableSchema, setVariableSchema] = useState([]); // [{ key, variable, source, description, value, resolved }]
+
   // Generation
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -165,6 +168,17 @@ export default function OutreachMessagePage({ params }) {
         })
         .catch(() => {});
     }
+  }, [contactId, companyHQId]);
+
+  // Load variable schema — all catalogue variables with their resolved values for this contact/owner context
+  useEffect(() => {
+    if (!companyHQId || !contactId) return;
+    const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
+    api.post('/api/variables/preview', { contactId, companyHQId, ownerId })
+      .then((res) => {
+        if (res.data?.success) setVariableSchema(res.data.variables || []);
+      })
+      .catch(() => {}); // non-fatal
   }, [contactId, companyHQId]);
 
   const handleSave = async () => {
@@ -438,26 +452,39 @@ export default function OutreachMessagePage({ params }) {
                   rows={14}
                   className="w-full rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:border-green-400 focus:ring-green-400"
                 />
-                {/* Variable Bank — shows what was resolved server-side */}
-                {result && (
+                {/* Variable Bank — full catalogue schema with live resolved values */}
+                {variableSchema.length > 0 && (
                   <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Resolved Variables</p>
-                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                      {[
-                        { label: '{{firstName}}', value: contact?.goesBy || contact?.firstName },
-                        { label: '{{lastName}}', value: contact?.lastName },
-                        { label: '{{companyName}}', value: contact?.companyName },
-                        { label: '{{title}}', value: contact?.title },
-                      ].map(({ label, value }) => (
-                        <div key={label} className={`flex flex-col rounded-md border px-2 py-1.5 ${value ? 'border-green-200 bg-white' : 'border-amber-200 bg-amber-50'}`}>
-                          <span className="font-mono text-[10px] text-gray-500">{label}</span>
-                          <span className={`mt-0.5 truncate text-xs font-medium ${value ? 'text-gray-800' : 'text-amber-600'}`}>
-                            {value || 'not set on contact'}
-                          </span>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Variable Reference</p>
+
+                    {/* Group by source */}
+                    {['CONTACT', 'OWNER', 'COMPUTED'].map((source) => {
+                      const vars = variableSchema.filter((v) => v.source === source);
+                      if (vars.length === 0) return null;
+                      const sourceLabels = { CONTACT: 'Recipient', OWNER: 'Sender / Your Company', COMPUTED: 'Computed' };
+                      return (
+                        <div key={source} className="mb-3 last:mb-0">
+                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">{sourceLabels[source]}</p>
+                          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                            {vars.map(({ key, variable, description, value, resolved }) => (
+                              <div
+                                key={key}
+                                title={description}
+                                className={`flex flex-col rounded-md border px-2 py-1.5 ${resolved ? 'border-green-200 bg-white' : 'border-amber-200 bg-amber-50'}`}
+                              >
+                                <span className="font-mono text-[10px] text-gray-500">{variable}</span>
+                                <span className={`mt-0.5 truncate text-xs font-medium ${resolved ? 'text-gray-800' : 'text-amber-500'}`}>
+                                  {resolved ? value : 'not set'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                    {snippetContentMap && Object.keys(snippetContentMap).length > 0 && (
+                      );
+                    })}
+
+                    {/* Snippets used in this generation */}
+                    {result && snippetContentMap && Object.keys(snippetContentMap).length > 0 && (
                       <div className="mt-2 border-t border-gray-200 pt-2">
                         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Snippets used</p>
                         <div className="flex flex-col gap-1">

@@ -400,18 +400,16 @@ Return ONLY valid JSON:
     let hydratedBody = rawBody;
     let hydratedSubject = rawSubject;
     try {
+      // Pass ownerId + companyHQId so the service can resolve OWNER variables
+      // (senderName, senderCompany, senderEmail) natively from the catalogue.
       const hydrateContext = {
         contactId: contactId || undefined,
         ownerId: owner.id,
         companyHQId,
       };
-      const metadata = {
-        ...(ownerName && { senderName: ownerName }),
-        ...(senderCompanyName && { senderCompany: senderCompanyName }),
-      };
       [hydratedBody, hydratedSubject] = await Promise.all([
-        hydrateTemplateFromDatabase(rawBody, hydrateContext, metadata),
-        hydrateTemplateFromDatabase(rawSubject, hydrateContext, metadata),
+        hydrateTemplateFromDatabase(rawBody, hydrateContext),
+        hydrateTemplateFromDatabase(rawSubject, hydrateContext),
       ]);
     } catch (hydrateErr) {
       console.warn('⚠️ Hydration failed, returning raw body:', hydrateErr.message);
