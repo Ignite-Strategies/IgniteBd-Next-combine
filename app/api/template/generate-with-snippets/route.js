@@ -268,7 +268,10 @@ export async function POST(request) {
       const parts = [];
       if (contactInfo.name) parts.push(`Name: ${contactInfo.name}`);
       if (contactInfo.title) parts.push(`Title: ${contactInfo.title}`);
-      if (contactInfo.companyName) parts.push(`Current company: ${contactInfo.companyName}`);
+      if (contactInfo.companyName) {
+        parts.push(`Current company: ${contactInfo.companyName}`);
+        parts.push(`IMPORTANT: Use "${contactInfo.companyName}" as the company name in the email — do NOT use generic terms like "fund sponsor" or descriptors from the relationship context.`);
+      }
       if (parts.length > 0) {
         contactInfoDesc = `\n\n=== RECIPIENT ===\n${parts.join('\n')}`;
       }
@@ -349,6 +352,15 @@ Return ONLY valid JSON:
     const selectedSnippets = generated.selectedSnippets || [];
     const validSnippets = snippets.map((s) => s.snipSlug);
 
+    const validSelectedSlugs = selectedSnippets.filter((name) => validSnippets.includes(name));
+
+    // Return snippet content map so page can do client-side Fill with Data
+    const snippetContentMap = {};
+    for (const slug of validSelectedSlugs) {
+      const snip = snippets.find((s) => s.snipSlug === slug);
+      if (snip) snippetContentMap[slug] = snip.snipText;
+    }
+
     return NextResponse.json({
       success: true,
       template: {
@@ -356,7 +368,8 @@ Return ONLY valid JSON:
         subject: generated.subject,
         body: generated.body,
       },
-      selectedSnippets: selectedSnippets.filter((name) => validSnippets.includes(name)),
+      selectedSnippets: validSelectedSlugs,
+      snippetContentMap, // { slug: text } for client-side hydration
       reasoning: generated.reasoning || 'Snippets selected based on intent and relationship context',
       availableSnippets: snippets.length,
     });

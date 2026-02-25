@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, ArrowLeft, RefreshCw, Check, Save, User, Tag, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, ArrowLeft, RefreshCw, Check, Save, Wand2, User, Tag, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 
 const DONT_KNOW = 'DONT_KNOW';
@@ -120,7 +120,10 @@ export default function OutreachMessagePage({ params }) {
   // Generation
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState(null); // { subject, body, reasoning, selectedSnippets }
+  // result.rawBody = original with {{snippet:slug}} refs; result.body = current editable (may be filled)
+  const [result, setResult] = useState(null);
+  const [snippetContentMap, setSnippetContentMap] = useState({}); // { slug: text }
+  const [isFilled, setIsFilled] = useState(false); // whether Fill with Data has been applied
   const [snippetCount, setSnippetCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -171,9 +174,10 @@ export default function OutreachMessagePage({ params }) {
     setError('');
     try {
       // Step 1: always save as a draft on the contact (no emailSent = draft)
+      // Save the filled/expanded body if Fill with Data was applied, otherwise raw
       const draftRes = await api.post(`/api/contacts/${contactId}/off-platform-send`, {
         subject: result.subject,
-        body: result.body,
+        body: result.body, // filled version if fillWithData was clicked
         platform: 'ai-draft',
         // no emailSent → null → draft
       });
@@ -197,12 +201,13 @@ export default function OutreachMessagePage({ params }) {
     setError('');
     try {
       const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
+      // Templates always save the raw form (with {{snippet:slug}} refs) so they're reusable
       const res = await api.post('/api/templates', {
         companyHQId,
         ownerId,
         title: result.subject,
         subject: result.subject,
-        body: result.body,
+        body: result.rawBody || result.body,
         ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
       });
       if (res.data?.success) {
@@ -217,6 +222,30 @@ export default function OutreachMessagePage({ params }) {
       setSavingTemplate(false);
     }
   };
+
+  const fillWithData = useCallback(() => {
+    if (!result) return;
+    const firstName = contact?.goesBy || contact?.firstName || '{{firstName}}';
+    const lastName = contact?.lastName || '{{lastName}}';
+    const companyName = contact?.companyName || '{{companyName}}';
+
+    let filled = result.rawBody || result.body;
+
+    // Expand {{snippet:slug}} with actual snippet text
+    filled = filled.replace(/\{\{snippet:([^}]+)\}\}/g, (_, slug) => {
+      return snippetContentMap[slug] || `[${slug}]`;
+    });
+
+    // Replace contact variables
+    filled = filled
+      .replace(/\{\{firstName\}\}/g, firstName)
+      .replace(/\{\{lastName\}\}/g, lastName)
+      .replace(/\{\{fullName\}\}/g, `${firstName} ${lastName}`.trim())
+      .replace(/\{\{companyName\}\}/g, companyName);
+
+    setResult((r) => ({ ...r, body: filled }));
+    setIsFilled(true);
+  }, [result, contact, snippetContentMap]);
 
   const handleGenerate = async () => {
     if (!notes.trim() && !additionalContext.trim()) {
@@ -249,12 +278,16 @@ export default function OutreachMessagePage({ params }) {
       });
 
       if (res.data?.success) {
+        const rawBody = res.data.template.body;
         setResult({
           subject: res.data.template.subject,
-          body: res.data.template.body,
+          body: rawBody,
+          rawBody, // preserve original for template save
           reasoning: res.data.reasoning,
           selectedSnippets: res.data.selectedSnippets || [],
         });
+        setSnippetContentMap(res.data.snippetContentMap || {});
+        setIsFilled(false);
       } else {
         setError(res.data?.error || 'Generation failed');
       }
@@ -415,14 +448,34 @@ export default function OutreachMessagePage({ params }) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">Body</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">Body</label>
+                  {!isFilled ? (
+                    <button
+                      type="button"
+                      onClick={fillWithData}
+                      className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 transition"
+                      title="Expand snippets and fill contact variables — ready to copy and send"
+                    >
+                      <Wand2 className="h-3 w-3" />
+                      Fill with Data
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs font-medium text-green-700">
+                      <Check className="h-3 w-3" />
+                      Filled — ready to copy
+                    </span>
+                  )}
+                </div>
                 <textarea
                   value={result.body}
                   onChange={(e) => setResult((r) => ({ ...r, body: e.target.value }))}
                   rows={14}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 ${isFilled ? 'border-green-300 bg-green-50 focus:border-green-400 focus:ring-green-400' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-400'}`}
                 />
-                <p className="mt-1 text-xs text-gray-400">Snippets render as {'{{snippet:name}}'}. Variables render as {'{{firstName}}'} etc.</p>
+                {!isFilled && (
+                  <p className="mt-1 text-xs text-gray-400">Click <strong>Fill with Data</strong> to expand snippets and replace variables with real contact info.</p>
+                )}
               </div>
             </div>
 
@@ -448,7 +501,7 @@ export default function OutreachMessagePage({ params }) {
                 )}
                 <button
                   type="button"
-                  onClick={() => { setResult(null); setError(''); setSaved(false); setShowTemplatePrompt(false); setTemplateSaved(false); }}
+                  onClick={() => { setResult(null); setError(''); setSaved(false); setShowTemplatePrompt(false); setTemplateSaved(false); setIsFilled(false); setSnippetContentMap({}); }}
                   className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
                 >
                   <RefreshCw className="h-4 w-4" />
