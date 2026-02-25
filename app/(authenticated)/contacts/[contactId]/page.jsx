@@ -61,6 +61,17 @@ export default function ContactDetailPage({ params }) {
           if (response.data?.success && response.data.contact) {
             setContact(response.data.contact);
             setNotesText(response.data.contact.notes || '');
+            // Load saved relationship context if it exists
+            if (response.data.contact.relationshipContext) {
+              try {
+                const parsed = typeof response.data.contact.relationshipContext === 'string' 
+                  ? JSON.parse(response.data.contact.relationshipContext)
+                  : response.data.contact.relationshipContext;
+                setRelationshipContext(parsed);
+              } catch (e) {
+                console.error('Failed to parse relationship context:', e);
+              }
+            }
             setLoading(false);
             // Don't call refreshContacts here - it causes infinite loops
             // The contact detail is already fresh, no need to refresh the list
@@ -154,6 +165,7 @@ export default function ContactDetailPage({ params }) {
   const [emailHistory, setEmailHistory] = useState([]);
   const [relationshipContext, setRelationshipContext] = useState(null);
   const [generatingRelationshipContext, setGeneratingRelationshipContext] = useState(false);
+  const [savingRelationshipContext, setSavingRelationshipContext] = useState(false);
   
   // Load last email send info
   useEffect(() => {
@@ -714,6 +726,25 @@ export default function ContactDetailPage({ params }) {
                       <UserCircle className="h-4 w-4" />
                       Build Persona
                     </button>
+                    <button
+                      onClick={() => {
+                        // Navigate to AI template builder with relationship context and persona
+                        const params = new URLSearchParams({
+                          ...(companyHQId && { companyHQId }),
+                          ...(contactId && { contactId }),
+                          ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
+                          ...(relationshipContext && { 
+                            relationshipContext: JSON.stringify(relationshipContext)
+                          }),
+                        });
+                        router.push(`/templates/create/ai-snippets?${params.toString()}`);
+                      }}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                      title="Build email template using AI and snippets"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Build Template
+                    </button>
                     {contact?.email && (
                       <button
                         onClick={() => {
@@ -1261,6 +1292,46 @@ export default function ContactDetailPage({ params }) {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    onClick={async () => {
+                      setSavingRelationshipContext(true);
+                      try {
+                        const response = await api.put(`/api/contacts/${contactId}`, {
+                          relationshipContext: JSON.stringify(relationshipContext),
+                        });
+                        if (response.data?.success) {
+                          setContact(response.data.contact);
+                          if (refreshContacts) {
+                            refreshContacts();
+                          }
+                          // Show success feedback
+                          alert('Relationship context saved successfully');
+                        } else {
+                          alert(response.data?.error || 'Failed to save relationship context');
+                        }
+                      } catch (error) {
+                        console.error('Error saving relationship context:', error);
+                        alert(error.response?.data?.error || 'Failed to save relationship context');
+                      } finally {
+                        setSavingRelationshipContext(false);
+                      }
+                    }}
+                    disabled={savingRelationshipContext}
+                    className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Save relationship context"
+                  >
+                    {savingRelationshipContext ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Save
+                      </>
+                    )}
+                  </button>
+                  <button
                     onClick={handleGenerateRelationshipContext}
                     disabled={generatingRelationshipContext}
                     className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1303,40 +1374,20 @@ export default function ContactDetailPage({ params }) {
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Email History</h3>
-              <div className="flex items-center gap-2">
-                {emailHistory.length === 0 && (
-                  <button
-                    onClick={() => {
-                      const url = companyHQId 
-                        ? `/outreach/record-off-platform?contactId=${contactId}&companyHQId=${companyHQId}`
-                        : `/outreach/record-off-platform?contactId=${contactId}`;
-                      router.push(url);
-                    }}
-                    className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Email Manually
-                  </button>
-                )}
+              {emailHistory.length === 0 && (
                 <button
                   onClick={() => {
-                    // Navigate to AI template builder with relationship context and persona
-                    const params = new URLSearchParams({
-                      ...(companyHQId && { companyHQId }),
-                      ...(contactId && { contactId }),
-                      ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
-                      ...(relationshipContext && { 
-                        relationshipContext: JSON.stringify(relationshipContext)
-                      }),
-                    });
-                    router.push(`/templates/create/ai-snippets?${params.toString()}`);
+                    const url = companyHQId 
+                      ? `/outreach/record-off-platform?contactId=${contactId}&companyHQId=${companyHQId}`
+                      : `/outreach/record-off-platform?contactId=${contactId}`;
+                    router.push(url);
                   }}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  Build Template
+                  <Plus className="h-4 w-4" />
+                  Add Email Manually
                 </button>
-              </div>
+              )}
             </div>
             {loadingLastEmail ? (
               <div className="flex items-center gap-2 text-sm text-gray-500">
