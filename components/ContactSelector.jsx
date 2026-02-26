@@ -215,6 +215,20 @@ export default function ContactSelector({
         
         return matches;
       })
+      // Dedupe: same person can exist twice (e.g. before company-scoped unique). Prefer contact with email.
+      .reduce((acc, c) => {
+        const nameCompany = `${(`${c.firstName || ''} ${c.lastName || ''}`.trim().toLowerCase())}|${(c.contactCompany?.companyName || c.companies?.companyName || '').toLowerCase()}`;
+        const existing = acc.find((x) => {
+          const xNameCompany = `${(`${x.firstName || ''} ${x.lastName || ''}`.trim().toLowerCase())}|${(x.contactCompany?.companyName || x.companies?.companyName || '').toLowerCase()}`;
+          return xNameCompany === nameCompany;
+        });
+        if (!existing) {
+          acc.push(c);
+        } else if ((c.email || '').trim() && !(existing.email || '').trim()) {
+          acc[acc.indexOf(existing)] = c;
+        }
+        return acc;
+      }, [])
       .slice(0, 20);
     
     if (contactSearch.length >= 2 && filtered.length === 0 && contacts.length > 0) {

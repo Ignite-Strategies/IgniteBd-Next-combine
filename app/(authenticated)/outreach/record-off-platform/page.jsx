@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * Record off-platform email — single implementation for both entry points:
+ * - Outreach: /outreach/record-off-platform (user selects contact)
+ * - Contact-scoped: same URL with ?contactId=... (contact pre-loaded from "Add Email Manually")
+ * Keep behavior and UI identical for both. See docs/RECORD_OFF_PLATFORM_SINGLE_PAGE.md.
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, FileText, Plus, X, Check, Loader2, Mail, Calendar, MessageSquare, Download } from 'lucide-react';
@@ -1214,7 +1221,7 @@ Best regards"`;
                     Found {parsedConversation.messages.length} messages.
                     {parsedConversation.ourOutbound && parsedConversation.lastReply
                       ? " We'll record your outbound email and the contact's reply."
-                      : ' Select the contact above so we can tell which message is yours and which is the reply.'}
+                      : ' Select the contact below so we can tell which message is yours and which is the reply.'}
                   </p>
                   {parsedConversation.ourOutbound && (
                     <p className="mt-1 text-blue-600">Outbound: {parsedConversation.ourOutbound.subject || 'No subject'} ({parsedConversation.ourOutbound.sent || 'no date'})</p>
