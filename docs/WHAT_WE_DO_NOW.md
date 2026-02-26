@@ -67,6 +67,23 @@ So connectors still matter and you follow up; the FK makes the “who introduced
 
 ---
 
+## How “upload email” and “Add Response” connect
+
+**Upload/record email** and **Add Response** are two separate steps; Add Response does **not** appear on the upload success screen.
+
+1. **Where you record the email**
+   - From the **contact page**: Email History → **Add Email Manually** → goes to **Record Off-Platform** (with that contact pre-selected).
+   - You paste or enter the email you sent → **Save Email Record** (or **Save email + response** if you pasted a full conversation).
+2. **What happens on success**
+   - If you came from a contact, you’re redirected back to **that contact page** after a short delay.
+3. **Where you add their reply**
+   - **On the contact page**, in **Email History**, each sent email (that doesn’t already have a response) has an **Add Response** button.
+   - So: you upload the email → you land back on the contact → the new email appears in the list with **Add Response** → you click it to record that they replied (and optionally set disposition: positive, not decision maker, forwarding, not interested).
+
+**Summary:** Upload creates the email row. Add Response is done **on the contact**, on that email’s row in Email History — not on the Record Off-Platform page.
+
+---
+
 ## Recording a response: what we do
 
 **API:** `PUT /api/emails/[emailId]/response`  

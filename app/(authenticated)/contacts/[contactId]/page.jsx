@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
@@ -178,7 +179,13 @@ export default function ContactDetailPage({ params }) {
   const [relationshipContext, setRelationshipContext] = useState(null);
   const [generatingRelationshipContext, setGeneratingRelationshipContext] = useState(false);
   const [savingRelationshipContext, setSavingRelationshipContext] = useState(false);
-  
+  const [editingIntroducedBy, setEditingIntroducedBy] = useState(false);
+  const [introducedByEmail, setIntroducedByEmail] = useState('');
+  const [lookupResult, setLookupResult] = useState(null);
+  const [lookupError, setLookupError] = useState('');
+  const [lookingUp, setLookingUp] = useState(false);
+  const [savingIntroducedBy, setSavingIntroducedBy] = useState(false);
+
   // Load email history (used by effect and after adding response)
   const loadEmailHistory = () => {
     if (!contactId) return;
@@ -1143,6 +1150,197 @@ export default function ContactDetailPage({ params }) {
                     className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
                   >
                     <XIcon className="h-4 w-4" />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Introduced By Section */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <UserPlus className="h-5 w-5 text-gray-500" />
+                Introduced By
+              </h3>
+              {!editingIntroducedBy && (
+                <button
+                  onClick={() => {
+                    setEditingIntroducedBy(true);
+                    setIntroducedByEmail('');
+                    setLookupResult(null);
+                    setLookupError('');
+                  }}
+                  className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                  title="Set who introduced this contact"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {!editingIntroducedBy ? (
+              <div>
+                {contact.introducedByContact ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600">Introduced by</span>
+                    <Link
+                      href={`/contacts/${contact.introducedByContactId}${companyHQId ? `?companyHQId=${companyHQId}` : ''}`}
+                      className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {contact.introducedByContact.displayName}
+                    </Link>
+                    {contact.introducedByContact.email && (
+                      <span className="text-sm text-gray-500">({contact.introducedByContact.email})</span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No introducer set. Click edit to add who introduced this contact.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={introducedByEmail}
+                    onChange={(e) => {
+                      setIntroducedByEmail(e.target.value);
+                      setLookupError('');
+                      setLookupResult(null);
+                    }}
+                    placeholder="Enter introducer's email to look up"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!introducedByEmail.trim() || !contact.crmId) return;
+                      setLookingUp(true);
+                      setLookupError('');
+                      setLookupResult(null);
+                      try {
+                        const response = await api.get(
+                          `/api/contacts/lookup-by-email?email=${encodeURIComponent(introducedByEmail.trim())}&crmId=${encodeURIComponent(contact.crmId)}`
+                        );
+                        if (response.data?.success && response.data.contact) {
+                          setLookupResult(response.data.contact);
+                        } else {
+                          setLookupError(response.data?.error || 'Contact not found');
+                        }
+                      } catch (err) {
+                        setLookupError(err.response?.data?.error || err.message || 'Lookup failed');
+                      } finally {
+                        setLookingUp(false);
+                      }
+                    }}
+                    disabled={lookingUp || !introducedByEmail.trim() || !contact.crmId}
+                    className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {lookingUp ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Looking up...
+                      </>
+                    ) : (
+                      'Look up'
+                    )}
+                  </button>
+                </div>
+                {lookupError && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-2 text-sm text-red-700">
+                    {lookupError}
+                  </div>
+                )}
+                {lookupResult && (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex items-center justify-between">
+                    <div>
+                      <span className="font-semibold text-gray-900">{lookupResult.displayName}</span>
+                      {lookupResult.email && (
+                        <span className="ml-2 text-sm text-gray-500">({lookupResult.email})</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setSavingIntroducedBy(true);
+                          try {
+                            const response = await api.put(`/api/contacts/${contactId}`, {
+                              introducedByContactId: lookupResult.id,
+                            });
+                            if (response.data?.success) {
+                              const contactRes = await api.get(`/api/contacts/${contactId}`);
+                              if (contactRes.data?.success && contactRes.data.contact) {
+                                setContact(contactRes.data.contact);
+                              }
+                              setEditingIntroducedBy(false);
+                              setLookupResult(null);
+                              setIntroducedByEmail('');
+                              if (refreshContacts) refreshContacts();
+                            } else {
+                              setLookupError(response.data?.error || 'Failed to save');
+                            }
+                          } catch (err) {
+                            setLookupError(err.response?.data?.error || err.message || 'Failed to save');
+                          } finally {
+                            setSavingIntroducedBy(false);
+                          }
+                        }}
+                        disabled={savingIntroducedBy}
+                        className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Check className="h-4 w-4" />
+                        {savingIntroducedBy ? 'Saving...' : 'Set'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!contact.introducedByContactId) {
+                        setEditingIntroducedBy(false);
+                        setLookupResult(null);
+                        setIntroducedByEmail('');
+                        return;
+                      }
+                      setSavingIntroducedBy(true);
+                      try {
+                        const response = await api.put(`/api/contacts/${contactId}`, {
+                          introducedByContactId: null,
+                        });
+                        if (response.data?.success) {
+                          const contactRes = await api.get(`/api/contacts/${contactId}`);
+                          if (contactRes.data?.success && contactRes.data.contact) {
+                            setContact(contactRes.data.contact);
+                          }
+                          setEditingIntroducedBy(false);
+                          setLookupResult(null);
+                          setIntroducedByEmail('');
+                          if (refreshContacts) refreshContacts();
+                        } else {
+                          setLookupError(response.data?.error || 'Failed to clear');
+                        }
+                      } catch (err) {
+                        setLookupError(err.response?.data?.error || err.message || 'Failed to clear');
+                      } finally {
+                        setSavingIntroducedBy(false);
+                      }
+                    }}
+                    disabled={savingIntroducedBy}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingIntroducedBy(false);
+                      setLookupResult(null);
+                      setIntroducedByEmail('');
+                      setLookupError('');
+                    }}
+                    disabled={savingIntroducedBy}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                  >
                     Cancel
                   </button>
                 </div>

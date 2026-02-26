@@ -112,12 +112,9 @@ export async function PUT(request, { params }) {
           const newNotes = (contact?.notes || '').trim() + noteSuffix;
           await prisma.contacts.update({
             where: { id: contactId },
-            data: {
-              notes: newNotes.trim() || null,
-              introPositionInTarget: 'INTRO_WITHIN_TARGET', // warm intro to a buyer at target company
-            },
+            data: { notes: newNotes.trim() || null },
           });
-          console.log('✅ Contact → connector/forwarded + introPositionInTarget=INTRO_WITHIN_TARGET (', disposition, ')');
+          console.log('✅ Contact → connector/forwarded (', disposition, ')');
         } else if (disposition === 'not_interested') {
           await prisma.contacts.update({
             where: { id: contactId },

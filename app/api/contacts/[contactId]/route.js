@@ -55,6 +55,28 @@ export async function GET(request, { params }) {
       if (contact && !contact.relationship_contexts) {
         contact.relationship_contexts = null;
       }
+
+      // Hydrate introducedBy contact when introducedByContactId is set (simple string FK, no Prisma relation)
+      if (contact?.introducedByContactId) {
+        const introducer = await prisma.contact.findUnique({
+          where: { id: contact.introducedByContactId },
+          select: { id: true, firstName: true, lastName: true, goesBy: true, fullName: true, email: true },
+        });
+        contact.introducedByContact = introducer
+          ? {
+              id: introducer.id,
+              displayName:
+                introducer.goesBy ||
+                [introducer.firstName, introducer.lastName].filter(Boolean).join(' ') ||
+                introducer.fullName ||
+                introducer.email ||
+                'Unknown',
+              email: introducer.email,
+            }
+          : null;
+      } else {
+        contact.introducedByContact = null;
+      }
     } catch (prismaError) {
       console.error('❌ Prisma query error:', prismaError);
       console.error('❌ Prisma error name:', prismaError.name);
@@ -194,6 +216,7 @@ export async function PUT(request, { params }) {
       stage,
       outreachPersonaSlug,
       relationshipContext, // JSON field for relationship context
+      introducedByContactId,
     } = body ?? {};
 
     // Validate pipeline and stage if provided
@@ -244,6 +267,23 @@ export async function PUT(request, { params }) {
           );
         }
         updateData.outreachPersonaSlug = outreachPersonaSlug;
+      }
+    }
+    if (introducedByContactId !== undefined) {
+      // Allow null to clear, or validate contact exists if provided
+      if (introducedByContactId === null || introducedByContactId === '') {
+        updateData.introducedByContactId = null;
+      } else {
+        const introducer = await prisma.contact.findUnique({
+          where: { id: introducedByContactId },
+        });
+        if (!introducer) {
+          return NextResponse.json(
+            { success: false, error: `Contact with id "${introducedByContactId}" not found` },
+            { status: 400 },
+          );
+        }
+        updateData.introducedByContactId = introducedByContactId;
       }
     }
     if (relationshipContext !== undefined) {

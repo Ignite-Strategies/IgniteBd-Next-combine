@@ -536,12 +536,8 @@ model Contact {
   urgencyScore                                              Int?
   buyingReadiness                                           BuyingReadiness?
   buyerPerson                                               BuyerPerson?
-  // Position intro within target company (where they sit in the path to a buyer)
-  introPositionInTarget                                     IntroPositionInTarget?
-  // Intro source: when this contact was introduced by another contact (e.g. connector forwarded to them)
-  introSourceContactId                                      String?
-  introSourceContact                                        Contact?   @relation("ContactIntroSource", fields: [introSourceContactId], references: [id], onDelete: SetNull)
-  contactsIntroduced                                        Contact[]  @relation("ContactIntroSource")
+  // Simple link: "who introduced this person" — store the other contact's id as string; look up when you need to show "Introduced by John"
+  introducedByContactId                                     String?
   // Manual outreach tracking fields
   persona_type                                              PersonaType?
   prior_relationship                                        RelationshipEnum?
@@ -584,8 +580,6 @@ model Contact {
   @@index([lastRespondedAt])
   @@index([nextContactedAt])
   @@index([doNotContactAgain])
-  @@index([introPositionInTarget])
-  @@index([introSourceContactId])
   @@map("contacts")
 }
 
@@ -1629,15 +1623,6 @@ enum BuyerPerson {
   BUSINESS_OWNER
   DIRECTOR_VP
   PRODUCT_USER
-}
-
-/// Where this contact sits in the path to a buyer at the target company (not pipeline stage).
-enum IntroPositionInTarget {
-  DECISION_MAKER   // They are the buyer / can say yes
-  INTRO_WITHIN_TARGET  // Warm intro at the company; can pass to the buyer (e.g. "I'll check with internal counsel")
-  GATEKEEPER       // Controls access; may need to get past first
-  INFLUENCER       // Influences the decision
-  OTHER
 }
 
 enum BuyingReadiness {
