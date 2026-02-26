@@ -76,6 +76,16 @@ export async function POST(request, { params }) {
       ? `BODY:\n${emailBody}\n\nNOTES:\n${notes}`
       : emailBody || notes || null;
 
+    let activityKind = null;
+    if (!isDraft) {
+      const priorSends = await prisma.email_activities.count({
+        where: {
+          contact_id: contactId,
+          OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM' }],
+        },
+      });
+      activityKind = priorSends > 0 ? 'SENT_REPLY' : 'SENT_INITIAL';
+    }
     const activity = await prisma.email_activities.create({
       data: {
         owner_id: owner.id,
@@ -88,6 +98,7 @@ export async function POST(request, { params }) {
         source: 'OFF_PLATFORM',
         platform: platform || 'manual',
         sentAt: emailSentDate,
+        activityKind,
       },
     });
 

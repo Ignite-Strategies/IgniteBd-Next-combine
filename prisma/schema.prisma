@@ -549,6 +549,9 @@ model Contact {
   nextContactedAt                                           DateTime? // When to contact next: computed (cadence) or manual (e.g. follow next quarter)
   nextContactNote                                            String?  // e.g. "Follow next quarter", "Do not call - asked to reach out in March"
   doNotContactAgain                                         Boolean  @default(false) // If true, no follow-up; ignore nextContactedAt
+  // Next engagement: when to engage this contact next; set by system (7d from send/response) or user. CRM concept (replaces "remind me").
+  nextEngagementDate                                        DateTime?
+  nextEngagementPurpose                                      String?  // unresponsive | periodic_check_in | referral_no_contact | manual
   outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
   relationship_contexts                                     relationship_contexts?
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
@@ -579,6 +582,7 @@ model Contact {
   @@index([lastContactedAt])
   @@index([lastRespondedAt])
   @@index([nextContactedAt])
+  @@index([nextEngagementDate])
   @@index([doNotContactAgain])
   @@map("contacts")
 }
@@ -638,41 +642,49 @@ model ecosystem_orgs {
 }
 
 // Single model for all email sends (platform + off-platform). Campaign/sequence nullable.
+// Activity kind: SENT_INITIAL / SENT_REPLY (we sent) or RESPONSE (contact replied; inReplyTo links to send).
 model email_activities {
-  id                  String           @id @default(cuid())
-  owner_id            String
-  contact_id          String?
-  tenant_id           String?
-  email               String?          // Recipient email (optional for off-platform; use contact)
-  subject             String?
-  body                String?          @db.Text
-  event               String?          // sent, delivered, opened, clicked, etc.
-  messageId           String?          @unique // SendGrid message ID; null for off-platform
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  id                     String              @id @default(cuid())
+  owner_id               String
+  contact_id             String?
+  tenant_id              String?
+  email                  String?             // Recipient email (optional for off-platform; use contact)
+  subject                String?
+  body                   String?             @db.Text
+  event                  String?             // sent, delivered, opened, clicked, etc.
+  messageId              String?             @unique // SendGrid message ID; null for off-platform
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  // Kind: send (initial/reply) vs contact response row (points back via inReplyToActivityId)
+  activityKind           EmailActivityKind?
+  inReplyToActivityId    String?             // When activityKind=RESPONSE, the email this reply is to
+  contactAppreciative    Boolean?            // "Great / let me look into this" → 7d from this response
   // Campaign/sequence — nullable; only set when sent via campaign/sequence
-  campaign_id         String?
-  sequence_id         String?
-  sequence_step_id    String?
-  reply_to_message_id String?
+  campaign_id            String?
+  sequence_id            String?
+  sequence_step_id      String?
+  reply_to_message_id    String?
   // Source: platform (SendGrid) vs off-platform (manual, gmail, etc.)
-  source              EmailSource?     @default(PLATFORM)
-  platform            String?         // "sendgrid", "gmail", "outlook", "apollo", "manual", "ai-draft"
-  sentAt              DateTime?        // When actually sent; null = use createdAt
-  // Response tracking (contact replied)
-  hasResponded        Boolean          @default(false)
-  contactResponse     String?          @db.Text
-  respondedAt         DateTime?
-  responseSubject     String?
-  campaigns           campaigns?       @relation(fields: [campaign_id], references: [id])
-  owners              owners           @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-  email_sequences     email_sequences? @relation(fields: [sequence_id], references: [id])
-  sequence_steps      sequence_steps?  @relation(fields: [sequence_step_id], references: [id])
-  contacts            Contact?         @relation(fields: [contact_id], references: [id], onDelete: Cascade)
+  source                 EmailSource?        @default(PLATFORM)
+  platform               String?             // "sendgrid", "gmail", "outlook", "apollo", "manual", "ai-draft"
+  sentAt                 DateTime?           // When actually sent; null = use createdAt
+  // Response tracking (contact replied) — when response stored on same row
+  hasResponded           Boolean             @default(false)
+  contactResponse       String?             @db.Text
+  respondedAt            DateTime?
+  responseSubject       String?
+  campaigns              campaigns?          @relation(fields: [campaign_id], references: [id])
+  owners                 owners              @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  email_sequences        email_sequences?    @relation(fields: [sequence_id], references: [id])
+  sequence_steps         sequence_steps?     @relation(fields: [sequence_step_id], references: [id])
+  contacts               Contact?            @relation(fields: [contact_id], references: [id], onDelete: Cascade)
+  inReplyTo              email_activities?   @relation("ResponseToSend", fields: [inReplyToActivityId], references: [id])
+  responses              email_activities[] @relation("ResponseToSend")
 
   @@index([campaign_id])
   @@index([contact_id, createdAt])
   @@index([contact_id])
+  @@index([inReplyToActivityId])
   @@index([messageId])
   @@index([owner_id])
   @@index([sequence_id])
@@ -1929,6 +1941,13 @@ enum PersonaType {
 enum EmailSource {
   PLATFORM
   OFF_PLATFORM
+}
+
+// Email activity kind: send (initial or reply) vs contact response as its own row
+enum EmailActivityKind {
+  SENT_INITIAL   // First outreach to contact
+  SENT_REPLY     // We sent a follow-up
+  RESPONSE       // Contact replied; inReplyToActivityId points to the email they replied to
 }
 
 enum EmailType {

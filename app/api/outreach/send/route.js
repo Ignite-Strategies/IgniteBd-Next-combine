@@ -204,10 +204,21 @@ export async function POST(request) {
         createdEmailId = updated.id;
         console.log('✅ Draft email activity updated and sent:', emailActivityId);
       } else {
+        const contactId = customArgs.contactId || null;
+        let activityKind = null;
+        if (contactId) {
+          const priorSends = await prisma.email_activities.count({
+            where: {
+              contact_id: contactId,
+              OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM' }],
+            },
+          });
+          activityKind = priorSends > 0 ? 'SENT_REPLY' : 'SENT_INITIAL';
+        }
         const emailActivity = await prisma.email_activities.create({
           data: {
             owner_id: owner.id,
-            contact_id: customArgs.contactId || null,
+            contact_id: contactId,
             tenant_id: customArgs.tenantId || null,
             campaign_id: customArgs.campaignId || null,
             sequence_id: customArgs.sequenceId || null,
@@ -220,6 +231,7 @@ export async function POST(request) {
             source: 'PLATFORM',
             platform: 'sendgrid',
             sentAt: new Date(),
+            activityKind,
           },
         });
         emailActivityId = emailActivity.id;

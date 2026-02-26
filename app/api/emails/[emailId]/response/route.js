@@ -11,6 +11,7 @@ import { ensureContactPipeline } from '@/lib/services/pipelineService';
  *   contactResponse: string (the reply text)
  *   respondedAt?: string (ISO date, defaults to now)
  *   responseSubject?: string
+ *   contactAppreciative?: boolean — "great / let me look into this" → sets 7d next engagement from this response
  *   responseDisposition?: 'positive' | 'not_decision_maker' | 'forwarding' | 'not_interested'
  *     - positive (default): move prospect engaged-awaiting-response → interest
  *     - not_decision_maker | forwarding: move to unassigned, optionally append note
@@ -50,7 +51,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { contactResponse, respondedAt, responseSubject, responseDisposition } = body ?? {};
+    const { contactResponse, respondedAt, responseSubject, responseDisposition, contactAppreciative } = body ?? {};
 
     if (!contactResponse) {
       return NextResponse.json(
@@ -74,6 +75,7 @@ export async function PUT(request, { params }) {
         respondedAt: responseDate,
         responseSubject: responseSubject || null,
         hasResponded: true,
+        contactAppreciative: contactAppreciative === true ? true : contactAppreciative === false ? false : undefined,
       },
       include: {
         contacts: {
@@ -91,14 +93,21 @@ export async function PUT(request, { params }) {
 
     const contactId = updated.contact_id;
     if (contactId) {
-      // Snap lastRespondedAt on Contact
+      // Snap lastRespondedAt; if contactAppreciative, set next engagement 7d from this response
+      const contactUpdate = { lastRespondedAt: responseDate };
+      if (contactAppreciative === true) {
+        const nextEng = new Date(responseDate);
+        nextEng.setDate(nextEng.getDate() + 7);
+        contactUpdate.nextEngagementDate = nextEng;
+        contactUpdate.nextEngagementPurpose = 'periodic_check_in';
+      }
       try {
         await prisma.contacts.update({
           where: { id: contactId },
-          data: { lastRespondedAt: responseDate },
+          data: contactUpdate,
         });
       } catch (e) {
-        console.warn('⚠️ Could not snap lastRespondedAt:', e?.message);
+        console.warn('⚠️ Could not update contact (lastRespondedAt/nextEngagement):', e?.message);
       }
 
       const disposition = responseDisposition || 'positive';
