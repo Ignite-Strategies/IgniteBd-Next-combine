@@ -154,6 +154,10 @@ export default function ContactDetailPage({ params }) {
   const [selectedPipeline, setSelectedPipeline] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
   const [savingStage, setSavingStage] = useState(false);
+  const [editingNextEngagement, setEditingNextEngagement] = useState(false);
+  const [nextEngagementDateEdit, setNextEngagementDateEdit] = useState('');
+  const [nextEngagementPurposeEdit, setNextEngagementPurposeEdit] = useState('');
+  const [savingNextEngagement, setSavingNextEngagement] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -736,6 +740,104 @@ export default function ContactDetailPage({ params }) {
               </button>
             </div>
           )}
+
+          {/* Next engagement */}
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium text-gray-600">Next engagement:</span>
+            {!editingNextEngagement ? (
+              <>
+                {contact.nextEngagementDate ? (
+                  <>
+                    <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-800">
+                      {new Date(contact.nextEngagementDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                    </span>
+                    {contact.nextEngagementPurpose && (
+                      <span className="text-gray-500">
+                        {contact.nextEngagementPurpose === 'GENERAL_CHECK_IN' && 'General check-in'}
+                        {contact.nextEngagementPurpose === 'UNRESPONSIVE' && 'Unresponsive'}
+                        {contact.nextEngagementPurpose === 'PERIODIC_CHECK_IN' && 'Periodic check-in'}
+                        {contact.nextEngagementPurpose === 'REFERRAL_NO_CONTACT' && 'Referral (no contact)'}
+                        {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-gray-400">Not set</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingNextEngagement(true);
+                    setNextEngagementDateEdit(contact.nextEngagementDate ? new Date(contact.nextEngagementDate).toISOString().slice(0, 10) : '');
+                    setNextEngagementPurposeEdit(contact.nextEngagementPurpose || '');
+                  }}
+                  className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                  title="Edit next engagement"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={nextEngagementDateEdit}
+                  onChange={(e) => setNextEngagementDateEdit(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                />
+                <select
+                  value={nextEngagementPurposeEdit}
+                  onChange={(e) => setNextEngagementPurposeEdit(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-2 py-1 text-sm min-w-[160px]"
+                >
+                  <option value="">—</option>
+                  <option value="GENERAL_CHECK_IN">General check-in</option>
+                  <option value="UNRESPONSIVE">Unresponsive</option>
+                  <option value="PERIODIC_CHECK_IN">Periodic check-in</option>
+                  <option value="REFERRAL_NO_CONTACT">Referral (no contact)</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={savingNextEngagement}
+                  onClick={async () => {
+                    setSavingNextEngagement(true);
+                    try {
+                      const res = await api.patch(`/api/contacts/${contactId}/next-engagement`, {
+                        nextEngagementDate: nextEngagementDateEdit || null,
+                        nextEngagementPurpose: nextEngagementPurposeEdit || null,
+                      });
+                      if (res.data?.success) {
+                        setContact((prev) => ({ ...prev, ...res.data.contact }));
+                        setEditingNextEngagement(false);
+                        if (refreshContacts) refreshContacts();
+                      } else {
+                        alert(res.data?.error || 'Failed to update');
+                      }
+                    } catch (err) {
+                      alert(err.response?.data?.error || err.message || 'Failed to update');
+                    } finally {
+                      setSavingNextEngagement(false);
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  <Check className="h-3 w-3" />
+                  {savingNextEngagement ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingNextEngagement(false);
+                    setNextEngagementDateEdit('');
+                    setNextEngagementPurposeEdit('');
+                  }}
+                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-6">

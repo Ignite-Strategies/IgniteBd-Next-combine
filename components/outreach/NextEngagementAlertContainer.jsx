@@ -7,12 +7,11 @@ import api from '@/lib/api';
 import { getTodayEST, addDaysEST, formatDateLabelEST, formatDateEST } from '@/lib/dateEst';
 
 /**
- * Email reminder container: hydrates by date, chronological.
- * Shows "next email sends" for a date range (default: today through +7 days).
- * Each row: date, contact name, follow-up type (manual/automatic), optional note; link to contact or compose.
- * For dashboard: compact. "See all" links to tracker (chronological by date).
+ * Next engagement alert container (web).
+ * Fetches GET /api/outreach/next-engagement-alerts (same API used to package email to client — see docs/NEXT_ENGAGEMENT_ALERT_NAMING.md).
+ * Filters and buckets by date in the frontend; no "dueDate" — we use nextEngagementDate only.
  */
-export default function EmailReminderContainer({
+export default function NextEngagementAlertContainer({
   companyHQId,
   dateFrom,
   dateTo,
@@ -21,12 +20,11 @@ export default function EmailReminderContainer({
   showSeeAll = true,
 }) {
   const router = useRouter();
-  const [reminders, setReminders] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resolvedCompanyId, setResolvedCompanyId] = useState(companyHQId || null);
 
-  // Use EST so "today" and "Tomorrow" (e.g. due 2/26) are consistent
   const todayEST = getTodayEST();
   const from = dateFrom || todayEST;
   const to = dateTo || addDaysEST(todayEST, 7);
@@ -44,22 +42,22 @@ export default function EmailReminderContainer({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api.get(`/api/outreach/reminders`, {
-      params: { companyHQId: resolvedCompanyId, dateFrom: from, dateTo: to, limit },
+    api.get(`/api/outreach/next-engagement-alerts`, {
+      params: { companyHQId: resolvedCompanyId, limit },
     })
       .then((res) => {
         if (!cancelled && res.data?.success) {
-          setReminders(res.data.reminders || []);
+          setAlerts(res.data.alerts || []);
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err?.response?.data?.error || 'Failed to load reminders');
+        if (!cancelled) setError(err?.response?.data?.error || 'Failed to load next engagement alerts');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [resolvedCompanyId, from, to, limit]);
+  }, [resolvedCompanyId, limit]);
 
   const formatDateLabel = (isoDate) => formatDateLabelEST(todayEST, isoDate);
 
@@ -70,10 +68,17 @@ export default function EmailReminderContainer({
     return `${fromF} – ${formatDateEST(toStr, toOpts)}`;
   };
 
-  const groupByDate = (list) => {
+  const datePart = (iso) => (iso && iso.slice) ? iso.slice(0, 10) : '';
+  const inRange = (list) =>
+    list.filter((r) => {
+      const d = datePart(r.nextEngagementDate);
+      return d && d >= from && d <= to;
+    });
+  const groupByNextEngagementDate = (list) => {
     const groups = {};
     for (const r of list) {
-      const key = r.dueDate;
+      const key = datePart(r.nextEngagementDate);
+      if (!key) continue;
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     }
@@ -82,6 +87,17 @@ export default function EmailReminderContainer({
 
   const name = (r) => [r.firstName, r.lastName].filter(Boolean).join(' ').trim() || r.email || '—';
 
+  const purposeLabel = (purpose) => {
+    if (!purpose) return 'Follow-up';
+    const labels = {
+      GENERAL_CHECK_IN: 'General check-in',
+      UNRESPONSIVE: 'Unresponsive',
+      PERIODIC_CHECK_IN: 'Periodic check-in',
+      REFERRAL_NO_CONTACT: 'Referral (no contact)',
+    };
+    return labels[purpose] || purpose;
+  };
+
   if (!resolvedCompanyId) return null;
 
   if (loading) {
@@ -89,7 +105,7 @@ export default function EmailReminderContainer({
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <div className="flex items-center gap-2 text-gray-500">
           <Mail className="h-5 w-5" />
-          <span className="text-sm">Loading next email sends…</span>
+          <span className="text-sm">Loading next engagement alerts…</span>
         </div>
       </div>
     );
@@ -103,7 +119,8 @@ export default function EmailReminderContainer({
     );
   }
 
-  const grouped = groupByDate(reminders);
+  const inWindow = inRange(alerts);
+  const grouped = groupByNextEngagementDate(inWindow);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -111,10 +128,10 @@ export default function EmailReminderContainer({
         <div>
           <div className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-amber-600" />
-            <h3 className="text-base font-semibold text-gray-900">Next email sends</h3>
+            <h3 className="text-base font-semibold text-gray-900">Next engagement alerts</h3>
           </div>
           <p className="mt-0.5 text-xs font-medium text-amber-700/90">
-            Due {formatDateRangeSubtitle(from, to)}
+            {formatDateRangeSubtitle(from, to)}
           </p>
         </div>
         {showSeeAll && (
@@ -135,7 +152,7 @@ export default function EmailReminderContainer({
       <div className={compact ? 'max-h-64 overflow-y-auto' : ''}>
         {grouped.length === 0 ? (
           <div className="p-6 text-center text-sm text-gray-500">
-            No follow-ups due between {from} and {to}.
+            No next engagements in this window.
           </div>
         ) : (
           <ul className="divide-y divide-gray-100">
@@ -161,7 +178,7 @@ export default function EmailReminderContainer({
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium text-gray-900">{name(r)}</p>
                           <p className="truncate text-xs text-gray-500">
-                            {r.reminderType === 'manual' ? 'Manual reminder' : 'Follow-up'}
+                            {purposeLabel(r.nextEngagementPurpose)}
                             {r.nextContactNote && ` · ${r.nextContactNote}`}
                           </p>
                         </div>

@@ -46,23 +46,33 @@ export async function PUT(request, { params }) {
     const body = await request.json();
     const { remindMeOn } = body ?? {};
 
-    // If remindMeOn is null/undefined, clear the reminder
+    // If remindMeOn is null/undefined, clear the reminder and next engagement
     if (remindMeOn === null || remindMeOn === undefined) {
       const updatedContact = await prisma.contact.update({
         where: { id: contactId },
-        data: { remindMeOn: null },
+        data: {
+          remindMeOn: null,
+          nextEngagementDate: null,
+          nextEngagementPurpose: null,
+        },
         select: {
           id: true,
           firstName: true,
           lastName: true,
           remindMeOn: true,
+          nextEngagementDate: true,
+          nextEngagementPurpose: true,
         },
       });
 
       return NextResponse.json({
         success: true,
         message: 'Reminder cleared',
-        contact: updatedContact,
+        contact: {
+          ...updatedContact,
+          remindMeOn: updatedContact.remindMeOn?.toISOString?.() ?? null,
+          nextEngagementDate: updatedContact.nextEngagementDate?.toISOString?.() ?? null,
+        },
       });
     }
 
@@ -75,16 +85,22 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Update contact with reminder date
+    // Update contact: remindMeOn (legacy) and nextEngagementDate as single source of truth
     const updatedContact = await prisma.contact.update({
       where: { id: contactId },
-      data: { remindMeOn: remindDate },
+      data: {
+        remindMeOn: remindDate,
+        nextEngagementDate: remindDate,
+        nextEngagementPurpose: 'GENERAL_CHECK_IN',
+      },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         email: true,
         remindMeOn: true,
+        nextEngagementDate: true,
+        nextEngagementPurpose: true,
       },
     });
 

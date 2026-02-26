@@ -21,7 +21,7 @@
 import { OpenAI } from 'openai';
 import { prisma } from '@/lib/prisma';
 import { EmailTypeDeterminationService, EmailTypeContext } from './EmailTypeDeterminationService';
-import { getLastSendDate } from './followUpCalculator';
+import { getLastSendDate } from './emailCadenceService';
 
 /**
  * Get seasonal and date context for email personalization

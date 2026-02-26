@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { snapContactLastContactedAt } from '@/lib/services/followUpCalculator';
+import { snapContactLastContactedAt, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
 
 /**
  * POST /api/contacts/[contactId]/off-platform-send
@@ -76,16 +76,7 @@ export async function POST(request, { params }) {
       ? `BODY:\n${emailBody}\n\nNOTES:\n${notes}`
       : emailBody || notes || null;
 
-    let activityKind = null;
-    if (!isDraft) {
-      const priorSends = await prisma.email_activities.count({
-        where: {
-          contact_id: contactId,
-          OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM' }],
-        },
-      });
-      activityKind = priorSends > 0 ? 'SENT_REPLY' : 'SENT_INITIAL';
-    }
+    // emailSequenceOrder: SENT once migration run; omit until then so create doesn't 500
     const activity = await prisma.email_activities.create({
       data: {
         owner_id: owner.id,
@@ -98,7 +89,6 @@ export async function POST(request, { params }) {
         source: 'OFF_PLATFORM',
         platform: platform || 'manual',
         sentAt: emailSentDate,
-        activityKind,
       },
     });
 
@@ -107,8 +97,9 @@ export async function POST(request, { params }) {
     if (!isDraft && emailSentDate) {
       try {
         await snapContactLastContactedAt(contactId, emailSentDate);
+        await computeAndPersistNextEngagement(contactId);
       } catch (snapErr) {
-        console.warn('⚠️ Could not snap lastContactedAt:', snapErr.message);
+        console.warn('⚠️ Could not snap lastContactedAt / persist next engagement:', snapErr.message);
       }
     }
 
@@ -116,10 +107,13 @@ export async function POST(request, { params }) {
       try {
         const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
         if (pipe?.pipeline === 'prospect' && pipe?.stage === 'need-to-engage') {
+          const newStage = 'engaged-awaiting-response';
           await prisma.pipelines.update({
             where: { contactId },
-            data: { stage: 'engaged-awaiting-response', updatedAt: new Date() },
+            data: { stage: newStage, updatedAt: new Date() },
           });
+          const { snapPipelineOnContact } = await import('@/lib/services/pipelineService');
+          await snapPipelineOnContact(contactId, pipe.pipeline, newStage);
           console.log('✅ Deal pipeline stage → engaged-awaiting-response for contact:', contactId);
         }
       } catch (pipeErr) {

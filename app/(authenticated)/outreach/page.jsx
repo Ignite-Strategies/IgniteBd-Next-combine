@@ -14,7 +14,7 @@ import {
   FileCode,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import EmailReminderContainer from '@/components/outreach/EmailReminderContainer.jsx';
+import NextEngagementAlertContainer from '@/components/outreach/NextEngagementAlertContainer.jsx';
 import { useOutreachContext } from '@/hooks/useOutreach';
 import api from '@/lib/api';
 
@@ -176,9 +176,9 @@ function OutreachContent() {
           router={router}
         />
 
-        {/* Next email sends — reminders by date, chronological */}
+        {/* Next engagement alerts — by nextEngagementDate, frontend buckets */}
         <div className="mb-8">
-          <EmailReminderContainer compact limit={30} showSeeAll />
+          <NextEngagementAlertContainer compact limit={30} showSeeAll />
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">

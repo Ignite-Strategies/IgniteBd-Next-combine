@@ -13,7 +13,7 @@
  * 4. Determine if it's a followup (immediate, quarterly check-in, etc.)
  */
 
-import { getLastSendDate } from './followUpCalculator';
+import { getLastSendDate } from './emailCadenceService';
 import { prisma } from '@/lib/prisma';
 
 export type EmailType = 'FIRST_TIME' | 'FOLLOWUP';

@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { getContactsDueForFollowUp } from '@/lib/services/reminderService';
+import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
 
 /**
  * GET /api/contacts/due-for-followup
- * Get contacts that are due for follow-up
- * 
- * Query params:
- *   - companyHQId: string (required)
- *   - daysOverdue?: number (default: 0, meaning due today or overdue)
- *   - limit?: number (default: 100)
+ * Contacts with nextEngagementDate set. Optional filter: dueBy (ISO date) to only return due on or before that date.
+ * Query: companyHQId (required), dueBy (optional), limit (default 500)
  */
 export async function GET(request) {
   try {
@@ -25,13 +21,8 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId');
-    const daysOverdue = searchParams.get('daysOverdue')
-      ? parseInt(searchParams.get('daysOverdue'), 10)
-      : 0;
-    const limit = searchParams.get('limit')
-      ? parseInt(searchParams.get('limit'), 10)
-      : 100;
-    const includeManualReminders = searchParams.get('includeManualReminders') !== 'false'; // Default: true
+    const dueBy = searchParams.get('dueBy'); // optional: only contacts with nextEngagementDate <= dueBy
+    const limit = Math.min(parseInt(searchParams.get('limit') || '500', 10), 500);
 
     if (!companyHQId) {
       return NextResponse.json(
@@ -40,7 +31,6 @@ export async function GET(request) {
       );
     }
 
-    // Verify company exists
     const company = await prisma.company_hqs.findUnique({
       where: { id: companyHQId },
     });
@@ -52,23 +42,17 @@ export async function GET(request) {
       );
     }
 
-    // Get contacts due for follow-up
-    const contacts = await getContactsDueForFollowUp(companyHQId, {
-      daysOverdue,
-      limit,
-      includeManualReminders,
-    });
+    let contacts = await getContactsWithNextEngagement(companyHQId, { limit });
+    if (dueBy) {
+      const cutoff = new Date(dueBy);
+      contacts = contacts.filter((c) => c.nextEngagementDate && new Date(c.nextEngagementDate) <= cutoff);
+    }
 
     return NextResponse.json({
       success: true,
       contacts,
       count: contacts.length,
       companyHQId,
-      filters: {
-        daysOverdue,
-        limit,
-        includeManualReminders,
-      },
     });
   } catch (error) {
     console.error('❌ Get contacts due for follow-up error:', error);

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { calculateNextSendDate, getLastSendDate } from '@/lib/services/followUpCalculator';
+import { calculateNextSendDate, getLastSendDate } from '@/lib/services/emailCadenceService';
 
 /**
  * GET /api/outreach/tracker

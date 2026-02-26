@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { ensureContactPipeline } from '@/lib/services/pipelineService';
+import { computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
 
 /**
  * PUT /api/emails/[emailId]/response
@@ -68,6 +69,7 @@ export async function PUT(request, { params }) {
       );
     }
 
+    // contactAppreciative column exists after migration; omit so response recording doesn't 500 before migrate
     const updated = await prisma.email_activities.update({
       where: { id: emailId },
       data: {
@@ -75,7 +77,6 @@ export async function PUT(request, { params }) {
         respondedAt: responseDate,
         responseSubject: responseSubject || null,
         hasResponded: true,
-        contactAppreciative: contactAppreciative === true ? true : contactAppreciative === false ? false : undefined,
       },
       include: {
         contacts: {
@@ -93,21 +94,25 @@ export async function PUT(request, { params }) {
 
     const contactId = updated.contact_id;
     if (contactId) {
-      // Snap lastRespondedAt; if contactAppreciative, set next engagement 7d from this response
-      const contactUpdate = { lastRespondedAt: responseDate };
-      if (contactAppreciative === true) {
-        const nextEng = new Date(responseDate);
-        nextEng.setDate(nextEng.getDate() + 7);
-        contactUpdate.nextEngagementDate = nextEng;
-        contactUpdate.nextEngagementPurpose = 'periodic_check_in';
-      }
       try {
         await prisma.contacts.update({
           where: { id: contactId },
-          data: contactUpdate,
+          data: { lastRespondedAt: responseDate },
         });
+        await computeAndPersistNextEngagement(contactId);
       } catch (e) {
-        console.warn('⚠️ Could not update contact (lastRespondedAt/nextEngagement):', e?.message);
+        if (e?.code === 'P2022') {
+          try {
+            await prisma.contacts.update({
+              where: { id: contactId },
+              data: { lastRespondedAt: responseDate },
+            });
+          } catch (e2) {
+            console.warn('⚠️ Could not update contact lastRespondedAt:', e2?.message);
+          }
+        } else {
+          console.warn('⚠️ Could not update contact:', e?.message);
+        }
       }
 
       const disposition = responseDisposition || 'positive';
@@ -134,10 +139,13 @@ export async function PUT(request, { params }) {
           // positive (default): move prospect engaged-awaiting-response → interest
           const pipe = await prisma.pipelines.findUnique({ where: { contactId } });
           if (pipe?.pipeline === 'prospect' && pipe?.stage === 'engaged-awaiting-response') {
+            const newStage = 'interest';
             await prisma.pipelines.update({
               where: { contactId },
-              data: { stage: 'interest', updatedAt: new Date() },
+              data: { stage: newStage, updatedAt: new Date() },
             });
+            const { snapPipelineOnContact } = await import('@/lib/services/pipelineService');
+            await snapPipelineOnContact(contactId, pipe.pipeline, newStage);
             console.log('✅ Deal pipeline stage → interest for contact:', contactId);
           }
         }

@@ -10,10 +10,29 @@
  * - Creates default pipeline (prospect/interest) if missing
  * - Updates pipeline if new values provided
  * - Validates pipeline and stage values
+ * - Snaps pipeline/stage onto Contact so cadence logic reads from one place (no joins)
  */
 
 import { prisma } from '@/lib/prisma';
 import { isValidPipeline, isValidStageForPipeline } from '@/lib/config/pipelineConfig';
+
+/**
+ * Snap pipeline and stage onto Contact. Call whenever pipelines row is created or updated
+ * so cadence/outreach logic can read from Contact only (limit pipeline lookups to ~5 writers).
+ */
+export async function snapPipelineOnContact(
+  contactId: string,
+  pipeline: string,
+  stage: string | null
+): Promise<void> {
+  await prisma.contact.update({
+    where: { id: contactId },
+    data: {
+      pipelineSnap: pipeline,
+      pipelineStageSnap: stage,
+    },
+  });
+}
 
 export interface EnsurePipelineOptions {
   pipeline?: string;
@@ -57,7 +76,7 @@ export async function ensureContactPipeline(
 
       // Validate pipeline
       if (!isValidPipeline(finalPipeline)) {
-        throw new Error(`Invalid pipeline: ${finalPipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution`);
+        throw new Error(`Invalid pipeline: ${finalPipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution, friend, friends`);
       }
 
       // Validate stage (if provided)
@@ -77,6 +96,7 @@ export async function ensureContactPipeline(
           stage: stageValue,
         },
       });
+      await snapPipelineOnContact(contactId, finalPipeline, stageValue);
 
       console.log(`✅ Pipeline updated for contact ${contactId}: ${finalPipeline}/${finalStage || 'null'}`);
     }
@@ -89,7 +109,7 @@ export async function ensureContactPipeline(
 
   // Validate pipeline
   if (!isValidPipeline(newPipeline)) {
-    throw new Error(`Invalid pipeline: ${newPipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution`);
+    throw new Error(`Invalid pipeline: ${newPipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution, friend, friends`);
   }
 
   // Validate stage (if provided)
@@ -114,6 +134,7 @@ export async function ensureContactPipeline(
       updatedAt: new Date(),
     },
   });
+  await snapPipelineOnContact(contactId, newPipeline, stageValue);
 
   console.log(`✅ Pipeline created for contact ${contactId}: ${newPipeline}/${newStage}`);
 }
@@ -136,7 +157,7 @@ export function validatePipeline(
   if (!isValidPipeline(pipeline)) {
     return {
       isValid: false,
-      error: `Invalid pipeline: ${pipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution`,
+      error: `Invalid pipeline: ${pipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution, friend`,
     };
   }
 

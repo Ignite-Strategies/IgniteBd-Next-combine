@@ -551,7 +551,11 @@ model Contact {
   doNotContactAgain                                         Boolean  @default(false) // If true, no follow-up; ignore nextContactedAt
   // Next engagement: when to engage this contact next; set by system (7d from send/response) or user. CRM concept (replaces "remind me").
   nextEngagementDate                                        DateTime?
-  nextEngagementPurpose                                      String?  // unresponsive | periodic_check_in | referral_no_contact | manual
+  nextEngagementPurpose                                      NextEngagementPurpose?   // Set by cadence or remind-me; "General check-in" when user sets date
+  contactDisposition                                         ContactDisposition?   // General attitude: happy to receive a note vs doesn't care (manual; future AI)
+  // Snapped pipeline so cadence/outreach logic reads from Contact only (limit pipeline lookups to writers)
+  pipelineSnap                                               String?   // pipeline name from pipelines.pipeline
+  pipelineStageSnap                                          String?   // stage from pipelines.stage
   outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
   relationship_contexts                                     relationship_contexts?
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
@@ -583,6 +587,7 @@ model Contact {
   @@index([lastRespondedAt])
   @@index([nextContactedAt])
   @@index([nextEngagementDate])
+  @@index([contactDisposition])
   @@index([doNotContactAgain])
   @@map("contacts")
 }
@@ -642,35 +647,36 @@ model ecosystem_orgs {
 }
 
 // Single model for all email sends (platform + off-platform). Campaign/sequence nullable.
-// Activity kind: SENT_INITIAL / SENT_REPLY (we sent) or RESPONSE (contact replied; inReplyTo links to send).
+// emailSequenceOrder = step in thread: SENT (we sent) | CONTACT_RESPONDED (they replied) | OWNER_RESPONSE (we replied back).
+// inReplyToActivityId = id ref to the email_activity this row is in reply to (for CONTACT_RESPONDED / OWNER_RESPONSE).
+// Legacy: contactResponse string + hasResponded on same row; expanded model = response as its own row (id ref).
 model email_activities {
-  id                     String              @id @default(cuid())
+  id                     String                  @id @default(cuid())
   owner_id               String
   contact_id             String?
   tenant_id              String?
-  email                  String?             // Recipient email (optional for off-platform; use contact)
+  email                  String?                 // Recipient email (optional for off-platform; use contact)
   subject                String?
-  body                   String?             @db.Text
-  event                  String?             // sent, delivered, opened, clicked, etc.
-  messageId              String?             @unique // SendGrid message ID; null for off-platform
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
-  // Kind: send (initial/reply) vs contact response row (points back via inReplyToActivityId)
-  activityKind           EmailActivityKind?
-  inReplyToActivityId    String?             // When activityKind=RESPONSE, the email this reply is to
-  contactAppreciative    Boolean?            // "Great / let me look into this" → 7d from this response
+  body                   String?                 @db.Text
+  event                  String?                 // sent, delivered, opened, clicked, etc.
+  messageId              String?                 @unique // SendGrid message ID; null for off-platform
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  emailSequenceOrder     EmailSequenceOrder?    // SENT | CONTACT_RESPONDED | OWNER_RESPONSE — step in thread
+  inReplyToActivityId    String?                 // Id ref to the email_activity this row replies to
+  contactAppreciative    Boolean?               // "Great / let me look into this" → 7d from this response
   // Campaign/sequence — nullable; only set when sent via campaign/sequence
   campaign_id            String?
   sequence_id            String?
   sequence_step_id      String?
   reply_to_message_id    String?
   // Source: platform (SendGrid) vs off-platform (manual, gmail, etc.)
-  source                 EmailSource?        @default(PLATFORM)
-  platform               String?             // "sendgrid", "gmail", "outlook", "apollo", "manual", "ai-draft"
-  sentAt                 DateTime?           // When actually sent; null = use createdAt
-  // Response tracking (contact replied) — when response stored on same row
-  hasResponded           Boolean             @default(false)
-  contactResponse       String?             @db.Text
+  source                 EmailSource?           @default(PLATFORM)
+  platform               String?                 // "sendgrid", "gmail", "outlook", "apollo", "manual", "ai-draft"
+  sentAt                 DateTime?              // When actually sent; null = use createdAt
+  // Legacy: response stored on same row (string). Expanded: response as own row, ref by inReplyToActivityId.
+  hasResponded           Boolean                 @default(false)
+  contactResponse       String?                 @db.Text
   respondedAt            DateTime?
   responseSubject       String?
   campaigns              campaigns?          @relation(fields: [campaign_id], references: [id])
@@ -691,6 +697,7 @@ model email_activities {
   @@index([source])
   @@index([sentAt])
   @@index([hasResponded])
+  @@index([emailSequenceOrder])
 }
 
 model email_sequences {
@@ -1943,16 +1950,27 @@ enum EmailSource {
   OFF_PLATFORM
 }
 
-// Email activity kind: send (initial or reply) vs contact response as its own row
-enum EmailActivityKind {
-  SENT_INITIAL   // First outreach to contact
-  SENT_REPLY     // We sent a follow-up
-  RESPONSE       // Contact replied; inReplyToActivityId points to the email they replied to
+// Step in thread: we sent, contact responded, or we (owner) responded. Replaces vague "activity kind".
+enum EmailSequenceOrder {
+  SENT                // We sent (initial or follow-up)
+  CONTACT_RESPONDED   // Contact replied; inReplyToActivityId → the send they replied to
+  OWNER_RESPONSE      // We replied back; inReplyToActivityId → the contact message we're replying to
 }
 
-enum EmailType {
-  FIRST_TIME
-  FOLLOWUP
+// General attitude of the contact (awareness). Manual for now; future: AI infers from email response.
+// Separate from pipeline — pipeline is source of truth for "where they landed"; this is "happy to receive a note" vs "doesn't care".
+enum ContactDisposition {
+  HAPPY_TO_RECEIVE_NOTE   // Open to / happy to get a note
+  NEUTRAL                 // Indifferent / neutral
+  DOESNT_CARE             // Doesn't care / not receptive
+}
+
+// Why we're engaging next. Set by cadence or remind-me; no free text.
+enum NextEngagementPurpose {
+  GENERAL_CHECK_IN      // User set date (remind-me) or generic follow-up
+  UNRESPONSIVE          // No response after last send → 7d
+  PERIODIC_CHECK_IN     // Responded + in category (e.g. connector/forwarded) → 7d
+  REFERRAL_NO_CONTACT   // Referral, no contact yet
 }
 
 enum ContextOfRelationship {

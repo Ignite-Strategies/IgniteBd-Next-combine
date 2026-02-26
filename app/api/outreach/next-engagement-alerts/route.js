@@ -3,9 +3,10 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
 
 /**
- * GET /api/outreach/reminders
- * @deprecated Use GET /api/outreach/next-engagement-alerts instead (same data, response key "alerts").
- * Kept for backward compatibility; returns same list under key "reminders".
+ * GET /api/outreach/next-engagement-alerts
+ * Single source of truth: Contact.nextEngagementDate. Returns all contacts with nextEngagementDate set.
+ * Same data for web (NextEngagementAlertContainer) and for email (future: package into email body).
+ * Query: companyHQId (required), limit (default 500). No date filter — consumer filters/buckets (web or email).
  */
 export async function GET(request) {
   try {
@@ -29,16 +30,16 @@ export async function GET(request) {
       );
     }
 
-    const reminders = await getContactsWithNextEngagement(companyHQId, { limit });
+    const alerts = await getContactsWithNextEngagement(companyHQId, { limit });
 
     return NextResponse.json({
       success: true,
-      reminders,
+      alerts,
     });
   } catch (error) {
-    console.error('❌ GET /api/outreach/reminders error:', error);
+    console.error('❌ GET /api/outreach/next-engagement-alerts error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch reminders', details: error?.message },
+      { success: false, error: 'Failed to fetch next engagement alerts', details: error?.message },
       { status: 500 },
     );
   }

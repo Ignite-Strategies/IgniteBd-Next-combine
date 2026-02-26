@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { validatePipeline } from '@/lib/services/pipelineService';
+import { validatePipeline, snapPipelineOnContact } from '@/lib/services/pipelineService';
 import { applyPipelineTriggers } from '@/lib/services/PipelineTriggerService';
 
 /**
@@ -119,6 +119,8 @@ export async function PUT(request, { params }) {
         updatedAt: new Date(),
       },
     });
+
+    await snapPipelineOnContact(contactId, pipeline, stageValue);
 
     // Re-fetch contact with pipeline to return complete data
     const contactWithPipeline = await prisma.contact.findUnique({
