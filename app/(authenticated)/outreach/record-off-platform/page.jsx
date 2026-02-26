@@ -6,6 +6,7 @@ import { Upload, FileText, Plus, X, Check, Loader2, Mail, Calendar, MessageSquar
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector';
 import api from '@/lib/api';
+import { parseEmailConversation, parseSingleEmailBlock } from '@/lib/utils/emailConversationParser';
 
 export default function RecordOffPlatformPage() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function RecordOffPlatformPage() {
   });
   const [emailBlob, setEmailBlob] = useState('');
   const [parsedEmail, setParsedEmail] = useState(null);
+  const [parsedConversation, setParsedConversation] = useState(null);
   const [selectedContactForEmail, setSelectedContactForEmail] = useState(null);
   const [emailCandidates, setEmailCandidates] = useState([]); // Multiple domain-match candidates
   const [fuzzyContact, setFuzzyContact] = useState(null); // Single domain-match suggestion
@@ -562,12 +564,58 @@ Best regards"`;
     return result;
   };
   
+  const handleParseConversation = () => {
+    if (!emailBlob.trim()) {
+      setParsingError('Please paste email content');
+      return;
+    }
+    setParsingError('');
+    setParsedEmail(null);
+    try {
+      const contactEmail = selectedContactForEmail?.email || contact?.email || null;
+      const result = parseEmailConversation(emailBlob, { contactEmail });
+      setParsedConversation(result);
+
+      if (result.messages.length === 1) {
+        const single = parseSingleEmailBlock(emailBlob);
+        setParsedEmail(single);
+        setManualEntry({
+          email: single.toEmail || result.contactEmail || '',
+          subject: single.subject || '',
+          body: single.body || '',
+          emailSent: single.sent || new Date().toISOString().split('T')[0],
+          platform: 'manual',
+          notes: '',
+        });
+        setParsedConversation(null);
+        return;
+      }
+
+      if (result.ourOutbound) {
+        setManualEntry({
+          email: result.contactEmail || result.ourOutbound.toEmail || manualEntry.email,
+          subject: result.ourOutbound.subject || '',
+          body: result.ourOutbound.body || '',
+          emailSent: result.ourOutbound.sent || new Date().toISOString().split('T')[0],
+          platform: 'manual',
+          notes: '',
+        });
+      }
+      if (result.contactEmail && !selectedContactForEmail && !contactIdFromUrl) {
+        setManualEntry((prev) => ({ ...prev, email: result.contactEmail }));
+      }
+    } catch (err) {
+      setParsingError(`Failed to parse conversation: ${err.message}`);
+      setParsedConversation(null);
+    }
+  };
+
   const handleParseEmailBlob = async () => {
     if (!emailBlob.trim()) {
       setParsingError('Please paste email content');
       return;
     }
-    
+    setParsedConversation(null);
     try {
       const parsed = parseEmailBlob(emailBlob);
       setParsedEmail(parsed);
@@ -683,6 +731,7 @@ Best regards"`;
     setManualEntry(prev => ({ ...prev, email: '' }));
     setEmailBlob('');
     setParsedEmail(null);
+    setParsedConversation(null);
     // Clear contactId from URL
     const params = new URLSearchParams(searchParams?.toString() || '');
     params.delete('contactId');
@@ -692,6 +741,63 @@ Best regards"`;
     router.replace(newUrl);
   };
   
+  // Save conversation: one outbound + contact reply
+  const handleSaveConversation = async () => {
+    const conv = parsedConversation;
+    if (!conv?.ourOutbound || !conv?.lastReply) {
+      setParsingError('Conversation must include your outbound and a contact reply.');
+      return;
+    }
+    let targetContactId = selectedContactForEmail?.id || contactIdFromUrl;
+    const targetEmail = selectedContactForEmail?.email || contact?.email || conv.contactEmail || manualEntry.email;
+    if (!targetContactId && targetEmail?.includes('@')) {
+      targetContactId = await findOrCreateContact(targetEmail);
+    }
+    if (!targetContactId) {
+      setParsingError('Select a contact or enter a valid email address.');
+      return;
+    }
+    setSaving(true);
+    setErrors([]);
+    try {
+      const sendRes = await api.post(`/api/contacts/${targetContactId}/off-platform-send`, {
+        emailSent: conv.ourOutbound.sent || manualEntry.emailSent,
+        subject: conv.ourOutbound.subject || manualEntry.subject,
+        body: conv.ourOutbound.body || manualEntry.body,
+        platform: manualEntry.platform || 'manual',
+        notes: manualEntry.notes || null,
+      });
+      if (!sendRes.data?.success || !sendRes.data?.offPlatformSend?.id) {
+        setErrors([sendRes.data?.error || 'Failed to save email']);
+        setSaving(false);
+        return;
+      }
+      const activityId = sendRes.data.offPlatformSend.id;
+      const responsePayload = {
+        contactResponse: conv.lastReply.body || conv.lastReply.contactResponse || '',
+        respondedAt: conv.lastReply.sent ? new Date(conv.lastReply.sent).toISOString() : undefined,
+      };
+      const responseRes = await api.put(`/api/emails/${activityId}/response`, responsePayload);
+      if (responseRes.data?.success) {
+        setSavedCount(1);
+        setParsedConversation(null);
+        setParsedEmail(null);
+        if (contactIdFromUrl) {
+          setTimeout(() => {
+            const url = companyHQId ? `/contacts/${targetContactId}?companyHQId=${companyHQId}` : `/contacts/${targetContactId}`;
+            router.push(url);
+          }, 1500);
+        }
+      } else {
+        setErrors([responseRes.data?.error || 'Email saved but failed to record response']);
+      }
+    } catch (err) {
+      setErrors([err.response?.data?.error || err.message || 'Failed to save']);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Save manual entry
   const handleSaveManual = async () => {
     // Determine which contact to use
@@ -1024,17 +1130,54 @@ Best regards"`;
                 placeholder="From: Your Name <your.email@example.com>&#10;Sent: Monday, January 15, 2024 2:30 PM&#10;To: Contact Name <contact@example.com>&#10;Subject: Follow-up on our conversation&#10;&#10;Hi there,&#10;&#10;Just following up on our previous discussion..."
                 className="w-full min-h-[200px] rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-mono focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               />
-              <button
-                type="button"
-                onClick={handleParseEmailBlob}
-                disabled={!emailBlob.trim()}
-                className="mt-2 flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 disabled:opacity-50"
-              >
-                <FileText className="h-4 w-4" />
-                Parse Email
-              </button>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleParseEmailBlob}
+                  disabled={!emailBlob.trim()}
+                  className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 disabled:opacity-50"
+                >
+                  <FileText className="h-4 w-4" />
+                  Parse Email
+                </button>
+                <button
+                  type="button"
+                  onClick={handleParseConversation}
+                  disabled={!emailBlob.trim()}
+                  className="flex items-center gap-2 rounded-lg border border-blue-600 bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 disabled:opacity-50"
+                  title="Use when pasting a full back-and-forth (Gmail/Outlook thread)"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Parse as conversation
+                </button>
+              </div>
               
-              {parsedEmail && (
+              {parsedConversation && parsedConversation.messages.length >= 2 && (
+                <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                  <div className="mb-2 font-semibold text-blue-800">Conversation parsed</div>
+                  <p className="text-blue-700">
+                    Found {parsedConversation.messages.length} messages.
+                    {parsedConversation.ourOutbound && parsedConversation.lastReply
+                      ? " We'll record your outbound email and the contact's reply."
+                      : ' Select the contact above so we can tell which message is yours and which is the reply.'}
+                  </p>
+                  {parsedConversation.ourOutbound && (
+                    <p className="mt-1 text-blue-600">Outbound: {parsedConversation.ourOutbound.subject || 'No subject'} ({parsedConversation.ourOutbound.sent || 'no date'})</p>
+                  )}
+                  {parsedConversation.lastReply && (
+                    <p className="mt-0.5 text-blue-600">Reply: from {parsedConversation.lastReply.fromEmail || parsedConversation.lastReply.from} — {(parsedConversation.lastReply.body || '').slice(0, 80)}{(parsedConversation.lastReply.body || '').length > 80 ? '…' : ''}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setParsedConversation(null)}
+                    className="mt-2 text-xs text-blue-600 underline hover:text-blue-800"
+                  >
+                    Clear and parse as single email
+                  </button>
+                </div>
+              )}
+              
+              {parsedEmail && !parsedConversation && (
                 <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
                   <div className="mb-2 font-semibold text-green-800">Parsed:</div>
                   <div className="space-y-1 text-green-700">
@@ -1256,6 +1399,27 @@ Best regards"`;
                 />
               </div>
               
+              {parsedConversation?.ourOutbound && parsedConversation?.lastReply ? (
+                <button
+                  type="button"
+                  onClick={handleSaveConversation}
+                  disabled={saving || !manualEntry.email || (!selectedContactForEmail && !contactIdFromUrl && !parsedConversation.contactEmail)}
+                  className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
+                  title="Record your outbound and the contact's reply in one go"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="h-4 w-4" />
+                      Save email + response
+                    </>
+                  )}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleSaveManual}
