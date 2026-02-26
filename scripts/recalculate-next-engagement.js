@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 async function main() {
   const companyHQId = process.argv[2] || null;
   // Dynamic import ESM service
-  const { computeAndPersistNextEngagement } = await import('../lib/emailCadenceService.js');
+  const { computeAndPersistNextEngagement } = await import('../lib/services/emailCadenceService.js');
 
   const where = companyHQId ? { crmId: companyHQId } : { crmId: { not: null } };
   const contacts = await prisma.contact.findMany({
