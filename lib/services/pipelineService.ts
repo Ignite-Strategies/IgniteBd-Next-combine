@@ -57,7 +57,7 @@ export async function ensureContactPipeline(
 
       // Validate pipeline
       if (!isValidPipeline(finalPipeline)) {
-        throw new Error(`Invalid pipeline: ${finalPipeline}. Must be one of: unassigned, prospect, client, collaborator, institution`);
+        throw new Error(`Invalid pipeline: ${finalPipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution`);
       }
 
       // Validate stage (if provided)
@@ -89,7 +89,7 @@ export async function ensureContactPipeline(
 
   // Validate pipeline
   if (!isValidPipeline(newPipeline)) {
-    throw new Error(`Invalid pipeline: ${newPipeline}. Must be one of: unassigned, prospect, client, collaborator, institution`);
+    throw new Error(`Invalid pipeline: ${newPipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution`);
   }
 
   // Validate stage (if provided)
@@ -136,7 +136,7 @@ export function validatePipeline(
   if (!isValidPipeline(pipeline)) {
     return {
       isValid: false,
-      error: `Invalid pipeline: ${pipeline}. Must be one of: unassigned, prospect, client, collaborator, institution`,
+      error: `Invalid pipeline: ${pipeline}. Must be one of: unassigned, connector, prospect, client, collaborator, institution`,
     };
   }
 

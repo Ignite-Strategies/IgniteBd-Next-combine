@@ -404,6 +404,8 @@ function ContactsViewPageContent() {
     const pipeline = contact.pipelines || contact.pipeline;
     if (!pipeline) return null;
     const colors = {
+      unassigned: 'bg-gray-100 text-gray-700',
+      connector: 'bg-amber-100 text-amber-800',
       prospect: 'bg-blue-100 text-blue-800',
       client: 'bg-green-100 text-green-800',
       collaborator: 'bg-purple-100 text-purple-800',
@@ -589,6 +591,8 @@ function ContactsViewPageContent() {
                   className="w-full appearance-none rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Pipelines</option>
+                  <option value="unassigned">Unassigned</option>
+                  <option value="connector">Connector</option>
                   <option value="prospect">Prospect</option>
                   <option value="client">Client</option>
                   <option value="collaborator">Collaborator</option>

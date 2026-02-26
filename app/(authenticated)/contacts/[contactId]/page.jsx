@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useContactsContext } from '@/hooks/useContacts';
@@ -168,22 +168,26 @@ export default function ContactDetailPage({ params }) {
   const [lastEmail, setLastEmail] = useState(null);
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
   const [emailHistory, setEmailHistory] = useState([]);
+  const [showAddResponseModal, setShowAddResponseModal] = useState(false);
+  const [addResponseEmail, setAddResponseEmail] = useState(null);
+  const [addResponseContactResponse, setAddResponseContactResponse] = useState('');
+  const [addResponseDisposition, setAddResponseDisposition] = useState('positive');
+  const [addResponseRespondedAt, setAddResponseRespondedAt] = useState('');
+  const [savingAddResponse, setSavingAddResponse] = useState(false);
+  const [addResponseError, setAddResponseError] = useState('');
   const [relationshipContext, setRelationshipContext] = useState(null);
   const [generatingRelationshipContext, setGeneratingRelationshipContext] = useState(false);
   const [savingRelationshipContext, setSavingRelationshipContext] = useState(false);
   
-  // Load last email send info
-  useEffect(() => {
+  // Load email history (used by effect and after adding response)
+  const loadEmailHistory = () => {
     if (!contactId) return;
-    
     setLoadingLastEmail(true);
     api.get(`/api/contacts/${contactId}/email-history`)
       .then((response) => {
         if (response.data?.success && response.data.activities?.length > 0) {
-          // Get most recent email
           const mostRecent = response.data.activities[0];
           setLastEmail(mostRecent);
-          // Store all emails for snippets
           setEmailHistory(response.data.activities);
         } else {
           setLastEmail(null);
@@ -198,7 +202,58 @@ export default function ContactDetailPage({ params }) {
       .finally(() => {
         setLoadingLastEmail(false);
       });
+  };
+
+  useEffect(() => {
+    if (!contactId) return;
+    loadEmailHistory();
   }, [contactId]);
+
+  const handleOpenAddResponse = (email) => {
+    setAddResponseEmail(email);
+    setAddResponseContactResponse('');
+    setAddResponseDisposition('positive');
+    setAddResponseRespondedAt(new Date().toISOString().split('T')[0]);
+    setAddResponseError('');
+    setShowAddResponseModal(true);
+  };
+
+  const handleSaveAddResponse = async () => {
+    if (!addResponseEmail?.id || !addResponseContactResponse.trim()) {
+      setAddResponseError('Response text is required');
+      return;
+    }
+    setSavingAddResponse(true);
+    setAddResponseError('');
+    try {
+      const payload = {
+        contactResponse: addResponseContactResponse.trim(),
+        responseDisposition: addResponseDisposition,
+      };
+      if (addResponseRespondedAt) {
+        payload.respondedAt = new Date(addResponseRespondedAt).toISOString();
+      }
+      const response = await api.put(`/api/emails/${addResponseEmail.id}/response`, payload);
+      if (response.data?.success) {
+        setShowAddResponseModal(false);
+        setAddResponseEmail(null);
+        loadEmailHistory();
+        if (refreshContacts) refreshContacts();
+        // Refresh contact (pipeline/notes may have changed)
+        const contactRes = await api.get(`/api/contacts/${contactId}`);
+        if (contactRes.data?.success && contactRes.data.contact) {
+          setContact(contactRes.data.contact);
+          setNotesText(contactRes.data.contact.notes || '');
+        }
+      } else {
+        setAddResponseError(response.data?.error || 'Failed to save response');
+      }
+    } catch (error) {
+      setAddResponseError(error.response?.data?.error || error.message || 'Failed to save response');
+    } finally {
+      setSavingAddResponse(false);
+    }
+  };
   
   // Load contact lists when modal opens
   useEffect(() => {
@@ -543,6 +598,8 @@ export default function ContactDetailPage({ params }) {
                   // Reset stage when pipeline changes (unless it's unassigned)
                   if (e.target.value === 'unassigned') {
                     setSelectedStage('');
+                  } else if (e.target.value === 'connector') {
+                    setSelectedStage('forwarded');
                   } else if (e.target.value === 'prospect') {
                     setSelectedStage('need-to-engage');
                   } else {
@@ -552,6 +609,7 @@ export default function ContactDetailPage({ params }) {
                 className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-600 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="unassigned">Unassigned</option>
+                <option value="connector">Connector</option>
                 <option value="prospect">Prospect</option>
                 <option value="client">Client</option>
                 <option value="collaborator">Collaborator</option>
@@ -563,6 +621,12 @@ export default function ContactDetailPage({ params }) {
                   onChange={(e) => setSelectedStage(e.target.value)}
                   className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
                 >
+                  {selectedPipeline === 'connector' && (
+                    <>
+                      <option value="forwarded">Forwarded</option>
+                      <option value="introduction-made">Introduction Made</option>
+                    </>
+                  )}
                   {selectedPipeline === 'prospect' && (
                     <>
                       <option value="need-to-engage">Need to Engage</option>
@@ -1393,20 +1457,18 @@ export default function ContactDetailPage({ params }) {
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Email History</h3>
-              {emailHistory.length === 0 && (
-                <button
-                  onClick={() => {
-                    const url = companyHQId 
-                      ? `/outreach/record-off-platform?contactId=${contactId}&companyHQId=${companyHQId}`
-                      : `/outreach/record-off-platform?contactId=${contactId}`;
-                    router.push(url);
-                  }}
-                  className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Email Manually
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  const url = companyHQId 
+                    ? `/outreach/record-off-platform?contactId=${contactId}&companyHQId=${companyHQId}`
+                    : `/outreach/record-off-platform?contactId=${contactId}`;
+                  router.push(url);
+                }}
+                className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
+              >
+                <Plus className="h-4 w-4" />
+                Add Email Manually
+              </button>
             </div>
             {loadingLastEmail ? (
               <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -1417,9 +1479,10 @@ export default function ContactDetailPage({ params }) {
               <div className="space-y-3">
                 {emailHistory.slice(0, 6).map((email, idx) => {
                   const isDraft = email.isDraft || email.type === 'draft';
+                  const canAddResponse = !isDraft && !email.hasResponded;
                   return (
                     <div
-                      key={idx}
+                      key={email.id || idx}
                       className={`rounded-lg border p-4 ${isDraft ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}
                     >
                       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -1441,19 +1504,50 @@ export default function ContactDetailPage({ params }) {
                               <span className="capitalize">{email.platform}</span>
                             </>
                           )}
+                          {email.hasResponded && (
+                            <>
+                              <span>•</span>
+                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                Replied
+                              </span>
+                            </>
+                          )}
                         </div>
-                        {isDraft && (
-                          <button
-                            onClick={() => router.push(`/contacts/${contactId}/outreach-message?companyHQId=${companyHQId}`)}
-                            className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
-                          >
-                            Edit &amp; Send
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {isDraft && (
+                            <button
+                              onClick={() => router.push(`/contacts/${contactId}/outreach-message?companyHQId=${companyHQId}`)}
+                              className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+                            >
+                              Edit &amp; Send
+                            </button>
+                          )}
+                          {canAddResponse && (
+                            <button
+                              onClick={() => handleOpenAddResponse(email)}
+                              className="flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-xs font-semibold text-green-700 transition hover:bg-green-100"
+                              title="Record contact response"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              Add Response
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="font-medium text-gray-900 text-sm">{email.subject || 'No subject'}</div>
                       {email.notes && (
                         <div className="mt-1 text-xs text-gray-600 line-clamp-2">{email.notes}</div>
+                      )}
+                      {email.hasResponded && email.contactResponse && (
+                        <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-2">
+                          <div className="text-xs font-semibold text-green-800 mb-1">Response</div>
+                          <div className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-3">{email.contactResponse}</div>
+                          {email.respondedAt && (
+                            <div className="mt-1 text-xs text-gray-500">
+                              {new Date(email.respondedAt).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -1466,7 +1560,7 @@ export default function ContactDetailPage({ params }) {
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
                 <p className="mb-2 text-sm text-gray-600">No emails sent yet.</p>
                 <p className="text-sm text-gray-500">
-                  Click "Build Outreach Email" to send your first email, or "Add Email Manually" to record an off-platform email.
+                  Click &quot;Build Outreach Email&quot; to send your first email, or &quot;Add Email Manually&quot; to record an off-platform email.
                 </p>
               </div>
             )}
@@ -1679,6 +1773,108 @@ export default function ContactDetailPage({ params }) {
                   className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Response Modal */}
+        {showAddResponseModal && addResponseEmail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Add Response</h2>
+                <button
+                  onClick={() => {
+                    setShowAddResponseModal(false);
+                    setAddResponseEmail(null);
+                    setAddResponseError('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Record a response from the contact for: <strong>{addResponseEmail.subject || 'No subject'}</strong>
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-gray-700">
+                    Response text <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={addResponseContactResponse}
+                    onChange={(e) => setAddResponseContactResponse(e.target.value)}
+                    placeholder="Paste or type the contact's reply..."
+                    className="w-full min-h-[120px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 resize-y"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-gray-700">
+                    Disposition
+                  </label>
+                  <select
+                    value={addResponseDisposition}
+                    onChange={(e) => setAddResponseDisposition(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="positive">Positive</option>
+                    <option value="not_decision_maker">Not decision maker</option>
+                    <option value="forwarding">Forwarding to someone</option>
+                    <option value="not_interested">Not interested</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Affects pipeline: positive → interest; not interested → do not contact again
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-gray-700">
+                    Response date
+                  </label>
+                  <input
+                    type="date"
+                    value={addResponseRespondedAt}
+                    onChange={(e) => setAddResponseRespondedAt(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {addResponseError && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                    {addResponseError}
+                  </div>
+                )}
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={handleSaveAddResponse}
+                  disabled={savingAddResponse || !addResponseContactResponse.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingAddResponse ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Save Response
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddResponseModal(false);
+                    setAddResponseEmail(null);
+                    setAddResponseError('');
+                  }}
+                  disabled={savingAddResponse}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
                 </button>
               </div>
             </div>

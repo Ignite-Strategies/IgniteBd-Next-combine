@@ -56,6 +56,9 @@ export async function GET(request, { params }) {
         source: true,
         platform: true,
         hasResponded: true,
+        contactResponse: true,
+        respondedAt: true,
+        responseSubject: true,
       },
     });
 
@@ -77,6 +80,9 @@ export async function GET(request, { params }) {
         platform: send.platform,
         notes: send.body,
         hasResponded: send.hasResponded,
+        contactResponse: send.contactResponse,
+        respondedAt: send.respondedAt?.toISOString(),
+        responseSubject: send.responseSubject,
       };
     }).sort((a, b) => {
       if (a.isDraft && !b.isDraft) return -1;

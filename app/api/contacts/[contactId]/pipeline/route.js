@@ -9,7 +9,7 @@ import { applyPipelineTriggers } from '@/lib/services/PipelineTriggerService';
  * Create or update pipeline for a contact
  * 
  * Body:
- * - pipeline (required) - "unassigned" | "prospect" | "client" | "collaborator" | "institution"
+ * - pipeline (required) - "unassigned" | "connector" | "prospect" | "client" | "collaborator" | "institution"
  * - stage (optional for "unassigned", required for others) - Stage within the pipeline
  * 
  * Returns:

@@ -1,4 +1,4 @@
-but# Outreach Message Architecture
+# Outreach Message Architecture
 
 > Last updated: Feb 2026  
 > Context: [Outreach Tracker + Contact Detail integration](./OUTREACH_TRACKER_AND_CONTACT_DETAIL_INTEGRATION.md)
@@ -156,10 +156,10 @@ When you mark a response and the contact is in **prospect** pipeline, stage **en
 
 When the reply is “not the buyer” or “I’ll forward to someone,” we:
 
-- **Pipeline:** They live on the **unassigned** pipeline. We set `pipeline = 'unassigned'`, `stage = null` (unassigned has no stages). So: out of the buying path, but still in the CRM.
-- **Position:** Set **`introPositionInTarget`** = **`INTRO_WITHIN_TARGET`** so they’re findable as “warm intro to a buyer at this company” (e.g. “I’ll check with internal counsel”).
+- **Pipeline:** They live on the **connector** pipeline, stage **forwarded**. (Unassigned is for people literally unassigned; connector is for warm intros.) Stages: **forwarded** (said they’d forward / pass along), **introduction-made** (intro to the buyer done — set when they refer). **They still matter:** you follow up (“Who did you forward it to?”, “Did you get a chance to pass it along?”) until you have the intro or the new contact.
+- **Position:** Set **`introPositionInTarget`** = **`INTRO_WITHIN_TARGET`** so they’re findable as “warm intro to a buyer at this company.”
 - **Notes:** Append a short line, e.g. `[Response] Not the decision maker.` or `[Response] Said they’ll forward to someone who may care.`
-- **Next step:** When they refer someone, add that person as a **new contact** (prospect); in notes, “Introduced by [Name].” See [Pipeline Deep Dive: Non‑buyers](./PIPELINE_DEEP_DIVE_NON_BUYERS.md).
+- **Next step:** When they refer someone, add that person as a **new contact** (prospect); in notes, “Introduced by [Name].” Move this contact’s stage to **introduction-made**. See [Pipeline Deep Dive: Non‑buyers](./PIPELINE_DEEP_DIVE_NON_BUYERS.md).
 
 **Contact field:** `introPositionInTarget` (enum: `DECISION_MAKER` | `INTRO_WITHIN_TARGET` | `GATEKEEPER` | `INFLUENCER` | `OTHER`). Use it to filter “all intros within target” without overloading pipeline.
 
@@ -168,8 +168,8 @@ To trigger this when recording the response, send **`responseDisposition`** in t
 | Value | Effect |
 |-------|--------|
 | `positive` (default) | Move prospect engaged-awaiting-response → interest. |
-| `not_decision_maker` | Unassigned + `introPositionInTarget=INTRO_WITHIN_TARGET` + append note. |
-| `forwarding` | Unassigned + `introPositionInTarget=INTRO_WITHIN_TARGET` + append note. |
+| `not_decision_maker` | **Connector** pipeline, stage **forwarded** + `introPositionInTarget=INTRO_WITHIN_TARGET` + append note. |
+| `forwarding` | Same (connector / forwarded). When they make the intro, move stage to **introduction-made** or add the new buyer as a contact. |
 | `not_interested` | Set **doNotContactAgain** on the contact (no pipeline change). |
 
 **API:** `PUT /api/emails/[emailId]/response`  

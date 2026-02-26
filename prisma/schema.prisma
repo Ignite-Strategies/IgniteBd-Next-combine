@@ -538,6 +538,10 @@ model Contact {
   buyerPerson                                               BuyerPerson?
   // Position intro within target company (where they sit in the path to a buyer)
   introPositionInTarget                                     IntroPositionInTarget?
+  // Intro source: when this contact was introduced by another contact (e.g. connector forwarded to them)
+  introSourceContactId                                      String?
+  introSourceContact                                        Contact?   @relation("ContactIntroSource", fields: [introSourceContactId], references: [id], onDelete: SetNull)
+  contactsIntroduced                                        Contact[]  @relation("ContactIntroSource")
   // Manual outreach tracking fields
   persona_type                                              PersonaType?
   prior_relationship                                        RelationshipEnum?
@@ -581,6 +585,7 @@ model Contact {
   @@index([nextContactedAt])
   @@index([doNotContactAgain])
   @@index([introPositionInTarget])
+  @@index([introSourceContactId])
   @@map("contacts")
 }
 

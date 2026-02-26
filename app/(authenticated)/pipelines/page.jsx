@@ -119,7 +119,7 @@ function PipelinesPageContent() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Pipeline"
-          subtitle="Track contacts through unassigned, prospect, client, collaborator, and institution flows."
+          subtitle="Track contacts through unassigned, connector, prospect, client, collaborator, and institution flows."
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
         />

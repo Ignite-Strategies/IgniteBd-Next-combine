@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Calendar } from 'lucide-react';
 
 function OutreachTrackerContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const companyHQId = searchParams.get('companyHQId') || '';
+  const companyHQId = searchParams.get('companyHQId') || (typeof window !== 'undefined' && (window.localStorage?.getItem('companyHQId') || window.localStorage?.getItem('companyId'))) || '';
 
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +137,36 @@ function OutreachTrackerContent() {
     return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">Due in {daysUntilDue}d</span>;
   };
 
+  // Group contacts by next follow-up date for chronological-by-date view
+  const contactsByDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const formatDateLabel = (isoDate) => {
+      if (!isoDate) return null;
+      const d = new Date(isoDate);
+      d.setHours(0, 0, 0, 0);
+      const diff = Math.round((d - today) / (1000 * 60 * 60 * 24));
+      if (diff === 0) return 'Today';
+      if (diff === 1) return 'Tomorrow';
+      if (diff === -1) return 'Yesterday';
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+    };
+    const groups = {};
+    const noDate = [];
+    for (const c of contacts) {
+      const dateKey = c.nextSendDate ? new Date(c.nextSendDate).toISOString().slice(0, 10) : null;
+      if (!dateKey) {
+        noDate.push(c);
+        continue;
+      }
+      if (!groups[dateKey]) groups[dateKey] = { label: formatDateLabel(c.nextSendDate), contacts: [] };
+      groups[dateKey].contacts.push(c);
+    }
+    const sorted = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    if (noDate.length) sorted.push([null, { label: 'No follow-up date', contacts: noDate }]);
+    return sorted;
+  }, [contacts]);
+
   if (!companyHQId) {
     return (
       <div className="p-8">
@@ -146,9 +178,18 @@ function OutreachTrackerContent() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Outreach Tracker</h1>
-        <p className="text-gray-600">Track all contacts with email sends and follow-up dates</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Outreach Tracker</h1>
+          <p className="text-gray-600">Track all contacts with email sends — chronological by follow-up date</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => router.push('/outreach')}
+          className="text-sm font-medium text-amber-600 hover:text-amber-700"
+        >
+          ← Back to Outreach Dashboard
+        </button>
       </div>
 
       {/* Filters */}
@@ -264,62 +305,76 @@ function OutreachTrackerContent() {
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Send
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Next Follow-Up
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Emails
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {contacts.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                      No contacts found matching your filters.
-                    </td>
-                  </tr>
-                ) : (
-                  contacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {contact.firstName} {contact.lastName}
-                        </div>
-                        <div className="text-sm text-gray-500">{contact.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(contact.lastSendDate)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(contact.nextSendDate)}
-                        {contact.remindMeOn && (
-                          <span className="ml-2 text-xs text-blue-600">(Manual)</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {contact.emailCount} email{contact.emailCount !== 1 ? 's' : ''}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(contact)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            {contacts.length === 0 ? (
+              <div className="px-6 py-12 text-center text-gray-500">
+                No contacts found matching your filters.
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {contactsByDate.map(([dateKey, { label, contacts: groupContacts }]) => (
+                  <div key={dateKey ?? 'none'} className="overflow-hidden">
+                    <div className="flex items-center gap-2 bg-gray-50 px-6 py-3 text-sm font-semibold text-gray-700">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      {label}
+                    </div>
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50/60">
+                        <tr>
+                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Send</th>
+                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Follow-Up</th>
+                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emails</th>
+                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-2 w-10" />
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {groupContacts.map((contact) => (
+                          <tr key={contact.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-3 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/contacts/${contact.id}`)}
+                                className="text-left"
+                              >
+                                <div className="text-sm font-medium text-gray-900 hover:text-amber-600">
+                                  {contact.firstName} {contact.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">{contact.email}</div>
+                              </button>
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
+                              {formatDate(contact.lastSendDate)}
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
+                              {formatDate(contact.nextSendDate)}
+                              {contact.remindMeOn && (
+                                <span className="ml-2 text-xs text-blue-600">(Manual)</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
+                              {contact.emailCount} email{contact.emailCount !== 1 ? 's' : ''}
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap">
+                              {getStatusBadge(contact)}
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/contacts/${contact.id}`)}
+                                className="text-xs font-medium text-amber-600 hover:text-amber-700"
+                              >
+                                Open
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

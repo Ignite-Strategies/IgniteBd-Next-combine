@@ -104,7 +104,7 @@ export async function PUT(request, { params }) {
       const disposition = responseDisposition || 'positive';
       try {
         if (disposition === 'not_decision_maker' || disposition === 'forwarding') {
-          await ensureContactPipeline(contactId, { pipeline: 'unassigned' });
+          await ensureContactPipeline(contactId, { pipeline: 'connector', stage: 'forwarded' });
           const noteSuffix = disposition === 'forwarding'
             ? '\n\n[Response] Said they’ll forward to someone who may care.'
             : '\n\n[Response] Not the decision maker.';
@@ -117,7 +117,7 @@ export async function PUT(request, { params }) {
               introPositionInTarget: 'INTRO_WITHIN_TARGET', // warm intro to a buyer at target company
             },
           });
-          console.log('✅ Contact → unassigned + introPositionInTarget=INTRO_WITHIN_TARGET (', disposition, ')');
+          console.log('✅ Contact → connector/forwarded + introPositionInTarget=INTRO_WITHIN_TARGET (', disposition, ')');
         } else if (disposition === 'not_interested') {
           await prisma.contacts.update({
             where: { id: contactId },

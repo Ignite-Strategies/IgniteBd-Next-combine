@@ -12,7 +12,8 @@
 
 **Pipelines:**
 
-- `unassigned` — Not in a formal path; no stages.
+- `unassigned` — Literally unassigned; not in any path. No stages.
+- `connector` — Warm intro to a buyer (said they’d forward, or intro made). Stages: **forwarded**, **introduction-made**.
 - `prospect` — Sales path (need-to-engage → … → contract-signed).
 - `client` — After contract-signed (kickoff → … → terminated-contract).
 - `collaborator` — Partnership path (interest → meeting → moa → agreement).
@@ -28,7 +29,9 @@
 6. `contract`
 7. `contract-signed` — **Conversion:** system moves contact to **client** pipeline, stage **kickoff**.
 
-**Unassigned:** No stages. Use this for “not in a buying path” (warm contact, referral source, etc.).
+**Unassigned:** No stages. Use only for contacts who are literally not assigned to any path yet.
+
+**Connector:** Stages **forwarded** (said they’d forward / pass along), **introduction-made** (intro to the buyer has been made). Use for warm intros — “I’ll check with internal counsel,” “I’ll forward to someone who may care.” **They still matter:** you have to follow up — e.g. “Who did you forward it to?”, “Did you get a chance to pass it along?” — until you get the intro or the new contact. When they refer, add the new person as a contact and move this contact’s stage to introduction-made.
 
 ---
 
@@ -38,7 +41,7 @@
 
 1. Open **Contact detail** (`/contacts/[contactId]`).
 2. In the pipeline section, click **Edit** (pencil) on pipeline/stage.
-3. Choose **Pipeline** (unassigned, prospect, client, collaborator, institution).
+3. Choose **Pipeline** (unassigned, connector, prospect, client, collaborator, institution).
 4. If not unassigned, choose **Stage** from that pipeline’s list.
 5. **Save.**
 
@@ -51,7 +54,7 @@ Pipeline page (`/pipelines`) is **read-only** (view by pipeline/stage); actual m
 - **Validation:** `pipelineConfig` — stage must belong to the chosen pipeline; `unassigned` has no stage (send `stage: null` or omit).
 - **Trigger:** If you set prospect → `contract-signed`, `PipelineTriggerService` converts the contact to client pipeline, stage `kickoff`.
 
-So: **moving someone “out” of the buying path = set pipeline to `unassigned`** (and optionally use notes/relationship/persona to say why).
+So: **warm intro / “I’ll forward” = set pipeline to `connector`**, stage **forwarded** (or **introduction-made** once the intro is done). **Literally unassigned** = set pipeline to `unassigned` (no stage).
 
 ---
 
@@ -63,7 +66,8 @@ You want to:
 - **Not** treat them as prospects (no follow-up cadence, no “next stage” pressure).
 - Still be able to find them (e.g. “warm contacts”, “said they’d forward”).
 
-Recommended: **move to `unassigned`** and use **notes**, **prior_relationship**, and optionally **outreach persona** to capture the reason.
+- **“I’ll forward” / referral source:** Use the **connector** pipeline, stage **forwarded** (or **introduction-made** once they’ve made the intro). Auto-set when you record a response with disposition `forwarding` or `not_decision_maker`.
+- **Friend / warm contact only (not a referral path):** Use **unassigned** + **notes**, **prior_relationship**, and optionally **outreach persona**.
 
 ---
 
@@ -85,15 +89,15 @@ Recommended: **move to `unassigned`** and use **notes**, **prior_relationship**,
 
 ### Scenario B: “Great to be in touch — I’ll forward to someone who may care”
 
-**Goal:** They’re not the buyer; they’re a **referral source**. You want to remember that and maybe follow up on the referral.
+**Goal:** They’re not the buyer; they’re a **connector** — warm intro to a buyer. You want to track “forwarded” vs “introduction made.”
 
 **What to do:**
 
-1. **Pipeline:** Set to **`unassigned`**.
-2. **Notes:** e.g. *“Not a buyer. Said: ‘I’ll forward this to someone who may care.’ Follow up on referral when they share contact.”*
-3. **Optional:** When they introduce someone, add that new person as a **new contact** (prospect) and in notes you can say “Introduced by [Name].”
+1. **Pipeline:** Set to **`connector`**, stage **forwarded** (or use **Record response** with disposition `forwarding` / `not_decision_maker` — we set this automatically).
+2. **Notes:** We append e.g. *[Response] Said they’ll forward to someone who may care.* You can add more context.
+3. When they introduce someone, add that person as a **new contact** (prospect). Set the new contact’s **intro source** to this connector (`introSourceContactId` → this contact). Note “Introduced by [Name]” in notes, and move this connector’s stage to **introduction-made**.
 
-**Result:** They’re out of the buying path; the system doesn’t treat them as a prospect. Notes give you the context for follow-up. (If you later add tags or a “Referral source” pipeline, you could use that instead of or in addition to notes.)
+**Result:** They live on the **connector** pipeline (forwarded → introduction-made). The new buyer contact points back to the connector via **introSourceContactId**, so you can see “Introduced by [Name]” on the buyer and “Introduced: [list of contacts]” on the connector.
 
 ---
 
@@ -101,7 +105,9 @@ Recommended: **move to `unassigned`** and use **notes**, **prior_relationship**,
 
 | Field | Use for non-buyers |
 |-------|---------------------|
-| **Pipeline = unassigned** | Removes them from prospect/client/collaborator/institution views and stages. |
+| **Pipeline = connector** (stages: forwarded, introduction-made) | Warm intro to a buyer; “I’ll forward,” referral source. |
+| **Pipeline = unassigned** | Literally unassigned — not in any path yet (e.g. friend/warm contact only). |
+| **introSourceContactId** | On the **introduced** contact (the buyer): FK to the connector who introduced them. Shows “Introduced by [Name]” on buyer; “Introduced: [list]” on connector. |
 | **notes** | “Warm contact only,” “Will forward to someone,” “Referral source,” etc. |
 | **prior_relationship** | WARM / ESTABLISHED / DORMANT — good for filtering “warm but not pushing.” |
 | **title** | Keep job/role on the contact (no separate “list” needed). |
@@ -121,13 +127,13 @@ Recommended: **move to `unassigned`** and use **notes**, **prior_relationship**,
 - When you **send** an email (platform or off-platform) and the contact is **prospect** + **need-to-engage**, their stage is set to **engaged-awaiting-response**.
 - When you **mark a response** and the contact is **prospect** + **engaged-awaiting-response**, their stage is set to **interest**.
 
-So: **any time you set pipeline to `unassigned` (and optionally clear stage), that contact is “moved out” of the buying path.** No extra “non-buyer” pipeline exists today; unassigned + notes/relationship/persona is the intended pattern.
+So: **connector** = warm intro path (forwarded / introduction-made). **Unassigned** = literally not in any path. Use connector for “I’ll forward” / referral; unassigned for friend/warm-contact-only.
 
 ---
 
 ## Gaps / Possible Extensions
 
-- **No “Warm contact only” or “Referral source” pipeline:** Today we use **unassigned + notes + prior_relationship**. If you want a dedicated list or report (e.g. “All warm-only contacts”), you can filter contacts where `pipeline = unassigned` and `prior_relationship = WARM` (and/or search notes for “referral”).
+- **Connector pipeline** = referral / “I’ll forward” path (stages: forwarded, introduction-made). **Unassigned** = literally unassigned; for “warm contact only” filter `pipeline = unassigned` and `prior_relationship = WARM` (and/or notes).
 - **Tags/labels:** There’s no `tags` or “referral source” flag on Contact. Notes (and optionally outreach persona) cover the use case; adding tags could make filtering and reporting easier later.
 - **Bulk move:** Pipeline page doesn’t support “move selected to unassigned” from the table; you do it one-by-one on contact detail (or via API in bulk if you build it).
 
@@ -136,8 +142,8 @@ So: **any time you set pipeline to `unassigned` (and optionally clear stage), th
 ## Summary
 
 - **Moving people:** Contact detail → Edit pipeline/stage → Save. API: `PUT /api/contacts/[contactId]/pipeline` with `pipeline` (and `stage` if not unassigned).
-- **Not buyers:** Set **pipeline = unassigned**. Use **notes** and **prior_relationship** (and **title**, **outreach persona**) to capture “warm contact only” or “I’ll forward to someone.”
-- **Friend/former colleague:** Unassigned + title kept + WARM + notes “keep warm, not pushing.”
-- **“I’ll forward to someone”:** Unassigned + notes “will forward to someone who may care”; add new contact when they refer.
+- **Connector (warm intro / “I’ll forward”):** Set **pipeline = connector**, stage **forwarded** (or **introduction-made** when intro is done). Recording a response with disposition `forwarding` / `not_decision_maker` does this automatically. Add new contact when they refer; move stage to introduction-made.
+- **Friend/former colleague (warm contact only):** Unassigned + title kept + WARM + notes “keep warm, not pushing.”
+- **Unassigned:** Use only for contacts literally not in any path yet.
 
 This keeps non-buyers in the CRM, out of the sales pipeline, and still findable and actionable via notes and relationship.
