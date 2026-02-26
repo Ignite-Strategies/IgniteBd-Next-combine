@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
+import { formatDeliveryMethodLabel } from '@/lib/utils/deliveryMethod';
 import { useContactsContext } from '@/hooks/useContacts';
 import ContactOutlook from '@/components/enrichment/ContactOutlook';
 import CompanySelector from '@/components/CompanySelector';
@@ -1699,7 +1700,7 @@ export default function ContactDetailPage({ params }) {
                           {!isDraft && email.platform && email.platform !== 'ai-draft' && (
                             <>
                               <span>•</span>
-                              <span className="capitalize">{email.platform}</span>
+                              <span>{formatDeliveryMethodLabel(email.platform)}</span>
                             </>
                           )}
                           {email.hasResponded && (

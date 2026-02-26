@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector';
 import api from '@/lib/api';
 import { parseEmailConversation, parseSingleEmailBlock } from '@/lib/utils/emailConversationParser';
+import { DELIVERY_METHODS, normalizeDeliveryMethod, formatDeliveryMethodLabel } from '@/lib/utils/deliveryMethod';
 
 export default function RecordOffPlatformPage() {
   const router = useRouter();
@@ -81,7 +82,7 @@ export default function RecordOffPlatformPage() {
     subject: '',
     body: '',
     emailSent: new Date().toISOString().split('T')[0],
-    platform: 'manual',
+    platform: 'email',
     notes: '',
   });
   const [emailBlob, setEmailBlob] = useState('');
@@ -228,7 +229,7 @@ export default function RecordOffPlatformPage() {
             subject: subjectIndex >= 0 && values[subjectIndex] ? values[subjectIndex].replace(/^["']|["']$/g, '').trim() : '',
             body: bodyIndex >= 0 && values[bodyIndex] ? values[bodyIndex].replace(/^["']|["']$/g, '').trim() : '',
             emailSent: dateIndex >= 0 && values[dateIndex] ? values[dateIndex].replace(/^["']|["']$/g, '').trim() : new Date().toISOString().split('T')[0],
-            platform: platformIndex >= 0 && values[platformIndex] ? values[platformIndex].replace(/^["']|["']$/g, '').trim() : 'manual',
+            platform: platformIndex >= 0 && values[platformIndex] ? values[platformIndex].replace(/^["']|["']$/g, '').trim().toLowerCase() : 'email',
             notes: notesIndex >= 0 && values[notesIndex] ? values[notesIndex].replace(/^["']|["']$/g, '').trim() : '',
           });
         }
@@ -377,7 +378,7 @@ Best regards"`;
           emailSent: row.emailSent,
           subject: row.subject || null,
           body: row.body || null,
-          platform: row.platform || 'manual',
+          platform: normalizeDeliveryMethod(row.platform),
           notes: row.notes || null,
         });
         
@@ -585,7 +586,7 @@ Best regards"`;
           subject: single.subject || '',
           body: single.body || '',
           emailSent: single.sent || new Date().toISOString().split('T')[0],
-          platform: 'manual',
+          platform: 'email',
           notes: '',
         });
         setParsedConversation(null);
@@ -632,7 +633,7 @@ Best regards"`;
           subject: result.ourOutbound.subject || '',
           body: result.ourOutbound.body || '',
           emailSent: result.ourOutbound.sent || new Date().toISOString().split('T')[0],
-          platform: 'manual',
+          platform: 'email',
           notes: '',
         });
       }
@@ -662,7 +663,7 @@ Best regards"`;
           subject: parsed.subject || '',
           body: parsed.body || '',
           emailSent: parsed.sent || new Date().toISOString().split('T')[0],
-          platform: 'manual',
+          platform: 'email',
           notes: '',
         });
         
@@ -818,7 +819,7 @@ Best regards"`;
         emailSent: conv.ourOutbound.sent || manualEntry.emailSent,
         subject: conv.ourOutbound.subject || manualEntry.subject,
         body: conv.ourOutbound.body || manualEntry.body,
-        platform: manualEntry.platform || 'manual',
+        platform: normalizeDeliveryMethod(manualEntry.platform),
         notes: manualEntry.notes || null,
       });
       if (!sendRes.data?.success || !sendRes.data?.offPlatformSend?.id) {
@@ -886,7 +887,7 @@ Best regards"`;
           emailSent: manualEntry.emailSent,
           subject: manualEntry.subject || null,
           body: manualEntry.body || null,
-          platform: manualEntry.platform || 'manual',
+          platform: normalizeDeliveryMethod(manualEntry.platform),
           notes: manualEntry.notes || null,
         });
         
@@ -933,7 +934,7 @@ Best regards"`;
         emailSent: manualEntry.emailSent,
         subject: manualEntry.subject || null,
         body: manualEntry.body || null,
-        platform: manualEntry.platform || 'manual',
+        platform: normalizeDeliveryMethod(manualEntry.platform),
         notes: manualEntry.notes || null,
       });
       
@@ -945,7 +946,7 @@ Best regards"`;
           subject: '',
           body: '',
           emailSent: new Date().toISOString().split('T')[0],
-          platform: 'manual',
+          platform: 'email',
           notes: '',
         });
       } else {
@@ -965,7 +966,7 @@ Best regards"`;
           title="Record Off-Platform Emails"
           subtitle={contact 
             ? `Track emails sent to ${contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email} outside the platform`
-            : "Track outreach sent outside the platform (Gmail, Outlook, LinkedIn, in-person, etc.)"
+            : "Track outreach sent outside the platform (email, LinkedIn, or in person)"
           }
           backTo={contactIdFromUrl 
             ? `${companyHQId ? `/contacts/${contactIdFromUrl}?companyHQId=${companyHQId}` : `/contacts/${contactIdFromUrl}`}`
@@ -1136,7 +1137,7 @@ Best regards"`;
                           <td className="px-3 py-2 text-gray-600 max-w-xs truncate" title={row.body || ''}>
                             {row.body ? (row.body.length > 50 ? `${row.body.substring(0, 50)}...` : row.body) : '—'}
                           </td>
-                          <td className="px-3 py-2 text-gray-600">{row.platform || 'manual'}</td>
+                          <td className="px-3 py-2 text-gray-600">{formatDeliveryMethodLabel(row.platform)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1425,18 +1426,13 @@ Best regards"`;
                     Delivery Method
                   </label>
                   <select
-                    value={manualEntry.platform}
+                    value={DELIVERY_METHODS.includes(manualEntry.platform) ? manualEntry.platform : 'email'}
                     onChange={(e) => setManualEntry({ ...manualEntry, platform: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="gmail">Gmail</option>
-                    <option value="outlook">Outlook</option>
+                    <option value="email">Email</option>
                     <option value="linkedin">LinkedIn</option>
-                    <option value="apollo">Apollo</option>
-                    <option value="in-person">In-Person</option>
-                    <option value="csv">CSV Export</option>
-                    <option value="manual">Manual</option>
-                    <option value="other">Other</option>
+                    <option value="in-person">In Person</option>
                   </select>
                 </div>
               </div>
