@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Calendar } from 'lucide-react';
 import api from '@/lib/api';
+import { getTodayEST, dayDiffEST, formatDateEST, formatDateLabelEST } from '@/lib/dateEst';
 
 function OutreachTrackerContent() {
   const router = useRouter();
@@ -95,22 +96,15 @@ function OutreachTrackerContent() {
 
   const formatDate = (dateString) => {
     if (!dateString) return '—';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return formatDateEST(dateString, { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const todayEST = getTodayEST();
   const getDaysUntilDue = (nextSendDate) => {
     if (!nextSendDate) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dueDate = new Date(nextSendDate);
-    dueDate.setHours(0, 0, 0, 0);
-    const diffTime = dueDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    const iso = typeof nextSendDate === 'string' ? nextSendDate.slice(0, 10) : new Date(nextSendDate).toISOString().slice(0, 10);
+    const diff = dayDiffEST(todayEST, iso);
+    return diff === null ? null : Math.ceil(diff);
   };
 
   const getStatusBadge = (contact) => {
@@ -138,19 +132,12 @@ function OutreachTrackerContent() {
     return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">Due in {daysUntilDue}d</span>;
   };
 
-  // Group contacts by next follow-up date for chronological-by-date view
+  // Group contacts by next follow-up date (labels in EST: Today, Tomorrow, etc.)
   const contactsByDate = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const formatDateLabel = (isoDate) => {
-      if (!isoDate) return null;
-      const d = new Date(isoDate);
-      d.setHours(0, 0, 0, 0);
-      const diff = Math.round((d - today) / (1000 * 60 * 60 * 24));
-      if (diff === 0) return 'Today';
-      if (diff === 1) return 'Tomorrow';
-      if (diff === -1) return 'Yesterday';
-      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+    const t = getTodayEST();
+    const formatLabel = (isoDate) => {
+      const { label } = formatDateLabelEST(t, isoDate);
+      return label || null;
     };
     const groups = {};
     const noDate = [];
@@ -160,7 +147,7 @@ function OutreachTrackerContent() {
         noDate.push(c);
         continue;
       }
-      if (!groups[dateKey]) groups[dateKey] = { label: formatDateLabel(c.nextSendDate), contacts: [] };
+      if (!groups[dateKey]) groups[dateKey] = { label: formatLabel(c.nextSendDate), contacts: [] };
       groups[dateKey].contacts.push(c);
     }
     const sorted = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));

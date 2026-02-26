@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Calendar, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
+import { getTodayEST, addDaysEST, formatDateLabelEST, formatDateEST } from '@/lib/dateEst';
 
 /**
  * Email reminder container: hydrates by date, chronological.
@@ -25,14 +26,10 @@ export default function EmailReminderContainer({
   const [error, setError] = useState(null);
   const [resolvedCompanyId, setResolvedCompanyId] = useState(companyHQId || null);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const from = dateFrom || today.toISOString().slice(0, 10);
-  const to = dateTo || (() => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 10);
-  })();
+  // Use EST so "today" and "Tomorrow" (e.g. due 2/26) are consistent
+  const todayEST = getTodayEST();
+  const from = dateFrom || todayEST;
+  const to = dateTo || addDaysEST(todayEST, 7);
 
   useEffect(() => {
     const id = companyHQId || (typeof window !== 'undefined' && (window.localStorage?.getItem('companyHQId') || window.localStorage?.getItem('companyId')));
@@ -64,22 +61,13 @@ export default function EmailReminderContainer({
     return () => { cancelled = true; };
   }, [resolvedCompanyId, from, to, limit]);
 
-  const formatDateLabel = (isoDate) => {
-    const d = new Date(isoDate);
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    const diff = Math.round((d - t) / (1000 * 60 * 60 * 24));
-    const actualDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    if (diff === 0) return { label: 'Today', actual: actualDate };
-    if (diff === 1) return { label: 'Tomorrow', actual: actualDate };
-    if (diff === -1) return { label: 'Yesterday', actual: actualDate };
-    return { label: actualDate, actual: actualDate };
-  };
+  const formatDateLabel = (isoDate) => formatDateLabelEST(todayEST, isoDate);
 
   const formatDateRangeSubtitle = (fromStr, toStr) => {
-    const from = new Date(fromStr);
-    const to = new Date(toStr);
-    return `${from.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${to.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: to.getFullYear() !== from.getFullYear() ? 'numeric' : undefined })}`;
+    const fromF = formatDateEST(fromStr, { month: 'short', day: 'numeric' });
+    const toOpts = { month: 'short', day: 'numeric' };
+    if (fromStr.slice(0, 4) !== toStr.slice(0, 4)) toOpts.year = 'numeric';
+    return `${fromF} – ${formatDateEST(toStr, toOpts)}`;
   };
 
   const groupByDate = (list) => {
