@@ -564,7 +564,7 @@ Best regards"`;
     return result;
   };
   
-  const handleParseConversation = () => {
+  const handleParseConversation = async () => {
     if (!emailBlob.trim()) {
       setParsingError('Please paste email content');
       return;
@@ -578,9 +578,10 @@ Best regards"`;
 
       if (result.messages.length === 1) {
         const single = parseSingleEmailBlock(emailBlob);
+        const email = single.toEmail || result.contactEmail || '';
         setParsedEmail(single);
         setManualEntry({
-          email: single.toEmail || result.contactEmail || '',
+          email,
           subject: single.subject || '',
           body: single.body || '',
           emailSent: single.sent || new Date().toISOString().split('T')[0],
@@ -588,6 +589,40 @@ Best regards"`;
           notes: '',
         });
         setParsedConversation(null);
+        // Find or create contact when single message (mirror handleParseEmailBlob)
+        if (!contactIdFromUrl && email?.includes('@') && companyHQId) {
+          setEmailCandidates([]);
+          setFuzzyContact(null);
+          try {
+            const params = new URLSearchParams({ email });
+            params.set('companyHQId', companyHQId);
+            const res = await api.get(`/api/contacts/by-email?${params.toString()}`);
+            if (res.data?.success && res.data.contact) {
+              if (!res.data.fuzzy) setSelectedContactForEmail(res.data.contact);
+              else setFuzzyContact(res.data.contact);
+            } else if (res.data?.fuzzy && res.data?.candidates?.length > 0) {
+              setEmailCandidates(res.data.candidates);
+            } else {
+              const newId = await findOrCreateContact(email);
+              if (newId) {
+                const newRes = await api.get(`/api/contacts/${newId}`);
+                if (newRes.data?.success && newRes.data.contact) {
+                  setSelectedContactForEmail(newRes.data.contact);
+                }
+              }
+            }
+          } catch (e) {
+            const newId = await findOrCreateContact(email);
+            if (newId) {
+              try {
+                const newRes = await api.get(`/api/contacts/${newId}`);
+                if (newRes.data?.success && newRes.data.contact) {
+                  setSelectedContactForEmail(newRes.data.contact);
+                }
+              } catch (_) {}
+            }
+          }
+        }
         return;
       }
 
@@ -631,10 +666,11 @@ Best regards"`;
           notes: '',
         });
         
-        // If no contactId from URL, try to find contact by email automatically
+        // If no contactId from URL, try to find or create contact by email
         if (!contactIdFromUrl && parsed.toEmail) {
           setEmailCandidates([]);
           setFuzzyContact(null);
+          let contactResolved = false;
           try {
             const params = new URLSearchParams({ email: parsed.toEmail });
             if (companyHQId) params.set('companyHQId', companyHQId);
@@ -648,6 +684,7 @@ Best regards"`;
                 // Exact match — auto-select
                 setSelectedContactForEmail(response.data.contact);
               }
+              contactResolved = true;
               setParsingError('');
               return;
             } else if (response.data?.fuzzy && response.data?.candidates?.length > 0) {
@@ -656,17 +693,34 @@ Best regards"`;
               setParsingError('');
               return;
             }
+            // No match found — create contact and add as selected (mirror contact-scoped behavior)
+            const newContactId = await findOrCreateContact(parsed.toEmail);
+            if (newContactId && companyHQId) {
+              const newContactRes = await api.get(`/api/contacts/${newContactId}`);
+              if (newContactRes.data?.success && newContactRes.data.contact) {
+                setSelectedContactForEmail(newContactRes.data.contact);
+                contactResolved = true;
+              }
+            }
           } catch (error) {
-            // Contact not found - that's okay, user can select manually
-            console.log('Contact not found by email, user can select manually');
+            // Contact not found - try to create
+            const newContactId = await findOrCreateContact(parsed.toEmail);
+            if (newContactId && companyHQId) {
+              try {
+                const newContactRes = await api.get(`/api/contacts/${newContactId}`);
+                if (newContactRes.data?.success && newContactRes.data.contact) {
+                  setSelectedContactForEmail(newContactRes.data.contact);
+                  contactResolved = true;
+                }
+              } catch (e) {
+                console.log('Contact not found by email, user can select manually');
+              }
+            }
           }
-        }
-        
-        // Clear fuzzy state and selected contact if we found email but no contactId
-        if (!contactIdFromUrl) {
-          setSelectedContactForEmail(null);
-          setEmailCandidates([]);
-          setFuzzyContact(null);
+          if (!contactResolved) {
+            setEmailCandidates([]);
+            setFuzzyContact(null);
+          }
         }
       } else {
         // If no email found, keep current manual entry but clear email field
@@ -1277,7 +1331,7 @@ Best regards"`;
                 <ContactSelector
                   companyHQId={companyHQId || undefined}
                   onContactSelect={handleContactSelectForEmail}
-                  {...(selectedContactForEmail ? { selectedContact: selectedContactForEmail } : {})}
+                  selectedContact={selectedContactForEmail}
                   placeholder="Search for contact..."
                   showLabel={false}
                 />
@@ -1446,7 +1500,12 @@ Best regards"`;
         {/* Success/Error Messages */}
         {savedCount > 0 && (
           <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4 text-sm text-green-700">
-            ✓ Successfully saved {savedCount} email{savedCount !== 1 ? 's' : ''}
+            <p>✓ Successfully saved {savedCount} email{savedCount !== 1 ? 's' : ''}.</p>
+            {contactIdFromUrl && (
+              <p className="mt-2 text-green-800">
+                Taking you to the contact — in Email History, use <strong>Add Response</strong> on that email to record their reply.
+              </p>
+            )}
           </div>
         )}
         

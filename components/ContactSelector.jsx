@@ -143,8 +143,14 @@ export default function ContactSelector({
       return;
     }
     
-    // Only sync if selectedContact is provided AND different from current
-    // AND user is not actively typing
+    // When parent explicitly clears (selectedContact is null), clear internal state
+    if (selectedContact === null) {
+      setSelectedContactId(null);
+      setContactSearch('');
+      return;
+    }
+    
+    // Only sync from selectedContact when NOT typing - prevents "ghost" overwrites
     if (selectedContact?.id && !isTypingRef.current) {
       // Only update if it's actually different
       if (selectedContactId !== selectedContact.id) {
@@ -156,7 +162,7 @@ export default function ContactSelector({
     
     // Don't clear search if user is actively typing
     // Never auto-clear - let the user clear manually or via handleClearContact
-  }, [contactId, selectedContact?.id, selectedContactId]); // Include selectedContactId to track changes
+  }, [contactId, selectedContact, selectedContact?.id, selectedContactId]);
 
   // Get selected contact object (computed from selectedContactId)
   const selectedContactObj = useMemo(() => {
@@ -250,13 +256,12 @@ export default function ContactSelector({
               }
               typingTimeoutRef.current = setTimeout(() => {
                 isTypingRef.current = false;
-              }, 1000);
+              }, 2000);
             }}
             onFocus={() => {
               isTypingRef.current = true;
             }}
             placeholder={loading ? "Loading contacts..." : companyId ? "Search contacts from this company..." : "Search contacts by name, email, or company..."}
-            disabled={loading}
             className="w-full rounded-lg border border-gray-300 px-4 py-2 pl-10 focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
           <div className="absolute left-3 top-1/2 -translate-y-1/2">
