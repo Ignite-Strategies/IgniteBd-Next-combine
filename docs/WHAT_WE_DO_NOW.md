@@ -7,7 +7,7 @@
 
 ## In one sentence
 
-We help you do **contact-first BD outreach**: build a message for this person, send (platform or off-platform), track when you contacted and when they responded, and move them by **pipeline** (deal stage) and **position** (intro within target vs decision maker) so warm intros stay findable without clogging the funnel.
+We help you do **contact-first BD outreach**: build a message for this person, send (platform or off-platform), track when you contacted and when they responded, and move them by **pipeline** (deal stage) and **position** (intro within target vs decision maker) so warm intros stay findable without clogging the funnel. Optional **introducedByContactId** (string) on a contact links to who introduced them; look up by that id when you need to show “Introduced by [Name].”
 
 ---
 
@@ -46,24 +46,12 @@ Every contact has one **pipeline** row: `pipeline` + `stage`.
 
 ---
 
-## Position = where they sit in the path to a buyer
+## Introduced by (optional link to connector)
 
-**Pipeline** = deal stage. **Position** = role at the target company (buyer vs warm intro).
+**Pipeline** = deal stage. To record “who introduced this contact,” we store **`Contact.introducedByContactId`** — a simple string: the **contact id** of the person who introduced them (e.g. the connector). No FK/relation in the schema; look up that contact when you need to show “Introduced by [Name]” or link to their record.
 
-We store **`Contact.introPositionInTarget`** (enum):
-
-- **DECISION_MAKER** — They are the buyer.
-- **INTRO_WITHIN_TARGET** — Warm intro at the company; can pass to the buyer (e.g. “I’ll check with internal counsel,” “I’ll forward to someone who may care”).
-- **GATEKEEPER** — Controls access.
-- **INFLUENCER** — Influences the decision.
-- **OTHER**
-
-So someone can be on the **connector** pipeline (forwarded / introduction-made) and **INTRO_WITHIN_TARGET** — “warm intro to a buyer.” You can filter by connector pipeline or by introPositionInTarget.
-
-**Intro source (Contact → Contact):** When a contact was introduced by another contact (e.g. connector forwarded to the buyer), link them: set the **new** contact’s **`introSourceContactId`** to the connector’s id. Then:
-- On the **buyer** contact you can show “Introduced by [connector name]” and link to the connector.
-- On the **connector** contact you can show “Introduced: [list of contacts they introduced]” via the inverse relation `contactsIntroduced`.  
-So connectors still matter and you follow up; the FK makes the “who introduced whom” graph explicit.
+- On the **contact detail** page: **Introduced By** section — enter the introducer’s email, **Look up**, then **Set** to save. The API looks up contact by email (scoped by `crmId`) and sets `introducedByContactId`.
+- **GET** `/api/contacts/[id]` returns `introducedByContact` (id, displayName, email) when set, so the UI can show the link without an extra request.
 
 ---
 
@@ -99,11 +87,11 @@ Then we branch on **responseDisposition**:
 | Disposition | What we do |
 |-------------|------------|
 | **positive** (default) | If prospect + engaged-awaiting-response → move stage to **interest**. |
-| **not_decision_maker** | Move to **connector** pipeline, stage **forwarded**. Set **introPositionInTarget = INTRO_WITHIN_TARGET**. Append note: “[Response] Not the decision maker.” |
+| **not_decision_maker** | Move to **connector** pipeline, stage **forwarded**. Append note: “[Response] Not the decision maker.” |
 | **forwarding** | Same; note: “[Response] Said they’ll forward to someone who may care.” When they make the intro, move stage to **introduction-made** or add the new buyer as a contact. |
 | **not_interested** | Set **Contact.doNotContactAgain = true**. No pipeline change. |
 
-So: **not the buyer / “I’ll forward”** → **connector / forwarded** + INTRO_WITHIN_TARGET + note. When they refer someone, add that person as a new contact (prospect), set the new contact’s **intro source** to the connector (Contact → Contact FK: `introSourceContactId`), note “Introduced by [Name],” and move the connector’s stage to **introduction-made**. Then you can show “Introduced by [Name]” on the buyer and “Introduced: [list]” on the connector.
+So: **not the buyer / “I’ll forward”** → **connector / forwarded** + note. When they refer someone, add that person as a new contact (prospect), set the new contact’s **introducedByContactId** to the connector’s id (e.g. via contact detail “Introduced By” → look up by email → Set), note “Introduced by [Name],” and move the connector’s stage to **introduction-made**.
 
 ---
 
@@ -119,7 +107,7 @@ So: **not the buyer / “I’ll forward”** → **connector / forwarded** + INT
 | Email history | `GET /api/contacts/[id]/email-history` — from email_activities |
 | Outreach tracker | `GET /api/outreach/tracker` — contacts with sends, filters, last/next dates, hasResponded |
 | Pipeline/stage | Contact detail edit, or `PUT /api/contacts/[id]` / pipeline API |
-| Intro source | Set `introSourceContactId` on the introduced contact (e.g. when adding the buyer); include `introSourceContact` / `contactsIntroduced` in contact GET when needed |
+| Intro source | Set `introducedByContactId` on the introduced contact (contact detail → Introduced By → look up by email → Set). Contact GET returns `introducedByContact` when set. Lookup: `GET /api/contacts/lookup-by-email?email=...&crmId=...` |
 
 ---
 

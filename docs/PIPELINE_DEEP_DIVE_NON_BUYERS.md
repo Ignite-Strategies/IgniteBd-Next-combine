@@ -95,9 +95,9 @@ You want to:
 
 1. **Pipeline:** Set to **`connector`**, stage **forwarded** (or use **Record response** with disposition `forwarding` / `not_decision_maker` — we set this automatically).
 2. **Notes:** We append e.g. *[Response] Said they’ll forward to someone who may care.* You can add more context.
-3. When they introduce someone, add that person as a **new contact** (prospect). Set the new contact’s **intro source** to this connector (`introSourceContactId` → this contact). Note “Introduced by [Name]” in notes, and move this connector’s stage to **introduction-made**.
+3. When they introduce someone, add that person as a **new contact** (prospect). Set the new contact’s **introducedByContactId** to this connector’s id (on contact detail → Introduced By → look up connector by email → Set). Note “Introduced by [Name]” in notes, and move this connector’s stage to **introduction-made**.
 
-**Result:** They live on the **connector** pipeline (forwarded → introduction-made). The new buyer contact points back to the connector via **introSourceContactId**, so you can see “Introduced by [Name]” on the buyer and “Introduced: [list of contacts]” on the connector.
+**Result:** They live on the **connector** pipeline (forwarded → introduction-made). The new buyer contact has **introducedByContactId** set to the connector’s id, so you can show “Introduced by [Name]” on the buyer and link to the connector.
 
 ---
 
@@ -107,7 +107,7 @@ You want to:
 |-------|---------------------|
 | **Pipeline = connector** (stages: forwarded, introduction-made) | Warm intro to a buyer; “I’ll forward,” referral source. |
 | **Pipeline = unassigned** | Literally unassigned — not in any path yet (e.g. friend/warm contact only). |
-| **introSourceContactId** | On the **introduced** contact (the buyer): FK to the connector who introduced them. Shows “Introduced by [Name]” on buyer; “Introduced: [list]” on connector. |
+| **introducedByContactId** | On the **introduced** contact (the buyer): string = connector’s contact id. Set via contact detail “Introduced By” (look up by email). Contact GET returns `introducedByContact` so you can show “Introduced by [Name].” |
 | **notes** | “Warm contact only,” “Will forward to someone,” “Referral source,” etc. |
 | **prior_relationship** | WARM / ESTABLISHED / DORMANT — good for filtering “warm but not pushing.” |
 | **title** | Keep job/role on the contact (no separate “list” needed). |
