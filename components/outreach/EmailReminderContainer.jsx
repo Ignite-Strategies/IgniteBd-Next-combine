@@ -69,10 +69,17 @@ export default function EmailReminderContainer({
     const t = new Date();
     t.setHours(0, 0, 0, 0);
     const diff = Math.round((d - t) / (1000 * 60 * 60 * 24));
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Tomorrow';
-    if (diff === -1) return 'Yesterday';
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const actualDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (diff === 0) return { label: 'Today', actual: actualDate };
+    if (diff === 1) return { label: 'Tomorrow', actual: actualDate };
+    if (diff === -1) return { label: 'Yesterday', actual: actualDate };
+    return { label: actualDate, actual: actualDate };
+  };
+
+  const formatDateRangeSubtitle = (fromStr, toStr) => {
+    const from = new Date(fromStr);
+    const to = new Date(toStr);
+    return `${from.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${to.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: to.getFullYear() !== from.getFullYear() ? 'numeric' : undefined })}`;
   };
 
   const groupByDate = (list) => {
@@ -113,9 +120,14 @@ export default function EmailReminderContainer({
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Mail className="h-5 w-5 text-amber-600" />
-          <h3 className="text-base font-semibold text-gray-900">Next email sends</h3>
+        <div>
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-amber-600" />
+            <h3 className="text-base font-semibold text-gray-900">Next email sends</h3>
+          </div>
+          <p className="mt-0.5 text-xs font-medium text-amber-700/90">
+            Due {formatDateRangeSubtitle(from, to)}
+          </p>
         </div>
         {showSeeAll && (
           <button
@@ -139,11 +151,16 @@ export default function EmailReminderContainer({
           </div>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {grouped.map(([dateKey, items]) => (
+            {grouped.map(([dateKey, items]) => {
+              const { label, actual } = formatDateLabel(dateKey);
+              return (
               <li key={dateKey}>
-                <div className="bg-gray-50/80 px-4 py-2 text-xs font-semibold text-gray-600">
-                  <Calendar className="mr-1.5 inline h-3.5 w-3.5" />
-                  {formatDateLabel(dateKey)}
+                <div className="bg-amber-50/80 px-4 py-2.5 text-xs font-semibold text-gray-700 border-l-2 border-amber-400">
+                  <Calendar className="mr-1.5 inline h-3.5 w-3.5 text-amber-600" />
+                  <span className="text-amber-800">{label}</span>
+                  {label !== actual && (
+                    <span className="ml-1.5 font-normal text-gray-500">· {actual}</span>
+                  )}
                 </div>
                 <ul className="divide-y divide-gray-50">
                   {items.map((r) => (
@@ -166,7 +183,8 @@ export default function EmailReminderContainer({
                   ))}
                 </ul>
               </li>
-            ))}
+            );
+            })}
           </ul>
         )}
       </div>

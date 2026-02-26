@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Calendar } from 'lucide-react';
+import api from '@/lib/api';
 
 function OutreachTrackerContent() {
   const router = useRouter();
@@ -12,13 +13,13 @@ function OutreachTrackerContent() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({
-    sendDateFrom: '',
-    sendDateTo: '',
-    followUpDateFrom: '',
-    followUpDateTo: '',
-    hasResponded: '',
-  });
+  const [filters, setFilters] = useState(() => ({
+    sendDateFrom: searchParams.get('sendDateFrom') || '',
+    sendDateTo: searchParams.get('sendDateTo') || '',
+    followUpDateFrom: searchParams.get('followUpDateFrom') || '',
+    followUpDateTo: searchParams.get('followUpDateTo') || '',
+    hasResponded: searchParams.get('hasResponded') || '',
+  }));
   const [pagination, setPagination] = useState({
     limit: 50,
     offset: 0,
@@ -37,20 +38,19 @@ function OutreachTrackerContent() {
     setError(null);
 
     try {
-      const params = new URLSearchParams({
+      const params = {
         companyHQId,
-        limit: pagination.limit.toString(),
-        offset: pagination.offset.toString(),
-      });
+        limit: pagination.limit,
+        offset: pagination.offset,
+      };
+      if (filters.sendDateFrom) params.sendDateFrom = filters.sendDateFrom;
+      if (filters.sendDateTo) params.sendDateTo = filters.sendDateTo;
+      if (filters.followUpDateFrom) params.followUpDateFrom = filters.followUpDateFrom;
+      if (filters.followUpDateTo) params.followUpDateTo = filters.followUpDateTo;
+      if (filters.hasResponded) params.hasResponded = filters.hasResponded;
 
-      if (filters.sendDateFrom) params.append('sendDateFrom', filters.sendDateFrom);
-      if (filters.sendDateTo) params.append('sendDateTo', filters.sendDateTo);
-      if (filters.followUpDateFrom) params.append('followUpDateFrom', filters.followUpDateFrom);
-      if (filters.followUpDateTo) params.append('followUpDateTo', filters.followUpDateTo);
-      if (filters.hasResponded) params.append('hasResponded', filters.hasResponded);
-
-      const response = await fetch(`/api/outreach/tracker?${params.toString()}`);
-      const data = await response.json();
+      const response = await api.get('/api/outreach/tracker', { params });
+      const data = response.data;
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to fetch contacts');
@@ -63,7 +63,8 @@ function OutreachTrackerContent() {
         hasMore: data.pagination?.hasMore || false,
       }));
     } catch (err) {
-      setError(err.message);
+      const message = err?.response?.data?.error || err?.message || 'Failed to fetch contacts';
+      setError(message);
       console.error('Error fetching contacts:', err);
     } finally {
       setLoading(false);
