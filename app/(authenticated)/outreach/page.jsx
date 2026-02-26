@@ -178,7 +178,7 @@ function OutreachContent() {
 
         {/* Next engagement alerts — by nextEngagementDate, frontend buckets */}
         <div className="mb-8">
-          <NextEngagementAlertContainer compact limit={30} showSeeAll />
+          <NextEngagementAlertContainer compact showSeeAll />
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">

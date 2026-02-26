@@ -4,18 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Calendar, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
-import { getTodayEST, addDaysEST, formatDateLabelEST, formatDateEST } from '@/lib/dateEst';
+import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
 
 /**
- * Next engagement alert container (web).
- * Fetches GET /api/outreach/next-engagement-alerts (same API used to package email to client — see docs/NEXT_ENGAGEMENT_ALERT_NAMING.md).
- * Filters and buckets by date in the frontend; no "dueDate" — we use nextEngagementDate only.
+ * Hydrate: all contacts with nextEngagementDate set. Show all, grouped by date (Due today, Tomorrow, or date).
  */
 export default function NextEngagementAlertContainer({
   companyHQId,
-  dateFrom,
-  dateTo,
-  limit = 50,
+  limit = 500,
   compact = false,
   showSeeAll = true,
 }) {
@@ -26,8 +22,6 @@ export default function NextEngagementAlertContainer({
   const [resolvedCompanyId, setResolvedCompanyId] = useState(companyHQId || null);
 
   const todayEST = getTodayEST();
-  const from = dateFrom || todayEST;
-  const to = dateTo || addDaysEST(todayEST, 7);
 
   useEffect(() => {
     const id = companyHQId || (typeof window !== 'undefined' && (window.localStorage?.getItem('companyHQId') || window.localStorage?.getItem('companyId')));
@@ -59,22 +53,8 @@ export default function NextEngagementAlertContainer({
     return () => { cancelled = true; };
   }, [resolvedCompanyId, limit]);
 
-  const formatDateLabel = (isoDate) => formatDateLabelEST(todayEST, isoDate);
-
-  const formatDateRangeSubtitle = (fromStr, toStr) => {
-    const fromF = formatDateEST(fromStr, { month: 'short', day: 'numeric' });
-    const toOpts = { month: 'short', day: 'numeric' };
-    if (fromStr.slice(0, 4) !== toStr.slice(0, 4)) toOpts.year = 'numeric';
-    return `${fromF} – ${formatDateEST(toStr, toOpts)}`;
-  };
-
   const datePart = (iso) => (iso && iso.slice) ? iso.slice(0, 10) : '';
-  const inRange = (list) =>
-    list.filter((r) => {
-      const d = datePart(r.nextEngagementDate);
-      return d && d >= from && d <= to;
-    });
-  const groupByNextEngagementDate = (list) => {
+  const groupByDate = (list) => {
     const groups = {};
     for (const r of list) {
       const key = datePart(r.nextEngagementDate);
@@ -83,6 +63,13 @@ export default function NextEngagementAlertContainer({
       groups[key].push(r);
     }
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  };
+
+  const sectionTitle = (dateKey) => {
+    const { label } = formatDateLabelEST(todayEST, dateKey);
+    if (label === 'Today') return 'Due today';
+    if (label === 'Tomorrow') return 'Due tomorrow';
+    return label || dateKey;
   };
 
   const name = (r) => [r.firstName, r.lastName].filter(Boolean).join(' ').trim() || r.email || '—';
@@ -119,8 +106,7 @@ export default function NextEngagementAlertContainer({
     );
   }
 
-  const inWindow = inRange(alerts);
-  const grouped = groupByNextEngagementDate(inWindow);
+  const grouped = groupByDate(alerts);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -130,19 +116,12 @@ export default function NextEngagementAlertContainer({
             <Mail className="h-5 w-5 text-amber-600" />
             <h3 className="text-base font-semibold text-gray-900">Next engagement alerts</h3>
           </div>
-          <p className="mt-0.5 text-xs font-medium text-amber-700/90">
-            {formatDateRangeSubtitle(from, to)}
-          </p>
+          <p className="mt-0.5 text-xs font-medium text-amber-700/90">Sorted by date</p>
         </div>
         {showSeeAll && (
           <button
             type="button"
-            onClick={() => {
-              const params = new URLSearchParams({ companyHQId: resolvedCompanyId });
-              params.set('followUpDateFrom', from);
-              params.set('followUpDateTo', to);
-              router.push(`/outreach/tracker?${params.toString()}`);
-            }}
+            onClick={() => router.push(`/outreach/tracker?companyHQId=${resolvedCompanyId}`)}
             className="text-sm font-medium text-amber-600 hover:text-amber-700"
           >
             See all
@@ -152,20 +131,15 @@ export default function NextEngagementAlertContainer({
       <div className={compact ? 'max-h-64 overflow-y-auto' : ''}>
         {grouped.length === 0 ? (
           <div className="p-6 text-center text-sm text-gray-500">
-            No next engagements in this window.
+            No next engagements.
           </div>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {grouped.map(([dateKey, items]) => {
-              const { label, actual } = formatDateLabel(dateKey);
-              return (
+            {grouped.map(([dateKey, items]) => (
               <li key={dateKey}>
                 <div className="bg-amber-50/80 px-4 py-2.5 text-xs font-semibold text-gray-700 border-l-2 border-amber-400">
                   <Calendar className="mr-1.5 inline h-3.5 w-3.5 text-amber-600" />
-                  <span className="text-amber-800">{label}</span>
-                  {label !== actual && (
-                    <span className="ml-1.5 font-normal text-gray-500">· {actual}</span>
-                  )}
+                  <span className="text-amber-800">{sectionTitle(dateKey)}</span>
                 </div>
                 <ul className="divide-y divide-gray-50">
                   {items.map((r) => (
@@ -188,8 +162,7 @@ export default function NextEngagementAlertContainer({
                   ))}
                 </ul>
               </li>
-            );
-            })}
+            ))}
           </ul>
         )}
       </div>
