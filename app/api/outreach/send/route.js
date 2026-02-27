@@ -205,7 +205,6 @@ export async function POST(request) {
         console.log('✅ Draft email activity updated and sent:', emailActivityId);
       } else {
         const contactId = customArgs.contactId || null;
-        // emailSequenceOrder: SENT once migration run; omit until then so create doesn't 500
         const emailActivity = await prisma.email_activities.create({
           data: {
             owner_id: owner.id,
@@ -219,6 +218,7 @@ export async function POST(request) {
             body: emailBody,
             messageId: messageId || null,
             event: 'sent',
+            emailSequenceOrder: 'OWNER_SEND',
             source: 'PLATFORM',
             platform: 'sendgrid',
             sentAt: new Date(),

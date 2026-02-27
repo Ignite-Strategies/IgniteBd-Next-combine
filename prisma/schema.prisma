@@ -647,9 +647,8 @@ model ecosystem_orgs {
 }
 
 // Single model for all email sends (platform + off-platform). Campaign/sequence nullable.
-// emailSequenceOrder = step in thread: SENT (we sent) | CONTACT_RESPONDED (they replied) | OWNER_RESPONSE (we replied back).
-// responseFromEmail = id of the next row in thread (owner or contact); stored as text, not a FK.
-// emailSequenceOrder = who sent this row (SENT | CONTACT_RESPONDED | OWNER_RESPONSE).
+// responseFromEmail = id of the next row in thread; stored as text, not a FK.
+// emailSequenceOrder = sender-aware: OWNER_SEND (we sent) | CONTACT_SEND (contact sent).
 model email_activities {
   id                     String                  @id @default(cuid())
   owner_id               String
@@ -662,7 +661,7 @@ model email_activities {
   messageId              String?                 @unique // SendGrid; null for off-platform
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
-  emailSequenceOrder     EmailSequenceOrder?    // SENT | CONTACT_RESPONDED | OWNER_RESPONSE (enum)
+  emailSequenceOrder     EmailSequenceOrder?    // OWNER_SEND | CONTACT_SEND (sender-aware)
   responseFromEmail      String?                 // Id of the email_activities row that is the response to this one (owner or contact); copy of id, not FK
   // Campaign/sequence — nullable
   campaign_id            String?
@@ -1941,11 +1940,10 @@ enum EmailSource {
   OFF_PLATFORM
 }
 
-// Step in thread: we sent, contact responded, or we (owner) responded. Replaces vague "activity kind".
+// Sender-aware: who sent this row (owner vs contact).
 enum EmailSequenceOrder {
-  SENT                // We sent (initial or follow-up)
-  CONTACT_RESPONDED   // Contact replied; previous row has responseFromEmail = this id
-  OWNER_RESPONSE      // We replied back; previous row has responseFromEmail = this id
+  OWNER_SEND    // We (owner) sent this message
+  CONTACT_SEND  // Contact sent this message
 }
 
 // General attitude of the contact (awareness). Manual for now; future: AI infers from email response.

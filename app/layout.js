@@ -7,17 +7,17 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
   display: "swap",
-  preload: true,
-  adjustFontFallback: false, // Prevent fallback font preloading to avoid warnings
+  preload: false, // Avoid "preloaded but not used" warnings when font isn't used in first paint
+  adjustFontFallback: false,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
-  preload: false, // Only preload the main font
-  adjustFontFallback: false, // Prevent font fallback preloading
-  fallback: ['monospace'], // Use system fallback instead of preloading
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ['monospace'],
 });
 
 export const metadata = {

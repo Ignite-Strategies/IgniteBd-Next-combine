@@ -76,7 +76,6 @@ export async function POST(request, { params }) {
       ? `BODY:\n${emailBody}\n\nNOTES:\n${notes}`
       : emailBody || notes || null;
 
-    // emailSequenceOrder: SENT once migration run; omit until then so create doesn't 500
     const activity = await prisma.email_activities.create({
       data: {
         owner_id: owner.id,
@@ -86,6 +85,7 @@ export async function POST(request, { params }) {
         body: bodyContent,
         event: isDraft ? null : 'sent',
         messageId: null,
+        emailSequenceOrder: 'OWNER_SEND',
         source: 'OFF_PLATFORM',
         platform: platform || 'manual',
         sentAt: emailSentDate,

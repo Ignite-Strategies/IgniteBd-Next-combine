@@ -193,16 +193,17 @@ export class OutreachEmailBuilderService {
         });
 
         const respIds = activities.map(a => a.responseFromEmail).filter(Boolean) as string[];
-        const respRows = respIds.length
+        type ResponseRow = { id: string; body: string | null; subject: string | null };
+        const respRows: ResponseRow[] = respIds.length
           ? await prisma.email_activities.findMany({
               where: { id: { in: respIds } },
               select: { id: true, body: true, subject: true },
             })
           : [];
-        const respMap = new Map(respRows.map(r => [r.id, r]));
+        const respMap = new Map<string, ResponseRow>(respRows.map(r => [r.id, r]));
 
         previousEmails = activities.map(a => {
-          const resp = a.responseFromEmail ? respMap.get(a.responseFromEmail) : null;
+          const resp: ResponseRow | undefined = a.responseFromEmail ? respMap.get(a.responseFromEmail) : undefined;
           return {
             id: a.id,
             type: a.source === 'PLATFORM' ? 'platform' : 'off-platform',

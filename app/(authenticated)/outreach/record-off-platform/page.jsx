@@ -803,7 +803,7 @@ Best regards"`;
     router.replace(newUrl);
   };
   
-  // Save full conversation: one email_activity per message (SENT, CONTACT_RESPONDED, OWNER_RESPONSE)
+  // Save full conversation: one email_activity per message (OWNER_SEND | CONTACT_SEND)
   const handleSaveConversation = async () => {
     const conv = parsedConversation;
     if (!conv?.messages?.length) {

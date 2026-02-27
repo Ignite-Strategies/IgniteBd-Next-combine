@@ -83,11 +83,9 @@ export async function POST(request, { params }) {
       }
 
       const isOutbound = direction === 'outbound';
-      const order = i === 0
-        ? (isOutbound ? 'SENT' : 'CONTACT_RESPONDED')
-        : (isOutbound ? 'OWNER_RESPONSE' : 'CONTACT_RESPONDED');
+      const order = isOutbound ? 'OWNER_SEND' : 'CONTACT_SEND';
 
-      if (order === 'CONTACT_RESPONDED' && sentAt) {
+      if (order === 'CONTACT_SEND' && sentAt) {
         lastInboundSentAt = sentAt;
       }
 

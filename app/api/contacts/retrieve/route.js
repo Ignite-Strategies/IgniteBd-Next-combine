@@ -268,17 +268,17 @@ export async function GET(request) {
       }
     }
   } catch (error) {
+    const message = error?.message ?? (error && String(error)) ?? 'Unknown error';
     console.error('❌ RetrieveContacts error:', error);
-    console.error('❌ Error stack:', error.stack);
-    console.error('❌ Error name:', error.name);
-    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error?.stack);
+    console.error('❌ Error message:', message);
     
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to retrieve contacts',
-        details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        details: message,
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
       },
       { status: 500 },
     );

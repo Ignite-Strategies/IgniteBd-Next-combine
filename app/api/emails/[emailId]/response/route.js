@@ -6,7 +6,7 @@ import { computeAndPersistNextEngagement } from '@/lib/services/emailCadenceServ
 
 /**
  * PUT /api/emails/[emailId]/response
- * Record a response from the contact: create a CONTACT_RESPONDED row and stamp parent with responseFromEmail.
+ * Record a response from the contact: create a CONTACT_SEND row and stamp parent with responseFromEmail.
  *
  * Body: {
  *   contactResponse: string (the reply text → body of the new row)
@@ -84,7 +84,7 @@ export async function PUT(request, { params }) {
         body: contactResponse,
         event: 'sent',
         messageId: null,
-        emailSequenceOrder: 'CONTACT_RESPONDED',
+        emailSequenceOrder: 'CONTACT_SEND',
         source: parent.source || 'OFF_PLATFORM',
         platform: parent.platform || 'manual',
         sentAt: responseDate,
