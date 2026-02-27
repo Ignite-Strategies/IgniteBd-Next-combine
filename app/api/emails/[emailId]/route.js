@@ -86,12 +86,13 @@ export async function GET(request, { params }) {
 /**
  * PUT /api/emails/[emailId]
  * Update an email record
- * 
+ *
  * Body: {
  *   subject?: string
  *   body?: string
  *   messageId?: string (SendGrid message ID after sending)
- *   messageId?: string (SendGrid message ID after sending)
+ *   sentAt?: string (ISO date; only for OFF_PLATFORM)
+ *   platform?: string (e.g. "linkedin", "email"; only for OFF_PLATFORM)
  * }
  */
 export async function PUT(request, { params }) {
@@ -127,12 +128,21 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { subject, body: emailBody, messageId } = body ?? {};
+    const { subject, body: emailBody, messageId, sentAt, platform } = body ?? {};
 
     const updateData = {};
     if (subject !== undefined) updateData.subject = subject;
     if (emailBody !== undefined) updateData.body = emailBody;
     if (messageId !== undefined) updateData.messageId = messageId;
+
+    // Only allow sentAt/platform for off-platform records (edit manual/LinkedIn etc.)
+    if (activity.source === 'OFF_PLATFORM') {
+      if (sentAt !== undefined) {
+        const d = new Date(sentAt);
+        updateData.sentAt = isNaN(d.getTime()) ? null : d;
+      }
+      if (platform !== undefined) updateData.platform = platform || null;
+    }
 
     const updated = await prisma.email_activities.update({
       where: { id: emailId },
@@ -146,6 +156,8 @@ export async function PUT(request, { params }) {
         subject: updated.subject,
         body: updated.body,
         messageId: updated.messageId,
+        sentAt: updated.sentAt?.toISOString?.() ?? null,
+        platform: updated.platform,
       },
     });
   } catch (error) {

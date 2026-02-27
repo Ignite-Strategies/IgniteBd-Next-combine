@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus, Pencil } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
-import { formatDeliveryMethodLabel } from '@/lib/utils/deliveryMethod';
+import { formatDeliveryMethodLabel, DELIVERY_METHODS, normalizeDeliveryMethod } from '@/lib/utils/deliveryMethod';
 import { formatDateEST } from '@/lib/dateEst';
 // Display pipeline/stage from relation or snap; format for read-only view
 function formatPipelineLabel(pipeline) {
@@ -191,6 +191,14 @@ export default function ContactDetailPage({ params }) {
   const [addResponseRespondedAt, setAddResponseRespondedAt] = useState('');
   const [savingAddResponse, setSavingAddResponse] = useState(false);
   const [addResponseError, setAddResponseError] = useState('');
+  const [showEditEmailModal, setShowEditEmailModal] = useState(false);
+  const [editEmail, setEditEmail] = useState(null);
+  const [editEmailSubject, setEditEmailSubject] = useState('');
+  const [editEmailBody, setEditEmailBody] = useState('');
+  const [editEmailSentAt, setEditEmailSentAt] = useState('');
+  const [editEmailPlatform, setEditEmailPlatform] = useState('email');
+  const [savingEditEmail, setSavingEditEmail] = useState(false);
+  const [editEmailError, setEditEmailError] = useState('');
   const [relationshipContext, setRelationshipContext] = useState(null);
   const [generatingRelationshipContext, setGeneratingRelationshipContext] = useState(false);
   const [savingRelationshipContext, setSavingRelationshipContext] = useState(false);
@@ -238,6 +246,42 @@ export default function ContactDetailPage({ params }) {
     setAddResponseRespondedAt(new Date().toISOString().split('T')[0]);
     setAddResponseError('');
     setShowAddResponseModal(true);
+  };
+
+  const handleOpenEditEmail = (email) => {
+    setEditEmail(email);
+    setEditEmailSubject(email.subject || '');
+    setEditEmailBody(email.notes || '');
+    const dateStr = email.date ? new Date(email.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    setEditEmailSentAt(dateStr);
+    setEditEmailPlatform(DELIVERY_METHODS.includes(email.platform) ? email.platform : 'email');
+    setEditEmailError('');
+    setShowEditEmailModal(true);
+  };
+
+  const handleSaveEditEmail = async () => {
+    if (!editEmail?.id) return;
+    setSavingEditEmail(true);
+    setEditEmailError('');
+    try {
+      const payload = { subject: editEmailSubject || null, body: editEmailBody || null };
+      if (editEmail.type === 'off-platform') {
+        payload.sentAt = editEmailSentAt ? new Date(editEmailSentAt).toISOString() : null;
+        payload.platform = normalizeDeliveryMethod(editEmailPlatform);
+      }
+      const response = await api.put(`/api/emails/${editEmail.id}`, payload);
+      if (response.data?.success) {
+        setShowEditEmailModal(false);
+        setEditEmail(null);
+        loadEmailHistory();
+      } else {
+        setEditEmailError(response.data?.error || 'Failed to save');
+      }
+    } catch (error) {
+      setEditEmailError(error.response?.data?.error || error.message || 'Failed to save');
+    } finally {
+      setSavingEditEmail(false);
+    }
   };
 
   const handleSaveAddResponse = async () => {
@@ -1842,6 +1886,16 @@ export default function ContactDetailPage({ params }) {
                               Edit &amp; Send
                             </button>
                           )}
+                          {!isDraft && (
+                            <button
+                              onClick={() => handleOpenEditEmail(email)}
+                              className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
+                              title="Edit this email record"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                          )}
                           {canAddResponse && (
                             <button
                               onClick={() => handleOpenAddResponse(email)}
@@ -2192,6 +2246,109 @@ export default function ContactDetailPage({ params }) {
                     setAddResponseError('');
                   }}
                   disabled={savingAddResponse}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Email Modal */}
+        {showEditEmailModal && editEmail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Edit Email Record</h2>
+                <button
+                  onClick={() => {
+                    setShowEditEmailModal(false);
+                    setEditEmail(null);
+                    setEditEmailError('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-gray-700">Subject</label>
+                  <input
+                    type="text"
+                    value={editEmailSubject}
+                    onChange={(e) => setEditEmailSubject(e.target.value)}
+                    placeholder="No subject"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-gray-700">Message</label>
+                  <textarea
+                    value={editEmailBody}
+                    onChange={(e) => setEditEmailBody(e.target.value)}
+                    placeholder="Email or message body..."
+                    rows={6}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 resize-y"
+                  />
+                </div>
+                {editEmail.type === 'off-platform' && (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-gray-700">Date Sent</label>
+                      <input
+                        type="date"
+                        value={editEmailSentAt}
+                        onChange={(e) => setEditEmailSentAt(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-gray-700">Delivery Method</label>
+                      <select
+                        value={DELIVERY_METHODS.includes(editEmailPlatform) ? editEmailPlatform : 'email'}
+                        onChange={(e) => setEditEmailPlatform(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="email">Email</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="in-person">In Person</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+                {editEmailError && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                    {editEmailError}
+                  </div>
+                )}
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={handleSaveEditEmail}
+                  disabled={savingEditEmail}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingEditEmail ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEditEmailModal(false);
+                    setEditEmail(null);
+                    setEditEmailError('');
+                  }}
+                  disabled={savingEditEmail}
                   className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel

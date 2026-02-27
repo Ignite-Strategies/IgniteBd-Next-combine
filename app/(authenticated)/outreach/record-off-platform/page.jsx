@@ -1252,8 +1252,14 @@ Best regards"`;
                   <div className="space-y-1 text-green-700">
                     {parsedEmail.toEmail ? (
                       <div>To: {parsedEmail.toEmail}</div>
+                    ) : selectedContactForEmail ? (
+                      <div className="text-green-700">
+                        No recipient email in pasted content. Using selected contact: <strong>{selectedContactForEmail.goesBy || `${selectedContactForEmail.firstName || ''} ${selectedContactForEmail.lastName || ''}`.trim() || 'Contact'}</strong>. You can save below.
+                      </div>
                     ) : (
-                      <div className="text-orange-700">⚠️ Could not determine recipient email - please select contact below</div>
+                      <div className="text-gray-600">
+                        No recipient email in pasted content. Select a contact below to associate this record.
+                      </div>
                     )}
                     {parsedEmail.subject && <div>Subject: {parsedEmail.subject}</div>}
                     {parsedEmail.sent && <div>Sent: {parsedEmail.sent}</div>}
@@ -1341,7 +1347,7 @@ Best regards"`;
               {/* Contact Selection - ALWAYS show, allow switching */}
               <div>
                 <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Select Contact {!parsedEmail?.toEmail && <span className="text-red-500">*</span>}
+                  Select Contact {!parsedEmail?.toEmail && !selectedContactForEmail && !(contactIdFromUrl && contact) ? <span className="text-red-500">*</span> : null}
                 </label>
                 <ContactSelector
                   companyHQId={companyHQId || undefined}
