@@ -44,8 +44,8 @@ export async function GET(request) {
 
     let contacts = await getContactsWithNextEngagement(companyHQId, { limit });
     if (dueBy) {
-      const cutoff = new Date(dueBy);
-      contacts = contacts.filter((c) => c.nextEngagementDate && new Date(c.nextEngagementDate) <= cutoff);
+      const dueByStr = String(dueBy).slice(0, 10); // YYYY-MM-DD
+      contacts = contacts.filter((c) => c.nextEngagementDate && c.nextEngagementDate <= dueByStr);
     }
 
     return NextResponse.json({

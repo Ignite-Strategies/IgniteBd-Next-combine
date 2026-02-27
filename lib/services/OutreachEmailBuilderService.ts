@@ -188,26 +188,37 @@ export class OutreachEmailBuilderService {
             body: true,
             source: true,
             platform: true,
-            hasResponded: true,
-            contactResponse: true,
-            responseSubject: true,
+            responseFromEmail: true,
           },
         });
 
-        previousEmails = activities.map(a => ({
-          id: a.id,
-          type: a.source === 'PLATFORM' ? 'platform' : 'off-platform',
-          date: (a.sentAt ?? a.createdAt).toISOString(),
-          subject: a.subject,
-          body: a.body,
-          platform: a.platform,
-          hasResponded: a.hasResponded,
-          contactResponse: a.contactResponse,
-          responseSubject: a.responseSubject,
-        }));
-        
-        if (activities.length > 0 && activities[0].hasResponded && activities[0].contactResponse) {
-          lastEmailResponse = activities[0].contactResponse;
+        const respIds = activities.map(a => a.responseFromEmail).filter(Boolean) as string[];
+        const respRows = respIds.length
+          ? await prisma.email_activities.findMany({
+              where: { id: { in: respIds } },
+              select: { id: true, body: true, subject: true },
+            })
+          : [];
+        const respMap = new Map(respRows.map(r => [r.id, r]));
+
+        previousEmails = activities.map(a => {
+          const resp = a.responseFromEmail ? respMap.get(a.responseFromEmail) : null;
+          return {
+            id: a.id,
+            type: a.source === 'PLATFORM' ? 'platform' : 'off-platform',
+            date: (a.sentAt ?? a.createdAt).toISOString(),
+            subject: a.subject,
+            body: a.body,
+            platform: a.platform,
+            hasResponded: !!a.responseFromEmail,
+            contactResponse: resp?.body ?? null,
+            responseSubject: resp?.subject ?? null,
+          };
+        });
+
+        if (activities.length > 0 && activities[0].responseFromEmail) {
+          const firstResp = respMap.get(activities[0].responseFromEmail);
+          if (firstResp?.body) lastEmailResponse = firstResp.body;
         }
       }
       

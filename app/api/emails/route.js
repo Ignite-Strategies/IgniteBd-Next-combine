@@ -121,7 +121,7 @@ export async function POST(request) {
         body: activity.body,
         source: activity.source,
         platform: activity.platform,
-        hasResponded: activity.hasResponded,
+        responseFromEmail: activity.responseFromEmail,
         createdAt: activity.createdAt.toISOString(),
       },
     });
@@ -144,7 +144,7 @@ export async function POST(request) {
  * 
  * Query params:
  *   - contactId?: string
- *   - hasResponded?: boolean
+ *   - hasResponded?: boolean (filters by responseFromEmail present)
  *   - source?: PLATFORM | OFF_PLATFORM
  *   - limit?: number (default: 50)
  */
@@ -167,7 +167,8 @@ export async function GET(request) {
 
     const where = {};
     if (contactId) where.contact_id = contactId;
-    if (hasResponded === 'true' || hasResponded === 'false') where.hasResponded = hasResponded === 'true';
+    if (hasResponded === 'true') where.responseFromEmail = { not: null };
+    if (hasResponded === 'false') where.responseFromEmail = null;
     if (source) where.source = source;
 
     const activities = await prisma.email_activities.findMany({
@@ -186,25 +187,38 @@ export async function GET(request) {
       },
     });
 
+    const responseIds = activities.map(a => a.responseFromEmail).filter(Boolean);
+    const responseRows = responseIds.length
+      ? await prisma.email_activities.findMany({
+          where: { id: { in: responseIds } },
+          select: { id: true, body: true, subject: true, sentAt: true },
+        })
+      : [];
+    const responseMap = new Map(responseRows.map(r => [r.id, r]));
+
     return NextResponse.json({
       success: true,
-      emails: activities.map(a => ({
-        id: a.id,
-        contactId: a.contact_id,
-        sendDate: (a.sentAt ?? a.createdAt).toISOString(),
-        subject: a.subject,
-        body: a.body,
-        source: a.source,
-        platform: a.platform,
-        hasResponded: a.hasResponded,
-        contactResponse: a.contactResponse,
-        respondedAt: a.respondedAt ? a.respondedAt.toISOString() : null,
-        responseSubject: a.responseSubject,
-        messageId: a.messageId,
-        campaignId: a.campaign_id,
-        createdAt: a.createdAt.toISOString(),
-        contact: a.contacts,
-      })),
+      emails: activities.map(a => {
+        const resp = a.responseFromEmail ? responseMap.get(a.responseFromEmail) : null;
+        return {
+          id: a.id,
+          contactId: a.contact_id,
+          sendDate: (a.sentAt ?? a.createdAt).toISOString(),
+          subject: a.subject,
+          body: a.body,
+          source: a.source,
+          platform: a.platform,
+          responseFromEmail: a.responseFromEmail,
+          hasResponded: !!a.responseFromEmail,
+          contactResponse: resp?.body ?? null,
+          respondedAt: resp?.sentAt ? resp.sentAt.toISOString() : null,
+          responseSubject: resp?.subject ?? null,
+          messageId: a.messageId,
+          campaignId: a.campaign_id,
+          createdAt: a.createdAt.toISOString(),
+          contact: a.contacts,
+        };
+      }),
       count: activities.length,
     });
   } catch (error) {

@@ -6,17 +6,13 @@ import { computeAndPersistNextEngagement } from '@/lib/services/emailCadenceServ
 
 /**
  * PUT /api/emails/[emailId]/response
- * Record a response from the contact
+ * Record a response from the contact: create a CONTACT_RESPONDED row and stamp parent with responseFromEmail.
  *
  * Body: {
- *   contactResponse: string (the reply text)
+ *   contactResponse: string (the reply text → body of the new row)
  *   respondedAt?: string (ISO date, defaults to now)
  *   responseSubject?: string
- *   contactAppreciative?: boolean — "great / let me look into this" → sets 7d next engagement from this response
  *   responseDisposition?: 'positive' | 'not_decision_maker' | 'forwarding' | 'not_interested'
- *     - positive (default): move prospect engaged-awaiting-response → interest
- *     - not_decision_maker | forwarding: move to unassigned, optionally append note
- *     - not_interested: set doNotContactAgain on contact
  * }
  */
 export async function PUT(request, { params }) {
@@ -40,11 +36,21 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const activity = await prisma.email_activities.findUnique({
+    const parent = await prisma.email_activities.findUnique({
       where: { id: emailId },
+      include: {
+        contacts: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
     });
 
-    if (!activity) {
+    if (!parent) {
       return NextResponse.json(
         { success: false, error: 'Email not found' },
         { status: 404 },
@@ -52,7 +58,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { contactResponse, respondedAt, responseSubject, responseDisposition, contactAppreciative } = body ?? {};
+    const { contactResponse, respondedAt, responseSubject, responseDisposition } = body ?? {};
 
     if (!contactResponse) {
       return NextResponse.json(
@@ -69,33 +75,33 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // contactAppreciative column exists after migration; omit so response recording doesn't 500 before migrate
-    const updated = await prisma.email_activities.update({
-      where: { id: emailId },
+    const responseRow = await prisma.email_activities.create({
       data: {
-        contactResponse,
-        respondedAt: responseDate,
-        responseSubject: responseSubject || null,
-        hasResponded: true,
-      },
-      include: {
-        contacts: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
+        owner_id: parent.owner_id,
+        contact_id: parent.contact_id,
+        email: parent.email || null,
+        subject: responseSubject || parent.subject,
+        body: contactResponse,
+        event: 'sent',
+        messageId: null,
+        emailSequenceOrder: 'CONTACT_RESPONDED',
+        source: parent.source || 'OFF_PLATFORM',
+        platform: parent.platform || 'manual',
+        sentAt: responseDate,
       },
     });
 
-    console.log('✅ Response recorded for email:', emailId);
+    await prisma.email_activities.update({
+      where: { id: emailId },
+      data: { responseFromEmail: responseRow.id },
+    });
 
-    const contactId = updated.contact_id;
+    console.log('✅ Response recorded for email:', emailId, '→ response row:', responseRow.id);
+
+    const contactId = parent.contact_id;
     if (contactId) {
       try {
-        await prisma.contacts.update({
+        await prisma.contact.update({
           where: { id: contactId },
           data: { lastRespondedAt: responseDate },
         });
@@ -103,7 +109,7 @@ export async function PUT(request, { params }) {
       } catch (e) {
         if (e?.code === 'P2022') {
           try {
-            await prisma.contacts.update({
+            await prisma.contact.update({
               where: { id: contactId },
               data: { lastRespondedAt: responseDate },
             });
@@ -122,15 +128,15 @@ export async function PUT(request, { params }) {
           const noteSuffix = disposition === 'forwarding'
             ? '\n\n[Response] Said they’ll forward to someone who may care.'
             : '\n\n[Response] Not the decision maker.';
-          const contact = await prisma.contacts.findUnique({ where: { id: contactId }, select: { notes: true } });
+          const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { notes: true } });
           const newNotes = (contact?.notes || '').trim() + noteSuffix;
-          await prisma.contacts.update({
+          await prisma.contact.update({
             where: { id: contactId },
             data: { notes: newNotes.trim() || null },
           });
           console.log('✅ Contact → connector/forwarded (', disposition, ')');
         } else if (disposition === 'not_interested') {
-          await prisma.contacts.update({
+          await prisma.contact.update({
             where: { id: contactId },
             data: { doNotContactAgain: true },
           });
@@ -157,12 +163,15 @@ export async function PUT(request, { params }) {
     return NextResponse.json({
       success: true,
       email: {
-        id: updated.id,
-        hasResponded: updated.hasResponded,
-        contactResponse: updated.contactResponse,
-        respondedAt: updated.respondedAt.toISOString(),
-        responseSubject: updated.responseSubject,
-        contact: updated.contacts,
+        id: parent.id,
+        responseFromEmail: responseRow.id,
+        responseRow: {
+          id: responseRow.id,
+          body: responseRow.body,
+          subject: responseRow.subject,
+          sentAt: responseRow.sentAt?.toISOString() ?? null,
+        },
+        contact: parent.contacts,
       },
     });
   } catch (error) {

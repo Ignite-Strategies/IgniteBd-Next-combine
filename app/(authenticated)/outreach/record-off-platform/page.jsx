@@ -803,11 +803,11 @@ Best regards"`;
     router.replace(newUrl);
   };
   
-  // Save conversation: one outbound + contact reply
+  // Save full conversation: one email_activity per message (SENT, CONTACT_RESPONDED, OWNER_RESPONSE)
   const handleSaveConversation = async () => {
     const conv = parsedConversation;
-    if (!conv?.ourOutbound || !conv?.lastReply) {
-      setParsingError('Conversation must include your outbound and a contact reply.');
+    if (!conv?.messages?.length) {
+      setParsingError('Conversation must have at least one message.');
       return;
     }
     let targetContactId = selectedContactForEmail?.id || contactIdFromUrl;
@@ -819,29 +819,23 @@ Best regards"`;
       setParsingError('Select a contact or enter a valid email address.');
       return;
     }
+    // Parser returns newest first; API expects chronological (oldest first)
+    const chronological = [...conv.messages].reverse();
+    const messages = chronological.map((m) => ({
+      direction: m.direction === 'outbound' ? 'outbound' : 'inbound',
+      subject: m.subject ?? null,
+      body: m.body ?? '',
+      sent: m.sent || null,
+    }));
     setSaving(true);
     setErrors([]);
     try {
-      const sendRes = await api.post(`/api/contacts/${targetContactId}/off-platform-send`, {
-        emailSent: conv.ourOutbound.sent || manualEntry.emailSent,
-        subject: conv.ourOutbound.subject || manualEntry.subject,
-        body: conv.ourOutbound.body || manualEntry.body,
+      const res = await api.post(`/api/contacts/${targetContactId}/off-platform-conversation`, {
+        messages,
         platform: normalizeDeliveryMethod(manualEntry.platform),
-        notes: manualEntry.notes || null,
       });
-      if (!sendRes.data?.success || !sendRes.data?.offPlatformSend?.id) {
-        setErrors([sendRes.data?.error || 'Failed to save email']);
-        setSaving(false);
-        return;
-      }
-      const activityId = sendRes.data.offPlatformSend.id;
-      const responsePayload = {
-        contactResponse: conv.lastReply.body || conv.lastReply.contactResponse || '',
-        respondedAt: conv.lastReply.sent ? new Date(conv.lastReply.sent).toISOString() : undefined,
-      };
-      const responseRes = await api.put(`/api/emails/${activityId}/response`, responsePayload);
-      if (responseRes.data?.success) {
-        setSavedCount(1);
+      if (res.data?.success) {
+        setSavedCount(res.data.messageCount ?? messages.length);
         setParsedConversation(null);
         setParsedEmail(null);
         if (contactIdFromUrl) {
@@ -851,7 +845,7 @@ Best regards"`;
           }, 1500);
         }
       } else {
-        setErrors([responseRes.data?.error || 'Email saved but failed to record response']);
+        setErrors([res.data?.error || 'Failed to save conversation']);
       }
     } catch (err) {
       setErrors([err.response?.data?.error || err.message || 'Failed to save']);
@@ -1456,13 +1450,13 @@ Best regards"`;
                 />
               </div>
               
-              {parsedConversation?.ourOutbound && parsedConversation?.lastReply ? (
+              {parsedConversation?.messages?.length >= 1 ? (
                 <button
                   type="button"
                   onClick={handleSaveConversation}
                   disabled={saving || !manualEntry.email || (!selectedContactForEmail && !contactIdFromUrl && !parsedConversation.contactEmail)}
                   className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
-                  title="Record your outbound and the contact's reply in one go"
+                  title="Save the full conversation (one record per message)"
                 >
                   {saving ? (
                     <>
@@ -1472,7 +1466,7 @@ Best regards"`;
                   ) : (
                     <>
                       <MessageSquare className="h-4 w-4" />
-                      Save email + response
+                      {parsedConversation.messages.length >= 2 ? `Save conversation (${parsedConversation.messages.length} messages)` : 'Save conversation'}
                     </>
                   )}
                 </button>

@@ -76,9 +76,8 @@ export async function GET(request) {
         { OR: [{ sentAt: { lte: new Date(sendDateTo) } }, { sentAt: null, createdAt: { lte: new Date(sendDateTo) } }] },
       ];
     }
-    if (hasResponded === 'true' || hasResponded === 'false') {
-      activityWhere.hasResponded = hasResponded === 'true';
-    }
+    if (hasResponded === 'true') activityWhere.responseFromEmail = { not: null };
+    if (hasResponded === 'false') activityWhere.responseFromEmail = null;
 
     const contactsWithActivities = await prisma.contact.findMany({
       where: {
@@ -118,7 +117,8 @@ export async function GET(request) {
             activityFilter.AND = activityFilter.AND || [];
             activityFilter.AND.push({ OR: [{ sentAt: { lte: new Date(sendDateTo) } }, { sentAt: null, createdAt: { lte: new Date(sendDateTo) } }] });
           }
-          if (hasResponded === 'true' || hasResponded === 'false') activityFilter.hasResponded = hasResponded === 'true';
+          if (hasResponded === 'true') activityFilter.responseFromEmail = { not: null };
+          if (hasResponded === 'false') activityFilter.responseFromEmail = null;
 
           const activities = await prisma.email_activities.findMany({
             where: activityFilter,
@@ -130,10 +130,18 @@ export async function GET(request) {
               subject: true,
               source: true,
               platform: true,
-              hasResponded: true,
-              respondedAt: true,
+              responseFromEmail: true,
             },
           });
+
+          const respIds = activities.map(a => a.responseFromEmail).filter(Boolean);
+          const respRows = respIds.length
+            ? await prisma.email_activities.findMany({
+                where: { id: { in: respIds } },
+                select: { id: true, sentAt: true },
+              })
+            : [];
+          const respAtMap = new Map(respRows.map(r => [r.id, r.sentAt]));
 
           const lastSendDate = await getLastSendDate(contact.id);
           const followUpInfo = await calculateNextSendDate(contact.id);
@@ -154,7 +162,7 @@ export async function GET(request) {
             }
           }
 
-          const hasAnyResponse = activities.some(a => a.hasResponded);
+          const hasAnyResponse = activities.some(a => !!a.responseFromEmail);
           const sendDate = (a) => (a.sentAt ?? a.createdAt).toISOString();
 
           return {
@@ -175,8 +183,8 @@ export async function GET(request) {
               subject: e.subject,
               source: e.source,
               platform: e.platform,
-              hasResponded: e.hasResponded,
-              respondedAt: e.respondedAt ? e.respondedAt.toISOString() : null,
+              hasResponded: !!e.responseFromEmail,
+              respondedAt: respAtMap.get(e.responseFromEmail)?.toISOString() ?? null,
             })),
             remindMeOn: contact.remindMeOn ? contact.remindMeOn.toISOString() : null,
           };

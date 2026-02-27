@@ -7,6 +7,7 @@ import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIco
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { formatDeliveryMethodLabel } from '@/lib/utils/deliveryMethod';
+import { formatDateEST } from '@/lib/dateEst';
 import { useContactsContext } from '@/hooks/useContacts';
 import ContactOutlook from '@/components/enrichment/ContactOutlook';
 import CompanySelector from '@/components/CompanySelector';
@@ -749,7 +750,7 @@ export default function ContactDetailPage({ params }) {
                 {contact.nextEngagementDate ? (
                   <>
                     <span className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-800">
-                      {new Date(contact.nextEngagementDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                      {formatDateEST(contact.nextEngagementDate, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                     {contact.nextEngagementPurpose && (
                       <span className="text-gray-500">
@@ -768,7 +769,7 @@ export default function ContactDetailPage({ params }) {
                   type="button"
                   onClick={() => {
                     setEditingNextEngagement(true);
-                    setNextEngagementDateEdit(contact.nextEngagementDate ? new Date(contact.nextEngagementDate).toISOString().slice(0, 10) : '');
+                    setNextEngagementDateEdit(contact.nextEngagementDate || '');
                     setNextEngagementPurposeEdit(contact.nextEngagementPurpose || '');
                   }}
                   className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"

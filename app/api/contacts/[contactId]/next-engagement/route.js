@@ -7,7 +7,7 @@ const VALID_PURPOSES = ['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN',
 /**
  * PATCH /api/contacts/[contactId]/next-engagement
  * Update next engagement date and/or purpose (edit from contact detail).
- * Body: { nextEngagementDate?: string (ISO) | null, nextEngagementPurpose?: NextEngagementPurpose | null }
+ * Body: { nextEngagementDate?: string "YYYY-MM-DD" | null, nextEngagementPurpose?: NextEngagementPurpose | null }
  * Purpose must be one of: GENERAL_CHECK_IN, UNRESPONSIVE, PERIODIC_CHECK_IN, REFERRAL_NO_CONTACT. Pass null to clear.
  */
 export async function PATCH(request, { params }) {
@@ -38,13 +38,14 @@ export async function PATCH(request, { params }) {
       if (nextEngagementDate == null || nextEngagementDate === '') {
         data.nextEngagementDate = null;
       } else {
-        // Store calendar date as noon UTC so EST display shows the same day (avoid "back in time" when user picks e.g. Feb 26)
         const dateOnly = String(nextEngagementDate).slice(0, 10);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
-          data.nextEngagementDate = new Date(dateOnly + 'T12:00:00.000Z');
-        } else {
-          data.nextEngagementDate = new Date(nextEngagementDate);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+          return NextResponse.json(
+            { success: false, error: 'nextEngagementDate must be YYYY-MM-DD' },
+            { status: 400 },
+          );
         }
+        data.nextEngagementDate = dateOnly;
       }
     }
     if (nextEngagementPurpose !== undefined) {
@@ -78,7 +79,7 @@ export async function PATCH(request, { params }) {
       success: true,
       contact: {
         id: contact.id,
-        nextEngagementDate: contact.nextEngagementDate?.toISOString() ?? null,
+        nextEngagementDate: contact.nextEngagementDate ?? null,
         nextEngagementPurpose: contact.nextEngagementPurpose ?? null,
       },
     });

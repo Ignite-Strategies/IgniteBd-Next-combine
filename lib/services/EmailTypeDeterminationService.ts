@@ -59,9 +59,9 @@ export class EmailTypeDeterminationService {
           OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM', sentAt: { not: null } }],
         },
         orderBy: { createdAt: 'desc' },
-        select: { hasResponded: true, contactResponse: true },
+        select: { responseFromEmail: true },
       });
-      lastEmailHadResponse = lastActivity?.hasResponded || false;
+      lastEmailHadResponse = !!lastActivity?.responseFromEmail;
     }
     
     // If no last email, it's first time
@@ -85,19 +85,25 @@ export class EmailTypeDeterminationService {
     lastSend.setHours(0, 0, 0, 0);
     const daysSinceLastSend = Math.floor((today.getTime() - lastSend.getTime()) / (1000 * 60 * 60 * 24));
     
-    // Get last email response text if available
+    // Get last email response text if available (from response row body)
     let lastEmailResponseText: string | null = null;
     if (lastEmailHadResponse === true) {
-      const lastActivityWithResponse = await prisma.email_activities.findFirst({
+      const lastWithResponse = await prisma.email_activities.findFirst({
         where: {
           contact_id: contactId,
-          hasResponded: true,
+          responseFromEmail: { not: null },
           OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM', sentAt: { not: null } }],
         },
         orderBy: { createdAt: 'desc' },
-        select: { contactResponse: true },
+        select: { responseFromEmail: true },
       });
-      lastEmailResponseText = lastActivityWithResponse?.contactResponse || null;
+      if (lastWithResponse?.responseFromEmail) {
+        const respRow = await prisma.email_activities.findUnique({
+          where: { id: lastWithResponse.responseFromEmail },
+          select: { body: true },
+        });
+        lastEmailResponseText = respRow?.body ?? null;
+      }
     }
     
     // Determine followup type based on time and context

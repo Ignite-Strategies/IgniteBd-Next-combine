@@ -71,12 +71,12 @@ export async function PUT(request, { params }) {
         contact: {
           ...updatedContact,
           remindMeOn: updatedContact.remindMeOn?.toISOString?.() ?? null,
-          nextEngagementDate: updatedContact.nextEngagementDate?.toISOString?.() ?? null,
+          nextEngagementDate: updatedContact.nextEngagementDate ?? null,
         },
       });
     }
 
-    // Parse and validate date
+    // Parse and validate date; store nextEngagementDate as date-only "YYYY-MM-DD"
     const remindDate = new Date(remindMeOn);
     if (isNaN(remindDate.getTime())) {
       return NextResponse.json(
@@ -84,13 +84,13 @@ export async function PUT(request, { params }) {
         { status: 400 },
       );
     }
+    const dateOnlyStr = remindDate.toISOString().slice(0, 10);
 
-    // Update contact: remindMeOn (legacy) and nextEngagementDate as single source of truth
     const updatedContact = await prisma.contact.update({
       where: { id: contactId },
       data: {
         remindMeOn: remindDate,
-        nextEngagementDate: remindDate,
+        nextEngagementDate: dateOnlyStr,
         nextEngagementPurpose: 'GENERAL_CHECK_IN',
       },
       select: {
@@ -104,7 +104,7 @@ export async function PUT(request, { params }) {
       },
     });
 
-    console.log('✅ Reminder set for contact:', contactId, 'on', remindDate.toISOString());
+    console.log('✅ Reminder set for contact:', contactId, 'on', dateOnlyStr);
 
     return NextResponse.json({
       success: true,
@@ -112,6 +112,7 @@ export async function PUT(request, { params }) {
       contact: {
         ...updatedContact,
         remindMeOn: updatedContact.remindMeOn ? updatedContact.remindMeOn.toISOString() : null,
+        nextEngagementDate: updatedContact.nextEngagementDate ?? null,
       },
     });
   } catch (error) {
@@ -159,6 +160,7 @@ export async function GET(request, { params }) {
         firstName: true,
         lastName: true,
         remindMeOn: true,
+        nextEngagementDate: true,
       },
     });
 
@@ -169,18 +171,17 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Calculate if reminder is due
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const remindDate = contact.remindMeOn ? new Date(contact.remindMeOn) : null;
-    const isDue = remindDate && remindDate <= today;
-    const daysUntilReminder = remindDate 
-      ? Math.ceil((remindDate - today) / (1000 * 60 * 60 * 24))
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const dueDateStr = contact.nextEngagementDate ?? (contact.remindMeOn ? contact.remindMeOn.toISOString().slice(0, 10) : null);
+    const isDue = dueDateStr && dueDateStr <= todayStr;
+    const daysUntilReminder = dueDateStr
+      ? Math.ceil((new Date(dueDateStr + 'T12:00:00.000Z') - new Date(todayStr + 'T12:00:00.000Z')) / (1000 * 60 * 60 * 24))
       : null;
 
     return NextResponse.json({
       success: true,
       remindMeOn: contact.remindMeOn ? contact.remindMeOn.toISOString() : null,
+      nextEngagementDate: contact.nextEngagementDate ?? null,
       isDue,
       daysUntilReminder,
     });

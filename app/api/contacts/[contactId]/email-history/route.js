@@ -55,17 +55,24 @@ export async function GET(request, { params }) {
         campaign_id: true,
         source: true,
         platform: true,
-        hasResponded: true,
-        contactResponse: true,
-        respondedAt: true,
-        responseSubject: true,
+        responseFromEmail: true,
       },
     });
+
+    const respIds = allSends.map(s => s.responseFromEmail).filter(Boolean);
+    const respRows = respIds.length
+      ? await prisma.email_activities.findMany({
+          where: { id: { in: respIds } },
+          select: { id: true, body: true, subject: true, sentAt: true },
+        })
+      : [];
+    const respMap = new Map(respRows.map(r => [r.id, r]));
 
     const drafts = allSends.filter(s => s.source === 'OFF_PLATFORM' && !s.sentAt);
     const sent = allSends.filter(s => s.event === 'sent' || (s.source === 'OFF_PLATFORM' && s.sentAt));
 
     const activities = allSends.map(send => {
+      const resp = send.responseFromEmail ? respMap.get(send.responseFromEmail) : null;
       const isDraft = send.source === 'OFF_PLATFORM' && !send.sentAt;
       const date = (send.sentAt ?? send.createdAt).toISOString();
       return {
@@ -79,10 +86,10 @@ export async function GET(request, { params }) {
         campaignId: send.campaign_id,
         platform: send.platform,
         notes: send.body,
-        hasResponded: send.hasResponded,
-        contactResponse: send.contactResponse,
-        respondedAt: send.respondedAt?.toISOString(),
-        responseSubject: send.responseSubject,
+        hasResponded: !!send.responseFromEmail,
+        contactResponse: resp?.body ?? null,
+        respondedAt: resp?.sentAt?.toISOString() ?? null,
+        responseSubject: resp?.subject ?? null,
       };
     }).sort((a, b) => {
       if (a.isDraft && !b.isDraft) return -1;

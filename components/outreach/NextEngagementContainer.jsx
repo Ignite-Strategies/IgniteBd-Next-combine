@@ -6,16 +6,8 @@ import { Mail, Calendar, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
 
-const TZ = 'America/New_York';
-
-// Stored nextEngagementDate is UTC; follow-up "date" = calendar day in EST
-function toESTDateString(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-CA', { timeZone: TZ });
-}
-
 /**
+ * nextEngagementDate is date-only "YYYY-MM-DD". Group by that string; labels use EST "today" for Due today/tomorrow.
  * Hydrate: all contacts with nextEngagementDate set. Show all, grouped by date (Due today, Tomorrow, or date).
  * No "alerts" / notifications yet — just the list. See docs/NEXT_ENGAGEMENT_UX_ROADMAP.md for future (email, in-app).
  */
@@ -66,7 +58,7 @@ export default function NextEngagementContainer({
   const groupByDate = (list) => {
     const groups = {};
     for (const r of list) {
-      const key = toESTDateString(r.nextEngagementDate);
+      const key = r.nextEngagementDate || '';
       if (!key) continue;
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);

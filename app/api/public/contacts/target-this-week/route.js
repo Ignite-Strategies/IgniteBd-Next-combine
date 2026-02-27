@@ -32,31 +32,25 @@ export async function GET(request) {
       );
     }
 
-    let weekStart;
-    if (weekStartParam) {
-      weekStart = new Date(weekStartParam);
-    } else {
-      const today = new Date();
-      const dayOfWeek = today.getDay();
-      const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-      weekStart = new Date(today);
-      weekStart.setDate(weekStart.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
-      weekStart.setHours(0, 0, 0, 0);
-    }
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    weekEnd.setHours(23, 59, 59, 999);
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+    const weekStartStr = weekStartParam ? String(weekStartParam).slice(0, 10) : monday.toISOString().slice(0, 10);
+    const weekEndDate = new Date(weekStartStr + 'T12:00:00.000Z');
+    weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+    const weekEndStr = weekEndDate.toISOString().slice(0, 10);
 
     const contacts = await getContactsWithNextEngagement(companyHQId, { limit: 1000 });
     const thisWeekContacts = contacts.filter((c) => {
-      if (!c.nextEngagementDate) return false;
-      const d = new Date(c.nextEngagementDate);
-      return d >= weekStart && d <= weekEnd;
+      const d = c.nextEngagementDate;
+      return d && d >= weekStartStr && d <= weekEndStr;
     });
 
     const contactsByDate = {};
     thisWeekContacts.forEach((contact) => {
-      const date = (contact.nextEngagementDate || '').slice(0, 10);
+      const date = contact.nextEngagementDate || '';
       if (!contactsByDate[date]) contactsByDate[date] = [];
       contactsByDate[date].push({
         id: contact.contactId,
@@ -68,8 +62,8 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      weekStart: weekStart.toISOString(),
-      weekEnd: weekEnd.toISOString(),
+      weekStart: weekStartStr,
+      weekEnd: weekEndStr,
       contactsByDate,
       sortedDates: Object.keys(contactsByDate).sort(),
       totalContacts: thisWeekContacts.length,
