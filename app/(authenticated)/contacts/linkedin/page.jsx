@@ -75,10 +75,6 @@ function GetContactFromLinkedInContent() {
           companyName: enrichedProfile.companyName,
         });
         
-        if (!enrichedProfile.email) {
-          alert('⚠️ Warning: Apollo did not return an email address for this LinkedIn profile. You can still save the contact, but email is required for outreach.');
-        }
-
         setEnrichmentData({
           rawEnrichmentPayload: rawApolloResponse,
           normalizedContact: enrichedProfile,
@@ -103,11 +99,6 @@ function GetContactFromLinkedInContent() {
 
     if (!companyHQId) {
       alert('Company context required. Please refresh the page with a companyHQId parameter.');
-      return;
-    }
-
-    if (!enrichmentData.normalizedContact?.email) {
-      alert('Email is required to save this contact. Apollo did not return an email address for this LinkedIn profile.');
       return;
     }
 
@@ -203,9 +194,13 @@ function GetContactFromLinkedInContent() {
                 </p>
               )}
               
-              {enrichmentData.normalizedContact.email && (
+              {enrichmentData.normalizedContact.email ? (
                 <p className="text-gray-700 text-sm">
                   <span className="font-medium">Email:</span> {enrichmentData.normalizedContact.email}
+                </p>
+              ) : (
+                <p className="text-amber-700 text-sm">
+                  No email from Apollo — you can still save and add it later.
                 </p>
               )}
 

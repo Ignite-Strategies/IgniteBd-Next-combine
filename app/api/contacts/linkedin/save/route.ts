@@ -39,17 +39,10 @@ export async function POST(request: Request) {
       rawApolloResponse, // Full Apollo response for extraction
     } = body;
 
-    // Validate required fields
+    // Validate required fields (email is optional — save with name + LinkedIn URL when Apollo doesn't return email)
     if (!crmId) {
       return NextResponse.json(
         { success: false, error: 'crmId (companyHQId) is required' },
-        { status: 400 },
-      );
-    }
-
-    if (!email) {
-      return NextResponse.json(
-        { success: false, error: 'email is required' },
         { status: 400 },
       );
     }
@@ -99,18 +92,7 @@ export async function POST(request: Request) {
     const companySize = inferCompanySize(apolloData);
     const positionType = extractPositionType(title);
 
-    // Normalize email
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // Upsert contact (by email + crmId)
-    const existingContact = await prisma.contact.findUnique({
-      where: {
-        email_crmId: {
-          email: normalizedEmail,
-          crmId: crmId,
-        },
-      },
-    });
+    const normalizedEmail = email ? (email as string).toLowerCase().trim() : null;
 
     const contactData: any = {
       firstName: firstName || null,
@@ -119,27 +101,45 @@ export async function POST(request: Request) {
       phone: phone || null,
       title: title || null,
       linkedinUrl: linkedinUrl || null,
-      // Simple company metadata
       companyName: companyName,
       companyIndustry: companyIndustry,
       companySize: companySize,
       positionType: positionType,
-      // Enrichment metadata
       enrichmentSource: 'Apollo',
       enrichmentFetchedAt: new Date(),
       enrichmentPayload: rawApolloResponse ? JSON.stringify(rawApolloResponse) : null,
     };
 
+    let existingContact: { id: string } | null = null;
+
+    if (normalizedEmail) {
+      existingContact = await prisma.contact.findUnique({
+        where: {
+          email_crmId: {
+            email: normalizedEmail,
+            crmId: crmId,
+          },
+        },
+        select: { id: true },
+      });
+    } else if (linkedinUrl) {
+      existingContact = await prisma.contact.findFirst({
+        where: {
+          crmId,
+          linkedinUrl: linkedinUrl,
+        },
+        select: { id: true },
+      });
+    }
+
     let contact;
     if (existingContact) {
-      // Update existing contact
       contact = await prisma.contact.update({
         where: { id: existingContact.id },
         data: contactData,
       });
-      console.log(`✅ Updated existing contact ${normalizedEmail} in CompanyHQ ${crmId}`);
+      console.log(`✅ Updated existing contact ${normalizedEmail || linkedinUrl} in CompanyHQ ${crmId}`);
     } else {
-      // Create new contact
       contact = await prisma.contact.create({
         data: {
           ...contactData,
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
           ownerId: owner.id,
         },
       });
-      console.log(`✅ Created new contact ${normalizedEmail} in CompanyHQ ${crmId}`);
+      console.log(`✅ Created new contact ${normalizedEmail || linkedinUrl} in CompanyHQ ${crmId}`);
     }
 
     return NextResponse.json({
