@@ -1212,7 +1212,7 @@ Best regards"`;
                 <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
                   <div className="mb-2 font-semibold text-blue-800">Conversation parsed</div>
                   <p className="text-blue-700">
-                    Found {parsedConversation.messages.length} messages. Select the contact below, then click <strong>Save conversation ({parsedConversation.messages.length} messages)</strong> at the bottom to save the whole thread. You don’t need to fill separate boxes—all {parsedConversation.messages.length} are saved in one step.
+                    Found {parsedConversation.messages.length} messages. Select the contact below, then click <strong>Save conversation ({parsedConversation.messages.length} messages)</strong> (green button under contact) to save the whole thread. You don’t need to fill separate boxes—all {parsedConversation.messages.length} are saved in one step.
                   </p>
                   <div className="mt-3 space-y-2">
                     <div className="text-xs font-semibold text-blue-800">Preview — what will be saved:</div>
@@ -1373,6 +1373,41 @@ Best regards"`;
                 )}
               </div>
               
+              {/* Save conversation — right after contact selector. Only disabled while saving; no form fields required. */}
+              {parsedConversation?.messages?.length >= 2 && (
+                <div className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSaveConversation}
+                      disabled={saving}
+                      className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Save the full conversation (one record per message)"
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="h-4 w-4" />
+                          Save conversation ({parsedConversation.messages.length} messages)
+                        </>
+                      )}
+                    </button>
+                    <span className="text-sm text-green-800">
+                      Saves the whole thread. No subject/body/date needed.
+                    </span>
+                  </div>
+                  {!selectedContactForEmail && !contactIdFromUrl && !parsedConversation?.contactEmail && !(manualEntry.email?.includes?.('@')) && (
+                    <p className="text-xs text-amber-800">
+                      Select a contact above first, or we’ll try to find one from the thread.
+                    </p>
+                  )}
+                </div>
+              )}
+              
               <div>
                 <label className="mb-1 block text-sm font-semibold text-gray-700">
                   Contact Email <span className="text-red-500">*</span>
@@ -1463,11 +1498,12 @@ Best regards"`;
                 />
               </div>
               
-              {parsedConversation?.messages?.length >= 1 ? (
+              {/* Save conversation only at bottom when single message; 2+ use the button above after contact selector */}
+              {parsedConversation?.messages?.length === 1 ? (
                 <button
                   type="button"
                   onClick={handleSaveConversation}
-                  disabled={saving || !manualEntry.email || (!selectedContactForEmail && !contactIdFromUrl && !parsedConversation.contactEmail)}
+                  disabled={saving}
                   className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
                   title="Save the full conversation (one record per message)"
                 >
@@ -1479,7 +1515,7 @@ Best regards"`;
                   ) : (
                     <>
                       <MessageSquare className="h-4 w-4" />
-                      {parsedConversation.messages.length >= 2 ? `Save conversation (${parsedConversation.messages.length} messages)` : 'Save conversation'}
+                      Save conversation
                     </>
                   )}
                 </button>

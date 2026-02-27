@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, Suspense } from 'react';
+import { useMemo, useState, useEffect, useLayoutEffect, Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Navigation from './Navigation';
@@ -41,9 +41,12 @@ export default function AppShell({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   // Resolved path: use pathname when available; fallback to window.location.pathname so sidebar shows on /contacts/view when usePathname() is null during hydration
-  const [resolvedPath, setResolvedPath] = useState(pathname ?? '');
+  const [resolvedPath, setResolvedPath] = useState(() => {
+    if (typeof window !== 'undefined') return window.location.pathname || pathname || '';
+    return pathname || '';
+  });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setResolvedPath(pathname ?? (typeof window !== 'undefined' ? window.location.pathname : ''));
   }, [pathname]);
 
@@ -74,7 +77,11 @@ export default function AppShell({ children }) {
     };
   }, []);
 
-  const showSidebar = useMemo(() => pathHasSidebar(resolvedPath), [resolvedPath]);
+  // When path isn't resolved yet (e.g. hydration), show sidebar so /contacts/view etc. don't flash without it
+  const showSidebar = useMemo(
+    () => pathHasSidebar(resolvedPath) || (resolvedPath === '' && !pathname),
+    [resolvedPath, pathname]
+  );
 
   // App routes always get the shell (e.g. /contacts/view). When pathname is null (hydration), use resolvedPath so sidebar still shows.
   const isAppRoute = useMemo(() => pathHasSidebar(resolvedPath) || !resolvedPath, [resolvedPath]);

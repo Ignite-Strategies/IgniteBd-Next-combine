@@ -8,6 +8,7 @@ import {
   UserCircle,
   Package,
   Users,
+  Contact,
   MessageSquare,
   GitBranch,
   Building2,
@@ -77,6 +78,7 @@ function Sidebar() {
       name: 'Engage',
       items: [
         { key: 'people', label: 'People', href: '/people', icon: Users },
+        { key: 'contacts', label: 'Contacts', href: '/contacts/view', icon: Contact },
         { key: 'outreach', label: 'Outreach', href: '/outreach', icon: MessageSquare },
         { key: 'templates', label: 'Templates', href: '/templates', icon: FileCode },
         { key: 'pipelines', label: 'Pipeline', href: '/pipelines', icon: GitBranch },
