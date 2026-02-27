@@ -31,11 +31,21 @@ const ROUTES_WITH_SIDEBAR = [
   '/contacts', // Contact management routes (includes /contacts/view, /contacts/manual, etc.)
 ];
 
+function pathHasSidebar(path) {
+  if (!path) return false;
+  return ROUTES_WITH_SIDEBAR.some((route) => path.startsWith(route));
+}
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  // Resolved path: use pathname when available; fallback to window.location.pathname so sidebar shows on /contacts/view when usePathname() is null during hydration
+  const [resolvedPath, setResolvedPath] = useState(pathname ?? '');
+
+  useEffect(() => {
+    setResolvedPath(pathname ?? (typeof window !== 'undefined' ? window.location.pathname : ''));
+  }, [pathname]);
 
   // Lazy load Firebase and check auth state (only in browser)
   useEffect(() => {
@@ -64,23 +74,17 @@ export default function AppShell({ children }) {
     };
   }, []);
 
-  const showSidebar = useMemo(() => {
-    if (!pathname) return false;
-    return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
-  }, [pathname]);
+  const showSidebar = useMemo(() => pathHasSidebar(resolvedPath), [resolvedPath]);
 
-  // App routes always get the shell (e.g. /contacts/view). When pathname is null (hydration), treat as app route.
-  const isAppRoute = useMemo(() => {
-    if (!pathname) return true;
-    return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
-  }, [pathname]);
+  // App routes always get the shell (e.g. /contacts/view). When pathname is null (hydration), use resolvedPath so sidebar still shows.
+  const isAppRoute = useMemo(() => pathHasSidebar(resolvedPath) || !resolvedPath, [resolvedPath]);
 
   // Routes that should never show navigation or context header (even when authenticated)
   const PUBLIC_ROUTES = ['/'];
   // Public bill payment routes - standalone pages, no admin UI
   // Check for both /bill/... and root-level bill routes (for bills subdomain)
   const BILL_ROUTES = ['/bill'];
-  const isRootBillRoute = pathname && /^\/[^\/]+\/[^\/]+$/.test(pathname) && pathname.split('/').length === 3;
+  const isRootBillRoute = resolvedPath && /^\/[^\/]+\/[^\/]+$/.test(resolvedPath) && resolvedPath.split('/').length === 3;
   // Auth/onboarding/setup routes that shouldn't show context header
   const HIDE_CONTEXT_ROUTES = [
     '/welcome', 
@@ -92,9 +96,9 @@ export default function AppShell({ children }) {
     '/profilesetup',
     '/owner-identity-survey',
   ];
-  const isPublicRoute = pathname && PUBLIC_ROUTES.includes(pathname);
-  const isBillRoute = pathname && (BILL_ROUTES.some(route => pathname.startsWith(route)) || isRootBillRoute);
-  const shouldHideContext = pathname && HIDE_CONTEXT_ROUTES.some(route => pathname.startsWith(route));
+  const isPublicRoute = resolvedPath && PUBLIC_ROUTES.includes(resolvedPath);
+  const isBillRoute = resolvedPath && (BILL_ROUTES.some(route => resolvedPath.startsWith(route)) || isRootBillRoute);
+  const shouldHideContext = resolvedPath && HIDE_CONTEXT_ROUTES.some(route => resolvedPath.startsWith(route));
 
   // Show shell when: not public/bill, and (auth not checked yet, or authenticated, or on an app route).
   // isAppRoute is true when pathname is null (hydration) so we don't flash no-shell.

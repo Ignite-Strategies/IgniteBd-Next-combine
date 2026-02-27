@@ -815,7 +815,7 @@ function ContactsViewPageContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
                       Phone
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                    <th className="max-w-[11rem] px-3 py-3 text-left text-xs font-medium uppercase text-gray-500">
                       Company
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
@@ -873,11 +873,12 @@ function ContactsViewPageContent() {
                         {contact.phone || 'N/A'}
                       </td>
                       <td 
-                        className="px-6 py-4 text-sm text-gray-500"
+                        className="max-w-[11rem] whitespace-nowrap px-3 py-4 text-sm text-gray-500"
                         onClick={(e) => e.stopPropagation()}
+                        title={contact.companies?.companyName || contact.company?.companyName || contact.contactCompany?.companyName || contact.companyName || ''}
                       >
                         <div className="flex items-center gap-2">
-                          <span>
+                          <span className="block truncate">
                             {contact.companies?.companyName || 
                              contact.company?.companyName || 
                              contact.contactCompany?.companyName || 
