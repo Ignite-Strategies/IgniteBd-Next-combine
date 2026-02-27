@@ -13,7 +13,6 @@ import {
   Sparkles,
   Loader2,
   ExternalLink,
-  CalendarClock,
 } from 'lucide-react';
 import api from '@/lib/api';
 import CompanySelector from '@/components/CompanySelector';
@@ -31,8 +30,6 @@ export default function ContactsListPage() {
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0, errors: [] });
   const [buildingTargetList, setBuildingTargetList] = useState(false);
   const [targetListUrl, setTargetListUrl] = useState(null);
-  const [recalculating, setRecalculating] = useState(false);
-  const [recalcResult, setRecalcResult] = useState(null);
 
   useEffect(() => {
     if (!companyHQId && typeof window !== 'undefined') {
@@ -222,30 +219,6 @@ export default function ContactsListPage() {
     }
   };
 
-  const handleRecalculateNextEngagement = async () => {
-    if (!companyHQId) return;
-    try {
-      setRecalculating(true);
-      setRecalcResult(null);
-      const response = await api.post(`/api/outreach/recalculate-next-engagement?companyHQId=${companyHQId}`);
-      if (response.data?.success) {
-        setRecalcResult({
-          updated: response.data.updated ?? 0,
-          total: response.data.total ?? 0,
-          errors: response.data.errors ?? 0,
-        });
-        await refreshContacts();
-      } else {
-        alert(response.data?.error || 'Recalculate failed');
-      }
-    } catch (error) {
-      console.error('Recalculate next engagement error:', error);
-      alert(error.response?.data?.error || error.message || 'Recalculate failed');
-    } finally {
-      setRecalculating(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -307,24 +280,6 @@ export default function ContactsListPage() {
               </>
             )}
             <button
-              onClick={handleRecalculateNextEngagement}
-              disabled={recalculating || loading}
-              title="Recalculate next follow-up dates for all contacts in this company (cadence + pipeline)"
-              className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {recalculating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Recalculating...
-                </>
-              ) : (
-                <>
-                  <CalendarClock className="h-4 w-4" />
-                  Recalculate next engagement
-                </>
-              )}
-            </button>
-            <button
               onClick={refreshContacts}
               disabled={loading}
               className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
@@ -334,21 +289,6 @@ export default function ContactsListPage() {
             </button>
           </div>
         </div>
-
-        {/* Recalculate result toast */}
-        {recalcResult != null && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-            Next engagement recalculated: <strong>{recalcResult.updated}</strong> of {recalcResult.total} contact{recalcResult.total !== 1 ? 's' : ''} updated.
-            {recalcResult.errors > 0 && <span className="ml-1 text-amber-700">({recalcResult.errors} skipped)</span>}
-            <button
-              type="button"
-              onClick={() => setRecalcResult(null)}
-              className="ml-2 text-amber-600 hover:text-amber-800 underline"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
 
         {/* Search */}
         <div className="mb-4">

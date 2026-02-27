@@ -19,10 +19,12 @@ import {
   CheckCheck,
   Loader2,
   Download,
+  CalendarClock,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
 import CompanySelector from '@/components/CompanySelector';
+import { formatDateEST } from '@/lib/dateEst';
 
 function ContactsViewPageContent() {
   const router = useRouter();
@@ -47,6 +49,10 @@ function ContactsViewPageContent() {
   const [selectedCompanyForAssign, setSelectedCompanyForAssign] = useState(null);
   const [savingCompanyAssignment, setSavingCompanyAssignment] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [showBulkNextEngagement, setShowBulkNextEngagement] = useState(false);
+  const [bulkNextEngagementDate, setBulkNextEngagementDate] = useState('');
+  const [bulkNextEngagementPurpose, setBulkNextEngagementPurpose] = useState('');
+  const [savingBulkNextEngagement, setSavingBulkNextEngagement] = useState(false);
   const lastValidatedCompanyHQId = useRef(null);
 
   // Redirect if no companyHQId in URL
@@ -146,6 +152,49 @@ function ContactsViewPageContent() {
       }
       return updated;
     });
+  };
+
+  const handleBulkSetNextEngagement = async () => {
+    const ids = Array.from(selectedContacts);
+    if (ids.length === 0) return;
+    const dateStr = bulkNextEngagementDate?.trim() || null;
+    const purpose = bulkNextEngagementPurpose?.trim() || null;
+    if (!dateStr && !purpose) {
+      alert('Set at least a date or purpose.');
+      return;
+    }
+    if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      alert('Date must be YYYY-MM-DD.');
+      return;
+    }
+    setSavingBulkNextEngagement(true);
+    try {
+      let ok = 0;
+      let err = 0;
+      for (const contactId of ids) {
+        try {
+          await api.patch(`/api/contacts/${contactId}/next-engagement`, {
+            ...(dateStr && { nextEngagementDate: dateStr }),
+            ...(purpose && { nextEngagementPurpose: purpose }),
+          });
+          ok++;
+        } catch (e) {
+          err++;
+        }
+      }
+      setShowBulkNextEngagement(false);
+      setBulkNextEngagementDate('');
+      setBulkNextEngagementPurpose('');
+      setSelectedContacts(new Set());
+      await refreshContactsFromAPI(false);
+      if (err > 0) {
+        alert(`Updated ${ok} contact(s). ${err} failed.`);
+      }
+    } catch (error) {
+      alert(error.response?.data?.error || error.message || 'Update failed');
+    } finally {
+      setSavingBulkNextEngagement(false);
+    }
   };
 
   const handleDownloadContacts = async () => {
@@ -463,6 +512,15 @@ function ContactsViewPageContent() {
                 <>
                   <button
                     type="button"
+                    onClick={() => setShowBulkNextEngagement(true)}
+                    className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                    title="Set or correct next engagement date/purpose for selected contacts"
+                  >
+                    <CalendarClock className="h-4 w-4" />
+                    Set next engagement ({selectedContacts.size})
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleGetEmails}
                     disabled={gettingEmails}
                     className={`flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition ${
@@ -625,6 +683,81 @@ function ContactsViewPageContent() {
           </div>
         </div>
 
+        {/* Bulk set next engagement modal */}
+        {showBulkNextEngagement && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-gray-200 p-4">
+                <h2 className="text-lg font-bold text-gray-900">Set next engagement</h2>
+                <button
+                  type="button"
+                  onClick={() => !savingBulkNextEngagement && (setShowBulkNextEngagement(false), setBulkNextEngagementDate(''), setBulkNextEngagementPurpose(''))}
+                  disabled={savingBulkNextEngagement}
+                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-4 p-4">
+                <p className="text-sm text-gray-600">
+                  Set date and/or purpose for <strong>{selectedContacts.size}</strong> selected contact{selectedContacts.size !== 1 ? 's' : ''}. Leave blank to leave unchanged.
+                </p>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Date (YYYY-MM-DD)</label>
+                  <input
+                    type="date"
+                    value={bulkNextEngagementDate}
+                    onChange={(e) => setBulkNextEngagementDate(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Purpose</label>
+                  <select
+                    value={bulkNextEngagementPurpose}
+                    onChange={(e) => setBulkNextEngagementPurpose(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="">— Leave unchanged —</option>
+                    <option value="GENERAL_CHECK_IN">General check-in</option>
+                    <option value="UNRESPONSIVE">Unresponsive</option>
+                    <option value="PERIODIC_CHECK_IN">Periodic check-in</option>
+                    <option value="REFERRAL_NO_CONTACT">Referral (no contact)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-gray-200 p-4">
+                <button
+                  type="button"
+                  onClick={() => !savingBulkNextEngagement && (setShowBulkNextEngagement(false), setBulkNextEngagementDate(''), setBulkNextEngagementPurpose(''))}
+                  disabled={savingBulkNextEngagement}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkSetNextEngagement}
+                  disabled={savingBulkNextEngagement || (!bulkNextEngagementDate?.trim() && !bulkNextEngagementPurpose?.trim())}
+                  className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingBulkNextEngagement ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Set for {selectedContacts.size} contact{selectedContacts.size !== 1 ? 's' : ''}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {filteredContacts.length === 0 ? (
           <div className="rounded-lg bg-white p-12 text-center shadow">
             <Users className="mx-auto mb-4 h-16 w-16 text-gray-400" />
@@ -690,6 +823,9 @@ function ContactsViewPageContent() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
                       Stage
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                      Next engagement
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
                       Actions
@@ -830,6 +966,24 @@ function ContactsViewPageContent() {
                       </td>
                       <td className="px-6 py-4">{getPipelineBadge(contact)}</td>
                       <td className="px-6 py-4">{getStageBadge(contact)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {contact.nextEngagementDate ? (
+                          <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                            {formatDateEST(contact.nextEngagementDate, { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {contact.nextEngagementPurpose && (
+                              <span className="ml-1 text-amber-600">
+                                · {contact.nextEngagementPurpose === 'GENERAL_CHECK_IN' && 'General check-in'}
+                                {contact.nextEngagementPurpose === 'UNRESPONSIVE' && 'Unresponsive'}
+                                {contact.nextEngagementPurpose === 'PERIODIC_CHECK_IN' && 'Periodic check-in'}
+                                {contact.nextEngagementPurpose === 'REFERRAL_NO_CONTACT' && 'Referral (no contact)'}
+                                {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <button
