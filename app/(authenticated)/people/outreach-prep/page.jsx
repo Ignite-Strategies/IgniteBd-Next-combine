@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Plus,
   List,
@@ -10,8 +10,14 @@ import {
 import PageHeader from '@/components/PageHeader.jsx';
 import { useLocalStorage } from '@/hooks/useLocalStorage.js';
 
+function qs(companyHQId) {
+  return companyHQId ? `?companyHQId=${encodeURIComponent(companyHQId)}` : '';
+}
+
 export default function OutreachPrepPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
   const [lists, setLists] = useLocalStorage('contactLists', []);
   const [checking, setChecking] = useState(true);
 
@@ -20,7 +26,7 @@ export default function OutreachPrepPage() {
     const checkLists = () => {
       if (lists.length === 0) {
         // Auto-redirect to create list if no lists exist
-        router.push('/contacts/list-builder');
+        router.push(`/contacts/list-builder${qs(companyHQId)}`);
         return;
       }
       setChecking(false);
@@ -29,7 +35,7 @@ export default function OutreachPrepPage() {
     // Small delay to ensure localStorage is read
     const timer = setTimeout(checkLists, 100);
     return () => clearTimeout(timer);
-  }, [lists.length, router]);
+  }, [lists.length, router, companyHQId]);
 
   if (checking) {
     return (
@@ -56,7 +62,7 @@ export default function OutreachPrepPage() {
           {/* Create Contact List */}
           <button
             type="button"
-            onClick={() => router.push('/contacts/list-builder')}
+            onClick={() => router.push(`/contacts/list-builder${qs(companyHQId)}`)}
             className="group rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 p-6 text-left transition hover:border-blue-400"
           >
             <div className="mb-4 flex items-center">
@@ -78,7 +84,7 @@ export default function OutreachPrepPage() {
           {/* View Existing Lists */}
           <button
             type="button"
-            onClick={() => router.push('/contacts/list-manager')}
+            onClick={() => router.push(`/contacts/list-manager${qs(companyHQId)}`)}
             className="group rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100 p-6 text-left transition hover:border-purple-400"
           >
             <div className="mb-4 flex items-center">

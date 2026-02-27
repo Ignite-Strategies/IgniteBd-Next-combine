@@ -1,16 +1,18 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import PageHeader from '@/components/PageHeader.jsx';
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // This page redirects to the list manager
 export default function ListsPage() {
   const router = useRouter();
-  
-  // Redirect to list manager
-  if (typeof window !== 'undefined') {
-    router.replace('/contacts/list-manager');
-  }
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
+
+  useEffect(() => {
+    const qs = companyHQId ? `?companyHQId=${encodeURIComponent(companyHQId)}` : '';
+    router.replace(`/contacts/list-manager${qs}`);
+  }, [router, companyHQId]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">

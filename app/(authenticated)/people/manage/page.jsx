@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 /**
  * Manage page redirects to contacts view
@@ -10,11 +10,13 @@ import { useRouter } from 'next/navigation';
  */
 export default function ManagePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const companyHQId = searchParams?.get('companyHQId') || '';
 
   useEffect(() => {
-    // Redirect to contacts list where users can click on contacts to manage them
-    router.replace('/contacts/view');
-  }, [router]);
+    const qs = companyHQId ? `?companyHQId=${encodeURIComponent(companyHQId)}` : '';
+    router.replace(`/contacts/view${qs}`);
+  }, [router, companyHQId]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
