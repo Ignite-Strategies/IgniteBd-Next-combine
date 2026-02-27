@@ -3,9 +3,8 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
 
 /**
- * GET /api/outreach/reminders
- * @deprecated Use GET /api/outreach/next-engagements instead (same data, response key "nextEngagements").
- * Kept for backward compatibility; returns same list under key "reminders".
+ * GET /api/outreach/next-engagements
+ * Contacts with nextEngagementDate set. Hydrate and show — no notifications. Query: companyHQId (required), limit (default 500).
  */
 export async function GET(request) {
   try {
@@ -29,16 +28,16 @@ export async function GET(request) {
       );
     }
 
-    const reminders = await getContactsWithNextEngagement(companyHQId, { limit });
+    const nextEngagements = await getContactsWithNextEngagement(companyHQId, { limit });
 
     return NextResponse.json({
       success: true,
-      reminders,
+      nextEngagements,
     });
   } catch (error) {
-    console.error('❌ GET /api/outreach/reminders error:', error);
+    console.error('❌ GET /api/outreach/next-engagements error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch reminders', details: error?.message },
+      { success: false, error: 'Failed to fetch next engagements', details: error?.message },
       { status: 500 },
     );
   }

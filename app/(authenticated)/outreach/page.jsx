@@ -14,7 +14,7 @@ import {
   FileCode,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
-import NextEngagementAlertContainer from '@/components/outreach/NextEngagementAlertContainer.jsx';
+import NextEngagementContainer from '@/components/outreach/NextEngagementContainer.jsx';
 import { useOutreachContext } from '@/hooks/useOutreach';
 import api from '@/lib/api';
 
@@ -176,9 +176,9 @@ function OutreachContent() {
           router={router}
         />
 
-        {/* Next engagement alerts — by nextEngagementDate, frontend buckets */}
+        {/* Next engagements — hydrate nextEngagementDate, sorted by date */}
         <div className="mb-8">
-          <NextEngagementAlertContainer compact showSeeAll />
+          <NextEngagementContainer compact showSeeAll />
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">

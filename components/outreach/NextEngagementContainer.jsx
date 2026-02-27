@@ -4,24 +4,40 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Calendar, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
-import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
+
+// User's local today (YYYY-MM-DD) so "Due today" matches their calendar, not EST
+function getTodayLocal() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dayDiff(dateKey, todayStr) {
+  if (!dateKey || !todayStr) return null;
+  const a = new Date(dateKey + 'T12:00:00');
+  const b = new Date(todayStr + 'T12:00:00');
+  return Math.round((a - b) / (24 * 60 * 60 * 1000));
+}
 
 /**
  * Hydrate: all contacts with nextEngagementDate set. Show all, grouped by date (Due today, Tomorrow, or date).
+ * No "alerts" / notifications yet — just the list. See docs/NEXT_ENGAGEMENT_UX_ROADMAP.md for future (email, in-app).
  */
-export default function NextEngagementAlertContainer({
+export default function NextEngagementContainer({
   companyHQId,
   limit = 500,
   compact = false,
   showSeeAll = true,
 }) {
   const router = useRouter();
-  const [alerts, setAlerts] = useState([]);
+  const [nextEngagements, setNextEngagements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resolvedCompanyId, setResolvedCompanyId] = useState(companyHQId || null);
 
-  const todayEST = getTodayEST();
+  const todayLocal = getTodayLocal();
 
   useEffect(() => {
     const id = companyHQId || (typeof window !== 'undefined' && (window.localStorage?.getItem('companyHQId') || window.localStorage?.getItem('companyId')));
@@ -36,16 +52,16 @@ export default function NextEngagementAlertContainer({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api.get(`/api/outreach/next-engagement-alerts`, {
+    api.get(`/api/outreach/next-engagements`, {
       params: { companyHQId: resolvedCompanyId, limit },
     })
       .then((res) => {
         if (!cancelled && res.data?.success) {
-          setAlerts(res.data.alerts || []);
+          setNextEngagements(res.data.nextEngagements || []);
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err?.response?.data?.error || 'Failed to load next engagement alerts');
+        if (!cancelled) setError(err?.response?.data?.error || 'Failed to load next engagements');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -66,10 +82,13 @@ export default function NextEngagementAlertContainer({
   };
 
   const sectionTitle = (dateKey) => {
-    const { label } = formatDateLabelEST(todayEST, dateKey);
-    if (label === 'Today') return 'Due today';
-    if (label === 'Tomorrow') return 'Due tomorrow';
-    return label || dateKey;
+    const diff = dayDiff(dateKey, todayLocal);
+    if (diff === 0) return 'Due today';
+    if (diff === 1) return 'Due tomorrow';
+    if (diff === -1) return 'Yesterday';
+    if (!dateKey) return '';
+    const d = new Date(dateKey + 'T12:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const name = (r) => [r.firstName, r.lastName].filter(Boolean).join(' ').trim() || r.email || '—';
@@ -92,7 +111,7 @@ export default function NextEngagementAlertContainer({
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <div className="flex items-center gap-2 text-gray-500">
           <Mail className="h-5 w-5" />
-          <span className="text-sm">Loading next engagement alerts…</span>
+          <span className="text-sm">Loading next engagements…</span>
         </div>
       </div>
     );
@@ -106,7 +125,7 @@ export default function NextEngagementAlertContainer({
     );
   }
 
-  const grouped = groupByDate(alerts);
+  const grouped = groupByDate(nextEngagements);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -114,7 +133,7 @@ export default function NextEngagementAlertContainer({
         <div>
           <div className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-amber-600" />
-            <h3 className="text-base font-semibold text-gray-900">Next engagement alerts</h3>
+            <h3 className="text-base font-semibold text-gray-900">Next engagements</h3>
           </div>
           <p className="mt-0.5 text-xs font-medium text-amber-700/90">Sorted by date</p>
         </div>
