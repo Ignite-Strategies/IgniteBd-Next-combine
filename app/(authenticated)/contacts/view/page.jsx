@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users,
@@ -25,14 +25,23 @@ import api from '@/lib/api';
 import { auth } from '@/lib/firebase';
 import CompanySelector from '@/components/CompanySelector';
 import { formatDateEST } from '@/lib/dateEst';
+import { useContactsContext } from '@/hooks/useContacts';
 
 function ContactsViewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const companyHQId = searchParams?.get('companyHQId') || '';
-  
-  const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const companyHQIdFromUrl = searchParams?.get('companyHQId') || '';
+  const {
+    contacts,
+    companyHQId: companyHQIdFromContext,
+    hydrated,
+    hydrating,
+    refreshContacts,
+    updateContact,
+    removeContact,
+  } = useContactsContext();
+  const companyHQId = companyHQIdFromUrl || companyHQIdFromContext;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [pipelineFilter, setPipelineFilter] = useState('');
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest' | 'name-asc' | 'name-desc'
@@ -53,9 +62,8 @@ function ContactsViewPageContent() {
   const [bulkNextEngagementDate, setBulkNextEngagementDate] = useState('');
   const [bulkNextEngagementPurpose, setBulkNextEngagementPurpose] = useState('');
   const [savingBulkNextEngagement, setSavingBulkNextEngagement] = useState(false);
-  const lastValidatedCompanyHQId = useRef(null);
 
-  // Redirect if no companyHQId in URL
+  // Redirect if no companyHQId (no URL param and layout has none)
   useEffect(() => {
     if (!companyHQId && typeof window !== 'undefined') {
       const stored = localStorage.getItem('companyHQId');
@@ -67,80 +75,7 @@ function ContactsViewPageContent() {
     }
   }, [companyHQId, router]);
 
-  const refreshContactsFromAPI = useCallback(
-    async (showLoading = true) => {
-      if (!companyHQId) {
-        console.log('⚠️ No companyHQId - skipping contact fetch');
-        return;
-      }
-
-      try {
-        if (showLoading) setLoading(true);
-        const params = new URLSearchParams({ companyHQId });
-        if (pipelineFilter) {
-          params.append('pipeline', pipelineFilter);
-        }
-        
-        console.log('📞 Fetching contacts from API:', {
-          companyHQId,
-          pipelineFilter: pipelineFilter || 'all',
-          url: `/api/contacts?${params.toString()}`,
-        });
-        
-        const response = await api.get(`/api/contacts?${params.toString()}`);
-
-        if (response.data?.success && response.data.contacts) {
-          const fetchedContacts = response.data.contacts;
-          console.log(`✅ Fetched ${fetchedContacts.length} contacts for CompanyHQ: ${companyHQId}`);
-          setContacts(fetchedContacts);
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(
-              'contacts',
-              JSON.stringify(fetchedContacts),
-            );
-          }
-        } else {
-          console.warn('⚠️ API response missing contacts:', response.data);
-          setContacts([]);
-        }
-      } catch (error) {
-        console.error('❌ Error fetching contacts:', error);
-        console.error('Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          companyHQId,
-        });
-        if (showLoading) setContacts([]);
-      } finally {
-        if (showLoading) setLoading(false);
-      }
-    },
-    [companyHQId, pipelineFilter],
-  );
-
-  // NO localStorage - always fetch from API when companyHQId changes
-  useEffect(() => {
-    if (!companyHQId) {
-      setLoading(false);
-      setContacts([]);
-      lastValidatedCompanyHQId.current = null;
-      return;
-    }
-
-    // Skip if we've already fetched for this companyHQId
-    if (lastValidatedCompanyHQId.current === companyHQId) {
-      return;
-    }
-
-    // Always fetch from API - no localStorage cache
-    console.log('🔄 Fetching contacts from API:', {
-      companyHQId,
-      timestamp: new Date().toISOString(),
-    });
-    lastValidatedCompanyHQId.current = companyHQId;
-    refreshContactsFromAPI(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyHQId]); // Only depend on companyHQId - refreshContactsFromAPI is stable within its useCallback
+  const loading = !hydrated || hydrating;
 
   const handleSelectContact = (contactId) => {
     setSelectedContacts((prev) => {
@@ -186,7 +121,7 @@ function ContactsViewPageContent() {
       setBulkNextEngagementDate('');
       setBulkNextEngagementPurpose('');
       setSelectedContacts(new Set());
-      await refreshContactsFromAPI(false);
+      await refreshContacts();
       if (err > 0) {
         alert(`Updated ${ok} contact(s). ${err} failed.`);
       }
@@ -314,16 +249,7 @@ function ContactsViewPageContent() {
         ),
       );
 
-      const updatedContacts = contacts.filter(
-        (contact) => !selectedContacts.has(contact.id),
-      );
-      setContacts(updatedContacts);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(
-          'contacts',
-          JSON.stringify(updatedContacts),
-        );
-      }
+      Array.from(selectedContacts).forEach((contactId) => removeContact(contactId));
       setSelectedContacts(new Set());
     } catch (error) {
       console.error('Error bulk deleting contacts:', error);
@@ -368,12 +294,7 @@ function ContactsViewPageContent() {
         const email = response.data?.email || null;
         const emailAlreadyExists = response.data?.emailAlreadyExists === true;
         if (email) {
-          // Update local state so table reflects new email
-          setContacts((prev) =>
-            prev.map((contact) =>
-              contact.id === c.id ? { ...contact, email } : contact,
-            ),
-          );
+          updateContact(c.id, { email });
         }
         results.push({
           name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed',
@@ -420,14 +341,7 @@ function ContactsViewPageContent() {
     try {
       setDeletingId(contactId);
       await api.delete(`/api/contacts/${contactId}`);
-      const updatedContacts = contacts.filter((c) => c.id !== contactId);
-      setContacts(updatedContacts);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(
-          'contacts',
-          JSON.stringify(updatedContacts),
-        );
-      }
+      removeContact(contactId);
       setSelectedContacts((prev) => {
         const updated = new Set(prev);
         updated.delete(contactId);
@@ -483,12 +397,10 @@ function ContactsViewPageContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="min-h-[calc(100vh-3.5rem)] py-8 flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="mb-2 text-2xl font-bold text-gray-900">
-            Loading Contacts…
-          </div>
-          <div className="text-gray-600">Fetching your contacts…</div>
+          <div className="mb-2 text-lg font-semibold text-gray-700">Loading…</div>
+          <div className="text-sm text-gray-500">Getting your contacts</div>
         </div>
       </div>
     );
@@ -567,23 +479,11 @@ function ContactsViewPageContent() {
                   }
                   setSyncing(true);
                   try {
-                    // Use hydrate route for complete refresh
-                    const response = await api.post('/api/contacts/hydrate', {
-                      companyHQId,
-                    });
-                    if (response.data?.success && Array.isArray(response.data.contacts)) {
-                      const hydratedContacts = response.data.contacts;
-                      setContacts(hydratedContacts);
-                      // NO localStorage - API only
-                      console.log(`✅ Synced ${hydratedContacts.length} contacts from API`);
-                    } else {
-                      // Fallback to regular refresh
-                      await refreshContactsFromAPI(true);
-                    }
+                    await api.post('/api/contacts/hydrate', { companyHQId });
+                    await refreshContacts();
                   } catch (error) {
                     console.error('Error syncing contacts:', error);
-                    // Fallback to regular refresh
-                    await refreshContactsFromAPI(true);
+                    await refreshContacts();
                   } finally {
                     setSyncing(false);
                   }
@@ -912,12 +812,7 @@ function ContactsViewPageContent() {
                                     });
                                     if (response.data?.success) {
                                       const updatedContact = response.data.contact;
-                                      // Update local state
-                                      const updatedContacts = contacts.map((c) =>
-                                        c.id === contact.id ? updatedContact : c
-                                      );
-                                      setContacts(updatedContacts);
-                                      // NO localStorage - API only
+                                      updateContact(contact.id, updatedContact);
                                       setAssigningCompanyId(null);
                                       setSelectedCompanyForAssign(null);
                                       console.log('✅ Company assigned');
@@ -1109,11 +1004,10 @@ function ContactsViewPageContent() {
 export default function ContactsViewPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="min-h-[calc(100vh-3.5rem)] py-8 flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="mb-2 text-2xl font-bold text-gray-900">
-            Loading Contacts…
-          </div>
+          <div className="mb-2 text-lg font-semibold text-gray-700">Loading…</div>
+          <div className="text-sm text-gray-500">Getting your contacts</div>
         </div>
       </div>
     }>

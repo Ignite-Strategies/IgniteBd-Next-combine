@@ -315,9 +315,21 @@ function ContactsLayoutContent({ children }) {
   );
 }
 
+// Single content-area loader so shell (navbar + sidebar) stays visible and we don't flash "one screen then another"
+function ContactsLayoutFallback() {
+  return (
+    <div className="min-h-[calc(100vh-3.5rem)] py-8 flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="mb-2 text-lg font-semibold text-gray-700">Loading…</div>
+        <div className="text-sm text-gray-500">Getting your contacts</div>
+      </div>
+    </div>
+  );
+}
+
 export default function ContactsLayout({ children }) {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<ContactsLayoutFallback />}>
       <ContactsLayoutContent>{children}</ContactsLayoutContent>
     </Suspense>
   );
