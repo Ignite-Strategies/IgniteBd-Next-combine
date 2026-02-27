@@ -8,6 +8,15 @@ import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { formatDeliveryMethodLabel } from '@/lib/utils/deliveryMethod';
 import { formatDateEST } from '@/lib/dateEst';
+// Display pipeline/stage from relation or snap; format for read-only view
+function formatPipelineLabel(pipeline) {
+  if (!pipeline) return 'Unassigned';
+  return pipeline.charAt(0).toUpperCase() + pipeline.slice(1).toLowerCase();
+}
+function formatStageLabel(stage) {
+  if (!stage) return 'No Stage';
+  return stage.replace(/-/g, ' ').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 import { useContactsContext } from '@/hooks/useContacts';
 import ContactOutlook from '@/components/enrichment/ContactOutlook';
 import CompanySelector from '@/components/CompanySelector';
@@ -581,16 +590,16 @@ export default function ContactDetailPage({ params }) {
           {!editingStage ? (
             <>
               <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600">
-                {contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'Unassigned'}
+                {formatPipelineLabel(contact.pipelines?.pipeline || contact.pipelineSnap || contact.pipeline?.pipeline)}
               </span>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-600">
-                  {contact.pipelines?.stage || contact.pipeline?.stage || 'No Stage'}
+                  {formatStageLabel(contact.pipelines?.stage || contact.pipelineStageSnap || contact.pipeline?.stage)}
                 </span>
                 <button
                   onClick={() => {
-                    const currentPipeline = contact.pipelines?.pipeline || contact.pipeline?.pipeline || 'unassigned';
-                    const currentStage = contact.pipelines?.stage || contact.pipeline?.stage || null;
+                    const currentPipeline = contact.pipelines?.pipeline || contact.pipelineSnap || contact.pipeline?.pipeline || 'unassigned';
+                    const currentStage = contact.pipelines?.stage || contact.pipelineStageSnap || contact.pipeline?.stage || null;
                     setEditingStage(true);
                     setSelectedPipeline(currentPipeline);
                     setSelectedStage(currentStage || '');
@@ -615,6 +624,8 @@ export default function ContactDetailPage({ params }) {
                     setSelectedStage('forwarded');
                   } else if (e.target.value === 'prospect') {
                     setSelectedStage('need-to-engage');
+                  } else if (e.target.value === 'friend') {
+                    setSelectedStage('awaiting_next_job');
                   } else {
                     setSelectedStage('interest');
                   }
@@ -627,6 +638,7 @@ export default function ContactDetailPage({ params }) {
                 <option value="client">Client</option>
                 <option value="collaborator">Collaborator</option>
                 <option value="institution">Institution</option>
+                <option value="friend">Friend</option>
               </select>
               {selectedPipeline !== 'unassigned' && (
                 <select
@@ -675,6 +687,12 @@ export default function ContactDetailPage({ params }) {
                       <option value="meeting">Meeting</option>
                       <option value="moa">MOA</option>
                       <option value="agreement">Agreement</option>
+                    </>
+                  )}
+                  {selectedPipeline === 'friend' && (
+                    <>
+                      <option value="awaiting_next_job">Awaiting next job</option>
+                      <option value="navigating">Navigating</option>
                     </>
                   )}
                 </select>

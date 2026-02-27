@@ -655,6 +655,7 @@ function ContactsViewPageContent() {
                   <option value="client">Client</option>
                   <option value="collaborator">Collaborator</option>
                   <option value="institution">Institution</option>
+                  <option value="friend">Friend</option>
                 </select>
               </div>
               <div className="relative">
