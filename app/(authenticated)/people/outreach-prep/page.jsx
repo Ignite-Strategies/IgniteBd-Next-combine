@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Plus,
@@ -14,7 +14,7 @@ function qs(companyHQId) {
   return companyHQId ? `?companyHQId=${encodeURIComponent(companyHQId)}` : '';
 }
 
-export default function OutreachPrepPage() {
+function OutreachPrepContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const companyHQId = searchParams?.get('companyHQId') || '';
@@ -108,8 +108,21 @@ export default function OutreachPrepPage() {
   );
 }
 
+const loadingFallback = (
+  <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+    <div className="text-center">
+      <div className="mb-2 text-2xl font-bold text-gray-900">Loading...</div>
+      <div className="text-gray-600">Checking your lists</div>
+    </div>
+  </div>
+);
 
-
-
+export default function OutreachPrepPage() {
+  return (
+    <Suspense fallback={loadingFallback}>
+      <OutreachPrepContent />
+    </Suspense>
+  );
+}
 
 
