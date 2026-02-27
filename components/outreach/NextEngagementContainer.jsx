@@ -111,10 +111,10 @@ export default function NextEngagementContainer({
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <div className="flex items-center gap-2 text-gray-500">
-          <Mail className="h-5 w-5" />
-          <span className="text-sm">Loading next engagements…</span>
+      <div className="rounded-xl border border-gray-200 bg-white p-8">
+        <div className="flex items-center gap-3 text-gray-500">
+          <Mail className="h-6 w-6" />
+          <span className="text-base">Loading next engagements…</span>
         </div>
       </div>
     );
@@ -122,44 +122,45 @@ export default function NextEngagementContainer({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-        <p className="text-sm text-red-800">{error}</p>
+      <div className="rounded-xl border border-red-100 bg-red-50 p-5">
+        <p className="text-base text-red-800">{error}</p>
       </div>
     );
   }
 
   const grouped = groupByDate(nextEngagements);
 
+  // Dashboard = compact preview (day-only labels). Tracker = full page uses this with compact=false.
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+      <div className={`flex items-center justify-between border-b border-gray-100 ${compact ? 'px-4 py-2.5' : 'px-5 py-4'}`}>
         <div>
           <div className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-amber-600" />
-            <h3 className="text-base font-semibold text-gray-900">Next engagements</h3>
+            <Mail className={`text-amber-600 ${compact ? 'h-5 w-5' : 'h-6 w-6'}`} />
+            <h3 className={compact ? 'text-base font-semibold text-gray-900' : 'text-lg font-semibold text-gray-900'}>Next engagements</h3>
           </div>
-          <p className="mt-0.5 text-xs font-medium text-amber-700/90">Sorted by date</p>
+          <p className={compact ? 'mt-0.5 text-xs font-medium text-amber-700/90' : 'mt-1 text-sm font-medium text-amber-700/90'}>Sorted by date</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className={`flex items-center ${compact ? 'gap-2' : 'gap-4'}`}>
           <button
             type="button"
             onClick={handleExport}
             disabled={nextEngagements.length === 0}
-            className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`flex items-center gap-1.5 font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'text-sm' : 'gap-2 text-base'}`}
             title="Download as CSV"
           >
-            <Download className="h-4 w-4" />
+            <Download className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
             Export
           </button>
-          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-400" title="Email digest (coming soon)">
-            <Send className="h-4 w-4" />
-            Email <span className="text-xs">(soon)</span>
+          <span className={`flex items-center gap-1.5 font-medium text-gray-400 ${compact ? 'text-sm' : 'gap-2 text-base'}`} title="Email digest (coming soon)">
+            <Send className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+            Email <span className={compact ? 'text-xs' : 'text-sm'}>(soon)</span>
           </span>
           {showSeeAll && (
             <button
               type="button"
               onClick={() => router.push(`/outreach/tracker?companyHQId=${resolvedCompanyId}`)}
-              className="text-sm font-medium text-amber-600 hover:text-amber-700"
+              className={`font-medium text-amber-600 hover:text-amber-700 ${compact ? 'text-sm' : 'text-base'}`}
             >
               See all
             </button>
@@ -168,15 +169,15 @@ export default function NextEngagementContainer({
       </div>
       <div className={compact ? 'max-h-64 overflow-y-auto' : ''}>
         {grouped.length === 0 ? (
-          <div className="p-6 text-center text-sm text-gray-500">
+          <div className={compact ? 'p-4 text-center text-sm text-gray-500' : 'p-8 text-center text-base text-gray-500'}>
             No next engagements.
           </div>
         ) : (
           <ul className="divide-y divide-gray-100">
             {grouped.map(([dateKey, items]) => (
               <li key={dateKey}>
-                <div className="bg-amber-50/80 px-4 py-2.5 text-xs font-semibold text-gray-700 border-l-2 border-amber-400">
-                  <Calendar className="mr-1.5 inline h-3.5 w-3.5 text-amber-600" />
+                <div className={compact ? 'bg-amber-50/80 px-4 py-2 text-xs font-semibold text-gray-700 border-l-2 border-amber-400' : 'bg-amber-50/80 px-5 py-3 text-sm font-semibold text-gray-700 border-l-2 border-amber-400'}>
+                  <Calendar className={compact ? 'mr-1.5 inline h-3.5 w-3.5 text-amber-600' : 'mr-2 inline h-4 w-4 text-amber-600'} />
                   <span className="text-amber-800">{sectionTitle(dateKey)}</span>
                 </div>
                 <ul className="divide-y divide-gray-50">
@@ -185,16 +186,16 @@ export default function NextEngagementContainer({
                       <button
                         type="button"
                         onClick={() => router.push(`/contacts/${r.contactId}`)}
-                        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
+                        className={`flex w-full items-center justify-between text-left hover:bg-gray-50 ${compact ? 'px-4 py-2.5' : 'px-5 py-4'}`}
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-gray-900">{name(r)}</p>
-                          <p className="truncate text-xs text-gray-500">
+                          <p className={`truncate font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}>{name(r)}</p>
+                          <p className={`truncate text-gray-500 ${compact ? 'text-xs' : 'text-sm'}`}>
                             {purposeLabel(r.nextEngagementPurpose)}
                             {r.nextContactNote && ` · ${r.nextContactNote}`}
                           </p>
                         </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                        <ChevronRight className={`shrink-0 text-gray-400 ${compact ? 'h-4 w-4' : 'h-5 w-5'}`} />
                       </button>
                     </li>
                   ))}

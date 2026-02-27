@@ -176,7 +176,7 @@ function OutreachContent() {
           router={router}
         />
 
-        {/* Next engagements — hydrate nextEngagementDate, sorted by date */}
+        {/* Next engagements — compact day-only preview; full list on Tracker */}
         <div className="mb-8">
           <NextEngagementContainer compact showSeeAll />
         </div>

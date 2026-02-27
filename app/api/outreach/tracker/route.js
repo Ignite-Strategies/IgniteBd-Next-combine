@@ -3,6 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { calculateNextSendDate, getLastSendDate } from '@/lib/services/emailCadenceService';
 
+/** Coerce Date, ISO string, or YYYY-MM-DD to ISO string; null/undefined → null. */
+function toISOStringSafe(val) {
+  if (val == null) return null;
+  if (typeof val === 'string') return new Date(val).toISOString();
+  if (typeof val.toISOString === 'function') return val.toISOString();
+  return new Date(val).toISOString();
+}
+
 /**
  * GET /api/outreach/tracker
  * Get all contacts with email sends, with filtering by send date and follow-up date
@@ -163,12 +171,12 @@ export async function GET(request) {
           }
 
           const hasAnyResponse = activities.some(a => !!a.responseFromEmail);
-          const sendDate = (a) => (a.sentAt ?? a.createdAt).toISOString();
+          const sendDate = (a) => toISOStringSafe(a.sentAt ?? a.createdAt);
 
           return {
             ...contact,
-            lastSendDate: lastSendDate ? lastSendDate.toISOString() : null,
-            nextSendDate: effectiveNextSendDate ? effectiveNextSendDate.toISOString() : null,
+            lastSendDate: toISOStringSafe(lastSendDate),
+            nextSendDate: toISOStringSafe(effectiveNextSendDate),
             daysUntilDue: followUpInfo.daysUntilDue,
             relationship: followUpInfo.relationship,
             cadenceDays: followUpInfo.cadenceDays,
@@ -184,9 +192,9 @@ export async function GET(request) {
               source: e.source,
               platform: e.platform,
               hasResponded: !!e.responseFromEmail,
-              respondedAt: respAtMap.get(e.responseFromEmail)?.toISOString() ?? null,
+              respondedAt: toISOStringSafe(respAtMap.get(e.responseFromEmail)),
             })),
-            remindMeOn: contact.remindMeOn ? contact.remindMeOn.toISOString() : null,
+            remindMeOn: toISOStringSafe(contact.remindMeOn),
           };
         } catch (error) {
           console.error(`Error enriching contact ${contact.id}:`, error);
