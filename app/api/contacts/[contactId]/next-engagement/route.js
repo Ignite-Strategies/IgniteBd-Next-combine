@@ -35,7 +35,17 @@ export async function PATCH(request, { params }) {
 
     const data = {};
     if (nextEngagementDate !== undefined) {
-      data.nextEngagementDate = nextEngagementDate == null || nextEngagementDate === '' ? null : new Date(nextEngagementDate);
+      if (nextEngagementDate == null || nextEngagementDate === '') {
+        data.nextEngagementDate = null;
+      } else {
+        // Store calendar date as noon UTC so EST display shows the same day (avoid "back in time" when user picks e.g. Feb 26)
+        const dateOnly = String(nextEngagementDate).slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+          data.nextEngagementDate = new Date(dateOnly + 'T12:00:00.000Z');
+        } else {
+          data.nextEngagementDate = new Date(nextEngagementDate);
+        }
+      }
     }
     if (nextEngagementPurpose !== undefined) {
       if (nextEngagementPurpose != null && nextEngagementPurpose !== '' && !VALID_PURPOSES.includes(nextEngagementPurpose)) {

@@ -4,21 +4,15 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Calendar, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
+import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
 
-// User's local today (YYYY-MM-DD) so "Due today" matches their calendar, not EST
-function getTodayLocal() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+const TZ = 'America/New_York';
 
-function dayDiff(dateKey, todayStr) {
-  if (!dateKey || !todayStr) return null;
-  const a = new Date(dateKey + 'T12:00:00');
-  const b = new Date(todayStr + 'T12:00:00');
-  return Math.round((a - b) / (24 * 60 * 60 * 1000));
+// Stored nextEngagementDate is UTC; follow-up "date" = calendar day in EST
+function toESTDateString(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-CA', { timeZone: TZ });
 }
 
 /**
@@ -37,7 +31,7 @@ export default function NextEngagementContainer({
   const [error, setError] = useState(null);
   const [resolvedCompanyId, setResolvedCompanyId] = useState(companyHQId || null);
 
-  const todayLocal = getTodayLocal();
+  const todayEST = getTodayEST();
 
   useEffect(() => {
     const id = companyHQId || (typeof window !== 'undefined' && (window.localStorage?.getItem('companyHQId') || window.localStorage?.getItem('companyId')));
@@ -69,11 +63,10 @@ export default function NextEngagementContainer({
     return () => { cancelled = true; };
   }, [resolvedCompanyId, limit]);
 
-  const datePart = (iso) => (iso && iso.slice) ? iso.slice(0, 10) : '';
   const groupByDate = (list) => {
     const groups = {};
     for (const r of list) {
-      const key = datePart(r.nextEngagementDate);
+      const key = toESTDateString(r.nextEngagementDate);
       if (!key) continue;
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
@@ -81,14 +74,12 @@ export default function NextEngagementContainer({
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   };
 
-  const sectionTitle = (dateKey) => {
-    const diff = dayDiff(dateKey, todayLocal);
-    if (diff === 0) return 'Due today';
-    if (diff === 1) return 'Due tomorrow';
-    if (diff === -1) return 'Yesterday';
-    if (!dateKey) return '';
-    const d = new Date(dateKey + 'T12:00:00');
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const sectionTitle = (estDateKey) => {
+    const { label, actual } = formatDateLabelEST(todayEST, estDateKey);
+    if (label === 'Today') return 'Due today';
+    if (label === 'Tomorrow') return 'Due tomorrow';
+    if (label === 'Yesterday') return 'Yesterday';
+    return actual || estDateKey;
   };
 
   const name = (r) => [r.firstName, r.lastName].filter(Boolean).join(' ').trim() || r.email || '—';
