@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Calendar, ChevronRight } from 'lucide-react';
+import { Mail, Calendar, ChevronRight, Download, Send } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
 
@@ -87,6 +87,26 @@ export default function NextEngagementContainer({
     return labels[purpose] || purpose;
   };
 
+  const handleExport = () => {
+    if (nextEngagements.length === 0) return;
+    const headers = ['Name', 'Email', 'Date', 'Purpose', 'Note'];
+    const rows = nextEngagements.map((r) => [
+      name(r),
+      r.email || '',
+      r.nextEngagementDate || '',
+      purposeLabel(r.nextEngagementPurpose),
+      (r.nextContactNote || '').replace(/"/g, '""'),
+    ]);
+    const csv = [headers.join(','), ...rows.map((row) => row.map((c) => `"${String(c)}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `next-engagements-${todayEST}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!resolvedCompanyId) return null;
 
   if (loading) {
@@ -120,15 +140,31 @@ export default function NextEngagementContainer({
           </div>
           <p className="mt-0.5 text-xs font-medium text-amber-700/90">Sorted by date</p>
         </div>
-        {showSeeAll && (
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push(`/outreach/tracker?companyHQId=${resolvedCompanyId}`)}
-            className="text-sm font-medium text-amber-600 hover:text-amber-700"
+            onClick={handleExport}
+            disabled={nextEngagements.length === 0}
+            className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Download as CSV"
           >
-            See all
+            <Download className="h-4 w-4" />
+            Export
           </button>
-        )}
+          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-400" title="Email digest (coming soon)">
+            <Send className="h-4 w-4" />
+            Email <span className="text-xs">(soon)</span>
+          </span>
+          {showSeeAll && (
+            <button
+              type="button"
+              onClick={() => router.push(`/outreach/tracker?companyHQId=${resolvedCompanyId}`)}
+              className="text-sm font-medium text-amber-600 hover:text-amber-700"
+            >
+              See all
+            </button>
+          )}
+        </div>
       </div>
       <div className={compact ? 'max-h-64 overflow-y-auto' : ''}>
         {grouped.length === 0 ? (

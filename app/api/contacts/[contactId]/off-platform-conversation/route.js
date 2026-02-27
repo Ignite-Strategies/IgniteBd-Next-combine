@@ -48,12 +48,25 @@ export async function POST(request, { params }) {
 
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
+      select: { id: true, email: true, crmId: true },
     });
     if (!contact) {
       return NextResponse.json(
         { success: false, error: 'Contact not found' },
         { status: 404 },
       );
+    }
+
+    // When contact belongs to a company (crmId), use that company's owner so managers record under the company owner (e.g. Joel for BPLaw)
+    let activityOwnerId = owner.id;
+    if (contact.crmId) {
+      const company = await prisma.company_hqs.findUnique({
+        where: { id: contact.crmId },
+        select: { ownerId: true },
+      });
+      if (company?.ownerId) {
+        activityOwnerId = company.ownerId;
+      }
     }
 
     const body = await request.json();
@@ -91,7 +104,7 @@ export async function POST(request, { params }) {
 
       const activity = await prisma.email_activities.create({
         data: {
-          owner_id: owner.id,
+          owner_id: activityOwnerId,
           contact_id: contactId,
           email: contact.email || null,
           subject,

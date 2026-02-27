@@ -1212,16 +1212,29 @@ Best regards"`;
                 <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
                   <div className="mb-2 font-semibold text-blue-800">Conversation parsed</div>
                   <p className="text-blue-700">
-                    Found {parsedConversation.messages.length} messages.
-                    {parsedConversation.ourOutbound && parsedConversation.lastReply
-                      ? " We'll record your outbound email and the contact's reply."
-                      : ' Select the contact below so we can tell which message is yours and which is the reply.'}
+                    Found {parsedConversation.messages.length} messages. Select the contact below, then click <strong>Save conversation ({parsedConversation.messages.length} messages)</strong> at the bottom to save the whole thread. You don’t need to fill separate boxes—all {parsedConversation.messages.length} are saved in one step.
                   </p>
+                  <div className="mt-3 space-y-2">
+                    <div className="text-xs font-semibold text-blue-800">Preview — what will be saved:</div>
+                    {parsedConversation.messages.map((m, i) => (
+                      <div key={i} className="rounded border border-blue-100 bg-white px-2 py-1.5 text-xs">
+                        <span className="font-medium text-gray-700">
+                          {m.direction === 'outbound' ? 'You →' : 'Contact →'}
+                        </span>{' '}
+                        {m.subject || '(no subject)'}
+                        {m.sent && <span className="ml-1 text-gray-500">({m.sent})</span>}
+                        {(m.body || '').trim() && (
+                          <div className="mt-0.5 truncate text-gray-500">
+                            {(m.body || '').trim().length > 60
+                              ? `${(m.body || '').trim().slice(0, 60)}…`
+                              : (m.body || '').trim()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   {parsedConversation.ourOutbound && (
-                    <p className="mt-1 text-blue-600">Outbound: {parsedConversation.ourOutbound.subject || 'No subject'} ({parsedConversation.ourOutbound.sent || 'no date'})</p>
-                  )}
-                  {parsedConversation.lastReply && (
-                    <p className="mt-0.5 text-blue-600">Reply: from {parsedConversation.lastReply.fromEmail || parsedConversation.lastReply.from} — {(parsedConversation.lastReply.body || '').slice(0, 80)}{(parsedConversation.lastReply.body || '').length > 80 ? '…' : ''}</p>
+                    <p className="mt-2 text-blue-600">Outbound: {parsedConversation.ourOutbound.subject || 'No subject'} ({parsedConversation.ourOutbound.sent || 'no date'})</p>
                   )}
                   <button
                     type="button"
