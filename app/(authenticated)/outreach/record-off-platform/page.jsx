@@ -757,12 +757,11 @@ Best regards"`;
       setContact(contact);
       setFuzzyContact(null);
       setEmailCandidates([]);
-      if (contact.email) {
-        setManualEntry(prev => ({
-          ...prev,
-          email: contact.email,
-        }));
-      }
+      // Set email from contact when available; leave as-is when contact has no email (e.g. LinkedIn-only)
+      setManualEntry(prev => ({
+        ...prev,
+        email: contact.email || prev.email,
+      }));
       // Don't push contactId into the URL here — that would trigger the
       // useEffect fetch loop and cause re-renders while the user is typing.
       // contactId in the URL is only meaningful when navigating TO this page.
@@ -867,12 +866,13 @@ Best regards"`;
     }
     
     // Priority: selected contact > contactId from URL > email lookup
+    // When a contact is selected (or loaded from URL), we can save even if they have no email — e.g. LinkedIn-only outreach
     if (selectedContactForEmail?.id) {
       targetContactId = selectedContactForEmail.id;
-      targetEmail = selectedContactForEmail.email;
+      targetEmail = selectedContactForEmail.email || '';
     } else if (contactIdFromUrl && contact) {
       targetContactId = contactIdFromUrl;
-      targetEmail = contact.email;
+      targetEmail = contact.email || '';
     } else if (!targetEmail || !targetEmail.includes('@')) {
       setParsingError('Please select a contact or enter a valid email address');
       return;
@@ -1410,19 +1410,21 @@ Best regards"`;
               
               <div>
                 <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Contact Email <span className="text-red-500">*</span>
+                  Contact Email {(selectedContactForEmail || (contactIdFromUrl && contact)) ? null : <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="email"
                   value={manualEntry.email}
                   onChange={(e) => setManualEntry({ ...manualEntry, email: e.target.value })}
-                  placeholder={parsedEmail?.toEmail ? parsedEmail.toEmail : selectedContactForEmail?.email || "john@example.com"}
+                  placeholder={parsedEmail?.toEmail ? parsedEmail.toEmail : selectedContactForEmail?.email || (manualEntry.platform !== 'email' ? 'Optional for LinkedIn / in-person' : 'e.g. contact@company.com')}
                   disabled={!!selectedContactForEmail}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
                 {selectedContactForEmail && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Email is set from selected contact. Clear contact selection above to edit manually.
+                    {selectedContactForEmail.email
+                      ? 'Email is set from selected contact. Clear contact selection above to edit manually.'
+                      : 'No email on file for this contact — OK for LinkedIn or in-person. You can still save.'}
                   </p>
                 )}
                 {parsedEmail?.toEmail && !selectedContactForEmail && (
@@ -1523,7 +1525,12 @@ Best regards"`;
               <button
                 type="button"
                 onClick={handleSaveManual}
-                disabled={saving || !manualEntry.email || !manualEntry.body || (!selectedContactForEmail && (fuzzyContact !== null || emailCandidates.length > 0))}
+                disabled={
+                  saving ||
+                  !manualEntry.body ||
+                  (!selectedContactForEmail && !(contactIdFromUrl && contact) && (!manualEntry.email || !manualEntry.email.includes('@'))) ||
+                  (!selectedContactForEmail && (fuzzyContact !== null || emailCandidates.length > 0))
+                }
                 className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
                 title={(!selectedContactForEmail && (fuzzyContact !== null || emailCandidates.length > 0)) ? 'Confirm the contact match above before saving' : undefined}
               >
@@ -1535,7 +1542,7 @@ Best regards"`;
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    Save Email Record
+                    {manualEntry.platform === 'email' ? 'Save Email Record' : 'Save Outreach Record'}
                   </>
                 )}
               </button>
