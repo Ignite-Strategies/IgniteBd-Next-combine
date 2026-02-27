@@ -65,7 +65,7 @@ export async function GET(request) {
       );
     }
 
-    // Contacts that have at least one "send" (platform sent or off-platform with sentAt)
+    // Contacts that have at least one "send" OR a next engagement date (so e.g. "friend due April 1" with no sends still shows)
     const activityWhere = {
       OR: [
         { event: 'sent' },
@@ -87,13 +87,18 @@ export async function GET(request) {
     if (hasResponded === 'true') activityWhere.responseFromEmail = { not: null };
     if (hasResponded === 'false') activityWhere.responseFromEmail = null;
 
+    const contactWhere = {
+      crmId: companyHQId,
+      OR: [
+        { email_activities: { some: activityWhere } },
+        { nextEngagementDate: { not: null } },
+        { remindMeOn: { not: null } },
+        { nextContactedAt: { not: null } },
+      ],
+    };
+
     const contactsWithActivities = await prisma.contact.findMany({
-      where: {
-        crmId: companyHQId,
-        email_activities: {
-          some: activityWhere,
-        },
-      },
+      where: contactWhere,
       select: {
         id: true,
         firstName: true,
@@ -171,6 +176,7 @@ export async function GET(request) {
           }
 
           const hasAnyResponse = activities.some(a => !!a.responseFromEmail);
+          if (hasResponded === 'true' && !hasAnyResponse) return null;
           const sendDate = (a) => toISOStringSafe(a.sentAt ?? a.createdAt);
 
           return {
@@ -214,10 +220,7 @@ export async function GET(request) {
       .slice(0, limit);
 
     const totalCount = await prisma.contact.count({
-      where: {
-        crmId: companyHQId,
-        email_activities: { some: activityWhere },
-      },
+      where: contactWhere,
     });
 
     return NextResponse.json({

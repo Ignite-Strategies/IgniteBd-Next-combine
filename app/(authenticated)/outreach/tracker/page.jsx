@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Calendar } from 'lucide-react';
+import { Calendar, Pencil, Check, X } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, dayDiffEST, formatDateEST, formatDateLabelEST } from '@/lib/dateEst';
 
@@ -27,6 +27,8 @@ function OutreachTrackerContent() {
     totalCount: 0,
     hasMore: false,
   });
+  const [editingNextDate, setEditingNextDate] = useState(null); // { contactId, value: 'YYYY-MM-DD' }
+  const [savingDate, setSavingDate] = useState(false);
 
   const fetchContacts = async () => {
     if (!companyHQId) {
@@ -92,6 +94,34 @@ function OutreachTrackerContent() {
       ...prev,
       offset: Math.max(0, prev.offset - prev.limit),
     }));
+  };
+
+  const startEditNextDate = (contact) => {
+    const dateOnly = contact.nextSendDate ? String(contact.nextSendDate).slice(0, 10) : '';
+    setEditingNextDate({ contactId: contact.id, value: dateOnly || '' });
+  };
+
+  const cancelEditNextDate = () => {
+    setEditingNextDate(null);
+  };
+
+  const saveNextDate = async (contactId) => {
+    if (!editingNextDate || editingNextDate.contactId !== contactId) return;
+    const value = editingNextDate.value.trim();
+    setSavingDate(true);
+    try {
+      await api.patch(`/api/contacts/${contactId}/next-engagement`, {
+        nextEngagementDate: value || null,
+      });
+      setEditingNextDate(null);
+      setError(null);
+      await fetchContacts();
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Failed to update date';
+      setError(msg);
+    } finally {
+      setSavingDate(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -335,9 +365,49 @@ function OutreachTrackerContent() {
                               {formatDate(contact.lastSendDate)}
                             </td>
                             <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                              {formatDate(contact.nextSendDate)}
-                              {contact.remindMeOn && (
-                                <span className="ml-2 text-xs text-blue-600">(Manual)</span>
+                              {editingNextDate?.contactId === contact.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="date"
+                                    value={editingNextDate.value}
+                                    onChange={(e) => setEditingNextDate(prev => prev ? { ...prev, value: e.target.value } : null)}
+                                    className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                                    disabled={savingDate}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => saveNextDate(contact.id)}
+                                    disabled={savingDate}
+                                    className="rounded p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
+                                    title="Save"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditNextDate}
+                                    disabled={savingDate}
+                                    className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+                                    title="Cancel"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  {formatDate(contact.nextSendDate)}
+                                  {contact.remindMeOn && (
+                                    <span className="ml-2 text-xs text-blue-600">(Manual)</span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditNextDate(contact)}
+                                    className="ml-2 inline-flex rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600"
+                                    title="Fix next follow-up date"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
                               )}
                             </td>
                             <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
