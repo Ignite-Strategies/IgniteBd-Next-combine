@@ -88,6 +88,7 @@ function SettingsPageContent() {
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companyData, setCompanyData] = useState({
     companyName: '',
+    slug: '',
     whatYouDo: '',
     companyStreet: '',
     companyCity: '',
@@ -258,6 +259,7 @@ function SettingsPageContent() {
     if (companyHQ) {
       setCompanyData({
         companyName: companyHQ.companyName || '',
+        slug: companyHQ.slug || '',
         whatYouDo: companyHQ.whatYouDo || '',
         companyStreet: companyHQ.companyStreet || '',
         companyCity: companyHQ.companyCity || '',
@@ -374,6 +376,7 @@ function SettingsPageContent() {
       
       const response = await api.put('/api/company/upsert', {
         companyName: companyData.companyName,
+        slug: companyData.slug || null,
         whatYouDo: companyData.whatYouDo,
         companyStreet: companyData.companyStreet,
         companyCity: companyData.companyCity,
@@ -717,6 +720,32 @@ function SettingsPageContent() {
                       onChange={(e) => setCompanyData({ ...companyData, companyName: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
                     />
+                  </div>
+                  <div>
+                    <label htmlFor="slug" className="block text-sm font-medium text-gray-700 mb-1">
+                      Cockpit URL Slug
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500 whitespace-nowrap">/cockpit/</span>
+                      <input
+                        type="text"
+                        id="slug"
+                        value={companyData.slug}
+                        onChange={(e) => {
+                          const slug = e.target.value
+                            .toLowerCase()
+                            .replace(/[^a-z0-9-]/g, '-')
+                            .replace(/-+/g, '-')
+                            .replace(/^-|-$/g, '');
+                          setCompanyData({ ...companyData, slug });
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                        placeholder="acme-corp"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Used for cockpit URL: /cockpit/{companyData.slug || 'your-slug'}
+                    </p>
                   </div>
                   <div>
                     <label htmlFor="whatYouDo" className="block text-sm font-medium text-gray-700 mb-1">

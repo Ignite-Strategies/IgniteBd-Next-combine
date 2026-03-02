@@ -27,6 +27,7 @@ export async function PUT(request) {
     const body = await request.json();
     const {
       companyName,
+      slug,
       whatYouDo,
       companyStreet,
       companyCity,
@@ -46,19 +47,46 @@ export async function PUT(request) {
     }
 
     // Check if owner already has a company
-    const existingCompany = await prisma.companyHQ.findFirst({
+    const existingCompany = await prisma.company_hqs.findFirst({
       where: { ownerId: owner.id },
     });
+
+    // Normalize slug if provided
+    let normalizedSlug = null;
+    if (slug && slug.trim()) {
+      normalizedSlug = slug
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      if (!normalizedSlug) {
+        normalizedSlug = null;
+      } else {
+        // Check if slug is already taken by another company (exclude current company if updating)
+        const existingBySlug = await prisma.company_hqs.findFirst({
+          where: { 
+            slug: normalizedSlug,
+            ...(existingCompany ? { id: { not: existingCompany.id } } : {}),
+          },
+        });
+        if (existingBySlug) {
+          return NextResponse.json(
+            { success: false, error: 'Slug already taken' },
+            { status: 409 },
+          );
+        }
+      }
+    }
 
     let companyHQ;
     let created = false;
 
     if (existingCompany) {
       // Update existing company
-      companyHQ = await prisma.companyHQ.update({
+      companyHQ = await prisma.company_hqs.update({
         where: { id: existingCompany.id },
         data: {
           companyName,
+          slug: normalizedSlug !== undefined ? normalizedSlug : undefined,
           whatYouDo: whatYouDo || null,
           companyStreet: companyStreet || null,
           companyCity: companyCity || null,
@@ -77,9 +105,22 @@ export async function PUT(request) {
       console.log('✅ CompanyHQ updated:', companyHQ.id);
     } else {
       // Create new company
-      companyHQ = await prisma.companyHQ.create({
+      // Generate slug from companyName if not provided
+      let finalSlug = normalizedSlug;
+      if (!finalSlug && companyName) {
+        finalSlug = companyName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        if (!finalSlug) {
+          finalSlug = null;
+        }
+      }
+
+      companyHQ = await prisma.company_hqs.create({
         data: {
           companyName,
+          slug: finalSlug,
           whatYouDo: whatYouDo || null,
           companyStreet: companyStreet || null,
           companyCity: companyCity || null,

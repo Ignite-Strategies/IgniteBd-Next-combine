@@ -2,18 +2,22 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Calendar, ChevronRight, Download, Upload, Copy, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, Calendar, ChevronRight, Download, Upload, Copy, X, CheckCircle, AlertCircle, Target, FileText, Edit } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, formatDateLabelEST, addDaysEST, formatDateEST } from '@/lib/dateEst';
 
 /**
  * Owner Cockpit Container
+ * - Welcome message with company name
  * - Week of date selector
  * - Upcoming sends (next engagements) for selected week
+ * - Next target lists placeholder
+ * - Update contact notes placeholder
  * - Bulk import/update next engagements via copy/paste or file upload
  */
 export default function OwnerCockpitContainer({
   companyHQId,
+  companyName,
   limit = 500,
 }) {
   const router = useRouter();
@@ -292,21 +296,37 @@ export default function OwnerCockpitContainer({
     return `${start} - ${end}`;
   };
 
+  const formatMondayDate = () => {
+    return formatDateEST(selectedWeekStart, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
   if (!resolvedCompanyId) return null;
 
   const grouped = groupByDate(filteredEngagements);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Mail className="h-6 w-6 text-amber-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Owner Cockpit</h3>
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-sm">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Welcome {companyName || 'to Owner Cockpit'}
+        </h1>
+        <p className="text-base text-gray-700">
+          Here is the outlook for week of {formatMondayDate()}
+        </p>
+      </div>
+
+      {/* Main Container */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-6 w-6 text-amber-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Upcoming Reach Outs</h3>
+            </div>
+            <p className="mt-1 text-sm font-medium text-amber-700/90">Next engagements for selected week</p>
           </div>
-          <p className="mt-1 text-sm font-medium text-amber-700/90">Upcoming sends for selected week</p>
-        </div>
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -530,6 +550,40 @@ export default function OwnerCockpitContainer({
           ))}
         </ul>
       )}
+      </div>
+
+      {/* Next Target Lists Section */}
+      <div className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-8">
+        <div className="flex flex-col items-center justify-center text-center">
+          <Target className="h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Next Target Lists</h3>
+          <p className="text-sm text-gray-500 max-w-md">
+            Target lists functionality coming soon. This will help you organize and prioritize your outreach efforts.
+          </p>
+        </div>
+      </div>
+
+      {/* Update Contact Notes Section */}
+      <div className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-8">
+        <div className="flex flex-col items-center justify-center text-center">
+          <FileText className="h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">Update Contact Notes</h3>
+          <p className="text-sm text-gray-500 mb-4 max-w-md">
+            Need to update notes on a contact? Do it here.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              // TODO: Implement contact notes update UI
+              alert('Contact notes update functionality coming soon!');
+            }}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            <Edit className="h-4 w-4" />
+            Update Contact Notes
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

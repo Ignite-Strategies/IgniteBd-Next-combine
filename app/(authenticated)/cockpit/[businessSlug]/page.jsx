@@ -28,37 +28,19 @@ function CockpitContent() {
       return;
     }
 
-    // Get companyHQId from localStorage and verify slug matches
+    // Look up company by slug
     const findCompanyBySlug = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Get companyHQId from localStorage
-        const storedCompanyId = typeof window !== 'undefined' 
-          ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId')
-          : null;
-
-        if (!storedCompanyId) {
-          setError('Company ID not found. Please ensure you are logged in.');
-          setLoading(false);
-          return;
-        }
-
-        // Fetch company and verify slug matches
+        // Fetch company by slug
         try {
-          const companyRes = await api.get(`/api/company-hqs/${storedCompanyId}`);
+          const companyRes = await api.get(`/api/company-hqs/by-slug/${businessSlug}`);
           const company = companyRes.data?.company;
           
           if (!company) {
             setError('Company not found');
-            setLoading(false);
-            return;
-          }
-
-          const companySlug = slugify(company.companyName);
-          if (companySlug !== businessSlug) {
-            setError(`URL slug "${businessSlug}" does not match company "${company.companyName}" (expected: ${companySlug})`);
             setLoading(false);
             return;
           }
@@ -68,7 +50,7 @@ function CockpitContent() {
         } catch (err) {
           console.error('Error fetching company:', err);
           if (err?.response?.status === 404) {
-            setError('Company not found');
+            setError(`Company not found for slug: ${businessSlug}. Please set a slug in company settings.`);
           } else if (err?.response?.status === 403) {
             setError('Access denied to this company');
           } else {
@@ -131,7 +113,7 @@ function CockpitContent() {
           backLabel="Back to Outreach"
         />
         <div className="mt-8">
-          <OwnerCockpitContainer companyHQId={companyHQId} />
+          <OwnerCockpitContainer companyHQId={companyHQId} companyName={companyName} />
         </div>
       </div>
     </div>
