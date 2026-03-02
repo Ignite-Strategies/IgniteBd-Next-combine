@@ -35,38 +35,70 @@ export async function POST(request: Request) {
     const html = typeof formData.get('html') === 'string' ? formData.get('html') as string : '';
     const headers = typeof formData.get('headers') === 'string' ? formData.get('headers') as string : '';
 
+    console.log('[inbound-email] Received webhook:', {
+      from,
+      to,
+      subject: subject.substring(0, 50),
+      hasText: !!text,
+      hasHtml: !!html,
+    });
+
     // Extract company slug from recipient address
     // Pattern: {companySlug}@crm.ignitestrategies.co
-    const slugMatch = to.match(/^([^@]+)@crm\.(.+)$/);
-    if (!slugMatch) {
-      console.error('[inbound-email] Invalid recipient address format:', to);
+    // SendGrid may send multiple "to" addresses, so handle comma-separated or just first match
+    const toAddresses = to.split(',').map(addr => addr.trim());
+    let companySlug: string | null = null;
+    
+    for (const toAddr of toAddresses) {
+      const slugMatch = toAddr.match(/^([^@]+)@crm\.(.+)$/);
+      if (slugMatch) {
+        companySlug = slugMatch[1].toLowerCase().trim();
+        break;
+      }
+    }
+
+    if (!companySlug) {
+      console.error('[inbound-email] Invalid recipient address format:', { to, toAddresses });
       return NextResponse.json(
         { success: false, error: 'Invalid recipient address format' },
         { status: 400 }
       );
     }
 
-    const companySlug = slugMatch[1].toLowerCase().trim();
-    if (!companySlug) {
-      return NextResponse.json(
-        { success: false, error: 'Company slug not found in recipient address' },
-        { status: 400 }
-      );
-    }
+    console.log('[inbound-email] Extracted slug:', companySlug);
 
     // Validate slug exists in company_hqs
     const company = await prisma.company_hqs.findUnique({
       where: { slug: companySlug },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, companyName: true, slug: true },
     });
 
     if (!company) {
-      console.error('[inbound-email] Company slug not found:', companySlug);
+      // Try to find by company name as fallback (for debugging)
+      const companiesWithSlug = await prisma.company_hqs.findMany({
+        where: {
+          companyName: { contains: 'BusinessPoint', mode: 'insensitive' },
+        },
+        select: { id: true, companyName: true, slug: true },
+        take: 5,
+      });
+      
+      console.error('[inbound-email] Company slug not found:', {
+        requestedSlug: companySlug,
+        foundCompanies: companiesWithSlug,
+      });
+      
       return NextResponse.json(
-        { success: false, error: 'Company slug not found' },
+        { success: false, error: `Company slug not found: "${companySlug}"` },
         { status: 400 }
       );
     }
+
+    console.log('[inbound-email] Found company:', {
+      id: company.id,
+      name: company.companyName,
+      slug: company.slug,
+    });
 
     // Get owner ID (from company or fallback)
     const ownerId = company.ownerId || process.env.INBOUND_EMAIL_OWNER_ID || null;
