@@ -44,21 +44,37 @@ export async function POST(request: Request) {
     });
 
     // Extract company slug from recipient address
+    // SendGrid sends format: "display-name" <email@domain.com> or just email@domain.com
     // Pattern: {companySlug}@crm.ignitestrategies.co
-    // SendGrid may send multiple "to" addresses, so handle comma-separated or just first match
-    const toAddresses = to.split(',').map(addr => addr.trim());
+    // Handle both formats: extract from angle brackets or direct email
+    
     let companySlug: string | null = null;
     
-    for (const toAddr of toAddresses) {
-      const slugMatch = toAddr.match(/^([^@]+)@crm\.(.+)$/);
+    // Try to extract from angle brackets first: <businesspoint-law@crm.ignitestrategies.co>
+    const angleBracketMatch = to.match(/<([^>]+)>/);
+    if (angleBracketMatch) {
+      const emailInBrackets = angleBracketMatch[1];
+      const slugMatch = emailInBrackets.match(/^([^@]+)@crm\.(.+)$/);
       if (slugMatch) {
         companySlug = slugMatch[1].toLowerCase().trim();
-        break;
       }
+    }
+    
+    // If not found in brackets, try direct match
+    if (!companySlug) {
+      const slugMatch = to.match(/^([^@]+)@crm\.(.+)$/);
+      if (slugMatch) {
+        companySlug = slugMatch[1].toLowerCase().trim();
+      }
+    }
+    
+    // Clean up slug: remove quotes, whitespace, tabs
+    if (companySlug) {
+      companySlug = companySlug.replace(/^["']+|["']+$/g, '').replace(/\s+/g, '').trim();
     }
 
     if (!companySlug) {
-      console.error('[inbound-email] Invalid recipient address format:', { to, toAddresses });
+      console.error('[inbound-email] Invalid recipient address format:', { to });
       return NextResponse.json(
         { success: false, error: 'Invalid recipient address format' },
         { status: 400 }
