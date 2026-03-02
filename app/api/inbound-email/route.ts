@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { takeCrmClientEmailAndParseAiService } from '@/lib/services/takeCrmClientEmailAndParseAiService';
+import { extractCompanySlugFromAddress, parseEmailAddresses } from '@/lib/utils/parseEmailAddress';
 
 /**
  * POST /api/inbound-email
@@ -35,48 +36,31 @@ export async function POST(request: Request) {
     const html = typeof formData.get('html') === 'string' ? formData.get('html') as string : '';
     const headers = typeof formData.get('headers') === 'string' ? formData.get('headers') as string : '';
 
+    // Parse email addresses from SendGrid payload
+    const parsedToAddresses = parseEmailAddresses(to);
+    const parsedFromAddresses = parseEmailAddresses(from);
+    
     console.log('[inbound-email] Received webhook:', {
       from,
       to,
+      parsedFromAddresses,
+      parsedToAddresses,
       subject: subject.substring(0, 50),
       hasText: !!text,
       hasHtml: !!html,
     });
 
-    // Extract company slug from recipient address
-    // SendGrid sends format: "display-name" <email@domain.com> or just email@domain.com
+    // Extract company slug from recipient address using email parser
     // Pattern: {companySlug}@crm.ignitestrategies.co
-    // Handle both formats: extract from angle brackets or direct email
-    
-    let companySlug: string | null = null;
-    
-    // Try to extract from angle brackets first: <businesspoint-law@crm.ignitestrategies.co>
-    const angleBracketMatch = to.match(/<([^>]+)>/);
-    if (angleBracketMatch) {
-      const emailInBrackets = angleBracketMatch[1];
-      const slugMatch = emailInBrackets.match(/^([^@]+)@crm\.(.+)$/);
-      if (slugMatch) {
-        companySlug = slugMatch[1].toLowerCase().trim();
-      }
-    }
-    
-    // If not found in brackets, try direct match
-    if (!companySlug) {
-      const slugMatch = to.match(/^([^@]+)@crm\.(.+)$/);
-      if (slugMatch) {
-        companySlug = slugMatch[1].toLowerCase().trim();
-      }
-    }
-    
-    // Clean up slug: remove quotes, whitespace, tabs
-    if (companySlug) {
-      companySlug = companySlug.replace(/^["']+|["']+$/g, '').replace(/\s+/g, '').trim();
-    }
+    const companySlug = extractCompanySlugFromAddress(to);
 
     if (!companySlug) {
-      console.error('[inbound-email] Invalid recipient address format:', { to });
+      console.error('[inbound-email] Invalid recipient address format - no slug found:', {
+        to,
+        parsedToAddresses,
+      });
       return NextResponse.json(
-        { success: false, error: 'Invalid recipient address format' },
+        { success: false, error: 'Invalid recipient address format - no company slug found' },
         { status: 400 }
       );
     }
