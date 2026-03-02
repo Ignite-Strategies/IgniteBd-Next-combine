@@ -332,6 +332,7 @@ model platform {
 model company_hqs {
   id                                            String                          @id @default(cuid())
   companyName                                   String
+  slug                                          String?                         @unique // URL-friendly slug for cockpit routes (e.g., "acme-corp")
   companyStreet                                 String?
   companyCity                                   String?
   companyState                                  String?
@@ -396,6 +397,7 @@ model company_hqs {
   @@index([planId])
   @@index([planStatus])
   @@index([stripeSubscriptionId])
+  @@index([slug])
 }
 
 model company_memberships {
@@ -672,6 +674,8 @@ model email_activities {
   source                 EmailSource?           @default(PLATFORM)
   platform               String?                 // "sendgrid", "gmail", "outlook", "apollo", "manual", "ai-draft"
   sentAt                 DateTime?              // When actually sent; null = use createdAt
+  // Raw email storage (for inbound ingestion)
+  emailRawText           String?                 @db.Text // Client's literal email (forwarded chains, pasted content)
   campaigns              campaigns?          @relation(fields: [campaign_id], references: [id])
   owners                 owners              @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   email_sequences        email_sequences?    @relation(fields: [sequence_id], references: [id])

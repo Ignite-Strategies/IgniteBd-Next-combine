@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import NextEngagementContainer from '@/components/outreach/NextEngagementContainer.jsx';
+import RecentInboundContainer from '@/components/outreach/RecentInboundContainer.jsx';
 import { useOutreachContext } from '@/hooks/useOutreach';
 import api from '@/lib/api';
 
@@ -179,6 +180,11 @@ function OutreachContent() {
         {/* Next engagements — compact day-only preview; full list on Tracker */}
         <div className="mb-8">
           <NextEngagementContainer compact showSeeAll />
+        </div>
+
+        {/* Recent Inbound Emails */}
+        <div className="mb-8">
+          <RecentInboundContainer compact showSeeAll />
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
