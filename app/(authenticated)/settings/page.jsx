@@ -112,6 +112,7 @@ function SettingsPageContent() {
   const [verifiedSender, setVerifiedSender] = useState(null);
   const [senderError, setSenderError] = useState(null);
 
+
   // Helper to get Firebase auth token for platform-manager API calls
   const getAuthToken = async () => {
     try {
@@ -474,6 +475,7 @@ function SettingsPageContent() {
       alert(`Error: ${err.response?.data?.error || err.message}\nStatus: ${err.response?.status || 'N/A'}`);
     }
   };
+
 
   // If a section is active, show the form
   if (activeSection) {
@@ -984,6 +986,7 @@ function SettingsPageContent() {
               <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-green-600 transition-colors" />
             </div>
           </button>
+
 
           {/* Connect Microsoft Card - Simple and Direct */}
           <div className="group relative rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm hover:border-blue-300 hover:shadow-md transition-all text-left md:col-span-2">

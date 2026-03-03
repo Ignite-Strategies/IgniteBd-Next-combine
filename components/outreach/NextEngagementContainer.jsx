@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Calendar, ChevronRight, Download, Send } from 'lucide-react';
+import { Mail, Calendar, ChevronRight, Download, Send, X, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
 
@@ -22,6 +22,13 @@ export default function NextEngagementContainer({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resolvedCompanyId, setResolvedCompanyId] = useState(companyHQId || null);
+  const [showSendEmailModal, setShowSendEmailModal] = useState(false);
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState(null);
+  const [emailSuccess, setEmailSuccess] = useState(false);
 
   const todayEST = getTodayEST();
 
@@ -107,6 +114,49 @@ export default function NextEngagementContainer({
     URL.revokeObjectURL(url);
   };
 
+  const handleSendEmail = async () => {
+    if (!resolvedCompanyId) {
+      setEmailError('Company ID is required');
+      return;
+    }
+
+    if (!recipientEmail) {
+      setEmailError('Recipient email is required');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      setEmailError(null);
+      setEmailSuccess(false);
+
+      const response = await api.post('/api/outreach/send-next-engagement-email', {
+        recipientName: recipientName || undefined,
+        recipientEmail,
+        companyHQId: resolvedCompanyId,
+        customMessage: customMessage || undefined,
+      });
+
+      if (response.data?.success) {
+        setEmailSuccess(true);
+        setRecipientName('');
+        setRecipientEmail('');
+        setCustomMessage('');
+        setTimeout(() => {
+          setShowSendEmailModal(false);
+          setEmailSuccess(false);
+        }, 2000);
+      } else {
+        setEmailError(response.data?.error || 'Failed to send email');
+      }
+    } catch (err) {
+      console.error('Failed to send next engagement email:', err);
+      setEmailError(err.response?.data?.error || err.message || 'Failed to send email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   if (!resolvedCompanyId) return null;
 
   if (loading) {
@@ -152,10 +202,16 @@ export default function NextEngagementContainer({
             <Download className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
             Export
           </button>
-          <span className={`flex items-center gap-1.5 font-medium text-gray-400 ${compact ? 'text-sm' : 'gap-2 text-base'}`} title="Email digest (coming soon)">
+          <button
+            type="button"
+            onClick={() => setShowSendEmailModal(true)}
+            disabled={nextEngagements.length === 0}
+            className={`flex items-center gap-1.5 font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'text-sm' : 'gap-2 text-base'}`}
+            title="Send next engagement report via email"
+          >
             <Send className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
-            Email <span className={compact ? 'text-xs' : 'text-sm'}>(soon)</span>
-          </span>
+            Email
+          </button>
           {showSeeAll && (
             <button
               type="button"
@@ -205,6 +261,122 @@ export default function NextEngagementContainer({
           </ul>
         )}
       </div>
+
+      {/* Send Email Modal */}
+      {showSendEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="relative w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Send Next Engagement Report</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSendEmailModal(false);
+                  setEmailError(null);
+                  setEmailSuccess(false);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4">
+              {emailSuccess && (
+                <div className="mb-4 rounded-md bg-green-50 border border-green-200 p-3">
+                  <p className="text-sm text-green-800">✅ Email sent successfully!</p>
+                </div>
+              )}
+
+              {emailError && (
+                <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3">
+                  <p className="text-sm text-red-800">{emailError}</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="recipientName" className="block text-sm font-medium text-gray-700 mb-1">
+                    Recipient Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    id="recipientName"
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 text-sm"
+                    placeholder="John Doe"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="recipientEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                    Recipient Email *
+                  </label>
+                  <input
+                    type="email"
+                    id="recipientEmail"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 text-sm"
+                    placeholder="recipient@example.com"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="customMessage" className="block text-sm font-medium text-gray-700 mb-1">
+                    Custom Message (Optional)
+                  </label>
+                  <textarea
+                    id="customMessage"
+                    value={customMessage}
+                    onChange={(e) => setCustomMessage(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 text-sm"
+                    placeholder="e.g., See below for your weekly reminders"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    This message will appear at the top of the email
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    disabled={sendingEmail || !recipientEmail || !resolvedCompanyId}
+                    className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingEmail ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Email
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSendEmailModal(false);
+                      setEmailError(null);
+                      setEmailSuccess(false);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
