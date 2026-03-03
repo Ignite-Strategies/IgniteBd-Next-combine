@@ -16,6 +16,7 @@ import {
   Calendar,
   Settings,
   FileCode,
+  Inbox,
 } from 'lucide-react';
 
 function Sidebar() {
@@ -80,6 +81,7 @@ function Sidebar() {
         { key: 'people', label: 'People', href: '/people', icon: Users },
         { key: 'contacts', label: 'Contacts', href: '/contacts/view', icon: Contact },
         { key: 'outreach', label: 'Outreach', href: '/outreach', icon: MessageSquare },
+        { key: 'inbound-parse', label: 'Inbound Parse', href: '/inbound-parse', icon: Inbox },
         { key: 'templates', label: 'Templates', href: '/templates', icon: FileCode },
         { key: 'pipelines', label: 'Pipeline', href: '/pipelines', icon: GitBranch },
         { key: 'companies', label: 'Company Hub', href: '/companies', icon: Building2 },
