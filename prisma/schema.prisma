@@ -364,6 +364,7 @@ model company_hqs {
   assessments                                   assessments[]
   blogs                                         blogs[]
   campaigns                                     campaigns[]
+  InboundEmail                                  InboundEmail[]
   companies                                     companies[]
   contacts_company_hqs_contactOwnerIdTocontacts Contact?                        @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
@@ -704,10 +705,15 @@ model InboundEmail {
   htmlBody        String?  @db.Text
   headers         String?  @db.Text
 
+  companyHQId     String?  // FK to company_hqs (company-scoped like rest of repo)
+  company_hqs     company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
   ingestionStatus String   @default("RECEIVED") // RECEIVED | PROCESSING | PROMOTED | FAILED
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([companyHQId])
 }
 
 model email_sequences {

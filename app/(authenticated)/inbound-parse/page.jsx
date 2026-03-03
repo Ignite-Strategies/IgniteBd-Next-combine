@@ -18,15 +18,26 @@ export default function InboundParsePage() {
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [showRaw, setShowRaw] = useState(false);
+  const [companyHQId, setCompanyHQId] = useState(null);
 
   useEffect(() => {
-    fetchInboundEmails();
+    // Get companyHQId from localStorage (company-scoped like rest of repo)
+    const crmId = typeof window !== 'undefined' 
+      ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') || null
+      : null;
+    
+    if (crmId) {
+      setCompanyHQId(crmId);
+      fetchInboundEmails(crmId);
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchInboundEmails = async () => {
+  const fetchInboundEmails = async (tenantId) => {
     try {
       setLoading(true);
-      const res = await api.get('/api/inbound-parse');
+      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}`);
       if (res.data?.success) {
         setEmails(res.data.emails || []);
       }

@@ -19,6 +19,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const companyHQId = searchParams.get('companyHQId'); // Company-scoped filtering
+
     // Get recent inbound emails (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -26,6 +29,7 @@ export async function GET(request: Request) {
     const inboundEmails = await prisma.inboundEmail.findMany({
       where: {
         createdAt: { gte: thirtyDaysAgo },
+        ...(companyHQId && { companyHQId }), // Filter by company (company-scoped)
       },
       orderBy: { createdAt: 'desc' },
       take: 100, // Limit to recent 100

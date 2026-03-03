@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { extractCompanySlugFromAddress } from '@/lib/utils/parseEmailAddress';
 
 /**
  * POST /api/inbound-email
@@ -12,6 +13,7 @@ import { prisma } from '@/lib/prisma';
  * This endpoint is public and does not require authentication (webhook-safe).
  * 
  * MVP1: Ingestion only. No processing, no AI parsing, no contact linking.
+ * Company scoping: Extract slug from 'to' field for filtering.
  */
 export async function POST(req: Request) {
   try {
@@ -43,7 +45,23 @@ export async function POST(req: Request) {
       ? formData.get('headers') as string
       : '';
 
-    // STEP 3: Create InboundEmail record (raw ingestion bucket)
+    // STEP 3: Extract company slug and resolve companyHQId (company-scoped like rest of repo)
+    // Pattern: {companySlug}@crm.ignitestrategies.co
+    let companyHQId: string | null = null;
+    if (to) {
+      const companySlug = extractCompanySlugFromAddress(to);
+      if (companySlug) {
+        const company = await prisma.company_hqs.findUnique({
+          where: { slug: companySlug },
+          select: { id: true },
+        });
+        if (company) {
+          companyHQId = company.id;
+        }
+      }
+    }
+
+    // STEP 4: Create InboundEmail record (raw ingestion bucket)
     const inboundEmail = await prisma.inboundEmail.create({
       data: {
         from: from || null,
@@ -52,6 +70,7 @@ export async function POST(req: Request) {
         textBody: text || null,
         htmlBody: html || null,
         headers: headers || null,
+        companyHQId: companyHQId || null,
         ingestionStatus: 'RECEIVED',
       },
     });
