@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Calendar, ChevronRight, Download, Send, X, Loader2 } from 'lucide-react';
+import { Mail, Calendar, ChevronRight, Download, Send, X, Loader2, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
 
@@ -263,7 +263,14 @@ export default function NextEngagementContainer({
       </div>
 
       {/* Send Email Modal */}
-      {showSendEmailModal && (
+      {showSendEmailModal && (() => {
+        // Same as 1:1 compose: resolve sender from localStorage owner
+        const owner = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('owner') || 'null') : null;
+        const senderEmail = owner?.sendgridVerifiedEmail || null;
+        const senderName = owner?.sendgridVerifiedName || null;
+        const hasVerifiedSender = !!senderEmail;
+
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="relative w-full max-w-md rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
@@ -282,6 +289,28 @@ export default function NextEngagementContainer({
             </div>
 
             <div className="px-6 py-4">
+              {/* From — same as 1:1 compose */}
+              <div className="mb-4">
+                <p className="text-xs font-medium text-gray-500 mb-1">From</p>
+                {!hasVerifiedSender ? (
+                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
+                    <p className="text-sm text-amber-800">Sender email not configured</p>
+                    <a
+                      href="/outreach/sender-verify"
+                      className="text-sm font-medium text-amber-700 hover:text-amber-800 mt-1 inline-block"
+                    >
+                      Verify sender email →
+                    </a>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                    <span className="text-sm text-gray-900">{senderName || senderEmail}</span>
+                    <span className="text-gray-500">&lt;{senderEmail}&gt;</span>
+                  </div>
+                )}
+              </div>
+
               {emailSuccess && (
                 <div className="mb-4 rounded-md bg-green-50 border border-green-200 p-3">
                   <p className="text-sm text-green-800">✅ Email sent successfully!</p>
@@ -345,7 +374,7 @@ export default function NextEngagementContainer({
                   <button
                     type="button"
                     onClick={handleSendEmail}
-                    disabled={sendingEmail || !recipientEmail || !resolvedCompanyId}
+                    disabled={sendingEmail || !hasVerifiedSender || !recipientEmail || !resolvedCompanyId}
                     className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {sendingEmail ? (
@@ -376,7 +405,8 @@ export default function NextEngagementContainer({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

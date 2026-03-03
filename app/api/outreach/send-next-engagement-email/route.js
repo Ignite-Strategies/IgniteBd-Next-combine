@@ -1,25 +1,28 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { prisma } from '@/lib/prisma';
 import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
 import { sendEmail } from '@/lib/sendgridClient';
 import { formatNextEngagementEmailHtml, formatNextEngagementEmailText } from '@/lib/email/nextEngagementEmailTemplate';
 
 /**
  * POST /api/outreach/send-next-engagement-email
- * 
- * Sends the next engagement container data as an email to a specified recipient.
- * 
+ *
+ * Sends the next engagement container as an email. Uses the signed-in owner's
+ * verified SendGrid sender (sendgridVerifiedEmail / sendgridVerifiedName).
+ *
  * Request body:
  * {
  *   "recipientName": "John Doe",
  *   "recipientEmail": "john@example.com",
- *   "companyHQId": "company-id"
+ *   "companyHQId": "company-id",
+ *   "customMessage": "optional intro text"
  * }
  */
 export async function POST(request) {
+  let firebaseUser;
   try {
-    // Auth
-    await verifyFirebaseToken(request);
+    firebaseUser = await verifyFirebaseToken(request);
   } catch (error) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized' },
@@ -38,7 +41,6 @@ export async function POST(request) {
       );
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(recipientEmail)) {
       return NextResponse.json(
@@ -47,7 +49,34 @@ export async function POST(request) {
       );
     }
 
-    // Fetch next engagement data
+    // Resolve owner and verified sender (same model as 1:1 compose)
+    const owner = await prisma.owners.findUnique({
+      where: { firebaseId: firebaseUser.uid },
+      select: {
+        id: true,
+        sendgridVerifiedEmail: true,
+        sendgridVerifiedName: true,
+      },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, error: 'Owner not found' },
+        { status: 404 },
+      );
+    }
+
+    if (!owner.sendgridVerifiedEmail) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'No verified sender. Verify your sender email in Settings (SendGrid Sender Identity) before sending.',
+        },
+        { status: 400 },
+      );
+    }
+
     const nextEngagements = await getContactsWithNextEngagement(companyHQId, { limit: 500 });
 
     if (nextEngagements.length === 0) {
@@ -57,18 +86,19 @@ export async function POST(request) {
       );
     }
 
-    // Format email
     const subject = `Next Engagement Report - ${new Date().toLocaleDateString()}`;
     const html = formatNextEngagementEmailHtml(nextEngagements, customMessage);
     const text = formatNextEngagementEmailText(nextEngagements, customMessage);
 
-    // Send email via SendGrid
+    // Send using owner's verified sender (same as 1:1 compose)
     const result = await sendEmail({
       to: recipientEmail,
       toName: recipientName || recipientEmail.split('@')[0],
       subject,
       html,
       text,
+      from: owner.sendgridVerifiedEmail,
+      fromName: owner.sendgridVerifiedName || undefined,
     });
 
     return NextResponse.json({
