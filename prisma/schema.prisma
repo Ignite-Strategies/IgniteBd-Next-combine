@@ -714,7 +714,7 @@ model InboundEmail {
   charsets        String?            // SendGrid: 'charsets' (JSON string)
   attachments     String?            // SendGrid: 'attachments' (count)
   attachment_info String?  @db.Text  // SendGrid: 'attachment-info' (JSON string)
-  raw             String?  @db.Text  // SendGrid: 'raw' (only if "Include Raw" enabled)
+  email           String?  @db.Text  // SendGrid: 'email' (full raw MIME when "Include Raw" enabled)
 
   companyHQId     String?  // FK to company_hqs (company-scoped like rest of repo)
   company_hqs     company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)

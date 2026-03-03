@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     const charsets = (formData.get('charsets') as string | null) || null;
     const attachments = (formData.get('attachments') as string | null) || null;
     const attachment_info = (formData.get('attachment-info') as string | null) || null; // Note: hyphenated key
-    const raw = (formData.get('raw') as string | null) || null; // Only if "Include Raw" enabled
+    const email = (formData.get('email') as string | null) || null; // SendGrid sends 'email' field (full raw MIME when "Include Raw" enabled)
 
     // Log what we extracted
     console.log('Extracted SendGrid fields:', {
@@ -68,8 +68,8 @@ export async function POST(req: Request) {
       htmlLength: html?.length || 0,
       headersLength: headers?.length || 0,
       sender_ip: sender_ip || '(empty)',
-      hasRaw: !!raw,
-      rawLength: raw?.length || 0,
+      hasEmail: !!email,
+      emailLength: email?.length || 0,
     });
 
     // STEP 3: Extract company slug and resolve companyHQId (company-scoped like rest of repo)
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
         charsets: charsets,
         attachments: attachments,
         attachment_info: attachment_info,
-        raw: raw, // Only if "Include Raw" enabled in SendGrid
+        email: email, // SendGrid 'email' field (full raw MIME when "Include Raw" enabled)
         // Our fields
         companyHQId: companyHQId,
         ingestionStatus: 'RECEIVED',
@@ -117,8 +117,8 @@ export async function POST(req: Request) {
     });
 
     // Log if content is missing
-    if (!text && !html && !raw) {
-      console.warn('⚠️ No email content detected (text/html/raw all empty).');
+    if (!text && !html && !email) {
+      console.warn('⚠️ No email content detected (text/html/email all empty).');
       console.warn('💡 Check SendGrid Inbound Parse settings - enable "Include Raw" if needed.');
     }
 

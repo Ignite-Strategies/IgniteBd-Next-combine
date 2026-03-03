@@ -155,7 +155,7 @@ export default function InboundParsePage() {
                           HTML
                         </span>
                       )}
-                      {email.raw && (
+                      {email.email && (
                         <span className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           Raw MIME
@@ -193,11 +193,11 @@ export default function InboundParsePage() {
 
                 {showRaw ? (
                   <div className="space-y-4">
-                    {selectedEmail.raw && (
+                    {selectedEmail.email && (
                       <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-2">Raw MIME (SendGrid "raw" field - only if "Include Raw" enabled)</label>
+                        <label className="text-sm font-semibold text-gray-600 block mb-2">Raw MIME (SendGrid "email" field - full MIME when "Include Raw" enabled)</label>
                         <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
-                          {selectedEmail.raw}
+                          {selectedEmail.email}
                         </pre>
                       </div>
                     )}
