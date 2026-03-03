@@ -151,13 +151,22 @@ export default function InboundEmailPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {/* Show when we have raw text but nothing was parsed — parsing failed or no content */}
+                    {selectedEmail.emailRawText && !selectedEmail.subject && !selectedEmail.body && !selectedEmail.email && (
+                      <div className="rounded-md bg-amber-50 border border-amber-200 p-3 mb-4">
+                        <p className="text-sm text-amber-800">
+                          <strong>Parsing pending or failed.</strong> This inbound had no body (or the parser failed). Check server logs for <code className="text-xs bg-amber-100 px-1">[inbound-email] Parsed result</code> and <code className="text-xs bg-amber-100 px-1">Parse failed</code>.
+                        </p>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-sm font-semibold text-gray-600 block mb-1">From</label>
                       <div>
                         {selectedEmail.contacts?.fullName && (
                           <div className="font-medium">{selectedEmail.contacts.fullName}</div>
                         )}
-                        <div className="text-sm text-gray-600">{selectedEmail.email}</div>
+                        <div className="text-sm text-gray-600">{selectedEmail.email || '(No email parsed)'}</div>
                       </div>
                     </div>
 
