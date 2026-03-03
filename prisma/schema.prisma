@@ -698,12 +698,23 @@ model email_activities {
 model InboundEmail {
   id              String   @id @default(cuid())
 
+  // SendGrid Inbound Parse fields (exact match, case-sensitive)
   from            String?
   to              String?
   subject         String?
-  textBody        String?  @db.Text
-  htmlBody        String?  @db.Text
-  headers         String?  @db.Text
+  text            String?  @db.Text  // SendGrid: 'text'
+  html            String?  @db.Text  // SendGrid: 'html'
+  headers         String?  @db.Text  // SendGrid: 'headers'
+  sender_ip       String?            // SendGrid: 'sender_ip'
+  envelope        String?  @db.Text  // SendGrid: 'envelope' (JSON string)
+  dkim            String?            // SendGrid: 'dkim'
+  SPF             String?            // SendGrid: 'SPF' (case-sensitive)
+  spam_score      String?            // SendGrid: 'spam_score'
+  spam_report     String?  @db.Text  // SendGrid: 'spam_report'
+  charsets        String?            // SendGrid: 'charsets' (JSON string)
+  attachments     String?            // SendGrid: 'attachments' (count)
+  attachment_info String?  @db.Text  // SendGrid: 'attachment-info' (JSON string)
+  raw             String?  @db.Text  // SendGrid: 'raw' (only if "Include Raw" enabled)
 
   companyHQId     String?  // FK to company_hqs (company-scoped like rest of repo)
   company_hqs     company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)

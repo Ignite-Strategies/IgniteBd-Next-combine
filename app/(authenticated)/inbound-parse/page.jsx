@@ -143,16 +143,22 @@ export default function InboundParsePage() {
                       {email.subject || '(No subject)'}
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                      {email.textBody && (
+                      {email.text && (
                         <span className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           Text
                         </span>
                       )}
-                      {email.htmlBody && (
+                      {email.html && (
                         <span className="flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           HTML
+                        </span>
+                      )}
+                      {email.raw && (
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          Raw MIME
                         </span>
                       )}
                       {email.ingestionStatus && (
@@ -187,23 +193,31 @@ export default function InboundParsePage() {
 
                 {showRaw ? (
                   <div className="space-y-4">
+                    {selectedEmail.raw && (
+                      <div>
+                        <label className="text-sm font-semibold text-gray-600 block mb-2">Raw MIME (SendGrid "raw" field - only if "Include Raw" enabled)</label>
+                        <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
+                          {selectedEmail.raw}
+                        </pre>
+                      </div>
+                    )}
                     <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">Raw Headers</label>
+                      <label className="text-sm font-semibold text-gray-600 block mb-2">Headers</label>
                       <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
                         {selectedEmail.headers || '(No headers)'}
                       </pre>
                     </div>
                     <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">Raw Text Body</label>
+                      <label className="text-sm font-semibold text-gray-600 block mb-2">Text Body</label>
                       <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
-                        {selectedEmail.textBody || '(No text body)'}
+                        {selectedEmail.text || '(No text body)'}
                       </pre>
                     </div>
                     <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">Raw HTML Body</label>
+                      <label className="text-sm font-semibold text-gray-600 block mb-2">HTML Body</label>
                       <div className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64">
-                        {selectedEmail.htmlBody ? (
-                          <div dangerouslySetInnerHTML={{ __html: selectedEmail.htmlBody }} />
+                        {selectedEmail.html ? (
+                          <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
                         ) : (
                           '(No HTML body)'
                         )}
@@ -245,20 +259,20 @@ export default function InboundParsePage() {
                       <div>{selectedEmail.subject || '(No subject)'}</div>
                     </div>
 
-                    {selectedEmail.textBody && (
+                    {selectedEmail.text && (
                       <div>
                         <label className="text-sm font-semibold text-gray-600 block mb-1">Text Body</label>
                         <div className="p-3 bg-gray-50 rounded text-sm whitespace-pre-wrap max-h-64 overflow-auto">
-                          {selectedEmail.textBody}
+                          {selectedEmail.text}
                         </div>
                       </div>
                     )}
 
-                    {selectedEmail.htmlBody && (
+                    {selectedEmail.html && (
                       <div>
                         <label className="text-sm font-semibold text-gray-600 block mb-1">HTML Body</label>
                         <div className="p-3 bg-gray-50 rounded text-sm max-h-64 overflow-auto border">
-                          <div dangerouslySetInnerHTML={{ __html: selectedEmail.htmlBody }} />
+                          <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
                         </div>
                       </div>
                     )}
