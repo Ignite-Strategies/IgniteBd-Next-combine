@@ -277,6 +277,23 @@ export default function InboundParsePage() {
                       </div>
                     )}
 
+                    {/* Forwarded emails (e.g. from Outlook) skip text/html — full content is in the 'email' MIME field */}
+                    {!selectedEmail.text && !selectedEmail.html && selectedEmail.email && (
+                      <div>
+                        <label className="text-sm font-semibold text-gray-600 block mb-1">
+                          Content (Raw MIME — forwarded email)
+                        </label>
+                        <div className="rounded border border-amber-200 bg-amber-50 p-2 mb-2">
+                          <p className="text-xs text-amber-700">
+                            SendGrid sent this as raw MIME (no parsed text/html). Content is base64-encoded inside the MIME body below. Switch to <strong>Show Raw</strong> for the full MIME.
+                          </p>
+                        </div>
+                        <pre className="p-3 bg-gray-50 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
+                          {selectedEmail.email.substring(0, 2000)}{selectedEmail.email.length > 2000 ? `\n\n... (${selectedEmail.email.length} chars total — click Show Raw for full content)` : ''}
+                        </pre>
+                      </div>
+                    )}
+
                     {selectedEmail.headers && (
                       <div>
                         <label className="text-sm font-semibold text-gray-600 block mb-1">Headers</label>
