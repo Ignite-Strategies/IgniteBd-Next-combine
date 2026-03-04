@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import PageHeader from '@/components/PageHeader';
-import { Inbox, Mail, Calendar, User, FileText } from 'lucide-react';
+import { Inbox, Mail, Calendar, FileText, Trash2, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
  * Inbound Parse Page
- * 
+ *
  * Route: /inbound-parse
- * 
+ *
  * View all emails received via SendGrid Inbound Parse (InboundEmail model).
- * Pure ingestion bucket - shows exactly what SendGrid sent us.
+ * Actions: Delete, Push to AI (parse → create EmailActivity).
  */
 export default function InboundParsePage() {
   const [emails, setEmails] = useState([]);
@@ -19,6 +19,9 @@ export default function InboundParsePage() {
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [showRaw, setShowRaw] = useState(false);
   const [companyHQId, setCompanyHQId] = useState(null);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null);
 
   useEffect(() => {
     // Get companyHQId from localStorage (company-scoped like rest of repo)
@@ -68,9 +71,65 @@ export default function InboundParsePage() {
 
   const extractName = (emailString) => {
     if (!emailString) return null;
-    // Extract name from "Name <email@domain.com>" format
     const match = emailString.match(/^([^<]+)</);
     return match ? match[1].trim() : null;
+  };
+
+  const handleDelete = async (e) => {
+    e?.stopPropagation?.();
+    if (!selectedEmail) return;
+    if (!confirm('Delete this inbound email? This cannot be undone.')) return;
+    setActionMessage(null);
+    setDeleteLoading(true);
+    try {
+      await api.delete(`/api/inbound-parse/${selectedEmail.id}`);
+      setEmails((prev) => prev.filter((x) => x.id !== selectedEmail.id));
+      setSelectedEmail(null);
+      setActionMessage({ type: 'success', text: 'Deleted' });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err.response?.data?.error || err.message || 'Delete failed',
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handlePushToAi = async (e) => {
+    e?.stopPropagation?.();
+    if (!selectedEmail) return;
+    setActionMessage(null);
+    setPushLoading(true);
+    try {
+      const res = await api.post('/api/inbound-parse/push-to-ai', {
+        inboundEmailId: selectedEmail.id,
+      });
+      const { emailActivityId, parsed } = res.data;
+      setEmails((prev) =>
+        prev.map((x) =>
+          x.id === selectedEmail.id ? { ...x, ingestionStatus: 'PROMOTED' } : x
+        )
+      );
+      setSelectedEmail((prev) =>
+        prev ? { ...prev, ingestionStatus: 'PROMOTED' } : null
+      );
+      setActionMessage({
+        type: 'success',
+        text: parsed?.contactEmail
+          ? `Promoted → EmailActivity. Contact: ${parsed.contactEmail}`
+          : `Promoted → EmailActivity`,
+      });
+      setTimeout(() => setActionMessage(null), 5000);
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err.response?.data?.error || err.message || 'Push to AI failed',
+      });
+    } finally {
+      setPushLoading(false);
+    }
   };
 
   if (loading) {
@@ -163,8 +222,10 @@ export default function InboundParsePage() {
                       )}
                       {email.ingestionStatus && (
                         <span className={`px-2 py-0.5 rounded text-xs ${
-                          email.ingestionStatus === 'RECEIVED' 
-                            ? 'bg-green-100 text-green-700' 
+                          email.ingestionStatus === 'PROMOTED'
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : email.ingestionStatus === 'RECEIVED'
+                            ? 'bg-green-100 text-green-700'
                             : email.ingestionStatus === 'FAILED'
                             ? 'bg-red-100 text-red-700'
                             : 'bg-gray-100 text-gray-700'
@@ -181,15 +242,48 @@ export default function InboundParsePage() {
             {/* Email Detail */}
             {selectedEmail && (
               <div className="border rounded-lg p-6 bg-white">
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Email Details</h3>
-                  <button
-                    onClick={() => setShowRaw(!showRaw)}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    {showRaw ? 'Show Parsed' : 'Show Raw'}
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setShowRaw(!showRaw)}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      {showRaw ? 'Show Parsed' : 'Show Raw'}
+                    </button>
+                    <button
+                      onClick={handlePushToAi}
+                      disabled={
+                        pushLoading ||
+                        selectedEmail.ingestionStatus === 'PROMOTED' ||
+                        !(selectedEmail.text || selectedEmail.html || selectedEmail.email)
+                      }
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {pushLoading ? 'Parsing…' : 'Push to AI'}
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleteLoading}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deleteLoading ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
+                {actionMessage && (
+                  <div
+                    className={`mb-4 px-3 py-2 rounded text-sm ${
+                      actionMessage.type === 'success'
+                        ? 'bg-green-50 text-green-800'
+                        : 'bg-red-50 text-red-800'
+                    }`}
+                  >
+                    {actionMessage.text}
+                  </div>
+                )}
 
                 {showRaw ? (
                   <div className="space-y-4">
@@ -317,8 +411,10 @@ export default function InboundParsePage() {
                       <div>
                         <label className="text-sm font-semibold text-gray-600 block mb-1">Status</label>
                         <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          selectedEmail.ingestionStatus === 'RECEIVED' 
-                            ? 'bg-green-100 text-green-700' 
+                          selectedEmail.ingestionStatus === 'PROMOTED'
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : selectedEmail.ingestionStatus === 'RECEIVED'
+                            ? 'bg-green-100 text-green-700'
                             : selectedEmail.ingestionStatus === 'FAILED'
                             ? 'bg-red-100 text-red-700'
                             : 'bg-gray-100 text-gray-700'

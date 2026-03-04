@@ -93,6 +93,7 @@ export async function GET(request, { params }) {
  *   messageId?: string (SendGrid message ID after sending)
  *   sentAt?: string (ISO date; only for OFF_PLATFORM)
  *   platform?: string (e.g. "linkedin", "email"; only for OFF_PLATFORM)
+ *   contactId?: string (pair/link email activity to contact — human pairing)
  * }
  */
 export async function PUT(request, { params }) {
@@ -128,12 +129,14 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const { subject, body: emailBody, messageId, sentAt, platform } = body ?? {};
+    const { subject, body: emailBody, messageId, sentAt, platform, contactId } = body ?? {};
 
     const updateData = {};
     if (subject !== undefined) updateData.subject = subject;
     if (emailBody !== undefined) updateData.body = emailBody;
     if (messageId !== undefined) updateData.messageId = messageId;
+    // Human pairing: link email activity to contact
+    if (contactId !== undefined) updateData.contact_id = contactId || null;
 
     // Only allow sentAt/platform for off-platform records (edit manual/LinkedIn etc.)
     if (activity.source === 'OFF_PLATFORM') {
@@ -153,6 +156,7 @@ export async function PUT(request, { params }) {
       success: true,
       email: {
         id: updated.id,
+        contactId: updated.contact_id,
         subject: updated.subject,
         body: updated.body,
         messageId: updated.messageId,

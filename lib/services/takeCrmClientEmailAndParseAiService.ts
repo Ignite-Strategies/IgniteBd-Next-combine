@@ -18,10 +18,36 @@ export interface ParsedEmailData {
   isResponse: boolean;                 // AI-detected: is this likely a response?
 }
 
+export interface ParseEmailInput {
+  /** Plain text body (preferred for body extraction) */
+  text?: string | null;
+  /** HTML body (use for contact/signature extraction when present) */
+  html?: string | null;
+  /** Raw MIME or combined content (fallback when text/html empty) */
+  raw?: string | null;
+}
+
 export async function takeCrmClientEmailAndParseAiService(
-  emailRawText: string,
+  emailRawTextOrInput: string | ParseEmailInput,
   headers?: string  // Raw headers string from SendGrid
 ): Promise<ParsedEmailData> {
+  const input: ParseEmailInput =
+    typeof emailRawTextOrInput === 'string'
+      ? { raw: emailRawTextOrInput }
+      : emailRawTextOrInput;
+
+  const text = (input.text || '').trim();
+  const html = (input.html || '').trim();
+  const raw = (input.raw || '').trim();
+
+  const emailRawText =
+    text && html
+      ? `PLAIN TEXT (use for body extraction):\n${text}\n\nHTML (use for contact/signature - tags stripped):\n${html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}`
+      : text || (html ? html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : raw) || raw;
+
+  if (!emailRawText) {
+    throw new Error('No content to parse');
+  }
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const model = process.env.OPENAI_MODEL || 'gpt-4o';
@@ -43,13 +69,14 @@ export async function takeCrmClientEmailAndParseAiService(
 
     const systemPrompt = `You are an email parsing assistant. Extract structured data from raw email content.
 
-The email may be a forwarded chain or pasted content. Extract:
+The email may be a forwarded chain or pasted content. Focus on the MOST RECENT message in the thread for extraction.
 
-1. Contact name (from signature, from field, or body)
-2. Contact email (from from field or signature)
-3. Next engagement date (if mentioned - look for phrases like "follow up in X months", "later this year", specific dates)
+Extract:
+1. Contact name - from signature, From field, or body. This is critical.
+2. Contact email - from From field or signature
+3. Next engagement date (if mentioned - "follow up in X months", "later this year", specific dates)
 4. Threading headers (In-Reply-To, References) if present
-5. Response detection (does this appear to be a reply? subject starts with "RE:", contains quoted text, etc.)
+5. Response detection (is this a reply? subject RE:, quoted text, etc.)
 
 Return EXACTLY this JSON structure:
 {
