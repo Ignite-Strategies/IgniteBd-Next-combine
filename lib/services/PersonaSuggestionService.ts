@@ -121,37 +121,46 @@ export class PersonaSuggestionService {
         messages: [
           {
             role: 'system',
-            content: `You are an expert at analyzing business relationship notes. Your task is to extract TWO things:
+            content: `You are an expert at analyzing business relationship notes for a BD outreach tool. Extract exactly THREE relationship signals and suggest a persona.
 
-1. RELATIONSHIP CONTEXT (Source of Truth) - Factual data from notes:
-   - Extract factual details: formerCompany, primaryWork, relationshipQuality, opportunityType
-   - Classify relationship dimensions:
-     * contextOfRelationship: DONT_KNOW, PRIOR_CONVERSATION, PRIOR_COLLEAGUE, PRIOR_SCHOOLMATE, CURRENT_CLIENT, CONNECTED_LINKEDIN_ONLY, REFERRAL, REFERRAL_FROM_WARM_CONTACT, USED_TO_WORK_AT_TARGET_COMPANY
-     * relationshipRecency: NEW, RECENT, STALE, LONG_DORMANT
-     * companyAwareness: DONT_KNOW, KNOWS_COMPANY, KNOWS_COMPANY_COMPETITOR, KNOWS_BUT_DISENGAGED
+THREE SIGNALS ONLY — do not add extra fields:
 
-2. PERSONA (Fills Gaps) - Classification for template matching:
-   - Suggest the most appropriate outreach persona slug from available personas
-   - Use relationship context + AI inference to detect patterns (e.g., competitor switching, referral opportunities)
-   - Provide confidence score (0-100) and reasoning
+1. contextOfRelationship — how does the sender know this person?
+   Values: DONT_KNOW | PRIOR_CONVERSATION | PRIOR_COLLEAGUE | PRIOR_SCHOOLMATE | CURRENT_CLIENT | CONNECTED_LINKEDIN_ONLY | REFERRAL | REFERRAL_FROM_WARM_CONTACT | USED_TO_WORK_AT_TARGET_COMPANY
 
-Return a JSON object with:
-- relationshipContext: { formerCompany?, primaryWork?, relationshipQuality?, opportunityType?, contextOfRelationship?, relationshipRecency?, companyAwareness? }
-- suggestedPersonaSlug: string (must match one of the available persona slugs exactly)
-- confidence: number (0-100)
-- reasoning: string (brief explanation of why this persona fits, considering relationship context)`,
+2. relationshipRecency — how recent/active is the relationship?
+   Values: NEW | RECENT | STALE | LONG_DORMANT
+
+3. companyAwareness — does the contact know the sender's company/service?
+   Values: DONT_KNOW | KNOWS_COMPANY | KNOWS_COMPANY_COMPETITOR | KNOWS_BUT_DISENGAGED
+
+Also extract formerCompany (string) ONLY if explicitly mentioned in the notes — the company this person previously worked at or that connects you. Leave null if unclear.
+
+DO NOT extract: opportunityType, primaryWork, relationshipQuality, or any other freeform fields. Those create noise.
+
+Return JSON:
+{
+  "relationshipContext": {
+    "contextOfRelationship": "<enum value>",
+    "relationshipRecency": "<enum value>",
+    "companyAwareness": "<enum value>",
+    "formerCompany": "<string or null>"
+  },
+  "suggestedPersonaSlug": "<must exactly match one available slug>",
+  "confidence": <0-100>,
+  "reasoning": "<one sentence explaining the persona fit>"
+}`,
           },
           {
             role: 'user',
-            content: `Analyze these contact notes and extract relationship context + suggest persona:
+            content: `Analyze these contact notes:
 
-Contact Notes:
 ${notesToAnalyze}
 
 Available Outreach Personas:
 ${availablePersonas.map((p) => `- ${p.slug}: ${p.name}${p.description ? ` - ${p.description}` : ''}`).join('\n')}
 
-Return JSON with relationshipContext, suggestedPersonaSlug, confidence, and reasoning.`,
+Return JSON with the three relationship signals, formerCompany, suggestedPersonaSlug, confidence, and reasoning.`,
           },
         ],
         temperature: 0.3,

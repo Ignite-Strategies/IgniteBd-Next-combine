@@ -1884,57 +1884,31 @@ export default function ContactDetailPage({ params }) {
             </div>
             {relationshipContext ? (
               <div className="space-y-3">
-                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 space-y-2 text-sm">
-                  {/* Factual extracted data */}
+                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 space-y-2.5 text-sm">
+                  {/* Three core signals — clean and readable */}
+                  {relationshipContext.contextOfRelationship && (
+                    <div className="flex items-start gap-2">
+                      <span className="w-36 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">How you know them</span>
+                      <span className="text-gray-800 font-medium">{relationshipContext.contextOfRelationship.replace(/_/g, ' ')}</span>
+                    </div>
+                  )}
+                  {relationshipContext.relationshipRecency && (
+                    <div className="flex items-start gap-2">
+                      <span className="w-36 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">How recent</span>
+                      <span className="text-gray-800 font-medium">{relationshipContext.relationshipRecency.replace(/_/g, ' ')}</span>
+                    </div>
+                  )}
+                  {relationshipContext.companyAwareness && (
+                    <div className="flex items-start gap-2">
+                      <span className="w-36 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">Business awareness</span>
+                      <span className="text-gray-800 font-medium">{relationshipContext.companyAwareness.replace(/_/g, ' ')}</span>
+                    </div>
+                  )}
+                  {/* Former company — only shown when present, as supporting context */}
                   {relationshipContext.formerCompany && (
-                    <div>
-                      <span className="font-semibold text-gray-700">Former Company:</span>{' '}
+                    <div className="flex items-start gap-2 pt-1 border-t border-blue-100 mt-1">
+                      <span className="w-36 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">Former company</span>
                       <span className="text-gray-600">{relationshipContext.formerCompany}</span>
-                    </div>
-                  )}
-                  {relationshipContext.primaryWork && (
-                    <div>
-                      <span className="font-semibold text-gray-700">Primary Work:</span>{' '}
-                      <span className="text-gray-600">{relationshipContext.primaryWork}</span>
-                    </div>
-                  )}
-                  {relationshipContext.relationshipQuality && (
-                    <div>
-                      <span className="font-semibold text-gray-700">Relationship Quality:</span>{' '}
-                      <span className="text-gray-600">{relationshipContext.relationshipQuality}</span>
-                    </div>
-                  )}
-                  {relationshipContext.opportunityType && (
-                    <div>
-                      <span className="font-semibold text-gray-700">Opportunity Type:</span>{' '}
-                      <span className="text-gray-600">{relationshipContext.opportunityType}</span>
-                    </div>
-                  )}
-                  
-                  {/* Relationship dimensions */}
-                  {(relationshipContext.contextOfRelationship || 
-                    relationshipContext.relationshipRecency || 
-                    relationshipContext.companyAwareness) && (
-                    <div className="pt-2 mt-2 border-t border-blue-200">
-                      <div className="text-xs font-semibold text-gray-600 mb-1">Relationship Dimensions:</div>
-                      {relationshipContext.contextOfRelationship && (
-                        <div className="text-xs">
-                          <span className="font-semibold text-gray-700">Type:</span>{' '}
-                          <span className="text-gray-600">{relationshipContext.contextOfRelationship.replace(/_/g, ' ')}</span>
-                        </div>
-                      )}
-                      {relationshipContext.relationshipRecency && (
-                        <div className="text-xs">
-                          <span className="font-semibold text-gray-700">Recency:</span>{' '}
-                          <span className="text-gray-600">{relationshipContext.relationshipRecency.replace(/_/g, ' ')}</span>
-                        </div>
-                      )}
-                      {relationshipContext.companyAwareness && (
-                        <div className="text-xs">
-                          <span className="font-semibold text-gray-700">Awareness:</span>{' '}
-                          <span className="text-gray-600">{relationshipContext.companyAwareness.replace(/_/g, ' ')}</span>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -2685,55 +2659,28 @@ export default function ContactDetailPage({ params }) {
                       </h3>
                       <div className="bg-blue-50 rounded-lg border border-blue-200 p-3 space-y-2 text-sm">
                         {/* Factual extracted data */}
+                        {personaSuggestion.relationshipContext.contextOfRelationship && (
+                          <div className="flex items-start gap-2">
+                            <span className="w-32 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">How you know them</span>
+                            <span className="text-gray-800 font-medium text-sm">{personaSuggestion.relationshipContext.contextOfRelationship.replace(/_/g, ' ')}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.relationshipContext.relationshipRecency && (
+                          <div className="flex items-start gap-2">
+                            <span className="w-32 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">How recent</span>
+                            <span className="text-gray-800 font-medium text-sm">{personaSuggestion.relationshipContext.relationshipRecency.replace(/_/g, ' ')}</span>
+                          </div>
+                        )}
+                        {personaSuggestion.relationshipContext.companyAwareness && (
+                          <div className="flex items-start gap-2">
+                            <span className="w-32 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">Business awareness</span>
+                            <span className="text-gray-800 font-medium text-sm">{personaSuggestion.relationshipContext.companyAwareness.replace(/_/g, ' ')}</span>
+                          </div>
+                        )}
                         {personaSuggestion.relationshipContext.formerCompany && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Former Company:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.relationshipContext.formerCompany}</span>
-                          </div>
-                        )}
-                        {personaSuggestion.relationshipContext.primaryWork && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Primary Work:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.relationshipContext.primaryWork}</span>
-                          </div>
-                        )}
-                        {personaSuggestion.relationshipContext.relationshipQuality && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Relationship Quality:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.relationshipContext.relationshipQuality}</span>
-                          </div>
-                        )}
-                        {personaSuggestion.relationshipContext.opportunityType && (
-                          <div>
-                            <span className="font-semibold text-gray-700">Opportunity Type:</span>{' '}
-                            <span className="text-gray-600">{personaSuggestion.relationshipContext.opportunityType}</span>
-                          </div>
-                        )}
-                        
-                        {/* Relationship dimensions */}
-                        {(personaSuggestion.relationshipContext.contextOfRelationship || 
-                          personaSuggestion.relationshipContext.relationshipRecency || 
-                          personaSuggestion.relationshipContext.companyAwareness) && (
-                          <div className="pt-2 mt-2 border-t border-blue-200">
-                            <div className="text-xs font-semibold text-gray-600 mb-1">Relationship Dimensions:</div>
-                            {personaSuggestion.relationshipContext.contextOfRelationship && (
-                              <div className="text-xs">
-                                <span className="font-semibold text-gray-700">Type:</span>{' '}
-                                <span className="text-gray-600">{personaSuggestion.relationshipContext.contextOfRelationship.replace(/_/g, ' ')}</span>
-                              </div>
-                            )}
-                            {personaSuggestion.relationshipContext.relationshipRecency && (
-                              <div className="text-xs">
-                                <span className="font-semibold text-gray-700">Recency:</span>{' '}
-                                <span className="text-gray-600">{personaSuggestion.relationshipContext.relationshipRecency.replace(/_/g, ' ')}</span>
-                              </div>
-                            )}
-                            {personaSuggestion.relationshipContext.companyAwareness && (
-                              <div className="text-xs">
-                                <span className="font-semibold text-gray-700">Awareness:</span>{' '}
-                                <span className="text-gray-600">{personaSuggestion.relationshipContext.companyAwareness.replace(/_/g, ' ')}</span>
-                              </div>
-                            )}
+                          <div className="flex items-start gap-2 pt-1 border-t border-gray-200 mt-1">
+                            <span className="w-32 flex-shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide pt-0.5">Former company</span>
+                            <span className="text-gray-600 text-sm">{personaSuggestion.relationshipContext.formerCompany}</span>
                           </div>
                         )}
                       </div>
