@@ -202,7 +202,7 @@ function TargetCockpitInner() {
   const searchParams = useSearchParams();
   const [companyHQId, setCompanyHQId] = useState('');
   const [targets, setTargets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
 
   // Resolve companyHQId
@@ -225,7 +225,11 @@ function TargetCockpitInner() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (data.success) setTargets(data.targets || []);
+      if (data.success) {
+        setTargets(data.targets || []);
+      } else {
+        console.error('Targeting list error:', data.error, data.details);
+      }
     } catch (err) {
       console.error('Failed to fetch targets:', err);
     } finally {
