@@ -62,10 +62,20 @@ const EMPTY_CONTACT = {
   priorEngagement: '',   // 'y' | 'n' | ''
 };
 
-// CSV template (also served from /public/templates/ignite-targets-template.csv)
-const CSV_TEMPLATE = `Name,Company,Title,LinkedIn URL,Notes,Last Contact,Aware of Business (y/n),Using Competitor (y/n),Worked Together At,Prior Engagement (y/n)
-Jane Doe,Acme Corp,,,,,,,,
-`;
+// Human-readable headers only — never db column names. Parser uses COLUMN_MAP to normalize.
+const CSV_HEADERS = [
+  'Name',
+  'Company',
+  'Title',
+  'LinkedIn',
+  'Notes',
+  'Last contact',
+  'Knows your business?',
+  'Using competitor?',
+  'Worked together at',
+  'Prior work together?',
+];
+const CSV_TEMPLATE = CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,,,,,,,,\n';
 
 function downloadTemplate() {
   const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
@@ -119,45 +129,65 @@ function parseCSVLine(line) {
   return out;
 }
 
+// Maps human-readable header variants → internal field key. Used to normalize arbitrary CSV columns.
+const COLUMN_MAP = [
+  { key: 'name',           aliases: ['name', 'full name', 'contact name', 'person'] },
+  { key: 'company',        aliases: ['company', 'org', 'employer', 'organization'] },
+  { key: 'title',          aliases: ['title', 'position', 'role', 'job', 'job title'] },
+  { key: 'linkedin',       aliases: ['linkedin', 'linkedin url', 'url', 'profile', 'linkedin profile'] },
+  { key: 'notes',          aliases: ['notes', 'note', 'description', 'context', 'relationship notes'] },
+  { key: 'relationship',   aliases: ['relationship', 'how met', 'howmet', 'relationship context', 'connection'] },
+  { key: 'lastContact',    aliases: ['last contact', 'lastcontact', 'when last contact', 'last spoke'] },
+  { key: 'awareOfBusiness',aliases: ['knows your business', 'aware of business', 'aware', 'knows business'] },
+  { key: 'usingCompetitor',aliases: ['using competitor', 'competitor', 'using a competitor'] },
+  { key: 'workedTogetherAt',aliases: ['worked together at', 'worked together', 'worked at', 'prior company'] },
+  { key: 'priorEngagement',aliases: ['prior work together', 'prior engagement', 'prior eng', 'did work together'] },
+];
+
+function normalizeHeader(h) {
+  const s = (h || '').toLowerCase().replace(/[?()]/g, '').trim();
+  return s;
+}
+
+function findColumnIndex(headers, fieldKey) {
+  const row = COLUMN_MAP.find((r) => r.key === fieldKey);
+  if (!row) return -1;
+  const normHeaders = headers.map(normalizeHeader);
+  for (let i = 0; i < normHeaders.length; i++) {
+    const h = normHeaders[i];
+    if (row.aliases.some((a) => h.includes(a) || a.includes(h))) return i;
+  }
+  return -1;
+}
+
 function parseCSVText(text) {
   const normalized = text.replace(/^\uFEFF/, '');
   const lines = normalized.split(/\r?\n/).filter((l) => l.trim());
   if (!lines.length) return [];
 
-  const HEADER_HINTS = ['name', 'company', 'title', 'linkedin', 'notes', 'relationship', 'last contact', 'aware', 'competitor', 'worked', 'prior'];
-  const looksLikeHeader = HEADER_HINTS.some((h) => lines[0].toLowerCase().includes(h));
+  const firstLine = parseCSVLine(lines[0]);
+  const looksLikeHeader = COLUMN_MAP.some((row) =>
+    firstLine.some((h) => row.aliases.some((a) => normalizeHeader(h).includes(a)))
+  );
 
   let headers = null;
   let dataLines = lines;
   if (looksLikeHeader) {
-    headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase().trim());
+    headers = firstLine;
     dataLines = lines.slice(1);
   }
 
-  const idx = (aliases) => headers
-    ? headers.findIndex((h) => aliases.some((a) => h.includes(a)))
-    : -1;
-
-  const nameIdx          = idx(['name', 'full name']);
-  const companyIdx       = idx(['company', 'org', 'employer']);
-  const titleIdx         = idx(['title', 'position', 'role', 'job']);
-  const linkedinIdx      = idx(['linkedin', 'url', 'profile']);
-  const notesIdx         = idx(['notes', 'note', 'description']);
-  const relationshipIdx  = idx(['relationship', 'how met', 'howmet', 'context']);
-  const lastContactIdx   = idx(['last contact', 'lastcontact']);
-  const awareIdx         = idx(['aware of business', 'aware']);
-  const competitorIdx    = idx(['using competitor', 'competitor']);
-  const workedAtIdx      = idx(['worked together at', 'worked together', 'worked at']);
-  const priorEngIdx      = idx(['prior engagement', 'prior eng', 'prior work']);
-
-  const get = (parts, i, fallback) => {
-    const ri = i !== -1 ? i : fallback;
-    return ri >= 0 && ri < parts.length ? (parts[ri] || '') : '';
+  const idx = (key) => headers ? findColumnIndex(headers, key) : -1;
+  const pos = (key, fallback) => {
+    const i = idx(key);
+    return i >= 0 ? i : fallback;
   };
-  const getYN = (parts, i) => {
-    const v = get(parts, i, -1).toLowerCase().trim();
-    if (v === 'y' || v === 'yes' || v === '1' || v === 'true') return 'y';
-    if (v === 'n' || v === 'no' || v === '0' || v === 'false') return 'n';
+
+  const get = (parts, i) => (i >= 0 && i < parts.length ? (parts[i] || '').trim() : '');
+  const getYN = (v) => {
+    const s = (v || '').toLowerCase().trim();
+    if (['y', 'yes', '1', 'true'].includes(s)) return 'y';
+    if (['n', 'no', '0', 'false'].includes(s)) return 'n';
     return '';
   };
 
@@ -165,20 +195,20 @@ function parseCSVText(text) {
     .map((l) => parseCSVLine(l))
     .filter((p) => p.some((v) => v))
     .map((parts) => {
-      const notes = get(parts, notesIdx, 4);
-      const relationship = get(parts, relationshipIdx, -1) || inferRelationshipFromNotes(notes);
+      const notes = get(parts, pos('notes', 4));
+      const relationship = get(parts, idx('relationship')) || inferRelationshipFromNotes(notes);
       return {
-        name:            get(parts, nameIdx, 0),
-        company:         get(parts, companyIdx, 1),
-        title:           get(parts, titleIdx, 2),
-        linkedin:        get(parts, linkedinIdx, 3),
+        name:             get(parts, pos('name', 0)),
+        company:          get(parts, pos('company', 1)),
+        title:            get(parts, pos('title', 2)),
+        linkedin:         get(parts, pos('linkedin', 3)),
         relationship,
         notes,
-        lastContact:     get(parts, lastContactIdx, -1),
-        awareOfBusiness: getYN(parts, awareIdx),
-        usingCompetitor: getYN(parts, competitorIdx),
-        workedTogetherAt: get(parts, workedAtIdx, -1),
-        priorEngagement: getYN(parts, priorEngIdx),
+        lastContact:      get(parts, idx('lastContact')),
+        awareOfBusiness:  getYN(get(parts, idx('awareOfBusiness'))),
+        usingCompetitor:  getYN(get(parts, idx('usingCompetitor'))),
+        workedTogetherAt: get(parts, idx('workedTogetherAt')),
+        priorEngagement:  getYN(get(parts, idx('priorEngagement'))),
       };
     })
     .filter((c) => c.name);

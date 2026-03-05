@@ -108,10 +108,12 @@ function TargetQueue({ targets, loading, companyHQId }) {
           {items.map((t) => (
             <div
               key={t.id}
-              onClick={() => goToContact(t)}
-              className="group flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition cursor-pointer"
+              className="group flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition"
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div
+                onClick={() => goToContact(t)}
+                className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+              >
                 <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 group-hover:bg-indigo-200 transition">
                   <User className="h-4 w-4 text-indigo-600" />
                 </div>
@@ -133,7 +135,6 @@ function TargetQueue({ targets, loading, companyHQId }) {
                       </>
                     )}
                   </div>
-                  {/* Persona slug — the meaningful readiness signal */}
                   {t.outreachPersonaSlug && (
                     <div className="mt-1">
                       <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
@@ -147,21 +148,23 @@ function TargetQueue({ targets, loading, companyHQId }) {
 
               <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                 <StatusBadge target={t} />
+                <button
+                  onClick={() => goToContact(t)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition"
+                >
+                  Edit
+                </button>
                 {t.linkedinUrl && (
                   <a
                     href={t.linkedinUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="rounded-lg p-1.5 text-gray-400 transition hover:bg-blue-50 hover:text-blue-600"
-                    title="View LinkedIn"
+                    className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                    title="Open LinkedIn (new tab)"
                   >
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 )}
-                <span className="text-gray-300 group-hover:text-indigo-400 transition">
-                  <ArrowRight className="h-4 w-4" />
-                </span>
               </div>
             </div>
           ))}
@@ -279,7 +282,7 @@ function TargetCockpitInner() {
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
             <div className="flex items-center gap-2">
               <Target className="h-4 w-4 text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-700">Need to engage</h2>
+              <h2 className="text-sm font-semibold text-gray-700">Next Targets Queue</h2>
               {!loading && targets.length > 0 && (
                 <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
                   {targets.length}
