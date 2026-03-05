@@ -150,6 +150,10 @@ export default function ContactDetailPage() {
   const [selectedPipeline, setSelectedPipeline] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
   const [savingStage, setSavingStage] = useState(false);
+  const [editingLastEngagement, setEditingLastEngagement] = useState(false);
+  const [lastEngagementDateEdit, setLastEngagementDateEdit] = useState('');
+  const [lastEngagementTypeEdit, setLastEngagementTypeEdit] = useState('');
+  const [savingLastEngagement, setSavingLastEngagement] = useState(false);
   const [editingNextEngagement, setEditingNextEngagement] = useState(false);
   const [nextEngagementDateEdit, setNextEngagementDateEdit] = useState('');
   const [nextEngagementPurposeEdit, setNextEngagementPurposeEdit] = useState('');
@@ -854,22 +858,101 @@ export default function ContactDetailPage() {
           )}
 
           {/* Last engagement */}
-          {contact.lastEngagementDate && (
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-medium text-gray-600">Last engagement:</span>
-              <span className="text-gray-800">
-                {formatDateEST(new Date(contact.lastEngagementDate).toISOString().slice(0, 10), { month: 'short', day: 'numeric', year: 'numeric' })}
-              </span>
-              {contact.lastEngagementType && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                  {contact.lastEngagementType === 'OUTBOUND_EMAIL' && 'Outbound email'}
-                  {contact.lastEngagementType === 'CONTACT_RESPONSE' && 'Contact response'}
-                  {contact.lastEngagementType === 'MEETING' && 'Meeting'}
-                  {contact.lastEngagementType === 'MANUAL' && 'Manual'}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium text-gray-600">Last engagement:</span>
+            {!editingLastEngagement ? (
+              <>
+                {contact.lastEngagementDate ? (
+                  <>
+                    <span className="text-gray-800">
+                      {formatDateEST(new Date(contact.lastEngagementDate).toISOString().slice(0, 10), { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                    {contact.lastEngagementType && (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        {contact.lastEngagementType === 'OUTBOUND_EMAIL' && 'Outbound email'}
+                        {contact.lastEngagementType === 'CONTACT_RESPONSE' && 'Contact response'}
+                        {contact.lastEngagementType === 'MEETING' && 'Meeting'}
+                        {contact.lastEngagementType === 'MANUAL' && 'Manual'}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-gray-400">Not set</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingLastEngagement(true);
+                    setLastEngagementDateEdit(contact.lastEngagementDate ? new Date(contact.lastEngagementDate).toISOString().slice(0, 10) : '');
+                    setLastEngagementTypeEdit(contact.lastEngagementType || '');
+                  }}
+                  className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                  title="Edit last engagement"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={lastEngagementDateEdit}
+                  onChange={(e) => setLastEngagementDateEdit(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                />
+                <select
+                  value={lastEngagementTypeEdit}
+                  onChange={(e) => setLastEngagementTypeEdit(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-2 py-1 text-sm min-w-[160px]"
+                >
+                  <option value="">—</option>
+                  <option value="OUTBOUND_EMAIL">Outbound email</option>
+                  <option value="CONTACT_RESPONSE">Contact response</option>
+                  <option value="MEETING">Meeting</option>
+                  <option value="MANUAL">Manual</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={savingLastEngagement}
+                  onClick={async () => {
+                    setSavingLastEngagement(true);
+                    try {
+                      const res = await api.patch(`/api/contacts/${contactId}/last-engagement`, {
+                        lastEngagementDate: lastEngagementDateEdit || null,
+                        lastEngagementType: lastEngagementTypeEdit || null,
+                      });
+                      if (res.data?.success) {
+                        setContact((prev) => ({ ...prev, ...res.data.contact }));
+                        setEditingLastEngagement(false);
+                        if (refreshContacts) refreshContacts();
+                      } else {
+                        alert(res.data?.error || 'Failed to update');
+                      }
+                    } catch (err) {
+                      alert(err.response?.data?.error || err.message || 'Failed to update');
+                    } finally {
+                      setSavingLastEngagement(false);
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  <Check className="h-3 w-3" />
+                  {savingLastEngagement ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingLastEngagement(false);
+                    setLastEngagementDateEdit('');
+                    setLastEngagementTypeEdit('');
+                  }}
+                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Next engagement */}
           <div className="flex flex-wrap items-center gap-2 text-sm">
