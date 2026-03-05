@@ -19,9 +19,11 @@ export default function InboundParsePage() {
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [showRaw, setShowRaw] = useState(false);
   const [companyHQId, setCompanyHQId] = useState(null);
+  const [parseLoading, setParseLoading] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
+  const [parsedPreview, setParsedPreview] = useState(null); // { contactEmail, contactName, nextEngagementDate, subject, body, isResponse }
 
   useEffect(() => {
     // Get companyHQId from localStorage (company-scoped like rest of repo)
@@ -97,15 +99,43 @@ export default function InboundParsePage() {
     }
   };
 
+  const handleParse = async (e) => {
+    e?.stopPropagation?.();
+    if (!selectedEmail) return;
+    setActionMessage(null);
+    setParseLoading(true);
+    try {
+      const res = await api.post('/api/inbound-parse/parse', {
+        inboundEmailId: selectedEmail.id,
+      });
+      if (res.data?.success && res.data.parsed) {
+        setParsedPreview(res.data.parsed);
+        setActionMessage({ type: 'success', text: 'Parsed. Review below and promote when ready.' });
+        setTimeout(() => setActionMessage(null), 4000);
+      } else {
+        setActionMessage({ type: 'error', text: res.data?.error || 'Parse failed' });
+      }
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err.response?.data?.error || err.message || 'Parse failed',
+      });
+    } finally {
+      setParseLoading(false);
+    }
+  };
+
   const handlePushToAi = async (e) => {
     e?.stopPropagation?.();
     if (!selectedEmail) return;
     setActionMessage(null);
     setPushLoading(true);
     try {
-      const res = await api.post('/api/inbound-parse/push-to-ai', {
-        inboundEmailId: selectedEmail.id,
-      });
+      const payload = { inboundEmailId: selectedEmail.id };
+      if (parsedPreview?.nextEngagementDate) {
+        payload.nextEngagementDate = parsedPreview.nextEngagementDate;
+      }
+      const res = await api.post('/api/inbound-parse/push-to-ai', payload);
       const { emailActivityId, parsed } = res.data;
       setEmails((prev) =>
         prev.map((x) =>
@@ -115,11 +145,13 @@ export default function InboundParsePage() {
       setSelectedEmail((prev) =>
         prev ? { ...prev, ingestionStatus: 'PROMOTED' } : null
       );
+      setParsedPreview(null);
+      const msg = parsed?.contactEmail
+        ? `Promoted → EmailActivity. Contact: ${parsed.contactEmail}`
+        : 'Promoted → EmailActivity';
       setActionMessage({
         type: 'success',
-        text: parsed?.contactEmail
-          ? `Promoted → EmailActivity. Contact: ${parsed.contactEmail}`
-          : `Promoted → EmailActivity`,
+        text: parsed?.nextEngagementDate ? `${msg} · Next engage: ${parsed.nextEngagementDate}` : msg,
       });
       setTimeout(() => setActionMessage(null), 5000);
     } catch (err) {
@@ -180,7 +212,7 @@ export default function InboundParsePage() {
                 return (
                   <div
                     key={email.id}
-                    onClick={() => setSelectedEmail(email)}
+                    onClick={() => { setSelectedEmail(email); setParsedPreview(null); }}
                     className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition ${
                       selectedEmail?.id === email.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
                     }`}
@@ -252,6 +284,18 @@ export default function InboundParsePage() {
                       {showRaw ? 'Show Parsed' : 'Show Raw'}
                     </button>
                     <button
+                      onClick={handleParse}
+                      disabled={
+                        parseLoading ||
+                        selectedEmail.ingestionStatus === 'PROMOTED' ||
+                        !(selectedEmail.text || selectedEmail.html || selectedEmail.email)
+                      }
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {parseLoading ? 'Parsing…' : 'Parse & Preview'}
+                    </button>
+                    <button
                       onClick={handlePushToAi}
                       disabled={
                         pushLoading ||
@@ -261,7 +305,7 @@ export default function InboundParsePage() {
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Sparkles className="h-4 w-4" />
-                      {pushLoading ? 'Parsing…' : 'Push to AI'}
+                      {pushLoading ? 'Promoting…' : 'Promote to Email Activity'}
                     </button>
                     <button
                       onClick={handleDelete}
@@ -282,6 +326,61 @@ export default function InboundParsePage() {
                     }`}
                   >
                     {actionMessage.text}
+                  </div>
+                )}
+
+                {parsedPreview && (
+                  <div className="mb-6 p-4 rounded-lg border-2 border-indigo-200 bg-indigo-50/50">
+                    <h4 className="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Parsed Preview — Review before promoting
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <span className="text-gray-600 font-medium">Contact:</span>{' '}
+                        {parsedPreview.contactName || '(none)'}
+                        {parsedPreview.contactEmail && (
+                          <span className="text-gray-600"> &lt;{parsedPreview.contactEmail}&gt;</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-gray-600 font-medium">Subject:</span>{' '}
+                        {parsedPreview.subject || '(none)'}
+                      </div>
+                      {parsedPreview.isResponse && (
+                        <span className="inline-block px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
+                          Response (will set next engage = 1 week from now if no date)
+                        </span>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="text-gray-600 font-medium">Next Engage Date:</label>
+                        <input
+                          type="date"
+                          value={parsedPreview.nextEngagementDate || ''}
+                          onChange={(e) =>
+                            setParsedPreview((p) => ({
+                              ...p,
+                              nextEngagementDate: e.target.value || null,
+                            }))
+                          }
+                          className="px-2 py-1 rounded border border-gray-300 text-sm"
+                        />
+                        <span className="text-xs text-gray-500">
+                          {parsedPreview.nextEngagementDate
+                            ? 'Will update contact when promoted'
+                            : 'Optional — responses default to +7 days'}
+                        </span>
+                      </div>
+                      {parsedPreview.body && (
+                        <div>
+                          <span className="text-gray-600 font-medium">Body snippet:</span>
+                          <div className="mt-1 p-2 rounded bg-white/80 text-gray-700 max-h-24 overflow-auto text-xs whitespace-pre-wrap">
+                            {parsedPreview.body.slice(0, 300)}
+                            {parsedPreview.body.length > 300 ? '…' : ''}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

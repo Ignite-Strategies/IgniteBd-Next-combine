@@ -34,6 +34,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const inboundEmailId = body?.inboundEmailId;
+    const nextEngagementDateOverride = typeof body?.nextEngagementDate === 'string' && body.nextEngagementDate.trim()
+      ? body.nextEngagementDate.trim()
+      : null;
+
     if (!inboundEmailId || typeof inboundEmailId !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Missing inboundEmailId' },
@@ -87,6 +91,10 @@ export async function POST(request: Request) {
         ? `[Parsed: ${parsed.contactName || '?'} <${parsed.contactEmail || '?'}>]\n\n${parsed.body || ''}`
         : parsed.body || null;
 
+    // Determine effective nextEngagementDate: user override > AI parsed > default for responses
+    const parsedDate = parsed.nextEngagementDate || null;
+    let effectiveNextEngagementDate = nextEngagementDateOverride || parsedDate;
+
     // Look up contact by email in this company
     let contactId: string | null = null;
     if (parsed.contactEmail) {
@@ -99,11 +107,16 @@ export async function POST(request: Request) {
       });
       if (contact) {
         contactId = contact.id;
-        // Update nextEngagementDate if AI parsed one
-        if (parsed.nextEngagementDate) {
+        // Default to 1 week from now for responses when no date parsed/override
+        if (!effectiveNextEngagementDate && parsed.isResponse) {
+          const oneWeekFromNow = new Date();
+          oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+          effectiveNextEngagementDate = oneWeekFromNow.toISOString().slice(0, 10); // "YYYY-MM-DD"
+        }
+        if (effectiveNextEngagementDate) {
           await prisma.contact.update({
             where: { id: contact.id },
-            data: { nextEngagementDate: parsed.nextEngagementDate },
+            data: { nextEngagementDate: effectiveNextEngagementDate },
           });
         }
       }
@@ -138,7 +151,7 @@ export async function POST(request: Request) {
       parsed: {
         contactEmail: parsed.contactEmail,
         contactName: parsed.contactName,
-        nextEngagementDate: parsed.nextEngagementDate,
+        nextEngagementDate: effectiveNextEngagementDate,
         isResponse: parsed.isResponse,
       },
     });
