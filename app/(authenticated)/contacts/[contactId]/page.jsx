@@ -172,6 +172,7 @@ export default function ContactDetailPage() {
   const [availablePersonas, setAvailablePersonas] = useState([]);
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [lastEmail, setLastEmail] = useState(null);
+  const [synthesizingSummary, setSynthesizingSummary] = useState(false);
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
   const [emailHistory, setEmailHistory] = useState([]);
   const [showAddResponseModal, setShowAddResponseModal] = useState(false);
@@ -1051,6 +1052,58 @@ export default function ContactDetailPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Engagement Summary */}
+        <div className="rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-indigo-600" />
+              Engagement Summary
+            </h3>
+            <button
+              type="button"
+              onClick={async () => {
+                setSynthesizingSummary(true);
+                try {
+                  const res = await api.post(`/api/contacts/${contactId}/synthesize-engagement-summary`);
+                  if (res.data?.success) {
+                    setContact((prev) => ({ ...prev, engagementSummary: res.data.summary }));
+                    if (refreshContacts) refreshContacts();
+                  } else {
+                    alert(res.data?.error || 'Failed to generate summary');
+                  }
+                } catch (err) {
+                  alert(err.response?.data?.error || err.message || 'Failed to generate summary');
+                } finally {
+                  setSynthesizingSummary(false);
+                }
+              }}
+              disabled={synthesizingSummary}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {synthesizingSummary ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Synthesizing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  {contact.engagementSummary ? 'Regenerate' : 'Generate Summary'}
+                </>
+              )}
+            </button>
+          </div>
+          {contact.engagementSummary ? (
+            <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
+              {contact.engagementSummary}
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500 italic">
+              No engagement summary yet. Click "Generate Summary" to synthesize a narrative from all email interactions.
+            </p>
+          )}
         </div>
 
         <div className="space-y-6">

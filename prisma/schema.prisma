@@ -555,6 +555,7 @@ model Contact {
   nextEngagementDate                                        String?   // ISO date only "YYYY-MM-DD"; no timestamp
   nextEngagementPurpose                                      NextEngagementPurpose?   // Set by cadence or remind-me; "General check-in" when user sets date
   contactDisposition                                         ContactDisposition?   // General attitude: happy to receive a note vs doesn't care (manual; future AI)
+  engagementSummary                                          String?   @db.Text   // AI-synthesized narrative of all email interactions with this contact
   // Snapped pipeline so cadence/outreach logic reads from Contact only (limit pipeline lookups to writers)
   pipelineSnap                                               String?   // pipeline name from pipelines.pipeline
   pipelineStageSnap                                          String?   // stage from pipelines.stage
