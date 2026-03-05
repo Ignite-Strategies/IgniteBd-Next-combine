@@ -853,6 +853,24 @@ export default function ContactDetailPage() {
             </div>
           )}
 
+          {/* Last engagement */}
+          {contact.lastEngagementDate && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-gray-600">Last engagement:</span>
+              <span className="text-gray-800">
+                {formatDateEST(new Date(contact.lastEngagementDate).toISOString().slice(0, 10), { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+              {contact.lastEngagementType && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                  {contact.lastEngagementType === 'OUTBOUND_EMAIL' && 'Outbound email'}
+                  {contact.lastEngagementType === 'CONTACT_RESPONSE' && 'Contact response'}
+                  {contact.lastEngagementType === 'MEETING' && 'Meeting'}
+                  {contact.lastEngagementType === 'MANUAL' && 'Manual'}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Next engagement */}
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-medium text-gray-600">Next engagement:</span>

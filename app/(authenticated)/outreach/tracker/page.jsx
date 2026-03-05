@@ -349,16 +349,25 @@ function OutreachTrackerContent() {
                       <tbody className="bg-white divide-y divide-gray-100">
                         {groupContacts.map((contact) => (
                           <tr key={contact.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-3 whitespace-nowrap">
+                            <td className="px-6 py-3">
                               <button
                                 type="button"
                                 onClick={() => router.push(`/contacts/${contact.id}`)}
                                 className="text-left"
                               >
-                                <div className="text-sm font-medium text-gray-900 hover:text-amber-600">
-                                  {contact.firstName} {contact.lastName}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900 hover:text-amber-600">
+                                    {contact.firstName} {contact.lastName}
+                                  </span>
+                                  {contact.title && (
+                                    <span className="text-xs text-gray-400 truncate max-w-[160px]">{contact.title}</span>
+                                  )}
                                 </div>
-                                <div className="text-sm text-gray-500">{contact.email}</div>
+                                <div className="text-sm text-gray-500">
+                                  {contact.company && <span className="font-medium text-gray-600">{contact.company}</span>}
+                                  {contact.company && contact.email && ' · '}
+                                  {contact.email}
+                                </div>
                               </button>
                             </td>
                             <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">

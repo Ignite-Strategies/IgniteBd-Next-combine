@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Calendar, ChevronRight, Download, Send, X, Loader2, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/api';
-import { getTodayEST, formatDateLabelEST } from '@/lib/dateEst';
+import { getTodayEST, formatDateLabelEST, formatDateEST } from '@/lib/dateEst';
 
 /**
  * nextEngagementDate is date-only "YYYY-MM-DD". Group by that string; labels use EST "today" for Due today/tomorrow.
@@ -92,6 +92,23 @@ export default function NextEngagementContainer({
       REFERRAL_NO_CONTACT: 'Referral (no contact)',
     };
     return labels[purpose] || purpose;
+  };
+
+  const engagementTypeLabel = (type) => {
+    const labels = {
+      OUTBOUND_EMAIL: 'outbound',
+      CONTACT_RESPONSE: 'response',
+      MEETING: 'meeting',
+      MANUAL: 'manual',
+    };
+    return labels[type] || type;
+  };
+
+  const lastEngagementSnippet = (r) => {
+    if (!r.lastEngagementDate) return null;
+    const dateStr = formatDateEST(r.lastEngagementDate.slice(0, 10), { month: 'short', day: 'numeric' });
+    const typeStr = r.lastEngagementType ? engagementTypeLabel(r.lastEngagementType) : '';
+    return `Last: ${dateStr}${typeStr ? ` (${typeStr})` : ''}`;
   };
 
   const handleExport = () => {
@@ -245,11 +262,29 @@ export default function NextEngagementContainer({
                         className={`flex w-full items-center justify-between text-left hover:bg-gray-50 ${compact ? 'px-4 py-2.5' : 'px-5 py-4'}`}
                       >
                         <div className="min-w-0 flex-1">
-                          <p className={`truncate font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}>{name(r)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className={`truncate font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}>{name(r)}</p>
+                            {r.title && !compact && (
+                              <span className="text-xs text-gray-400 truncate max-w-[180px]">{r.title}</span>
+                            )}
+                          </div>
                           <p className={`truncate text-gray-500 ${compact ? 'text-xs' : 'text-sm'}`}>
+                            {r.company && <span className="font-medium text-gray-600">{r.company}</span>}
+                            {r.company && ' · '}
                             {purposeLabel(r.nextEngagementPurpose)}
                             {r.nextContactNote && ` · ${r.nextContactNote}`}
                           </p>
+                          {!compact && (
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-gray-400">
+                              {lastEngagementSnippet(r) && <span>{lastEngagementSnippet(r)}</span>}
+                              {r.stage && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">{r.stage}</span>}
+                            </div>
+                          )}
+                          {r.lastSummary && !compact && (
+                            <p className="mt-0.5 truncate text-xs text-indigo-600/80 italic">
+                              {r.lastSummary.length > 100 ? r.lastSummary.slice(0, 100) + '…' : r.lastSummary}
+                            </p>
+                          )}
                         </div>
                         <ChevronRight className={`shrink-0 text-gray-400 ${compact ? 'h-4 w-4' : 'h-5 w-5'}`} />
                       </button>
