@@ -30,8 +30,20 @@ Any code that hydrates and then writes `owner.companyHQId` would overwrite the u
 - `app/(onboarding)/welcome/page.jsx` – Saves `owner`, `memberships`; only writes `companyHQId` in `handleContinue` ✅
 - `app/(authenticated)/context-switch/page.jsx` – Uses `switchCompanyHQ` (explicit user action) ✅
 
-## How Pages Resolve companyHQId
+## Universal Pattern: useCompanyHQId
 
-- **URL param first**, then **localStorage fallback** (e.g. growth-dashboard, targeting, contacts/view redirect).
-- Dashboard and similar pages: `companyHQId = searchParams.get('companyHQId') || localStorage.getItem('companyHQId') || ''`
-- Show "Company Keys Missing" only when **both** URL and localStorage are empty.
+Use the `useCompanyHQId` hook for any page that needs company context:
+
+```js
+import { useCompanyHQId } from '@/hooks/useCompanyHQId';
+
+const { companyHQId, missing } = useCompanyHQId();
+if (missing) return <CompanyKeyMissingError />;
+```
+
+The hook:
+1. Resolves `companyHQId` from URL first, then localStorage
+2. If URL is missing it but localStorage has it → `router.replace` to add the param (preserves path + other params)
+3. Returns `{ companyHQId, missing }` — show error only when `missing` is true
+
+**Apply to**: growth-dashboard, and gradually to other company-scoped pages (personas, outreach/compose, templates, etc.).

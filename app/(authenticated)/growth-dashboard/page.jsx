@@ -1,21 +1,15 @@
 'use client';
 
 import { useEffect, Suspense, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Plus, Mail, Users, RefreshCw } from 'lucide-react';
 import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
 import api from '@/lib/api';
+import { useCompanyHQId } from '@/hooks/useCompanyHQId';
 
 function GrowthDashboardPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  // URL first, then localStorage fallback (keeps company context when navigating without param)
-  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
-  const storedCompanyHQId = typeof window !== 'undefined'
-    ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
-    : '';
-  const companyHQId = urlCompanyHQId || storedCompanyHQId;
-  const missingCompanyKey = !companyHQId;
+  const { companyHQId, missing: missingCompanyKey } = useCompanyHQId();
 
   const [companyHQ, setCompanyHQ] = useState(null);
   const [totalContacts, setTotalContacts] = useState(0);

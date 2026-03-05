@@ -73,10 +73,6 @@ function buildToneGuidance(personaSlug, rc) {
     lines.push(`The recipient formerly worked at ${rc.formerCompany} — that is YOUR company or a company you are both connected to. Do NOT reference this as if it is their old company in a distant way; it is your shared connection.`);
   }
 
-  if (rc?.primaryWork && isDefined(rc.primaryWork)) {
-    lines.push(`The recipient works in a ${rc.primaryWork} role/context. Use {{companyName}} when referencing their employer — do NOT write "${rc.primaryWork}" as a company name in the email. You can reference their industry context naturally (e.g. "knowing you're on the fund side now") but always use {{companyName}} for the actual employer.`);
-  }
-
   lines.push('Do NOT repeat the same phrase or snippet twice. Each piece of content should appear once.');
 
   if (lines.length === 1) {
@@ -151,9 +147,6 @@ export async function POST(request) {
                 relationshipRecency: true,
                 companyAwareness: true,
                 formerCompany: true,
-                primaryWork: true,
-                relationshipQuality: true,
-                opportunityType: true,
               },
             },
           },
@@ -181,9 +174,6 @@ export async function POST(request) {
             if (isDefined(rc.relationshipRecency)) clean.relationshipRecency = rc.relationshipRecency;
             if (isDefined(rc.companyAwareness)) clean.companyAwareness = rc.companyAwareness;
             if (rc.formerCompany) clean.formerCompany = rc.formerCompany;
-            if (rc.primaryWork) clean.primaryWork = rc.primaryWork;
-            if (isDefined(rc.relationshipQuality)) clean.relationshipQuality = rc.relationshipQuality;
-            if (isDefined(rc.opportunityType)) clean.opportunityType = rc.opportunityType;
             if (Object.keys(clean).length > 0) effectiveRelationshipContext = clean;
           }
         }
@@ -262,11 +252,8 @@ export async function POST(request) {
       const parts = [];
       if (rc.contextOfRelationship) parts.push(`Relationship type: ${humanize(rc.contextOfRelationship)}`);
       if (rc.relationshipRecency) parts.push(`Recency: ${humanize(rc.relationshipRecency)}`);
-      if (rc.formerCompany) parts.push(`Former company connection: ${rc.formerCompany}`);
-      if (rc.primaryWork) parts.push(`Recipient's industry/work type: ${rc.primaryWork} — this is a category descriptor, NOT the company name. Use {{companyName}} when referencing their employer; do NOT write "${rc.primaryWork}" as the company name in the email.`);
       if (rc.companyAwareness) parts.push(`Company awareness: ${humanize(rc.companyAwareness)}`);
-      if (rc.relationshipQuality) parts.push(`Relationship quality: ${humanize(rc.relationshipQuality)}`);
-      if (rc.opportunityType) parts.push(`Opportunity type: ${humanize(rc.opportunityType)}`);
+      if (rc.formerCompany) parts.push(`Former company connection: ${rc.formerCompany}`);
       if (parts.length > 0) {
         relationshipContextDesc = `\n\n=== RELATIONSHIP CONTEXT ===\n${parts.join('\n')}`;
       }
