@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus, Pencil } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus, Pencil, FileText, BookmarkPlus, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { formatDeliveryMethodLabel, DELIVERY_METHODS, normalizeDeliveryMethod } from '@/lib/utils/deliveryMethod';
@@ -209,6 +209,18 @@ export default function ContactDetailPage({ params }) {
   const [lookingUp, setLookingUp] = useState(false);
   const [savingIntroducedBy, setSavingIntroducedBy] = useState(false);
 
+  // Persona templates
+  const [personaTemplates, setPersonaTemplates] = useState([]);
+  const [loadingPersonaTemplates, setLoadingPersonaTemplates] = useState(false);
+  const [expandedTemplateId, setExpandedTemplateId] = useState(null);
+  const [showSaveTemplateForm, setShowSaveTemplateForm] = useState(false);
+  const [newTemplateTitle, setNewTemplateTitle] = useState('');
+  const [newTemplateSubject, setNewTemplateSubject] = useState('');
+  const [newTemplateBody, setNewTemplateBody] = useState('');
+  const [savingNewTemplate, setSavingNewTemplate] = useState(false);
+  const [saveTemplateError, setSaveTemplateError] = useState('');
+  const [saveTemplateSuccess, setSaveTemplateSuccess] = useState(false);
+
   // Load email history (used by effect and after adding response)
   const loadEmailHistory = () => {
     if (!contactId) return;
@@ -366,6 +378,20 @@ export default function ContactDetailPage({ params }) {
     }
   }, [contact?.outreachPersonaSlug]);
 
+  // Load templates for this persona
+  useEffect(() => {
+    if (!contact?.outreachPersonaSlug || !companyHQId) return;
+    setLoadingPersonaTemplates(true);
+    api.get(`/api/templates?companyHQId=${companyHQId}&personaSlug=${encodeURIComponent(contact.outreachPersonaSlug)}`)
+      .then((res) => {
+        if (res.data?.success) {
+          setPersonaTemplates(res.data.templates || []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPersonaTemplates(false));
+  }, [contact?.outreachPersonaSlug, companyHQId]);
+
   const handleSuggestPersona = async () => {
     if (!contactId) return;
     
@@ -440,6 +466,40 @@ export default function ContactDetailPage({ params }) {
       alert(error.response?.data?.error || 'Failed to apply persona');
     } finally {
       setSavingPersona(false);
+    }
+  };
+
+  const handleSavePersonaTemplate = async () => {
+    if (!newTemplateTitle.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
+      setSaveTemplateError('Title, subject, and body are all required.');
+      return;
+    }
+    setSavingNewTemplate(true);
+    setSaveTemplateError('');
+    setSaveTemplateSuccess(false);
+    try {
+      const res = await api.post('/api/templates', {
+        companyHQId,
+        title: newTemplateTitle.trim(),
+        subject: newTemplateSubject.trim(),
+        body: newTemplateBody.trim(),
+        personaSlug: contact.outreachPersonaSlug,
+      });
+      if (res.data?.success) {
+        setPersonaTemplates((prev) => [res.data.template, ...prev]);
+        setNewTemplateTitle('');
+        setNewTemplateSubject('');
+        setNewTemplateBody('');
+        setShowSaveTemplateForm(false);
+        setSaveTemplateSuccess(true);
+        setTimeout(() => setSaveTemplateSuccess(false), 3000);
+      } else {
+        setSaveTemplateError(res.data?.error || 'Failed to save template.');
+      }
+    } catch (err) {
+      setSaveTemplateError(err.response?.data?.error || 'Failed to save template.');
+    } finally {
+      setSavingNewTemplate(false);
     }
   };
 

@@ -128,7 +128,6 @@ export async function POST(request) {
               ...(linkedinUrl && { linkedinUrl }),
               ...(howMet && { howMet }),
               ...(notes && { notes }),
-              outreachIntent: 'TARGET',
             },
           });
           results.updated++;
@@ -145,7 +144,6 @@ export async function POST(request) {
               ...(linkedinUrl && { linkedinUrl }),
               ...(howMet && { howMet }),
               ...(notes && { notes }),
-              outreachIntent: 'TARGET',
             },
           });
           results.created++;
@@ -167,7 +165,6 @@ export async function POST(request) {
           companyName: contact.companyName,
           title: contact.title,
           howMet: contact.howMet,
-          outreachIntent: contact.outreachIntent,
         });
       } catch (err) {
         console.error(`Error saving target ${idx + 1}:`, err);

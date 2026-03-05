@@ -5,7 +5,8 @@ import { resolveMembership } from '@/lib/membership';
 
 /**
  * GET /api/targeting/list
- * Returns all contacts where outreachIntent = TARGET for the given company.
+ * Returns contacts in the prospect / need-to-engage pipeline stage for the given company.
+ * These are contacts submitted via the Target Cockpit awaiting first outreach.
  *
  * Query params:
  * - companyHQId (required)
@@ -42,7 +43,10 @@ export async function GET(request) {
     const targets = await prisma.contact.findMany({
       where: {
         crmId: companyHQId,
-        outreachIntent: 'TARGET',
+        pipelines: {
+          pipeline: 'prospect',
+          stage: 'need-to-engage',
+        },
       },
       select: {
         id: true,
@@ -54,13 +58,16 @@ export async function GET(request) {
         linkedinUrl: true,
         howMet: true,
         notes: true,
+        outreachPersonaSlug: true,
         prior_relationship: true,
         pipelineSnap: true,
         pipelineStageSnap: true,
-        outreachIntent: true,
         enrichmentFetchedAt: true,
         createdAt: true,
         updatedAt: true,
+        pipelines: {
+          select: { pipeline: true, stage: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,

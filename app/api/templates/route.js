@@ -148,6 +148,7 @@ export async function GET(request) {
 
     const { searchParams } = request.nextUrl;
     const companyHQId = searchParams.get('companyHQId');
+    const personaSlug = searchParams.get('personaSlug');
 
     if (!companyHQId) {
       return NextResponse.json(
@@ -165,10 +166,11 @@ export async function GET(request) {
       );
     }
 
-    // List templates for this company (company-scoped)
+    // List templates for this company, optionally filtered by personaSlug
     const templates = await prisma.templates.findMany({
       where: {
         companyHQId,
+        ...(personaSlug ? { personaSlug } : {}),
       },
       orderBy: {
         createdAt: 'desc',

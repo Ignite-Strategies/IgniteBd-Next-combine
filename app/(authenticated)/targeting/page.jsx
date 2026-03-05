@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Target, Plus, RefreshCw, User, Building2, ExternalLink, Clock } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Target, Plus, RefreshCw, User, Building2, ExternalLink, Sparkles, ArrowRight, UserCheck } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import PageHeader from '@/components/PageHeader.jsx';
 import TargetSubmissionModal from '@/components/targeting/TargetSubmissionModal.jsx';
@@ -36,29 +36,44 @@ function displayName(t) {
 }
 
 function StatusBadge({ target }) {
+  if (target.outreachPersonaSlug) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+        <Sparkles className="h-3 w-3" />
+        Ready
+      </span>
+    );
+  }
   if (target.enrichmentFetchedAt) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+        <UserCheck className="h-3 w-3" />
         Enriched
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-      <Clock className="h-3 w-3" />
-      Queued
+      Needs setup
     </span>
   );
 }
 
 // ─── Target Queue ──────────────────────────────────────────────────────────────
 
-function TargetQueue({ targets, loading, onRefresh }) {
+function TargetQueue({ targets, loading, companyHQId }) {
+  const router = useRouter();
+
+  const goToContact = (t) => {
+    const base = `/contacts/${t.id}`;
+    router.push(companyHQId ? `${base}?companyHQId=${companyHQId}` : base);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-gray-400">
         <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-        Loading targets…
+        Loading queue…
       </div>
     );
   }
@@ -67,8 +82,8 @@ function TargetQueue({ targets, loading, onRefresh }) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Target className="h-12 w-12 text-gray-300 mb-4" />
-        <p className="text-base font-semibold text-gray-600">No targets in queue</p>
-        <p className="text-sm text-gray-400 mt-1">Submit your first batch to get started.</p>
+        <p className="text-base font-semibold text-gray-600">No one in the queue</p>
+        <p className="text-sm text-gray-400 mt-1">Submit targets and they'll appear here until first outreach is sent.</p>
       </div>
     );
   }
@@ -80,20 +95,24 @@ function TargetQueue({ targets, loading, onRefresh }) {
       {groups.map(({ date, items }) => (
         <div key={date}>
           {/* Date group header */}
-          <div className="flex items-center justify-between border-l-2 border-blue-400 bg-blue-50/60 px-5 py-2.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+          <div className="flex items-center justify-between border-l-2 border-indigo-400 bg-indigo-50/50 px-5 py-2.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-700">
               {formatGroupDate(date)}
             </span>
-            <span className="text-xs text-blue-500">
-              {items.length} target{items.length !== 1 ? 's' : ''}
+            <span className="text-xs text-indigo-500">
+              {items.length} contact{items.length !== 1 ? 's' : ''}
             </span>
           </div>
 
           {/* Target rows */}
           {items.map((t) => (
-            <div key={t.id} className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition">
+            <div
+              key={t.id}
+              onClick={() => goToContact(t)}
+              className="group flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition cursor-pointer"
+            >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 group-hover:bg-indigo-200 transition">
                   <User className="h-4 w-4 text-indigo-600" />
                 </div>
                 <div className="min-w-0">
@@ -114,22 +133,35 @@ function TargetQueue({ targets, loading, onRefresh }) {
                       </>
                     )}
                   </div>
+                  {/* Persona slug — the meaningful readiness signal */}
+                  {t.outreachPersonaSlug && (
+                    <div className="mt-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+                        <Sparkles className="h-3 w-3" />
+                        {t.outreachPersonaSlug}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                 <StatusBadge target={t} />
                 {t.linkedinUrl && (
                   <a
                     href={t.linkedinUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="rounded-lg p-1.5 text-gray-400 transition hover:bg-blue-50 hover:text-blue-600"
                     title="View LinkedIn"
                   >
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 )}
+                <span className="text-gray-300 group-hover:text-indigo-400 transition">
+                  <ArrowRight className="h-4 w-4" />
+                </span>
               </div>
             </div>
           ))}
@@ -143,22 +175,22 @@ function TargetQueue({ targets, loading, onRefresh }) {
 
 function StatsBar({ targets }) {
   const total = targets.length;
-  const enriched = targets.filter((t) => t.enrichmentFetchedAt).length;
-  const queued = total - enriched;
+  const ready = targets.filter((t) => t.outreachPersonaSlug).length;
+  const needsSetup = total - ready;
 
   return (
     <div className="grid grid-cols-3 divide-x divide-gray-200">
       <div className="px-6 py-4 text-center">
         <p className="text-2xl font-bold text-gray-900">{total}</p>
-        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Total</p>
+        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">In Queue</p>
       </div>
       <div className="px-6 py-4 text-center">
-        <p className="text-2xl font-bold text-amber-600">{queued}</p>
-        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Queued</p>
+        <p className="text-2xl font-bold text-purple-600">{ready}</p>
+        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Persona Ready</p>
       </div>
       <div className="px-6 py-4 text-center">
-        <p className="text-2xl font-bold text-blue-600">{enriched}</p>
-        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Enriched</p>
+        <p className="text-2xl font-bold text-amber-500">{needsSetup}</p>
+        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Needs Setup</p>
       </div>
     </div>
   );
@@ -228,14 +260,14 @@ function TargetCockpitInner() {
         />
 
         {/* Intro banner */}
-        <div className="mb-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
+        <div className="mb-6 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-5">
           <div className="flex items-start gap-3">
-            <Target className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
+            <Target className="h-6 w-6 text-indigo-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-blue-900">Weekly targeting workflow</p>
-              <p className="text-sm text-blue-700 mt-0.5">
-                Submit 5–10 intentional contacts per batch. Add relationship context so templates
-                can be generated for each target's cadence.
+              <p className="text-sm font-semibold text-indigo-900">Who you're reaching out to this week</p>
+              <p className="text-sm text-indigo-700 mt-0.5">
+                Contacts stay here in <strong>need-to-engage</strong> until their first email goes out.
+                Set a persona on each contact to unlock template matching.
               </p>
             </div>
           </div>
@@ -274,7 +306,7 @@ function TargetCockpitInner() {
           </div>
 
           {/* Queue list */}
-          <TargetQueue targets={targets} loading={loading} onRefresh={fetchTargets} />
+          <TargetQueue targets={targets} loading={loading} companyHQId={companyHQId} />
         </div>
 
         {/* Empty call-to-action */}
