@@ -560,6 +560,7 @@ model Contact {
   pipelineSnap                                               String?   // pipeline name from pipelines.pipeline
   pipelineStageSnap                                          String?   // stage from pipelines.stage
   outreachPersonaSlug                                       String? // Assigned outreach persona (e.g., "FormerColleagueNowReachingoutAgainAfterLongTime")
+  outreachIntent                                            ContactOutreachIntent?   @default(PROSPECT) // TARGET = queued for next cadence (Targeting UX)
   relationship_contexts                                     relationship_contexts?
   company_hqs_company_hqs_contactOwnerIdTocontacts          company_hqs[]              @relation("company_hqs_contactOwnerIdTocontacts")
   consultant_deliverables                                   consultant_deliverables[]
@@ -592,6 +593,7 @@ model Contact {
   @@index([nextEngagementDate])
   @@index([contactDisposition])
   @@index([doNotContactAgain])
+  @@index([outreachIntent])
   @@map("contacts")
 }
 
@@ -1745,6 +1747,11 @@ enum RelationshipEnum {
   WARM
   ESTABLISHED
   DORMANT
+}
+
+enum ContactOutreachIntent {
+  PROSPECT   // Default: in pool, not queued for "next cadence"
+  TARGET     // Explicitly marked for next cadence run
 }
 
 enum SequenceStatus {

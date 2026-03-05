@@ -29,6 +29,8 @@ const ROUTES_WITH_SIDEBAR = [
   '/templates',
   '/companies',
   '/contacts', // Contact management routes (includes /contacts/view, /contacts/manual, etc.)
+  '/targeting',
+  '/inbound-parse',
 ];
 
 function pathHasSidebar(path) {
