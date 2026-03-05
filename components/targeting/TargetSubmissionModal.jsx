@@ -19,7 +19,21 @@ import { auth } from '@/lib/firebase';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS = ['Choose', 'Add Contacts', 'Review Targets', 'Confirm', 'Done'];
+const STEPS = ['Choose', 'Add Contacts', 'Review Targets', 'Confirm', 'Done', 'Outreach'];
+
+// ─── Template hydration ────────────────────────────────────────────────────────
+// Fills {{variable}} slots with real contact data so the template is ready to copy.
+function hydrateTemplate(text, contact) {
+  if (!text) return '';
+  const firstName = contact.firstName || contact.fullName?.split(' ')[0] || '';
+  const lastName = contact.lastName || contact.fullName?.split(' ').slice(1).join(' ') || '';
+  return text
+    .replace(/\{\{first_name\}\}/gi, firstName)
+    .replace(/\{\{last_name\}\}/gi, lastName)
+    .replace(/\{\{full_name\}\}/gi, contact.fullName || [firstName, lastName].filter(Boolean).join(' '))
+    .replace(/\{\{company_name\}\}/gi, contact.companyName || '')
+    .replace(/\{\{title\}\}/gi, contact.title || '');
+}
 
 const RELATIONSHIP_OPTIONS = [
   '',
@@ -351,7 +365,40 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
 
+  // ── Step 5: outreach prep per saved contact ──
+  const [outreachIdx, setOutreachIdx] = useState(0);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+  const [personaSuggestion, setPersonaSuggestion] = useState(null); // { suggestedPersonaSlug, confidence, reasoning }
+  const [appliedSlug, setAppliedSlug] = useState(null);
+  const [applyingSlug, setApplyingSlug] = useState(false);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [matchedTemplates, setMatchedTemplates] = useState([]);
+  const [hydratedSubject, setHydratedSubject] = useState('');
+  const [hydratedBody, setHydratedBody] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generatedBody, setGeneratedBody] = useState('');
+  const [savingGenTemplate, setSavingGenTemplate] = useState(false);
+  const [genTemplateSaved, setGenTemplateSaved] = useState(false);
+
   const fileInputRef = useRef(null);
+
+  const resetOutreach = () => {
+    setOutreachIdx(0);
+    setLoadingSuggestion(false);
+    setPersonaSuggestion(null);
+    setAppliedSlug(null);
+    setApplyingSlug(false);
+    setLoadingTemplates(false);
+    setMatchedTemplates([]);
+    setHydratedSubject('');
+    setHydratedBody('');
+    setCopied(false);
+    setGenerating(false);
+    setGeneratedBody('');
+    setSavingGenTemplate(false);
+    setGenTemplateSaved(false);
+  };
 
   const reset = () => {
     setStep(0);
@@ -362,6 +409,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
     setParseError('');
     setSaving(false);
     setResult(null);
+    resetOutreach();
   };
 
   const handleClose = () => { reset(); onClose(); };
@@ -434,6 +482,120 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
   const currentContact = contacts[currentIdx] || null;
   const isLastCard = currentIdx === contacts.length - 1;
   const isFirstCard = currentIdx === 0;
+
+  // Current contact in step 5
+  const outreachContacts = result?.savedContacts || [];
+  const outreachContact = outreachContacts[outreachIdx] || null;
+
+  // Auto-load persona suggestion when entering step 5 or navigating to a new contact
+  useEffect(() => {
+    if (step !== 5 || !outreachContact?.id) return;
+    resetOutreach();
+    setLoadingSuggestion(true);
+
+    auth.currentUser?.getIdToken().then((token) => {
+      fetch(`/api/contacts/${outreachContact.id}/suggest-persona`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) setPersonaSuggestion(data);
+        })
+        .catch(() => {})
+        .finally(() => setLoadingSuggestion(false));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, outreachIdx]);
+
+  const handleApplyPersona = async (slug) => {
+    if (!outreachContact?.id || !slug) return;
+    setApplyingSlug(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/contacts/${outreachContact.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ outreachPersonaSlug: slug }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppliedSlug(slug);
+        // Fetch matching templates
+        setLoadingTemplates(true);
+        const tRes = await fetch(
+          `/api/templates?companyHQId=${encodeURIComponent(companyHQId)}&personaSlug=${encodeURIComponent(slug)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const tData = await tRes.json();
+        const templates = tData.templates || [];
+        setMatchedTemplates(templates);
+        if (templates.length > 0) {
+          const tpl = templates[0];
+          setHydratedSubject(hydrateTemplate(tpl.subject, outreachContact));
+          setHydratedBody(hydrateTemplate(tpl.body, outreachContact));
+        }
+        setLoadingTemplates(false);
+      }
+    } catch (err) {
+      console.error('Error applying persona:', err);
+    } finally {
+      setApplyingSlug(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!outreachContact?.id || !companyHQId) return;
+    setGenerating(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/template/generate-with-snippets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          companyHQId,
+          contactId: outreachContact.id,
+          intent: outreachContact.notes || outreachContact.howMet || 'outreach',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGeneratedBody(data.template?.body || '');
+        setHydratedSubject(data.template?.subject || '');
+        setHydratedBody(data.template?.body || '');
+      }
+    } catch (err) {
+      console.error('Generate error:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSaveGeneratedTemplate = async () => {
+    if (!appliedSlug || !hydratedBody || !companyHQId) return;
+    setSavingGenTemplate(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          companyHQId,
+          title: `${appliedSlug} – generated`,
+          subject: hydratedSubject,
+          body: hydratedBody,
+          personaSlug: appliedSlug,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) setGenTemplateSaved(true);
+    } catch (err) {
+      console.error('Save template error:', err);
+    } finally {
+      setSavingGenTemplate(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!validContacts.length) return;
@@ -691,6 +853,179 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
               </div>
             </div>
           )}
+
+          {/* ── Step 5: Outreach Prep ── */}
+          {step === 5 && (
+            <div className="space-y-5">
+              {/* Contact navigator */}
+              {outreachContacts.length > 1 && (
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span className="font-semibold">{outreachContact?.fullName || [outreachContact?.firstName, outreachContact?.lastName].filter(Boolean).join(' ') || '—'}</span>
+                  <span>{outreachIdx + 1} of {outreachContacts.length}</span>
+                </div>
+              )}
+
+              {/* Persona suggestion card */}
+              {!appliedSlug && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Suggested Persona</p>
+                  {loadingSuggestion ? (
+                    <div className="flex items-center gap-2 text-sm text-indigo-600">
+                      <Sparkles className="h-4 w-4 animate-pulse" /> Analysing notes…
+                    </div>
+                  ) : personaSuggestion ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-bold text-purple-800">
+                          {personaSuggestion.suggestedPersonaSlug}
+                        </span>
+                        {personaSuggestion.confidence && (
+                          <span className="text-xs text-indigo-500">{personaSuggestion.confidence}% confidence</span>
+                        )}
+                      </div>
+                      {personaSuggestion.reasoning && (
+                        <p className="text-xs text-indigo-700 leading-relaxed">{personaSuggestion.reasoning}</p>
+                      )}
+                      <button
+                        onClick={() => handleApplyPersona(personaSuggestion.suggestedPersonaSlug)}
+                        disabled={applyingSlug}
+                        className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50"
+                      >
+                        {applyingSlug ? 'Applying…' : '✓ Apply this persona'}
+                      </button>
+                    </>
+                  ) : (
+                    <p className="text-sm text-indigo-600 italic">No suggestion — add notes to the contact for a better result.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Persona applied — template section */}
+              {appliedSlug && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-semibold text-gray-800">Persona applied:</span>
+                    <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold text-purple-800">{appliedSlug}</span>
+                  </div>
+
+                  {loadingTemplates ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <Sparkles className="h-4 w-4 animate-pulse" /> Looking up templates…
+                    </div>
+                  ) : matchedTemplates.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Template found — hydrated for {outreachContact?.firstName || 'this contact'}
+                      </p>
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray-500">Subject</label>
+                          <input
+                            type="text"
+                            value={hydratedSubject}
+                            onChange={(e) => setHydratedSubject(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray-500">Body</label>
+                          <textarea
+                            value={hydratedBody}
+                            onChange={(e) => setHydratedBody(e.target.value)}
+                            rows={8}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm resize-none focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`Subject: ${hydratedSubject}\n\n${hydratedBody}`);
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2500);
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
+                          >
+                            {copied ? '✓ Copied!' : 'Copy email'}
+                          </button>
+                          {matchedTemplates.length > 1 && (
+                            <button
+                              onClick={() => {
+                                const next = matchedTemplates[(matchedTemplates.indexOf(matchedTemplates.find(t => hydrateTemplate(t.body, outreachContact) === hydratedBody)) + 1) % matchedTemplates.length];
+                                if (next) { setHydratedSubject(hydrateTemplate(next.subject, outreachContact)); setHydratedBody(hydrateTemplate(next.body, outreachContact)); }
+                              }}
+                              className="text-xs text-purple-600 hover:underline"
+                            >
+                              Try another template ({matchedTemplates.length} available)
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* No template found — offer generation */
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-center space-y-3">
+                      <p className="text-sm text-gray-600">No template saved for <strong>{appliedSlug}</strong> yet.</p>
+                      {!hydratedBody ? (
+                        <button
+                          onClick={handleGenerate}
+                          disabled={generating}
+                          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 mx-auto"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          {generating ? 'Generating…' : 'Generate email from phrase library'}
+                        </button>
+                      ) : (
+                        <div className="space-y-3 text-left">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-500">Subject</label>
+                            <input
+                              type="text"
+                              value={hydratedSubject}
+                              onChange={(e) => setHydratedSubject(e.target.value)}
+                              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-500">Body</label>
+                            <textarea
+                              value={hydratedBody}
+                              onChange={(e) => setHydratedBody(e.target.value)}
+                              rows={8}
+                              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm resize-none focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`Subject: ${hydratedSubject}\n\n${hydratedBody}`);
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2500);
+                              }}
+                              className="flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                            >
+                              {copied ? '✓ Copied!' : 'Copy email'}
+                            </button>
+                            {!genTemplateSaved ? (
+                              <button
+                                onClick={handleSaveGeneratedTemplate}
+                                disabled={savingGenTemplate}
+                                className="flex items-center gap-1.5 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                              >
+                                {savingGenTemplate ? 'Saving…' : 'Save as persona template'}
+                              </button>
+                            ) : (
+                              <span className="text-sm text-green-600 font-medium">✓ Saved to template library</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Footer ── */}
@@ -782,13 +1117,52 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
         )}
 
         {step === 4 && (
-          <div className="flex justify-center border-t border-gray-200 px-6 py-4 flex-shrink-0 gap-3">
+          <div className="flex justify-center border-t border-gray-200 px-6 py-4 flex-shrink-0 gap-3 flex-wrap">
             <button onClick={reset} className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
               Submit more
             </button>
+            {result?.savedContacts?.length > 0 && (
+              <button
+                onClick={() => { setOutreachIdx(0); setStep(5); }}
+                className="flex items-center gap-2 rounded-lg bg-purple-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+              >
+                <Sparkles className="h-4 w-4" />
+                Set up outreach
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
             <button onClick={handleClose} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
               Done
             </button>
+          </div>
+        )}
+
+        {step === 5 && (
+          <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              {outreachIdx > 0 && (
+                <button
+                  onClick={() => { resetOutreach(); setOutreachIdx((i) => i - 1); }}
+                  className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {outreachIdx < outreachContacts.length - 1 ? (
+                <button
+                  onClick={() => { resetOutreach(); setOutreachIdx((i) => i + 1); }}
+                  className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                  Next contact <ChevronRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <button onClick={handleClose} className="rounded-lg bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                  Done
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

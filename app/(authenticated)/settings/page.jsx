@@ -43,6 +43,9 @@ function SettingsPageContent() {
   }, []);
   
   // Refresh owner data from API (replaces refreshOwner from hook)
+  // ⚠️ Do NOT write companyHQId/companyHQ - preserve user's current company context.
+  // hydrate returns owner.companyHQId = API default (first membership); overwriting
+  // would cause "Ignite Strategies vs BusinessPoint Law" flip.
   const refreshOwner = useCallback(async () => {
     try {
       const response = await api.get('/api/owner/hydrate');

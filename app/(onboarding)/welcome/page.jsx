@@ -61,6 +61,9 @@ export default function WelcomePage() {
             const requiresSelection = memberships.length > 1;
             
             // Save hydrate data to localStorage (always)
+            // ⚠️ NEVER write owner.companyHQId to localStorage here - that's the API's
+            // default (first membership by role sort) and would overwrite user's explicit choice.
+            // companyHQId is ONLY set in handleContinue (below) or context-switch.
             localStorage.setItem('owner', JSON.stringify(owner));
             localStorage.setItem('ownerId', owner.id);
             localStorage.setItem('memberships', JSON.stringify(memberships));

@@ -116,6 +116,9 @@ export async function GET(request) {
       ...ownerSafe
     } = owner;
 
+    // owner.companyHQId = first membership by role sort (display default only).
+    // Consumers must NEVER write this to localStorage - would overwrite user's explicit choice.
+    // Only welcome handleContinue and context-switch may set companyHQId.
     const ownerWithMemberships = {
       ...ownerSafe,
       companyHQId: defaultMembership?.companyHqId || null,        // Default CompanyHQ (first after role sorting)

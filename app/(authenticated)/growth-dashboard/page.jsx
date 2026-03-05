@@ -9,9 +9,12 @@ import api from '@/lib/api';
 function GrowthDashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const companyHQId = searchParams?.get('companyHQId') || '';
-  
-  // URL param is source of truth - welcome page sets it, no checking needed
+  // URL first, then localStorage fallback (keeps company context when navigating without param)
+  const urlCompanyHQId = searchParams?.get('companyHQId') || '';
+  const storedCompanyHQId = typeof window !== 'undefined'
+    ? (localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '')
+    : '';
+  const companyHQId = urlCompanyHQId || storedCompanyHQId;
   const missingCompanyKey = !companyHQId;
 
   const [companyHQ, setCompanyHQ] = useState(null);

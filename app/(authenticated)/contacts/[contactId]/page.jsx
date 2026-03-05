@@ -209,6 +209,9 @@ export default function ContactDetailPage({ params }) {
   const [lookingUp, setLookingUp] = useState(false);
   const [savingIntroducedBy, setSavingIntroducedBy] = useState(false);
 
+  // Make-template from email history
+  const [makeTemplateEmail, setMakeTemplateEmail] = useState(null); // the email being converted
+
   // Persona templates
   const [personaTemplates, setPersonaTemplates] = useState([]);
   const [loadingPersonaTemplates, setLoadingPersonaTemplates] = useState(false);
@@ -1383,6 +1386,144 @@ export default function ContactDetailPage({ params }) {
             )}
           </section>
 
+          {/* Persona Templates Section */}
+          {contact?.outreachPersonaSlug && (
+            <section className="rounded-2xl bg-white p-6 shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-purple-500" />
+                    Persona Templates
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{contact.outreachPersonaSlug}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSaveTemplateForm((v) => !v);
+                    setSaveTemplateError('');
+                    setSaveTemplateSuccess(false);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 transition hover:bg-purple-100"
+                >
+                  <BookmarkPlus className="h-3.5 w-3.5" />
+                  Save email as template
+                </button>
+              </div>
+
+              {/* Save template inline form */}
+              {showSaveTemplateForm && (
+                <div className="mb-5 space-y-3 rounded-xl border border-purple-200 bg-purple-50/40 p-4">
+                  <p className="text-xs font-semibold text-purple-800 uppercase tracking-wide">
+                    New template for <span className="font-bold">{contact.outreachPersonaSlug}</span>
+                  </p>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Title</label>
+                    <input
+                      type="text"
+                      value={newTemplateTitle}
+                      onChange={(e) => setNewTemplateTitle(e.target.value)}
+                      placeholder={`${contact.outreachPersonaSlug} – initial outreach`}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Subject</label>
+                    <input
+                      type="text"
+                      value={newTemplateSubject}
+                      onChange={(e) => setNewTemplateSubject(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">
+                      Body
+                      <span className="ml-2 font-normal text-gray-400">Use {'{{first_name}}'} and {'{{company_name}}'} for variable slots</span>
+                    </label>
+                    <textarea
+                      value={newTemplateBody}
+                      onChange={(e) => setNewTemplateBody(e.target.value)}
+                      rows={6}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm resize-none focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    />
+                  </div>
+                  {saveTemplateError && (
+                    <p className="text-xs text-red-600">{saveTemplateError}</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleSavePersonaTemplate}
+                      disabled={savingNewTemplate}
+                      className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {savingNewTemplate ? 'Saving…' : 'Save template'}
+                    </button>
+                    <button
+                      onClick={() => { setShowSaveTemplateForm(false); setNewTemplateTitle(''); setNewTemplateSubject(''); setNewTemplateBody(''); setSaveTemplateError(''); }}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {saveTemplateSuccess && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">
+                  <Check className="h-4 w-4" /> Template saved to persona library.
+                </div>
+              )}
+
+              {/* Template list */}
+              {loadingPersonaTemplates ? (
+                <div className="flex items-center gap-2 py-4 text-sm text-gray-400">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading templates…
+                </div>
+              ) : personaTemplates.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">
+                  No templates saved for this persona yet. Generate one from the outreach page or paste an email above.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {personaTemplates.map((tpl) => (
+                    <div key={tpl.id} className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                      {/* Template header row */}
+                      <div
+                        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-100 transition"
+                        onClick={() => setExpandedTemplateId(expandedTemplateId === tpl.id ? null : tpl.id)}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{tpl.title}</p>
+                          <p className="text-xs text-gray-500 truncate mt-0.5">{tpl.subject}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          <Link
+                            href={`/contacts/${contactId}/outreach-message${companyHQId ? `?companyHQId=${companyHQId}` : ''}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-purple-700"
+                          >
+                            Use this
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                          {expandedTemplateId === tpl.id
+                            ? <ChevronUp className="h-4 w-4 text-gray-400" />
+                            : <ChevronDown className="h-4 w-4 text-gray-400" />
+                          }
+                        </div>
+                      </div>
+                      {/* Expanded body */}
+                      {expandedTemplateId === tpl.id && (
+                        <div className="border-t border-gray-200 bg-white px-4 py-4">
+                          <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans leading-relaxed">{tpl.body}</pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Introduced By Section */}
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
@@ -1966,6 +2107,24 @@ export default function ContactDetailPage({ params }) {
                               Add Response
                             </button>
                           )}
+                          {!isDraft && (email.notes || email.subject) && (
+                            <button
+                              onClick={() => {
+                                setMakeTemplateEmail(email);
+                                setNewTemplateTitle(`${contact?.outreachPersonaSlug || 'Untitled'} – ${email.subject || 'template'}`);
+                                setNewTemplateSubject(email.subject || '');
+                                setNewTemplateBody(email.notes || '');
+                                setShowSaveTemplateForm(false);
+                                setSaveTemplateError('');
+                                setSaveTemplateSuccess(false);
+                              }}
+                              className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-semibold text-purple-700 transition hover:bg-purple-100"
+                              title="Save this email as a reusable persona template"
+                            >
+                              <BookmarkPlus className="h-3.5 w-3.5" />
+                              Make template
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className="font-medium text-gray-900 text-sm">{email.subject || 'No subject'}</div>
@@ -2307,6 +2466,87 @@ export default function ContactDetailPage({ params }) {
                   }}
                   disabled={savingAddResponse}
                   className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Make Template Modal */}
+        {makeTemplateEmail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Save as Persona Template</h2>
+                  {contact?.outreachPersonaSlug ? (
+                    <p className="text-xs text-purple-600 mt-0.5 font-semibold">{contact.outreachPersonaSlug}</p>
+                  ) : (
+                    <p className="text-xs text-amber-600 mt-0.5">No persona assigned — template will save without a persona tag</p>
+                  )}
+                </div>
+                <button onClick={() => setMakeTemplateEmail(null)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100">
+                  <XIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-700">
+                Replace contact-specific names with <code className="font-mono bg-indigo-100 px-1 rounded">{'{{first_name}}'}</code> and <code className="font-mono bg-indigo-100 px-1 rounded">{'{{company_name}}'}</code> before saving so this template works for any future contact with this persona.
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Title</label>
+                  <input
+                    type="text"
+                    value={newTemplateTitle}
+                    onChange={(e) => setNewTemplateTitle(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Subject</label>
+                  <input
+                    type="text"
+                    value={newTemplateSubject}
+                    onChange={(e) => setNewTemplateSubject(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Body</label>
+                  <textarea
+                    value={newTemplateBody}
+                    onChange={(e) => setNewTemplateBody(e.target.value)}
+                    rows={10}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm resize-none font-sans focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                  />
+                </div>
+              </div>
+
+              {saveTemplateError && <p className="text-xs text-red-600">{saveTemplateError}</p>}
+              {saveTemplateSuccess && (
+                <p className="flex items-center gap-1.5 text-sm text-green-700 font-medium">
+                  <Check className="h-4 w-4" /> Saved to persona template library.
+                </p>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={async () => {
+                    await handleSavePersonaTemplate();
+                    if (!saveTemplateError) setMakeTemplateEmail(null);
+                  }}
+                  disabled={savingNewTemplate}
+                  className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {savingNewTemplate ? 'Saving…' : 'Save template'}
+                </button>
+                <button
+                  onClick={() => { setMakeTemplateEmail(null); setSaveTemplateError(''); }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
                 >
                   Cancel
                 </button>

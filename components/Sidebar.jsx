@@ -18,6 +18,7 @@ import {
   FileCode,
   Inbox,
   Crosshair,
+  Library,
 } from 'lucide-react';
 
 function Sidebar() {
@@ -83,6 +84,7 @@ function Sidebar() {
         { key: 'contacts', label: 'Contacts', href: '/contacts/view', icon: Contact },
         { key: 'outreach', label: 'Outreach', href: '/outreach', icon: MessageSquare },
         { key: 'targeting', label: 'Targeting', href: '/targeting', icon: Crosshair },
+        { key: 'phrase-library', label: 'Phrase Library', href: '/phrase-library', icon: Library },
         { key: 'inbound-parse', label: 'Inbound Parse', href: '/inbound-parse', icon: Inbox },
         { key: 'templates', label: 'Templates', href: '/templates', icon: FileCode },
         { key: 'pipelines', label: 'Pipeline', href: '/pipelines', icon: GitBranch },
