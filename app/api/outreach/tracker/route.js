@@ -92,7 +92,6 @@ export async function GET(request) {
       OR: [
         { email_activities: { some: activityWhere } },
         { nextEngagementDate: { not: null } },
-        { remindMeOn: { not: null } },
         { nextContactedAt: { not: null } },
       ],
     };
@@ -106,7 +105,6 @@ export async function GET(request) {
         email: true,
         prior_relationship: true,
         persona_type: true,
-        remindMeOn: true,
       },
       take: limit * 2,
       skip: offset,
@@ -167,13 +165,7 @@ export async function GET(request) {
             if (followUpDateTo && followUpDate > new Date(followUpDateTo)) return null;
           }
 
-          let effectiveNextSendDate = nextSendDate;
-          if (contact.remindMeOn) {
-            const remindDate = new Date(contact.remindMeOn);
-            if (!effectiveNextSendDate || remindDate < effectiveNextSendDate) {
-              effectiveNextSendDate = remindDate;
-            }
-          }
+          const effectiveNextSendDate = nextSendDate;
 
           const hasAnyResponse = activities.some(a => !!a.responseFromEmail);
           if (hasResponded === 'true' && !hasAnyResponse) return null;
@@ -200,7 +192,6 @@ export async function GET(request) {
               hasResponded: !!e.responseFromEmail,
               respondedAt: toISOStringSafe(respAtMap.get(e.responseFromEmail)),
             })),
-            remindMeOn: toISOStringSafe(contact.remindMeOn),
           };
         } catch (error) {
           console.error(`Error enriching contact ${contact.id}:`, error);

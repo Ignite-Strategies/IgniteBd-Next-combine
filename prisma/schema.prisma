@@ -545,10 +545,13 @@ model Contact {
   persona_type                                              PersonaType?
   prior_relationship                                        RelationshipEnum?
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
-  remindMeOn                                                DateTime? // Manual reminder: "remind me to contact on April 1"
-  // Snapped / manual contact dates (off-platform friendly)
-  lastContactedAt                                           DateTime? // Snap: last time we contacted (from emails/off-platform sends or manual)
-  lastRespondedAt                                           DateTime? // Snap: last time they replied (set when recording a response)
+  remindMeOn                                                DateTime? // DEPRECATED: replaced by nextEngagementDate. Will be dropped after backfill migration.
+  // DEPRECATED: use lastEngagementDate instead. Will be dropped after backfill.
+  lastContactedAt                                           DateTime? // DEPRECATED: replaced by lastEngagementDate
+  lastRespondedAt                                           DateTime? // DEPRECATED: replaced by lastEngagementDate
+  // Universal engagement tracking — one date, one type, no ping-pong
+  lastEngagementDate                                        DateTime? // Most recent interaction (sent or received), resets cadence
+  lastEngagementType                                        EngagementType? // What kind: OUTBOUND_EMAIL, CONTACT_RESPONSE, etc.
   nextContactedAt                                           DateTime? // When to contact next: computed (cadence) or manual (e.g. follow next quarter)
   nextContactNote                                            String?  // e.g. "Follow next quarter", "Do not call - asked to reach out in March"
   doNotContactAgain                                         Boolean  @default(false) // If true, no follow-up; ignore nextContactedAt
@@ -589,6 +592,7 @@ model Contact {
   @@index([remindMeOn])
   @@index([lastContactedAt])
   @@index([lastRespondedAt])
+  @@index([lastEngagementDate])
   @@index([nextContactedAt])
   @@index([nextEngagementDate])
   @@index([contactDisposition])
@@ -679,6 +683,7 @@ model email_activities {
   sentAt                 DateTime?              // When actually sent; null = use createdAt
   // Raw email storage (for inbound ingestion)
   emailRawText           String?                 @db.Text // Client's literal email (forwarded chains, pasted content)
+  summary                String?                 @db.Text // AI-generated 1-2 sentence summary of the interaction
   campaigns              campaigns?          @relation(fields: [campaign_id], references: [id])
   owners                 owners              @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   email_sequences        email_sequences?    @relation(fields: [sequence_id], references: [id])
@@ -1987,6 +1992,14 @@ enum EmailSource {
 enum EmailSequenceOrder {
   OWNER_SEND    // We (owner) sent this message
   CONTACT_SEND  // Contact sent this message
+}
+
+// Universal engagement type — what triggered the lastEngagementDate update.
+enum EngagementType {
+  OUTBOUND_EMAIL      // We sent them an email (platform or off-platform)
+  CONTACT_RESPONSE    // They responded to us
+  MEETING             // Had a meeting
+  MANUAL              // Manual entry / note
 }
 
 // General attitude of the contact (awareness). Manual for now; future: AI infers from email response.

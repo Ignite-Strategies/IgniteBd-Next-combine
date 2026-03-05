@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { readPayload, deletePayload } from '@/lib/redis';
 import sgMail from '@sendgrid/mail';
 import { handleServerError, getErrorStatusCode } from '@/lib/serverError';
-import { snapContactLastContactedAt, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
+import { stampLastEngagement, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
 
 // Initialize SendGrid (lazy)
 let sendGridInitialized = false;
@@ -232,14 +232,13 @@ export async function POST(request) {
       console.warn('⚠️ Could not log email activity:', dbError.message);
     }
 
-    // Snap lastContactedAt on contact (off-platform friendly)
     const contactIdForSnap = customArgs.contactId || null;
     if (contactIdForSnap) {
       try {
-        await snapContactLastContactedAt(contactIdForSnap, new Date());
+        await stampLastEngagement(contactIdForSnap, new Date(), 'OUTBOUND_EMAIL');
         await computeAndPersistNextEngagement(contactIdForSnap);
       } catch (snapErr) {
-        console.warn('⚠️ Could not snap lastContactedAt / persist next engagement:', snapErr.message);
+        console.warn('⚠️ Could not stamp lastEngagementDate / persist next engagement:', snapErr.message);
       }
     }
 

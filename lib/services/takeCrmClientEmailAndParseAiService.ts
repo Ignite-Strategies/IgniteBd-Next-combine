@@ -16,6 +16,7 @@ export interface ParsedEmailData {
   inReplyTo: string | null;           // Message-ID from In-Reply-To header
   references: string[] | null;        // Message-IDs from References header
   isResponse: boolean;                 // AI-detected: is this likely a response?
+  summary: string;                     // 1-2 sentence AI summary of the interaction
 }
 
 export interface ParseEmailInput {
@@ -27,9 +28,16 @@ export interface ParseEmailInput {
   raw?: string | null;
 }
 
+export interface OwnerContext {
+  name?: string | null;
+  email?: string | null;
+  companyName?: string | null;
+}
+
 export async function takeCrmClientEmailAndParseAiService(
   emailRawTextOrInput: string | ParseEmailInput,
-  headers?: string  // Raw headers string from SendGrid
+  headers?: string,  // Raw headers string from SendGrid
+  ownerContext?: OwnerContext | null,
 ): Promise<ParsedEmailData> {
   const input: ParseEmailInput =
     typeof emailRawTextOrInput === 'string'
@@ -67,30 +75,55 @@ export async function takeCrmClientEmailAndParseAiService(
       }
     }
 
-    const systemPrompt = `You are an email parsing assistant. Extract structured data from raw email content.
+    // Build owner context block for the prompt
+    let ownerBlock = '';
+    if (ownerContext?.name || ownerContext?.email || ownerContext?.companyName) {
+      ownerBlock = '\nOWNER/CLIENT CONTEXT (the person who forwarded this email to us — they are NOT the contact):\n';
+      if (ownerContext.name) ownerBlock += `  Owner name: ${ownerContext.name}\n`;
+      if (ownerContext.email) ownerBlock += `  Owner email: ${ownerContext.email}\n`;
+      if (ownerContext.companyName) ownerBlock += `  Owner company: ${ownerContext.companyName}\n`;
+      ownerBlock += '\nThe CONTACT is the OTHER person in the conversation — the prospect/target the owner is corresponding with. Do NOT return the owner as the contact.\n';
+    }
 
-The email may be a forwarded chain or pasted content. Focus on the MOST RECENT message in the thread for extraction.
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const systemPrompt = `You are an email parsing assistant for a CRM. Extract structured data from raw email content.
+
+The email was forwarded to us by the OWNER (our client) — it contains their correspondence with a CONTACT (the prospect/target).
+${ownerBlock}
+CRITICAL RULES:
+1. The CONTACT is the OTHER person in the conversation — NOT the owner/client who forwarded it.
+2. In a forwarded email chain, identify who the owner is corresponding WITH. That person is the contact.
+3. If there are multiple people, pick the primary correspondent (the one the owner is doing business development with).
 
 Extract:
-1. Contact name - from signature, From field, or body. This is critical.
-2. Contact email - from From field or signature
-3. Next engagement date (if mentioned - "follow up in X months", "later this year", specific dates)
+1. Contact name — the prospect/target (NOT the owner). Look at all participants and exclude the owner.
+2. Contact email — the prospect/target's email address
+3. Next engagement date — be AGGRESSIVE about extracting this. Today is ${todayStr}. Examples:
+   - "follow up in 3-6 months" → pick the midpoint (~4.5 months from today)
+   - "later this year" → approximately 6 months from today
+   - "next quarter" → 3 months from today
+   - "follow up in a few weeks" → 3 weeks from today
+   - Any specific date mentioned → use that date
+   - "not interested" with no follow-up mentioned → null
 4. Threading headers (In-Reply-To, References) if present
-5. Response detection (is this a reply? subject RE:, quoted text, etc.)
+5. Response detection — is the contact responding to the owner's outreach?
+6. Summary — a 1-2 sentence summary of the interaction that captures: what happened, the contact's disposition (interested, not interested, deferred, forwarding), and any actionable next steps. This summary will be used by downstream logic to determine engagement cadence.
 
 Return EXACTLY this JSON structure:
 {
   "subject": "...",
-  "body": "...",
-  "contactEmail": "...",
-  "contactName": "..." or null,
+  "body": "the most recent message body (brief summary of the exchange)",
+  "contactEmail": "the prospect/target email, NOT the owner",
+  "contactName": "the prospect/target name" or null,
   "nextEngagementDate": "YYYY-MM-DD" or null,
   "inReplyTo": "Message-ID" or null,
   "references": ["Message-ID1", "Message-ID2"] or null,
-  "isResponse": true or false
+  "isResponse": true or false,
+  "summary": "1-2 sentence summary of the interaction"
 }
 
-Keep it simple. Extract what you can find.`;
+Return JSON only.`;
 
     const userPrompt = `Parse this raw email:
 
@@ -165,5 +198,6 @@ function parseResponse(content: string): ParsedEmailData {
       ? (data.references || parsed.references) 
       : null,
     isResponse: data.isResponse !== undefined ? data.isResponse : parsed.isResponse !== undefined ? parsed.isResponse : false,
+    summary: data.summary || parsed.summary || '',
   };
 }

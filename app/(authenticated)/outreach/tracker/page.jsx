@@ -396,7 +396,7 @@ function OutreachTrackerContent() {
                               ) : (
                                 <>
                                   {formatDate(contact.nextSendDate)}
-                                  {contact.remindMeOn && (
+                                  {contact.isManualOverride && (
                                     <span className="ml-2 text-xs text-blue-600">(Manual)</span>
                                   )}
                                   <button

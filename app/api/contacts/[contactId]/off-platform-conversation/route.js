@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { snapContactLastContactedAt, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
+import { stampLastEngagement, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
 
 /**
  * POST /api/contacts/[contactId]/off-platform-conversation
@@ -128,27 +128,15 @@ export async function POST(request, { params }) {
       createdIds.push(activity.id);
     }
 
-    // Update contact and cadence using last inbound (contact reply) if any
-    if (lastInboundSentAt) {
-      try {
-        await prisma.contact.update({
-          where: { id: contactId },
-          data: { lastRespondedAt: lastInboundSentAt },
-        });
-        await computeAndPersistNextEngagement(contactId);
-      } catch (e) {
-        console.warn('⚠️ Could not update contact lastRespondedAt:', e?.message);
-      }
-    } else {
-      const firstSent = rawMessages[0]?.sent ? new Date(rawMessages[0].sent) : null;
-      if (firstSent && !isNaN(firstSent.getTime())) {
-        try {
-          await snapContactLastContactedAt(contactId, firstSent);
-          await computeAndPersistNextEngagement(contactId);
-        } catch (e) {
-          console.warn('⚠️ Could not snap lastContactedAt:', e?.message);
-        }
-      }
+    // Stamp lastEngagementDate with the most recent message in the conversation
+    const lastMsg = rawMessages[rawMessages.length - 1];
+    const lastMsgDate = lastMsg?.sent ? new Date(lastMsg.sent) : new Date();
+    const lastMsgType = lastMsg?.direction === 'inbound' ? 'CONTACT_RESPONSE' : 'OUTBOUND_EMAIL';
+    try {
+      await stampLastEngagement(contactId, lastMsgDate, lastMsgType);
+      await computeAndPersistNextEngagement(contactId);
+    } catch (e) {
+      console.warn('⚠️ Could not stamp lastEngagementDate:', e?.message);
     }
 
     console.log('✅ Off-platform conversation saved:', createdIds.length, 'messages');

@@ -86,7 +86,8 @@ export async function PUT(request, { params }) {
         id: true,
         firstName: true,
         lastName: true,
-        lastContactedAt: true,
+        lastEngagementDate: true,
+        lastEngagementType: true,
         nextContactedAt: true,
         nextContactNote: true,
         doNotContactAgain: true,
@@ -97,7 +98,7 @@ export async function PUT(request, { params }) {
       success: true,
       contact: {
         ...updated,
-        lastContactedAt: updated.lastContactedAt?.toISOString() ?? null,
+        lastEngagementDate: updated.lastEngagementDate?.toISOString() ?? null,
         nextContactedAt: updated.nextContactedAt?.toISOString() ?? null,
       },
     });
@@ -143,7 +144,8 @@ export async function GET(request, { params }) {
       where: { id: contactId },
       select: {
         id: true,
-        lastContactedAt: true,
+        lastEngagementDate: true,
+        lastEngagementType: true,
         nextContactedAt: true,
         nextContactNote: true,
         doNotContactAgain: true,
@@ -159,7 +161,8 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      lastContactedAt: contact.lastContactedAt?.toISOString() ?? null,
+      lastEngagementDate: contact.lastEngagementDate?.toISOString() ?? null,
+      lastEngagementType: contact.lastEngagementType ?? null,
       nextContactedAt: contact.nextContactedAt?.toISOString() ?? null,
       nextContactNote: contact.nextContactNote ?? null,
       doNotContactAgain: contact.doNotContactAgain ?? false,

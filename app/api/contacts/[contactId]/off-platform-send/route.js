@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { snapContactLastContactedAt, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
+import { stampLastEngagement, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
 
 /**
  * POST /api/contacts/[contactId]/off-platform-send
@@ -109,10 +109,10 @@ export async function POST(request, { params }) {
 
     if (!isDraft && emailSentDate) {
       try {
-        await snapContactLastContactedAt(contactId, emailSentDate);
+        await stampLastEngagement(contactId, emailSentDate, 'OUTBOUND_EMAIL');
         await computeAndPersistNextEngagement(contactId);
       } catch (snapErr) {
-        console.warn('⚠️ Could not snap lastContactedAt / persist next engagement:', snapErr.message);
+        console.warn('⚠️ Could not stamp lastEngagementDate / persist next engagement:', snapErr.message);
       }
     }
 

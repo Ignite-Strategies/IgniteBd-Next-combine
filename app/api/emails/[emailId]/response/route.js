@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { ensureContactPipeline } from '@/lib/services/pipelineService';
-import { computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
+import { stampLastEngagement, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
 
 /**
  * PUT /api/emails/[emailId]/response
@@ -101,24 +101,10 @@ export async function PUT(request, { params }) {
     const contactId = parent.contact_id;
     if (contactId) {
       try {
-        await prisma.contact.update({
-          where: { id: contactId },
-          data: { lastRespondedAt: responseDate },
-        });
+        await stampLastEngagement(contactId, responseDate, 'CONTACT_RESPONSE');
         await computeAndPersistNextEngagement(contactId);
       } catch (e) {
-        if (e?.code === 'P2022') {
-          try {
-            await prisma.contact.update({
-              where: { id: contactId },
-              data: { lastRespondedAt: responseDate },
-            });
-          } catch (e2) {
-            console.warn('⚠️ Could not update contact lastRespondedAt:', e2?.message);
-          }
-        } else {
-          console.warn('⚠️ Could not update contact:', e?.message);
-        }
+        console.warn('⚠️ Could not stamp lastEngagementDate:', e?.message);
       }
 
       const disposition = responseDisposition || 'positive';
