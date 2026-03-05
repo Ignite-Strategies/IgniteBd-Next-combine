@@ -545,10 +545,6 @@ model Contact {
   persona_type                                              PersonaType?
   prior_relationship                                        RelationshipEnum?
   lastContact                                               String? // Manual: "Aug 2025", "Last week", etc.
-  remindMeOn                                                DateTime? // DEPRECATED: replaced by nextEngagementDate. Will be dropped after backfill migration.
-  // DEPRECATED: use lastEngagementDate instead. Will be dropped after backfill.
-  lastContactedAt                                           DateTime? // DEPRECATED: replaced by lastEngagementDate
-  lastRespondedAt                                           DateTime? // DEPRECATED: replaced by lastEngagementDate
   // Universal engagement tracking — one date, one type, no ping-pong
   lastEngagementDate                                        DateTime? // Most recent interaction (sent or received), resets cadence
   lastEngagementType                                        EngagementType? // What kind: OUTBOUND_EMAIL, CONTACT_RESPONSE, etc.
@@ -589,9 +585,6 @@ model Contact {
   @@index([ownerId])
   @@index([role])
   @@index([prior_relationship])
-  @@index([remindMeOn])
-  @@index([lastContactedAt])
-  @@index([lastRespondedAt])
   @@index([lastEngagementDate])
   @@index([nextContactedAt])
   @@index([nextEngagementDate])
