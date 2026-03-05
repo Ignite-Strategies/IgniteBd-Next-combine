@@ -1401,16 +1401,13 @@ model relationship_contexts {
   contactId                 String                @unique
   contacts                  Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
   
-  // Relationship dimensions (enums)
+  // Three core signals — how you know them / how recent / business awareness
   contextOfRelationship     ContextOfRelationship?
   relationshipRecency       RelationshipRecency?
   companyAwareness          CompanyAwareness?
   
-  // Factual extracted data (from notes)
-  formerCompany            String?
-  primaryWork              String?
-  relationshipQuality      String?
-  opportunityType          String?
+  // Supporting context
+  formerCompany             String?               // Where they previously worked (if explicitly in notes)
   
   createdAt                 DateTime              @default(now())
   updatedAt                 DateTime              @updatedAt

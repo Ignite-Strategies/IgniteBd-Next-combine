@@ -81,9 +81,6 @@ export default function ContactDetailPage({ params }) {
                 relationshipRecency: rc.relationshipRecency,
                 companyAwareness: rc.companyAwareness,
                 formerCompany: rc.formerCompany,
-                primaryWork: rc.primaryWork,
-                relationshipQuality: rc.relationshipQuality,
-                opportunityType: rc.opportunityType,
               });
             }
             setLoading(false);
