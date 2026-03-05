@@ -254,52 +254,34 @@ function TargetCockpitInner() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
 
-        <PageHeader
-          title="Target Cockpit"
-          subtitle="Submit weekly outreach targets for template generation"
-          actions={
-            <button
-              onClick={() => setModalOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4" />
-              Submit Targets
-            </button>
-          }
-        />
+        <PageHeader title="Target Cockpit" subtitle="Stage your weekly outreach targets" />
 
-        {/* Intro banner */}
-        <div className="mb-6 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-5">
-          <div className="flex items-start gap-3">
-            <Target className="h-6 w-6 text-indigo-600 flex-shrink-0 mt-0.5" />
+        {/* Hero: Add targets — staging ground, primary action */}
+        <button
+          onClick={() => setModalOpen(true)}
+          className="mb-6 w-full rounded-xl border-2 border-dashed border-indigo-300 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 text-left transition hover:border-indigo-400 hover:from-indigo-100 hover:to-purple-100"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-100">
+              <Plus className="h-6 w-6 text-indigo-600" />
+            </div>
             <div>
-              <p className="text-sm font-semibold text-indigo-900">Who you're reaching out to this week</p>
-              <p className="text-sm text-indigo-700 mt-0.5">
-                Contacts stay here in <strong>need-to-engage</strong> until their first email goes out.
-                Set a persona on each contact to unlock template matching.
+              <p className="text-base font-semibold text-indigo-900">Add targets for this week</p>
+              <p className="text-sm text-indigo-600 mt-0.5">
+                CSV upload, paste contacts, or quick notes — they land in need-to-engage until first outreach.
               </p>
             </div>
           </div>
-        </div>
+        </button>
 
-        {/* Stats + Queue card */}
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-
-          {/* Stats bar */}
-          {!loading && targets.length > 0 && (
-            <>
-              <StatsBar targets={targets} />
-              <div className="border-t border-gray-100" />
-            </>
-          )}
-
-          {/* Queue header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+        {/* Queue — compact, secondary */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
             <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-gray-500" />
-              <h2 className="text-base font-semibold text-gray-900">Next Targets Queue</h2>
-              {targets.length > 0 && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              <Target className="h-4 w-4 text-gray-400" />
+              <h2 className="text-sm font-semibold text-gray-700">Need to engage</h2>
+              {!loading && targets.length > 0 && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
                   {targets.length}
                 </span>
               )}
@@ -307,29 +289,22 @@ function TargetCockpitInner() {
             <button
               onClick={fetchTargets}
               disabled={loading}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-50 disabled:opacity-50"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
           </div>
 
-          {/* Queue list */}
+          {!loading && targets.length > 0 && (
+            <>
+              <StatsBar targets={targets} />
+              <div className="border-t border-gray-100" />
+            </>
+          )}
+
           <TargetQueue targets={targets} loading={loading} companyHQId={companyHQId} />
         </div>
-
-        {/* Empty call-to-action */}
-        {!loading && targets.length === 0 && (
-          <div className="mt-6 flex justify-center">
-            <button
-              onClick={() => setModalOpen(true)}
-              className="flex items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-8 py-4 text-sm font-semibold text-gray-500 transition hover:border-blue-400 hover:text-blue-600"
-            >
-              <Plus className="h-4 w-4" />
-              Submit your first batch of targets
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Submission modal */}
