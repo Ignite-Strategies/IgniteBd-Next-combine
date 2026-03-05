@@ -55,12 +55,18 @@ const EMPTY_CONTACT = {
   linkedin: '',
   relationship: '',
   notes: '',
+  lastContact: '',
+  awareOfBusiness: '',   // 'y' | 'n' | ''
+  usingCompetitor: '',   // 'y' | 'n' | ''
+  workedTogetherAt: '',  // company name string
+  priorEngagement: '',   // 'y' | 'n' | ''
 };
 
 // CSV template (also served from /public/templates/ignite-targets-template.csv)
-const CSV_TEMPLATE = `Name,Company,Title,LinkedIn URL,Relationship Context,Notes
-Susan Min,PIMCO,Managing Director,https://linkedin.com/in/susanmin,Former colleague,Did a small project together at WeCommerce — she's moved to a much bigger role now
-John Rivera,Blackstone,VP of Operations,https://linkedin.com/in/johnrivera,Warm intro,Intro from Sarah at Ignite Summit last month
+const CSV_TEMPLATE = `Name,Company,Title,LinkedIn URL,Notes,Last Contact,Aware of Business (y/n),Using Competitor (y/n),Worked Together At,Prior Engagement (y/n)
+Susan Min,PIMCO,Managing Director,https://linkedin.com/in/susanmin,Did a small project together at WeCommerce — she's moved to a much bigger role now,2 years ago,n,n,WeCommerce,y
+John Rivera,Blackstone,VP of Operations,https://linkedin.com/in/johnrivera,Warm intro from Sarah at Ignite Summit last month,1 month ago,n,n,,n
+Jane Park,Apollo Global,Chief of Staff,,Brief conversation at the CFO roundtable,6 months ago,y,n,,n
 `;
 
 function downloadTemplate() {
@@ -120,7 +126,7 @@ function parseCSVText(text) {
   const lines = normalized.split(/\r?\n/).filter((l) => l.trim());
   if (!lines.length) return [];
 
-  const HEADER_HINTS = ['name', 'company', 'title', 'linkedin', 'notes', 'relationship'];
+  const HEADER_HINTS = ['name', 'company', 'title', 'linkedin', 'notes', 'relationship', 'last contact', 'aware', 'competitor', 'worked', 'prior'];
   const looksLikeHeader = HEADER_HINTS.some((h) => lines[0].toLowerCase().includes(h));
 
   let headers = null;
@@ -134,16 +140,27 @@ function parseCSVText(text) {
     ? headers.findIndex((h) => aliases.some((a) => h.includes(a)))
     : -1;
 
-  const nameIdx = idx(['name', 'full name']);
-  const companyIdx = idx(['company', 'org', 'employer']);
-  const titleIdx = idx(['title', 'position', 'role', 'job']);
-  const linkedinIdx = idx(['linkedin', 'url', 'profile']);
-  const relationshipIdx = idx(['relationship', 'how met', 'howmet', 'context']);
-  const notesIdx = idx(['notes', 'note', 'description']);
+  const nameIdx          = idx(['name', 'full name']);
+  const companyIdx       = idx(['company', 'org', 'employer']);
+  const titleIdx         = idx(['title', 'position', 'role', 'job']);
+  const linkedinIdx      = idx(['linkedin', 'url', 'profile']);
+  const notesIdx         = idx(['notes', 'note', 'description']);
+  const relationshipIdx  = idx(['relationship', 'how met', 'howmet', 'context']);
+  const lastContactIdx   = idx(['last contact', 'lastcontact']);
+  const awareIdx         = idx(['aware of business', 'aware']);
+  const competitorIdx    = idx(['using competitor', 'competitor']);
+  const workedAtIdx      = idx(['worked together at', 'worked together', 'worked at']);
+  const priorEngIdx      = idx(['prior engagement', 'prior eng', 'prior work']);
 
   const get = (parts, i, fallback) => {
     const ri = i !== -1 ? i : fallback;
     return ri >= 0 && ri < parts.length ? (parts[ri] || '') : '';
+  };
+  const getYN = (parts, i) => {
+    const v = get(parts, i, -1).toLowerCase().trim();
+    if (v === 'y' || v === 'yes' || v === '1' || v === 'true') return 'y';
+    if (v === 'n' || v === 'no' || v === '0' || v === 'false') return 'n';
+    return '';
   };
 
   return dataLines
@@ -153,12 +170,17 @@ function parseCSVText(text) {
       const notes = get(parts, notesIdx, 4);
       const relationship = get(parts, relationshipIdx, -1) || inferRelationshipFromNotes(notes);
       return {
-        name: get(parts, nameIdx, 0),
-        company: get(parts, companyIdx, 1),
-        title: get(parts, titleIdx, 2),
-        linkedin: get(parts, linkedinIdx, 3),
+        name:            get(parts, nameIdx, 0),
+        company:         get(parts, companyIdx, 1),
+        title:           get(parts, titleIdx, 2),
+        linkedin:        get(parts, linkedinIdx, 3),
         relationship,
         notes,
+        lastContact:     get(parts, lastContactIdx, -1),
+        awareOfBusiness: getYN(parts, awareIdx),
+        usingCompetitor: getYN(parts, competitorIdx),
+        workedTogetherAt: get(parts, workedAtIdx, -1),
+        priorEngagement: getYN(parts, priorEngIdx),
       };
     })
     .filter((c) => c.name);
@@ -324,6 +346,64 @@ function SingleContactCard({ contact, index, total, onChange, onDelete }) {
           rows={3}
           className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
         />
+      </div>
+
+      {/* Quick signals — optional, feed directly into relationship_contexts */}
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Quick signals <span className="font-normal normal-case text-gray-400">(optional — helps AI pick the right template)</span></p>
+
+        {/* Last contact + Worked together at */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Last contact</label>
+            <input
+              type="text"
+              value={contact.lastContact || ''}
+              onChange={(e) => update('lastContact', e.target.value)}
+              placeholder="e.g. 2 years ago, last month"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Worked together at</label>
+            <input
+              type="text"
+              value={contact.workedTogetherAt || ''}
+              onChange={(e) => update('workedTogetherAt', e.target.value)}
+              placeholder="Company name, or leave blank"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Y/N toggles */}
+        <div className="flex flex-wrap gap-4">
+          {[
+            { field: 'awareOfBusiness', label: 'Aware of my business?' },
+            { field: 'usingCompetitor', label: 'Using a competitor?' },
+            { field: 'priorEngagement', label: 'Did work together before?' },
+          ].map(({ field, label }) => (
+            <div key={field} className="flex items-center gap-2">
+              <span className="text-xs text-gray-600">{label}</span>
+              <div className="flex rounded-md border border-gray-300 overflow-hidden text-xs">
+                {['y', 'n'].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => update(field, contact[field] === val ? '' : val)}
+                    className={`px-2.5 py-1 font-medium transition ${
+                      contact[field] === val
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {val === 'y' ? 'Yes' : 'No'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Relationship Context — auto-filled from notes */}

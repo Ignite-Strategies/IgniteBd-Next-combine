@@ -1397,23 +1397,25 @@ model template_snippets {
 
 // Relationship context - foundational info about WHO the persona is (one per contact)
 model relationship_contexts {
-  relationshipContextId     String                @id @default(cuid())
-  contactId                 String                @unique
-  contacts                  Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  relationshipContextId     String    @id @default(cuid())
+  contactId                 String    @unique
+  contacts                  Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
   
-  // Three core signals — how you know them / how recent / business awareness
-  contextOfRelationship     ContextOfRelationship?
-  relationshipRecency       RelationshipRecency?
-  companyAwareness          CompanyAwareness?
+  // Three core signals — stored as strings so they can evolve without migrations.
+  // Conventional values: contextOfRelationship e.g. "PRIOR_COLLEAGUE", "REFERRAL"
+  //                      relationshipRecency e.g. "RECENT", "LONG_DORMANT"
+  //                      companyAwareness e.g. "KNOWS_COMPANY", "KNOWS_COMPANY_COMPETITOR"
+  contextOfRelationship     String?
+  relationshipRecency       String?
+  companyAwareness          String?
   
   // Supporting context
-  formerCompany             String?               // Where they previously worked (if explicitly in notes)
+  formerCompany             String?   // Where they previously worked (if explicitly in notes)
   
-  createdAt                 DateTime              @default(now())
-  updatedAt                 DateTime              @updatedAt
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   @@index([contactId])
-  @@index([contextOfRelationship, relationshipRecency, companyAwareness])
 }
 
 // Simple outreach personas - descriptive slugs that drive snippet assembly
@@ -2003,31 +2005,6 @@ enum NextEngagementPurpose {
   REFERRAL_NO_CONTACT   // Referral, no contact yet
 }
 
-enum ContextOfRelationship {
-  DONT_KNOW
-  PRIOR_CONVERSATION
-  PRIOR_COLLEAGUE
-  PRIOR_SCHOOLMATE
-  CURRENT_CLIENT
-  CONNECTED_LINKEDIN_ONLY
-  REFERRAL
-  REFERRAL_FROM_WARM_CONTACT
-  USED_TO_WORK_AT_TARGET_COMPANY
-}
-
-enum RelationshipRecency {
-  NEW
-  RECENT
-  STALE
-  LONG_DORMANT
-}
-
-enum CompanyAwareness {
-  DONT_KNOW
-  KNOWS_COMPANY
-  KNOWS_COMPANY_COMPETITOR
-  KNOWS_BUT_DISENGAGED
-}
 
 // Where in the email template this snippet belongs (not "type" like email — position in the template)
 enum TemplatePosition {

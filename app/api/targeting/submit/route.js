@@ -94,6 +94,13 @@ export async function POST(request) {
         const notes = c.notes?.trim() || null;
         const fullName = [firstName, lastName].filter(Boolean).join(' ') || null;
 
+        // Quick signals from the submission form / CSV
+        const lastContact     = c.lastContact?.trim() || null;
+        const awareOfBusiness = c.awareOfBusiness || null; // 'y' | 'n'
+        const usingCompetitor = c.usingCompetitor || null; // 'y' | 'n'
+        const workedTogetherAt = c.workedTogetherAt?.trim() || null;
+        const priorEngagement = c.priorEngagement || null; // 'y' | 'n'
+
         // Try to find existing contact: email match first, then name match
         let existing = null;
         if (email) {
@@ -156,6 +163,53 @@ export async function POST(request) {
           defaultPipeline: 'prospect',
           defaultStage: 'need-to-engage',
         });
+
+        // Map quick signals → relationship_contexts (plain strings, no enum constraint)
+        const hasSignals = lastContact || awareOfBusiness || usingCompetitor || workedTogetherAt || priorEngagement;
+        if (hasSignals) {
+          // contextOfRelationship: workedTogetherAt wins, then priorEngagement
+          const contextOfRelationship = workedTogetherAt
+            ? 'PRIOR_COLLEAGUE'
+            : priorEngagement === 'y'
+            ? 'PRIOR_CLIENT'
+            : null;
+
+          // relationshipRecency: map free text → conventional values
+          let relationshipRecency = null;
+          if (lastContact) {
+            const lc = lastContact.toLowerCase();
+            if (/week|day|recent|just|new/i.test(lc))          relationshipRecency = 'RECENT';
+            else if (/month|quarter|few months/i.test(lc))     relationshipRecency = 'STALE';
+            else if (/year|long|while|ages|dormant/i.test(lc)) relationshipRecency = 'LONG_DORMANT';
+            else                                                 relationshipRecency = 'STALE'; // fallback for anything unrecognised
+          }
+
+          // companyAwareness: competitor overrides aware
+          const companyAwareness = usingCompetitor === 'y'
+            ? 'KNOWS_COMPANY_COMPETITOR'
+            : awareOfBusiness === 'y'
+            ? 'KNOWS_COMPANY'
+            : awareOfBusiness === 'n'
+            ? 'NO_AWARENESS'
+            : null;
+
+          const rcData = {
+            contactId: contact.id,
+            ...(contextOfRelationship && { contextOfRelationship }),
+            ...(relationshipRecency    && { relationshipRecency }),
+            ...(companyAwareness       && { companyAwareness }),
+            ...(workedTogetherAt       && { formerCompany: workedTogetherAt }),
+          };
+
+          // Only upsert if we have at least one signal to write
+          if (Object.keys(rcData).length > 1) {
+            await prisma.relationship_contexts.upsert({
+              where: { contactId: contact.id },
+              update: rcData,
+              create: rcData,
+            });
+          }
+        }
 
         savedContacts.push({
           id: contact.id,

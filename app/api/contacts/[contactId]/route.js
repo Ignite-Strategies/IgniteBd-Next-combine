@@ -313,9 +313,6 @@ export async function PUT(request, { params }) {
           relationshipRecency: parsedContext.relationshipRecency || null,
           companyAwareness: parsedContext.companyAwareness || null,
           formerCompany: parsedContext.formerCompany || null,
-          primaryWork: parsedContext.primaryWork || null,
-          relationshipQuality: parsedContext.relationshipQuality || null,
-          opportunityType: parsedContext.opportunityType || null,
         };
         await prisma.relationship_contexts.upsert({
           where: { contactId },

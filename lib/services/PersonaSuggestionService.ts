@@ -37,16 +37,12 @@ function getOpenAIClient(): OpenAI {
 }
 
 export interface RelationshipContextInfo {
-  // Factual extracted data (source of truth)
-  formerCompany?: string;
-  primaryWork?: string;
-  relationshipQuality?: string;
-  opportunityType?: string;
-  
-  // Relationship context dimensions (maps to relationship_contexts table)
-  contextOfRelationship?: 'DONT_KNOW' | 'PRIOR_CONVERSATION' | 'PRIOR_COLLEAGUE' | 'PRIOR_SCHOOLMATE' | 'CURRENT_CLIENT' | 'CONNECTED_LINKEDIN_ONLY' | 'REFERRAL' | 'REFERRAL_FROM_WARM_CONTACT' | 'USED_TO_WORK_AT_TARGET_COMPANY';
-  relationshipRecency?: 'NEW' | 'RECENT' | 'STALE' | 'LONG_DORMANT';
-  companyAwareness?: 'DONT_KNOW' | 'KNOWS_COMPANY' | 'KNOWS_COMPANY_COMPETITOR' | 'KNOWS_BUT_DISENGAGED';
+  // Three core signals — stored as plain strings (not DB enums)
+  // Conventional values documented in relationship_contexts schema comments.
+  contextOfRelationship?: string; // e.g. "PRIOR_COLLEAGUE", "REFERRAL", "PRIOR_CLIENT"
+  relationshipRecency?: string;   // e.g. "RECENT", "STALE", "LONG_DORMANT"
+  companyAwareness?: string;      // e.g. "KNOWS_COMPANY", "KNOWS_COMPANY_COMPETITOR"
+  formerCompany?: string;         // e.g. "WeCommerce" — only if explicitly in notes
 }
 
 export interface PersonaSuggestionResult {
