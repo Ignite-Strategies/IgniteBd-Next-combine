@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus, Pencil, FileText, BookmarkPlus, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import api from '@/lib/api';
@@ -21,9 +21,11 @@ import { useContactsContext } from '@/hooks/useContacts';
 import ContactOutlook from '@/components/enrichment/ContactOutlook';
 import CompanySelector from '@/components/CompanySelector';
 
-export default function ContactDetailPage({ params }) {
+export default function ContactDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const params = useParams();
+  const contactId = params?.contactId || null;
   const companyHQId = searchParams?.get('companyHQId') || (typeof window !== 'undefined' ? localStorage.getItem('companyHQId') : '') || '';
   const { contacts, refreshContacts } = useContactsContext();
   const [lists, setLists] = useState([]);
@@ -31,25 +33,12 @@ export default function ContactDetailPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [contact, setContact] = useState(null);
-  const [contactId, setContactId] = useState(null);
-
-  // Handle params (may be sync or async in Next.js)
-  useEffect(() => {
-    const resolveParams = async () => {
-      if (params && typeof params.then === 'function') {
-        // Params is a Promise (Next.js 15+)
-        const resolvedParams = await params;
-        setContactId(resolvedParams?.contactId);
-      } else if (params?.contactId) {
-        // Params is an object
-        setContactId(params.contactId);
-      }
-    };
-    resolveParams();
-  }, [params]);
 
   useEffect(() => {
-    if (!contactId) return;
+    if (!contactId) {
+      setLoading(false);
+      return;
+    }
 
     let isMounted = true;
     const loadContact = async () => {
