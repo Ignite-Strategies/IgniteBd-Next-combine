@@ -201,11 +201,18 @@ function StatsBar({ targets }) {
 function TargetCockpitInner() {
   const searchParams = useSearchParams();
   const [companyHQId, setCompanyHQId] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
   const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Resolve companyHQId
+  // Wait for Firebase auth to resolve — auth.currentUser is null on first render
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((user) => setCurrentUser(user));
+    return unsub;
+  }, []);
+
+  // Resolve companyHQId from URL or localStorage
   useEffect(() => {
     const url = searchParams?.get('companyHQId') || '';
     if (url) { setCompanyHQId(url); return; }
@@ -214,13 +221,11 @@ function TargetCockpitInner() {
   }, [searchParams]);
 
   const fetchTargets = useCallback(async () => {
-    if (!companyHQId) return;
-    const user = auth.currentUser;
-    if (!user) return;
+    if (!companyHQId || !currentUser) return;
 
     setLoading(true);
     try {
-      const token = await user.getIdToken();
+      const token = await currentUser.getIdToken();
       const res = await fetch(`/api/targeting/list?companyHQId=${companyHQId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -235,7 +240,7 @@ function TargetCockpitInner() {
     } finally {
       setLoading(false);
     }
-  }, [companyHQId]);
+  }, [companyHQId, currentUser]);
 
   useEffect(() => {
     fetchTargets();
