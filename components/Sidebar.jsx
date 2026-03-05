@@ -106,7 +106,7 @@ function Sidebar() {
   ];
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 h-[calc(100vh-3.5rem)] fixed left-0 top-14 overflow-y-auto z-30">
+    <div className="w-64 flex-shrink-0 bg-white border-r border-gray-200 h-full overflow-y-auto">
       <div className="p-4 border-b border-gray-200">
         <Link href={getHref("/growth-dashboard")} className="flex items-center gap-3">
           <span className="text-2xl">🔥</span>

@@ -134,7 +134,7 @@ export default function InboundParsePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <PageHeader title="Inbound Parse" subtitle="Loading..." />
           <div className="flex items-center justify-center py-12">
@@ -146,7 +146,7 @@ export default function InboundParsePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Inbound Parse"

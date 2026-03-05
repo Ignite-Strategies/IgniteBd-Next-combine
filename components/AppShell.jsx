@@ -115,23 +115,25 @@ export default function AppShell({ children }) {
   
   if (shouldShowShell) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Top Navigation Bar - Global component */}
+      <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+        {/* Top Navigation Bar */}
         <Navigation />
-        
-        {/* CompanyHQ Context Header - Shows current company and role (hidden on auth/onboarding pages) */}
+
+        {/* CompanyHQ Context Header - below nav, not overlapping sidebar */}
         {!shouldHideContext && <CompanyHQContextHeader />}
-        
-        {/* Sidebar - Only render when showSidebar is true */}
-        {showSidebar && (
-          <Suspense fallback={<div className="w-64" />}>
-            <Sidebar />
-          </Suspense>
-        )}
-        {/* Main Content Area */}
-        <main className={showSidebar ? 'flex-1 ml-64 min-h-[calc(100vh-3.5rem)]' : 'min-h-[calc(100vh-3.5rem)]'}>
-          {children}
-        </main>
+
+        {/* Body: sidebar + main content side-by-side, filling remaining height */}
+        <div className="flex flex-1 overflow-hidden">
+          {showSidebar && (
+            <Suspense fallback={<div className="w-64 flex-shrink-0 bg-white border-r border-gray-200" />}>
+              <Sidebar />
+            </Suspense>
+          )}
+          {/* Main Content Area - scrolls independently */}
+          <main className="flex-1 overflow-y-auto min-h-0 bg-gray-50">
+            {children}
+          </main>
+        </div>
       </div>
     );
   }
