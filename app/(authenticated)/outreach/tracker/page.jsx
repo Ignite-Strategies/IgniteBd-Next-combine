@@ -364,8 +364,8 @@ function OutreachTrackerContent() {
                                   )}
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                  {contact.company && <span className="font-medium text-gray-600">{contact.company}</span>}
-                                  {contact.company && contact.email && ' · '}
+                                  {contact.companyName && <span className="font-medium text-gray-600">{contact.companyName}</span>}
+                                  {contact.companyName && contact.email && ' · '}
                                   {contact.email}
                                 </div>
                               </button>

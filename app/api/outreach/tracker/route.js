@@ -104,7 +104,7 @@ export async function GET(request) {
         lastName: true,
         email: true,
         title: true,
-        company: true,
+        companyName: true,
         prior_relationship: true,
         persona_type: true,
         lastEngagementDate: true,
