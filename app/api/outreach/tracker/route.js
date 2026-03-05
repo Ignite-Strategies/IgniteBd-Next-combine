@@ -105,6 +105,7 @@ export async function GET(request) {
         email: true,
         title: true,
         companyName: true,
+        companies: { select: { companyName: true } },
         prior_relationship: true,
         persona_type: true,
         lastEngagementDate: true,
@@ -176,8 +177,10 @@ export async function GET(request) {
           if (hasResponded === 'true' && !hasAnyResponse) return null;
           const sendDate = (a) => toISOStringSafe(a.sentAt ?? a.createdAt);
 
+          const { companies: companiesRel, ...contactFields } = contact;
           return {
-            ...contact,
+            ...contactFields,
+            companyName: contactFields.companyName || companiesRel?.companyName || null,
             lastSendDate: toISOStringSafe(lastSendDate),
             nextSendDate: toISOStringSafe(effectiveNextSendDate),
             daysUntilDue: followUpInfo.daysUntilDue,
