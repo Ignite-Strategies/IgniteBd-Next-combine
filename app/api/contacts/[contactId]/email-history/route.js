@@ -51,11 +51,13 @@ export async function GET(request, { params }) {
         subject: true,
         email: true,
         body: true,
+        summary: true,
         event: true,
         campaign_id: true,
         source: true,
         platform: true,
         responseFromEmail: true,
+        sequenceOrder: true,
       },
     });
 
@@ -86,6 +88,8 @@ export async function GET(request, { params }) {
         campaignId: send.campaign_id,
         platform: send.platform,
         notes: send.body,
+        summary: send.summary,
+        sequenceOrder: send.sequenceOrder,
         hasResponded: !!send.responseFromEmail,
         contactResponse: resp?.body ?? null,
         respondedAt: resp?.sentAt?.toISOString() ?? null,

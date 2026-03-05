@@ -2155,113 +2155,120 @@ export default function ContactDetailPage() {
                 Loading email history...
               </div>
             ) : emailHistory.length > 0 ? (
-              <div className="space-y-3">
-                {emailHistory.slice(0, 6).map((email, idx) => {
-                  const isDraft = email.isDraft || email.type === 'draft';
-                  const canAddResponse = !isDraft && !email.hasResponded;
-                  return (
-                    <div
-                      key={email.id || idx}
-                      className={`rounded-lg border p-4 ${isDraft ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}
-                    >
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          {isDraft ? (
-                            <span className="rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                              Draft
-                            </span>
-                          ) : (
-                            <span>{new Date(email.date).toLocaleDateString()}</span>
-                          )}
-                          <span>•</span>
-                          <span className="capitalize">
-                            {isDraft ? (email.platform === 'ai-draft' ? 'AI Generated' : 'Draft') : email.type === 'platform' ? 'Platform' : 'Off-Platform'}
-                          </span>
-                          {!isDraft && email.platform && email.platform !== 'ai-draft' && (
-                            <>
-                              <span>•</span>
-                              <span>{formatDeliveryMethodLabel(email.platform)}</span>
-                            </>
-                          )}
-                          {email.hasResponded && (
-                            <>
-                              <span>•</span>
-                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Summary</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {emailHistory.map((email, idx) => {
+                      const isDraft = email.isDraft || email.type === 'draft';
+                      const canAddResponse = !isDraft && !email.hasResponded;
+                      return (
+                        <tr key={email.id || idx} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                            {isDraft ? (
+                              <span className="rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                Draft
+                              </span>
+                            ) : (
+                              formatDateEST(email.date.slice(0, 10), { month: 'short', day: 'numeric', year: 'numeric' })
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            <div className="font-medium">{email.subject || 'No subject'}</div>
+                            {email.notes && (
+                              <div className="mt-0.5 text-xs text-gray-500 line-clamp-1">{email.notes}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="capitalize">
+                                {isDraft ? (email.platform === 'ai-draft' ? 'AI Generated' : 'Draft') : email.type === 'platform' ? 'Platform' : 'Off-Platform'}
+                              </span>
+                              {!isDraft && email.platform && email.platform !== 'ai-draft' && (
+                                <span className="text-xs text-gray-400">{formatDeliveryMethodLabel(email.platform)}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 max-w-md">
+                            {email.summary ? (
+                              <div className="text-xs italic">{email.summary}</div>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {email.hasResponded ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 Replied
                               </span>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isDraft && (
-                            <button
-                              onClick={() => router.push(`/contacts/${contactId}/outreach-message?companyHQId=${companyHQId}`)}
-                              className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
-                            >
-                              Edit &amp; Send
-                            </button>
-                          )}
-                          {!isDraft && (
-                            <button
-                              onClick={() => handleOpenEditEmail(email)}
-                              className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-                              title="Edit this email record"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              Edit
-                            </button>
-                          )}
-                          {canAddResponse && (
-                            <button
-                              onClick={() => handleOpenAddResponse(email)}
-                              className="flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-xs font-semibold text-green-700 transition hover:bg-green-100"
-                              title="Record contact response"
-                            >
-                              <MessageSquare className="h-3.5 w-3.5" />
-                              Add Response
-                            </button>
-                          )}
-                          {!isDraft && (email.notes || email.subject) && (
-                            <button
-                              onClick={() => {
-                                setMakeTemplateEmail(email);
-                                setNewTemplateTitle(`${contact?.outreachPersonaSlug || 'Untitled'} – ${email.subject || 'template'}`);
-                                setNewTemplateSubject(email.subject || '');
-                                setNewTemplateBody(email.notes || '');
-                                setShowSaveTemplateForm(false);
-                                setSaveTemplateError('');
-                                setSaveTemplateSuccess(false);
-                              }}
-                              className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-semibold text-purple-700 transition hover:bg-purple-100"
-                              title="Save this email as a reusable persona template"
-                            >
-                              <BookmarkPlus className="h-3.5 w-3.5" />
-                              Make template
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="font-medium text-gray-900 text-sm">{email.subject || 'No subject'}</div>
-                      {email.notes && (
-                        <div className="mt-1 text-xs text-gray-600 line-clamp-2">{email.notes}</div>
-                      )}
-                      {email.hasResponded && email.contactResponse && (
-                        <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-2">
-                          <div className="text-xs font-semibold text-green-800 mb-1">Response</div>
-                          <div className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-3">{email.contactResponse}</div>
-                          {email.respondedAt && (
-                            <div className="mt-1 text-xs text-gray-500">
-                              {new Date(email.respondedAt).toLocaleDateString()}
+                            ) : !isDraft ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                No response
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm">
+                            <div className="flex items-center gap-1">
+                              {isDraft ? (
+                                <button
+                                  onClick={() => router.push(`/contacts/${contactId}/outreach-message?companyHQId=${companyHQId}`)}
+                                  className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+                                >
+                                  Edit &amp; Send
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenEditEmail(email)}
+                                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                    title="Edit this email record"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  {canAddResponse && (
+                                    <button
+                                      onClick={() => handleOpenAddResponse(email)}
+                                      className="rounded p-1 text-green-600 hover:bg-green-50"
+                                      title="Record contact response"
+                                    >
+                                      <MessageSquare className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  {(email.notes || email.subject) && (
+                                    <button
+                                      onClick={() => {
+                                        setMakeTemplateEmail(email);
+                                        setNewTemplateTitle(`${contact?.outreachPersonaSlug || 'Untitled'} – ${email.subject || 'template'}`);
+                                        setNewTemplateSubject(email.subject || '');
+                                        setNewTemplateBody(email.notes || '');
+                                        setShowSaveTemplateForm(false);
+                                        setSaveTemplateError('');
+                                        setSaveTemplateSuccess(false);
+                                      }}
+                                      className="rounded p-1 text-purple-600 hover:bg-purple-50"
+                                      title="Save as template"
+                                    >
+                                      <BookmarkPlus className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {emailHistory.length > 6 && (
-                  <p className="text-sm text-gray-500 italic">Showing 6 of {emailHistory.length} emails</p>
-                )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
