@@ -43,8 +43,15 @@ export function middleware(request) {
     return new NextResponse(null, { status: 404 });
   }
 
-  // Log bills subdomain requests for debugging
-  if (host.includes('bills.ignitegrowth.biz')) {
+  // Bills subdomain: block root (/) - require valid bill path; allow only /company-slug/bill-id
+  const isBillsSubdomain = host.includes('bills.ignitegrowth.biz') || host.includes('bills.ignitegrow.biz');
+  if (isBillsSubdomain) {
+    // Root or other non-bill paths: return 404 - no exploration/crawling
+    const isBillPath = /^\/[^/]+\/[^/]+(\?.*)?$/.test(pathname) || pathname.startsWith('/bill/');
+    if (!isBillPath) {
+      console.log(`🚫 [BILLS] Blocked non-bill path: ${pathname} (host: ${host})`);
+      return new NextResponse(null, { status: 404 });
+    }
     console.log(`🔍 [BILLS] ${pathname} (host: ${host})`);
   }
 
