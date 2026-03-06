@@ -2258,18 +2258,42 @@ export default function ContactDetailPage() {
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Email History</h3>
-              <button
-                onClick={() => {
-                  const url = companyHQId 
-                    ? `/outreach/record-off-platform?contactId=${contactId}&companyHQId=${companyHQId}`
-                    : `/outreach/record-off-platform?contactId=${contactId}`;
-                  router.push(url);
-                }}
-                className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
-              >
-                <Plus className="h-4 w-4" />
-                Add Email Manually
-              </button>
+              <div className="flex items-center gap-2">
+                {emailHistory.some(e => !e.summary) && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await api.post(`/api/contacts/${contactId}/generate-email-summaries`);
+                        if (res.data?.success) {
+                          loadEmailHistory();
+                          if (res.data.generated > 0) {
+                            setContact(c => ({ ...c, contactSummary: null, engagementSummary: null }));
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Failed to generate summaries:', err);
+                      }
+                    }}
+                    className="flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+                    title="Generate AI summaries for emails missing them — needed for Contact Summary generation"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Summarize Emails
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    const url = companyHQId 
+                      ? `/outreach/record-off-platform?contactId=${contactId}&companyHQId=${companyHQId}`
+                      : `/outreach/record-off-platform?contactId=${contactId}`;
+                    router.push(url);
+                  }}
+                  className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Email Manually
+                </button>
+              </div>
             </div>
             {loadingLastEmail ? (
               <div className="flex items-center gap-2 text-sm text-gray-500">
