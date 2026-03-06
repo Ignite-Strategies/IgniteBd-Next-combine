@@ -212,6 +212,8 @@ export async function PUT(request, { params }) {
       buyerDecision,
       howMet,
       notes,
+      contactSummary,
+      engagementSummary,
       pipeline,
       stage,
       outreachPersonaSlug,
@@ -251,6 +253,8 @@ export async function PUT(request, { params }) {
     if (buyerDecision !== undefined) updateData.buyerDecision = buyerDecision;
     if (howMet !== undefined) updateData.howMet = howMet;
     if (notes !== undefined) updateData.notes = notes;
+    if (contactSummary !== undefined) updateData.contactSummary = contactSummary;
+    if (engagementSummary !== undefined) updateData.engagementSummary = engagementSummary;
     if (outreachPersonaSlug !== undefined) {
       // Allow null to unset persona, or validate slug exists if provided
       if (outreachPersonaSlug === null || outreachPersonaSlug === '') {

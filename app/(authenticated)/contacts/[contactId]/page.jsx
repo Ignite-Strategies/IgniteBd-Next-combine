@@ -174,6 +174,9 @@ export default function ContactDetailPage() {
   const [lastEmail, setLastEmail] = useState(null);
   const [synthesizingSummary, setSynthesizingSummary] = useState(false);
   const [synthesizingContactSummary, setSynthesizingContactSummary] = useState(false);
+  const [editingContactSummary, setEditingContactSummary] = useState(false);
+  const [contactSummaryText, setContactSummaryText] = useState('');
+  const [savingContactSummary, setSavingContactSummary] = useState(false);
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
   const [emailHistory, setEmailHistory] = useState([]);
   const [showAddResponseModal, setShowAddResponseModal] = useState(false);
@@ -1062,41 +1065,108 @@ export default function ContactDetailPage() {
               <Sparkles className="h-5 w-5 text-indigo-600" />
               Contact Summary
             </h3>
-            <button
-              type="button"
-              onClick={async () => {
-                setSynthesizingContactSummary(true);
-                try {
-                  const res = await api.post(`/api/contacts/${contactId}/synthesize-contact-summary`);
-                  if (res.data?.success) {
-                    setContact((prev) => ({ ...prev, contactSummary: res.data.summary }));
-                    if (refreshContacts) refreshContacts();
-                  } else {
-                    alert(res.data?.error || 'Failed to generate summary');
-                  }
-                } catch (err) {
-                  alert(err.response?.data?.error || err.message || 'Failed to generate summary');
-                } finally {
-                  setSynthesizingContactSummary(false);
-                }
-              }}
-              disabled={synthesizingContactSummary}
-              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {synthesizingContactSummary ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  {contact.contactSummary ? 'Regenerate' : 'Generate'}
-                </>
+            <div className="flex items-center gap-2">
+              {!editingContactSummary && contact.contactSummary && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContactSummaryText(contact.contactSummary || '');
+                    setEditingContactSummary(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-indigo-300 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 transition"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </button>
               )}
-            </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setSynthesizingContactSummary(true);
+                  try {
+                    const res = await api.post(`/api/contacts/${contactId}/synthesize-contact-summary`);
+                    if (res.data?.success) {
+                      setContact((prev) => ({ ...prev, contactSummary: res.data.summary }));
+                      setEditingContactSummary(false);
+                      if (refreshContacts) refreshContacts();
+                    } else {
+                      alert(res.data?.error || 'Failed to generate summary');
+                    }
+                  } catch (err) {
+                    alert(err.response?.data?.error || err.message || 'Failed to generate summary');
+                  } finally {
+                    setSynthesizingContactSummary(false);
+                  }
+                }}
+                disabled={synthesizingContactSummary}
+                className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {synthesizingContactSummary ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    {contact.contactSummary ? 'Regenerate' : 'Generate'}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-          {contact.contactSummary ? (
+          {editingContactSummary ? (
+            <div className="space-y-2">
+              <textarea
+                value={contactSummaryText}
+                onChange={(e) => setContactSummaryText(e.target.value)}
+                rows={5}
+                className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm text-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 resize-y"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setSavingContactSummary(true);
+                    try {
+                      const res = await api.put(`/api/contacts/${contactId}`, {
+                        contactSummary: contactSummaryText.trim() || null,
+                      });
+                      if (res.data?.success) {
+                        setContact((prev) => ({ ...prev, contactSummary: contactSummaryText.trim() || null }));
+                        setEditingContactSummary(false);
+                        if (refreshContacts) refreshContacts();
+                      } else {
+                        alert(res.data?.error || 'Failed to save');
+                      }
+                    } catch (err) {
+                      alert(err.response?.data?.error || err.message || 'Failed to save');
+                    } finally {
+                      setSavingContactSummary(false);
+                    }
+                  }}
+                  disabled={savingContactSummary}
+                  className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {savingContactSummary ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingContactSummary(false);
+                    setContactSummaryText('');
+                  }}
+                  disabled={savingContactSummary}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                >
+                  <XIcon className="h-3.5 w-3.5" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : contact.contactSummary ? (
             <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
               {contact.contactSummary}
             </p>
