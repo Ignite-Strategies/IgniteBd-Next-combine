@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS "Meeting" (
   "meetingType" "MeetingType" NOT NULL DEFAULT 'OTHER',
   "outcome" "MeetingOutcome",
   "notes" TEXT,
+  "summary" TEXT,
   "nextAction" TEXT,
   "nextEngagementDate" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, User, Loader2, Check } from 'lucide-react';
+import { X, Calendar, User, Loader2, Check, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 import { PIPELINE_STAGES } from '@/lib/config/pipelineConfig';
 
@@ -35,6 +35,9 @@ export default function LogMeetingModal({ isOpen, onClose, companyHQId, preSelec
   const [nextEngagementDate, setNextEngagementDate] = useState('');
   const [pipeline, setPipeline] = useState('prospect');
   const [stage, setStage] = useState('meeting');
+  const [blobText, setBlobText] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [parsedFromBlob, setParsedFromBlob] = useState(false);
 
   useEffect(() => {
     if (preSelectedContact) {
@@ -62,18 +65,45 @@ export default function LogMeetingModal({ isOpen, onClose, companyHQId, preSelec
   const filteredContacts = useMemo(() => {
     if (!contactSearch.trim()) return contacts.slice(0, 50);
     const q = contactSearch.toLowerCase().trim();
+    const terms = q.split(/\s+/).filter(Boolean);
     return contacts
       .filter((c) => {
         const name = [c.firstName, c.lastName].filter(Boolean).join(' ').toLowerCase();
         const full = (c.fullName || '').toLowerCase();
         const email = (c.email || '').toLowerCase();
-        return name.includes(q) || full.includes(q) || email.includes(q);
+        const company = (c.companyName || '').toLowerCase();
+        return terms.every((t) =>
+          name.includes(t) || full.includes(t) || email.includes(t) || company.includes(t)
+        );
       })
       .slice(0, 20);
   }, [contacts, contactSearch]);
 
   const prospectStages = PIPELINE_STAGES.prospect || [];
   const currentPipelineStages = PIPELINE_STAGES[pipeline] || prospectStages;
+
+  const handleParseBlob = async () => {
+    if (!blobText.trim()) return;
+    setParsing(true);
+    setError('');
+    try {
+      const res = await api.post('/api/meetings/parse-blob', { blob: blobText });
+      if (res.data?.success && res.data?.parsed) {
+        const p = res.data.parsed;
+        const searchParts = [p.contactName, p.companyName].filter(Boolean);
+        if (searchParts.length) setContactSearch(searchParts.join(' '));
+        if (p.rawNotes) setNotes(p.rawNotes);
+        if (p.suggestedMeetingType) setMeetingType(p.suggestedMeetingType);
+        setParsedFromBlob(true);
+      } else {
+        setError(res.data?.error || 'Parse failed');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to parse');
+    } finally {
+      setParsing(false);
+    }
+  };
 
   const handleSelectContact = (c) => {
     setSelectedContact(c);
@@ -132,6 +162,8 @@ export default function LogMeetingModal({ isOpen, onClose, companyHQId, preSelec
     setNextEngagementDate('');
     setPipeline('prospect');
     setStage('meeting');
+    setBlobText('');
+    setParsedFromBlob(false);
     setError('');
   };
 
@@ -167,6 +199,33 @@ export default function LogMeetingModal({ isOpen, onClose, companyHQId, preSelec
                 {error}
               </div>
             )}
+
+            {/* Blob parse */}
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50/50 p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Sparkles className="inline h-4 w-4 mr-1 text-amber-500" />
+                Paste meeting note (from you or VA)
+              </label>
+              <textarea
+                value={blobText}
+                onChange={(e) => setBlobText(e.target.value)}
+                placeholder='e.g. "Joel has an upcoming meeting with Sarah, a former client. She reached out via the website and is from Acme Corp."'
+                rows={3}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 mb-2"
+              />
+              <button
+                type="button"
+                onClick={handleParseBlob}
+                disabled={parsing || !blobText.trim()}
+                className="flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Parse & pre-fill
+              </button>
+              {parsedFromBlob && (
+                <p className="mt-2 text-xs text-green-600">Parsed. Review and select contact below.</p>
+              )}
+            </div>
 
             {/* Contact */}
             <div>

@@ -2,9 +2,18 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { validatePipeline, snapPipelineOnContact, ensureContactPipeline } from '@/lib/services/pipelineService';
+import { generateMeetingSummaryService } from '@/lib/services/generateMeetingSummaryService';
 
 const MEETING_TYPES = ['INTRO', 'FOLLOW_UP', 'PROPOSAL_REVIEW', 'CHECK_IN', 'OTHER'];
 const OUTCOMES = ['POSITIVE', 'NEUTRAL', 'NEGATIVE', 'NO_SHOW'];
+
+// Map meeting outcome to contact disposition
+const OUTCOME_TO_DISPOSITION = {
+  POSITIVE: 'WARM',
+  NEUTRAL: 'NEUTRAL',
+  NEGATIVE: 'COOLING',
+  NO_SHOW: null, // leave unchanged
+};
 
 /**
  * POST /api/meetings
@@ -99,6 +108,8 @@ export async function POST(request) {
         ? String(nextEngagementDate).slice(0, 10)
         : null;
 
+    const notesTrimmed = notes?.trim() || null;
+
     const meeting = await prisma.meeting.create({
       data: {
         contactId,
@@ -107,11 +118,26 @@ export async function POST(request) {
         meetingDate: meetingDateParsed,
         meetingType: meetingTypeVal,
         outcome: outcomeVal,
-        notes: notes?.trim() || null,
+        notes: notesTrimmed,
         nextAction: nextAction?.trim() || null,
         nextEngagementDate: nextEngagementDateStr,
       },
     });
+
+    let summary = null;
+    if (notesTrimmed && notesTrimmed.length >= 20) {
+      try {
+        summary = await generateMeetingSummaryService(notesTrimmed);
+        if (summary) {
+          await prisma.meeting.update({
+            where: { id: meeting.id },
+            data: { summary },
+          });
+        }
+      } catch (err) {
+        console.warn('Meeting summary generation failed:', err?.message);
+      }
+    }
 
     const contactUpdate = {
       lastEngagementDate: meetingDateParsed,
@@ -120,6 +146,10 @@ export async function POST(request) {
     if (nextEngagementDateStr) {
       contactUpdate.nextEngagementDate = nextEngagementDateStr;
       contactUpdate.nextEngagementPurpose = 'MEETING_FOLLOW_UP';
+    }
+    const dispositionFromOutcome = outcomeVal ? OUTCOME_TO_DISPOSITION[outcomeVal] : null;
+    if (dispositionFromOutcome) {
+      contactUpdate.contactDisposition = dispositionFromOutcome;
     }
 
     if (pipeline && stage) {
@@ -144,6 +174,7 @@ export async function POST(request) {
         meetingType: meeting.meetingType,
         outcome: meeting.outcome,
         notes: meeting.notes,
+        summary: summary || meeting.summary,
         nextAction: meeting.nextAction,
         nextEngagementDate: meeting.nextEngagementDate,
         createdAt: meeting.createdAt,

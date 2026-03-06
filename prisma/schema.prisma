@@ -606,6 +606,7 @@ model Meeting {
   meetingType        MeetingType     @default(OTHER)
   outcome            MeetingOutcome?
   notes              String?         @db.Text
+  summary            String?         @db.Text   // AI-inferred from notes
   nextAction         String?
   nextEngagementDate String?
 
