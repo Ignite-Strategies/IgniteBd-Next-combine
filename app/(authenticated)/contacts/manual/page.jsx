@@ -566,7 +566,7 @@ export default function ContactManualPage() {
                 />
               </div>
             </div>
-            <div>
+            <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 <FileText className="mr-1 inline h-4 w-4" />
                 Notes
@@ -576,8 +576,9 @@ export default function ContactManualPage() {
                 onChange={(e) => setContactData({ ...contactData, notes: e.target.value })}
                 rows={3}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                placeholder="Any additional notes..."
+                placeholder="e.g. Former Ares Direct Lending — warm prior relationship, now at Oxford Finance. Interested in NDA processing services."
               />
+              <p className="mt-1 text-xs text-gray-400">Relationship context, how you know them, former company, buying signals. Powers AI summary generation.</p>
             </div>
             <div className="flex gap-3 border-t pt-6">
               <button

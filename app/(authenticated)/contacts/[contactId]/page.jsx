@@ -2033,7 +2033,15 @@ export default function ContactDetailPage() {
                 {contact.notes ? (
                   <p className="text-sm text-gray-600 whitespace-pre-wrap">{contact.notes}</p>
                 ) : (
-                  <p className="text-sm text-gray-400 italic">Add notes from meetings, emails, and relationship updates. Then use Build Persona Slug and Generate Context to fill the sections above and below.</p>
+                  <button
+                    onClick={() => {
+                      setEditingNotes(true);
+                      setNotesText('');
+                    }}
+                    className="w-full rounded-lg border-2 border-dashed border-gray-200 p-4 text-left text-sm text-gray-400 hover:border-gray-300 hover:text-gray-500 transition"
+                  >
+                    + Add notes — relationship context, how you met, former company, key signals. Used to generate persona and contact summary.
+                  </button>
                 )}
               </div>
             ) : (
