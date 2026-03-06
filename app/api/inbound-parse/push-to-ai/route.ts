@@ -111,8 +111,6 @@ export async function POST(request: Request) {
             email: normalizedEmail,
             firstName: nameParts[0] || null,
             lastName: nameParts.slice(1).join(' ') || null,
-            companyName: parsed.contactCompany || null,
-            title: parsed.contactTitle || null,
           },
           select: { id: true },
         });
