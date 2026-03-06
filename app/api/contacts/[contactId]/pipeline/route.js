@@ -109,14 +109,12 @@ export async function PUT(request, { params }) {
       update: {
         pipeline,
         stage: stageValue,
-        updatedAt: new Date(),
       },
       create: {
         id: pipelineId,
-        contactId,
         pipeline,
         stage: stageValue,
-        updatedAt: new Date(),
+        contacts: { connect: { id: contactId } },
       },
     });
 
