@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { calculateNextSendDate, getLastSendDate } from '@/lib/services/emailCadenceService';
+import { cadenceDaysForDisposition } from '@/lib/services/engagementService';
 
 /** Coerce Date, ISO string, or YYYY-MM-DD to ISO string; null/undefined → null. */
 function toISOStringSafe(val) {
@@ -110,6 +110,9 @@ export async function GET(request) {
         persona_type: true,
         lastEngagementDate: true,
         lastEngagementType: true,
+        nextEngagementDate: true,
+        nextContactNote: true,
+        contactDisposition: true,
         pipelineStageSnap: true,
         engagementSummary: true,
       },
@@ -148,9 +151,11 @@ export async function GET(request) {
             },
           });
 
-          const lastSendDate = await getLastSendDate(contact.id);
-          const followUpInfo = await calculateNextSendDate(contact.id);
-          const nextSendDate = followUpInfo.nextSendDate;
+          const todayMs = Date.now();
+          const nextSendDate = contact.nextEngagementDate ?? null;
+          const daysUntilDue = nextSendDate
+            ? Math.round((new Date(nextSendDate + 'T12:00:00Z').getTime() - todayMs) / 86400000)
+            : null;
 
           if (followUpDateFrom || followUpDateTo) {
             if (!nextSendDate) return null;
@@ -159,7 +164,6 @@ export async function GET(request) {
             if (followUpDateTo && followUpDate > new Date(followUpDateTo)) return null;
           }
 
-          // hasResponded derived from Contact.lastEngagementType — single source of truth
           const contactResponded = contact.lastEngagementType === 'CONTACT_RESPONSE';
           const sendDate = (a) => toISOStringSafe(a.sentAt ?? a.createdAt);
 
@@ -167,17 +171,15 @@ export async function GET(request) {
           return {
             ...contactFields,
             companyName: contactFields.companyName || companiesRel?.companyName || null,
-            lastSendDate: toISOStringSafe(lastSendDate),
+            lastSendDate: toISOStringSafe(contact.lastEngagementDate),
             nextSendDate: toISOStringSafe(nextSendDate),
-            daysUntilDue: followUpInfo.daysUntilDue,
-            relationship: followUpInfo.relationship,
-            cadenceDays: followUpInfo.cadenceDays,
+            daysUntilDue,
+            cadenceDays: cadenceDaysForDisposition(contact.contactDisposition),
             emailCount: activities.length,
             hasResponded: contactResponded,
-            isManualOverride: followUpInfo.isManualOverride ?? false,
-            optedOut: followUpInfo.optedOut ?? false,
-            contactDisposition: followUpInfo.contactDisposition ?? null,
-            nextContactNote: followUpInfo.nextContactNote ?? null,
+            optedOut: contact.contactDisposition === 'OPTED_OUT',
+            contactDisposition: contact.contactDisposition ?? null,
+            nextContactNote: contact.nextContactNote ?? null,
             emails: activities.map(e => ({
               id: e.id,
               sendDate: sendDate(e),

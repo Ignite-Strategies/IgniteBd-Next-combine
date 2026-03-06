@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
+import { listContactsDue } from '@/lib/services/engagementService';
 
 /**
  * GET /api/contacts/due-for-followup
@@ -42,7 +42,7 @@ export async function GET(request) {
       );
     }
 
-    let contacts = await getContactsWithNextEngagement(companyHQId, { limit });
+    let contacts = await listContactsDue(companyHQId, { limit });
     if (dueBy) {
       const dueByStr = String(dueBy).slice(0, 10); // YYYY-MM-DD
       contacts = contacts.filter((c) => c.nextEngagementDate && c.nextEngagementDate <= dueByStr);

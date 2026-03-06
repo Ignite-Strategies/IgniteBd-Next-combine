@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { ensureContactPipeline } from '@/lib/services/pipelineService';
-import { stampLastEngagement, computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
+import { computeNextEngagement } from '@/lib/services/engagementService';
 
 /**
  * PUT /api/emails/[emailId]/response
@@ -101,8 +101,8 @@ export async function PUT(request, { params }) {
     const contactId = parent.contact_id;
     if (contactId) {
       try {
-        await stampLastEngagement(contactId, responseDate, 'CONTACT_RESPONSE');
-        await computeAndPersistNextEngagement(contactId);
+        await prisma.contact.update({ where: { id: contactId }, data: { lastEngagementDate: responseDate, lastEngagementType: 'CONTACT_RESPONSE' } });
+        await computeNextEngagement(contactId);
       } catch (e) {
         console.warn('⚠️ Could not stamp lastEngagementDate:', e?.message);
       }

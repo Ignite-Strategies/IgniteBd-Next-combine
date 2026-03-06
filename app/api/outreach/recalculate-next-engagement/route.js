@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
+import { computeNextEngagement } from '@/lib/services/engagementService';
 
 /**
  * POST /api/outreach/recalculate-next-engagement
@@ -23,7 +23,7 @@ export async function POST(request) {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId') || null;
 
-    // OPTED_OUT contacts get nextEngagementDate cleared by computeAndPersistNextEngagement — safe to include all
+    // OPTED_OUT contacts get nextEngagementDate cleared by computeNextEngagement — safe to include all
     const where = companyHQId ? { crmId: companyHQId } : { crmId: { not: null } };
     const contacts = await prisma.contact.findMany({
       where,
@@ -34,7 +34,7 @@ export async function POST(request) {
     let errors = 0;
     for (const c of contacts) {
       try {
-        const result = await computeAndPersistNextEngagement(c.id);
+        const result = await computeNextEngagement(c.id);
         if (result.updated) updated++;
       } catch {
         errors++;

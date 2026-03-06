@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { takeCrmClientEmailAndParseAiService } from '@/lib/services/takeCrmClientEmailAndParseAiService';
-import { stampLastEngagement } from '@/lib/services/emailCadenceService';
 
 function buildParseInput(inbound: {
   text: string | null;
@@ -140,7 +139,7 @@ export async function POST(request: Request) {
     // ── 4. Stamp lastEngagementDate ──
     const engagementType = parsed.isResponse ? 'CONTACT_RESPONSE' : 'OUTBOUND_EMAIL';
     if (contactId) {
-      await stampLastEngagement(contactId, inbound.createdAt, engagementType);
+      await prisma.contact.update({ where: { id: contactId }, data: { lastEngagementDate: inbound.createdAt, lastEngagementType: engagementType } });
     }
 
     // ── 5. nextEngagementDate (only if AI parsed one or user overrode) ──

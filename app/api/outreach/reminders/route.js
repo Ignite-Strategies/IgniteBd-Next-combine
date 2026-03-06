@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
+import { listContactsDue } from '@/lib/services/engagementService';
 
 /**
  * GET /api/outreach/reminders
@@ -29,7 +29,7 @@ export async function GET(request) {
       );
     }
 
-    const reminders = await getContactsWithNextEngagement(companyHQId, { limit });
+    const reminders = await listContactsDue(companyHQId, { limit });
 
     return NextResponse.json({
       success: true,

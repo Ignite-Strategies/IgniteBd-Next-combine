@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { calculateNextSendDate } from '@/lib/services/emailCadenceService';
+import { cadenceDaysForDisposition } from '@/lib/services/engagementService';
 
 /**
  * GET /api/contacts/[contactId]/next-send-date
- * Calculate when the next follow-up email should be sent
- * 
- * Query params:
- *   - coldFollowUpDays?: number (default: 7)
- *   - warmFollowUpDays?: number (default: 3)
- *   - establishedFollowUpDays?: number (default: 14)
- *   - dormantFollowUpDays?: number (default: 30)
+ * Read next engagement date and cadence info directly from the contact record.
  */
 export async function GET(request, { params }) {
   try {
@@ -26,7 +20,7 @@ export async function GET(request, { params }) {
   try {
     const resolvedParams = await params;
     const { contactId } = resolvedParams || {};
-    
+
     if (!contactId) {
       return NextResponse.json(
         { success: false, error: 'contactId is required' },
@@ -34,9 +28,17 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Verify contact exists
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
+      select: {
+        id: true,
+        lastEngagementDate: true,
+        lastEngagementType: true,
+        nextEngagementDate: true,
+        nextContactNote: true,
+        contactDisposition: true,
+        prior_relationship: true,
+      },
     });
 
     if (!contact) {
@@ -46,46 +48,28 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Get custom cadence from query params (if provided)
-    const { searchParams } = new URL(request.url);
-    const config = {};
-    if (searchParams.get('coldFollowUpDays')) {
-      config.coldFollowUpDays = parseInt(searchParams.get('coldFollowUpDays'), 10);
-    }
-    if (searchParams.get('warmFollowUpDays')) {
-      config.warmFollowUpDays = parseInt(searchParams.get('warmFollowUpDays'), 10);
-    }
-    if (searchParams.get('establishedFollowUpDays')) {
-      config.establishedFollowUpDays = parseInt(searchParams.get('establishedFollowUpDays'), 10);
-    }
-    if (searchParams.get('dormantFollowUpDays')) {
-      config.dormantFollowUpDays = parseInt(searchParams.get('dormantFollowUpDays'), 10);
-    }
-
-    // Calculate next send date
-    const result = await calculateNextSendDate(contactId, config);
+    const todayMs = Date.now();
+    const nextSendDate = contact.nextEngagementDate ?? null;
+    const daysUntilDue = nextSendDate
+      ? Math.round((new Date(nextSendDate + 'T12:00:00Z').getTime() - todayMs) / 86400000)
+      : null;
 
     return NextResponse.json({
       success: true,
-      nextSendDate: result.nextSendDate ? result.nextSendDate.toISOString() : null,
-      lastSendDate: result.lastSendDate ? result.lastSendDate.toISOString() : null,
-      daysUntilDue: result.daysUntilDue,
-      relationship: result.relationship,
-      cadenceDays: result.cadenceDays,
-      isDue: result.daysUntilDue !== null && result.daysUntilDue <= 0,
-      isManualOverride: result.isManualOverride ?? false,
-      optedOut: result.optedOut ?? false,
-      contactDisposition: result.contactDisposition ?? null,
-      nextContactNote: result.nextContactNote ?? null,
+      nextSendDate,
+      lastSendDate: contact.lastEngagementDate?.toISOString() ?? null,
+      daysUntilDue,
+      relationship: contact.prior_relationship ?? null,
+      cadenceDays: cadenceDaysForDisposition(contact.contactDisposition),
+      isDue: daysUntilDue !== null && daysUntilDue <= 0,
+      optedOut: contact.contactDisposition === 'OPTED_OUT',
+      contactDisposition: contact.contactDisposition ?? null,
+      nextContactNote: contact.nextContactNote ?? null,
     });
   } catch (error) {
-    console.error('❌ Calculate next send date error:', error);
+    console.error('❌ next-send-date error:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to calculate next send date',
-        details: error.message,
-      },
+      { success: false, error: 'Failed to get next send date', details: error.message },
       { status: 500 },
     );
   }

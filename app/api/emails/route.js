@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { stampLastEngagement } from '@/lib/services/emailCadenceService';
 
 /**
  * POST /api/emails
@@ -104,7 +103,7 @@ export async function POST(request) {
     });
 
     try {
-      await stampLastEngagement(contactId, emailSendDate, 'OUTBOUND_EMAIL');
+      await prisma.contact.update({ where: { id: contactId }, data: { lastEngagementDate: emailSendDate, lastEngagementType: 'OUTBOUND_EMAIL' } });
     } catch (snapErr) {
       console.warn('⚠️ Could not stamp lastEngagementDate:', snapErr.message);
     }

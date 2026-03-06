@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
+import { listContactsDue } from '@/lib/services/engagementService';
 import { sendEmail } from '@/lib/sendgridClient';
 import { formatNextEngagementEmailHtml, formatNextEngagementEmailText } from '@/lib/email/nextEngagementEmailTemplate';
 
@@ -77,7 +77,7 @@ export async function POST(request) {
       );
     }
 
-    const nextEngagements = await getContactsWithNextEngagement(companyHQId, { limit: 500 });
+    const nextEngagements = await listContactsDue(companyHQId, { limit: 500 });
 
     if (nextEngagements.length === 0) {
       return NextResponse.json(

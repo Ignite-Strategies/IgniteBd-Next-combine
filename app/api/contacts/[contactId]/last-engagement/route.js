@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { stampLastEngagement } from '@/lib/services/emailCadenceService';
-
 const VALID_TYPES = ['OUTBOUND_EMAIL', 'CONTACT_RESPONSE', 'MEETING', 'MANUAL'];
 
 /**
@@ -43,23 +41,18 @@ export async function PATCH(request, { params }) {
         );
       }
 
-      // Use stampLastEngagement service (respects "only move forward" rule)
       const engagementType = lastEngagementType && VALID_TYPES.includes(lastEngagementType) 
         ? lastEngagementType 
         : 'MANUAL';
       
-      const result = await stampLastEngagement(contactId, dateOnly + 'T12:00:00.000Z', engagementType);
-      
-      if (!result.updated) {
-        // Date was older than existing, but user explicitly set it — allow override
-        await prisma.contact.update({
-          where: { id: contactId },
-          data: {
-            lastEngagementDate: new Date(dateOnly + 'T12:00:00.000Z'),
-            lastEngagementType: engagementType,
-          },
-        });
-      }
+      // Manual edit — always allow, no "move forward only" restriction
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: {
+          lastEngagementDate: new Date(dateOnly + 'T12:00:00.000Z'),
+          lastEngagementType: engagementType,
+        },
+      });
     } else if (lastEngagementType !== undefined && lastEngagementDate == null) {
       // Only updating type, not date
       if (lastEngagementType != null && lastEngagementType !== '' && !VALID_TYPES.includes(lastEngagementType)) {

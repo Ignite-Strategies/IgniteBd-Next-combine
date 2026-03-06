@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { computeAndPersistNextEngagement } from '@/lib/services/emailCadenceService';
+import { computeNextEngagement } from '@/lib/services/engagementService';
 
 /**
  * POST /api/contacts/[contactId]/compute-engagement
@@ -29,7 +29,7 @@ export async function POST(request, { params }) {
       );
     }
 
-    const result = await computeAndPersistNextEngagement(contactId);
+    const result = await computeNextEngagement(contactId);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getContactsWithNextEngagement } from '@/lib/services/nextEngagementService';
+import { listContactsDue } from '@/lib/services/engagementService';
 
 /**
  * GET /api/public/contacts/target-this-week
@@ -42,7 +42,7 @@ export async function GET(request) {
     weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
     const weekEndStr = weekEndDate.toISOString().slice(0, 10);
 
-    const contacts = await getContactsWithNextEngagement(companyHQId, { limit: 1000 });
+    const contacts = await listContactsDue(companyHQId, { limit: 1000 });
     const thisWeekContacts = contacts.filter((c) => {
       const d = c.nextEngagementDate;
       return d && d >= weekStartStr && d <= weekEndStr;
