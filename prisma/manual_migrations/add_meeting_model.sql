@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS "Meeting" (
 
 -- Add foreign keys
 ALTER TABLE "Meeting" ADD CONSTRAINT "Meeting_contactId_fkey" 
-  FOREIGN KEY ("contactId") REFERENCES "Contact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  FOREIGN KEY ("contactId") REFERENCES "contacts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "Meeting" ADD CONSTRAINT "Meeting_ownerId_fkey" 
   FOREIGN KEY ("ownerId") REFERENCES "owners"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "Meeting" ADD CONSTRAINT "Meeting_crmId_fkey" 
