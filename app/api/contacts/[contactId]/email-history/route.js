@@ -57,7 +57,7 @@ export async function GET(request, { params }) {
         source: true,
         platform: true,
         responseFromEmail: true,
-        sequenceOrder: true,
+        emailSequenceOrder: true,
       },
     });
 
@@ -89,7 +89,7 @@ export async function GET(request, { params }) {
         platform: send.platform,
         notes: send.body,
         summary: send.summary,
-        sequenceOrder: send.sequenceOrder,
+        sequenceOrder: send.emailSequenceOrder,
         hasResponded: !!send.responseFromEmail,
         contactResponse: resp?.body ?? null,
         respondedAt: resp?.sentAt?.toISOString() ?? null,
