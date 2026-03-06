@@ -128,10 +128,9 @@ export async function ensureContactPipeline(
   await prisma.pipelines.create({
     data: {
       id: pipelineId,
-      contactId,
       pipeline: newPipeline,
       stage: stageValue,
-      updatedAt: new Date(),
+      contacts: { connect: { id: contactId } },
     },
   });
   await snapPipelineOnContact(contactId, newPipeline, stageValue);
