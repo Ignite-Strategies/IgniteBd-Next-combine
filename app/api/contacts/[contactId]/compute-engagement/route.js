@@ -29,7 +29,9 @@ export async function POST(request, { params }) {
       );
     }
 
-    const result = await computeNextEngagement(contactId);
+    // force=true: full AI inference — disposition + pipeline stage + next date.
+    // Only the manual "Calculate Engagement" button should do this.
+    const result = await computeNextEngagement(contactId, { force: true });
 
     return NextResponse.json({
       success: true,

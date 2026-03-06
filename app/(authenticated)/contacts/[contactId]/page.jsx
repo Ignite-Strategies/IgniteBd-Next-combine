@@ -158,6 +158,8 @@ export default function ContactDetailPage() {
   const [nextEngagementDateEdit, setNextEngagementDateEdit] = useState('');
   const [nextEngagementPurposeEdit, setNextEngagementPurposeEdit] = useState('');
   const [savingNextEngagement, setSavingNextEngagement] = useState(false);
+  const [computingEngagement, setComputingEngagement] = useState(false);
+  const [computeResult, setComputeResult] = useState(null);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -994,6 +996,42 @@ export default function ContactDetailPage() {
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
+                <button
+                  type="button"
+                  disabled={computingEngagement}
+                  onClick={async () => {
+                    setComputingEngagement(true);
+                    setComputeResult(null);
+                    try {
+                      const res = await api.post(`/api/contacts/${contactId}/compute-engagement`);
+                      if (res.data?.success) {
+                        setComputeResult(res.data);
+                        // Reload contact to surface updated disposition, pipeline, and date
+                        const contactRes = await api.get(`/api/contacts/${contactId}`);
+                        if (contactRes.data?.contact) {
+                          setContact(contactRes.data.contact);
+                          if (refreshContacts) refreshContacts();
+                        }
+                      } else {
+                        alert(res.data?.error || 'Failed to compute');
+                      }
+                    } catch (err) {
+                      alert(err.response?.data?.error || err.message || 'Failed to compute');
+                    } finally {
+                      setComputingEngagement(false);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
+                  title="AI inference: set disposition, pipeline stage, and next engagement date from email history"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {computingEngagement ? 'Calculating...' : 'Calculate'}
+                </button>
+                {computeResult && (
+                  <span className="text-xs text-green-600 font-medium">
+                    ✓ {computeResult.source === 'ai_full_inference' ? `AI inferred · ${computeResult.reasoning || ''}` : computeResult.source?.replace(/_/g, ' ')}
+                  </span>
+                )}
               </>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
