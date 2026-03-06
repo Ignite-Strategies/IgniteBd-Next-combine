@@ -381,6 +381,7 @@ model company_hqs {
   invoice_settings                              invoice_settings?
   invoice_templates                             invoice_templates[]
   landing_pages                                 landing_pages[]
+  meetings                                      Meeting[]
   personas                                      personas[]
   phase_templates                               phase_templates[]
   presentations                                 presentations[]
@@ -550,11 +551,10 @@ model Contact {
   lastEngagementType                                        EngagementType? // What kind: OUTBOUND_EMAIL, CONTACT_RESPONSE, etc.
   nextContactedAt                                           DateTime? // When to contact next: computed (cadence) or manual (e.g. follow next quarter)
   nextContactNote                                            String?  // e.g. "Follow next quarter", "Do not call - asked to reach out in March"
-  doNotContactAgain                                         Boolean  @default(false) // If true, no follow-up; ignore nextContactedAt
   // Next engagement: when to engage this contact next; set by system (7d from send/response) or user. DATE-ONLY "YYYY-MM-DD" to avoid timezone drift.
   nextEngagementDate                                        String?   // ISO date only "YYYY-MM-DD"; no timestamp
   nextEngagementPurpose                                      NextEngagementPurpose?   // Set by cadence or remind-me; "General check-in" when user sets date
-  contactDisposition                                         ContactDisposition?   // General attitude: happy to receive a note vs doesn't care (manual; future AI)
+  contactDisposition                                         ContactDisposition?   // Relationship + buyer intent — drives cadence frequency and follow-up strategy
   contactSummary                                             String?   @db.Text   // AI-synthesized rich narrative: who they are, relationship, disposition, buying signals
   engagementSummary                                          String?              // AI-generated 1-sentence action-oriented status for outreach surfaces
   // Snapped pipeline so cadence/outreach logic reads from Contact only (limit pipeline lookups to writers)
@@ -577,6 +577,7 @@ model Contact {
   work_packages_work_packages_workPackageMemberIdTocontacts work_packages[]            @relation("work_packages_workPackageMemberIdTocontacts")
   contact_analyses                                          contact_analyses?
   email_activities                                          email_activities[]
+  meetings                                                   Meeting[]
 
   @@unique([email, crmId])
   @@index([companyDomain])
@@ -591,9 +592,35 @@ model Contact {
   @@index([nextContactedAt])
   @@index([nextEngagementDate])
   @@index([contactDisposition])
-  @@index([doNotContactAgain])
   @@index([outreachIntent])
   @@map("contacts")
+}
+
+model Meeting {
+  id                 String          @id @default(cuid())
+  contactId          String
+  ownerId            String
+  crmId              String
+
+  meetingDate        DateTime
+  meetingType        MeetingType     @default(OTHER)
+  outcome            MeetingOutcome?
+  notes              String?         @db.Text
+  nextAction         String?
+  nextEngagementDate String?
+
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  contact            Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  owner              owners          @relation(fields: [ownerId], references: [id])
+  company_hq         company_hqs     @relation(fields: [crmId], references: [id])
+
+  @@index([contactId])
+  @@index([ownerId])
+  @@index([crmId])
+  @@index([meetingDate])
+  @@index([contactId, meetingDate])
 }
 
 model deliverable_templates {
@@ -1071,6 +1098,7 @@ model owners {
   email_activities                          email_activities[]
   email_sequences                           email_sequences[]
   email_signatures                          email_signatures[]
+  meetings                                  Meeting[]
   templates                                 templates[]
 }
 
@@ -2000,11 +2028,13 @@ enum EngagementType {
 // General attitude of the contact (awareness). Manual for now; future: AI infers from email response.
 // Separate from pipeline — pipeline is source of truth for "where they landed"; this is "happy to receive a note" vs "doesn't care".
 enum ContactDisposition {
-  ADVOCATE              // Warm advocate — would make introductions, loves to engage
-  HAPPY_TO_RECEIVE_NOTE // Open to / happy to get a note
-  NEUTRAL               // Indifferent / neutral
-  DOESNT_CARE           // Not very receptive
-  OPTED_OUT             // Explicitly asked to stop — hard gate, no follow-up
+  ADVOCATE            // Champion — would make intros, actively helpful; standard cadence
+  WARM                // Friendly + receptive; standard follow-up cadence
+  WARM_WRONG_CONTACT  // Good relationship but not the buyer — nurture for intro; quarterly
+  WARM_NO_NEED        // Friendly but has another service/vendor; semi-annual check-in
+  NEUTRAL             // Indifferent, keep periodic presence; bi-weekly
+  COOLING             // Was put off or went cold — back off; ~6 months
+  OPTED_OUT           // Hard gate — explicitly asked to stop, clear nextEngagementDate
 }
 
 // Why we're engaging next. Set by cadence or remind-me; no free text.
@@ -2013,6 +2043,22 @@ enum NextEngagementPurpose {
   UNRESPONSIVE          // No response after last send → 7d
   PERIODIC_CHECK_IN     // Responded + in category (e.g. connector/forwarded) → 7d
   REFERRAL_NO_CONTACT   // Referral, no contact yet
+  MEETING_FOLLOW_UP     // Post-meeting follow-up
+}
+
+enum MeetingType {
+  INTRO
+  FOLLOW_UP
+  PROPOSAL_REVIEW
+  CHECK_IN
+  OTHER
+}
+
+enum MeetingOutcome {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  NO_SHOW
 }
 
 

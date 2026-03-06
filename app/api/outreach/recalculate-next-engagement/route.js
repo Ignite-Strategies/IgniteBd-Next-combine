@@ -23,7 +23,8 @@ export async function POST(request) {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId') || null;
 
-    const where = companyHQId ? { crmId: companyHQId, doNotContactAgain: false } : { crmId: { not: null }, doNotContactAgain: false };
+    // OPTED_OUT contacts get nextEngagementDate cleared by computeAndPersistNextEngagement — safe to include all
+    const where = companyHQId ? { crmId: companyHQId } : { crmId: { not: null } };
     const contacts = await prisma.contact.findMany({
       where,
       select: { id: true },

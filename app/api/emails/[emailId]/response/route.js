@@ -124,9 +124,9 @@ export async function PUT(request, { params }) {
         } else if (disposition === 'not_interested') {
           await prisma.contact.update({
             where: { id: contactId },
-            data: { doNotContactAgain: true },
+            data: { contactDisposition: 'OPTED_OUT', nextEngagementDate: null, nextEngagementPurpose: null },
           });
-          console.log('✅ Contact marked doNotContactAgain (not_interested)');
+          console.log('✅ Contact disposition → OPTED_OUT (not_interested)');
         } else {
           // positive (default): move prospect engaged-awaiting-response → interest
           const pipe = await prisma.pipelines.findUnique({ where: { contactId } });

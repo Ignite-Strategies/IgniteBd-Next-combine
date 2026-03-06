@@ -74,7 +74,8 @@ export async function GET(request, { params }) {
       cadenceDays: result.cadenceDays,
       isDue: result.daysUntilDue !== null && result.daysUntilDue <= 0,
       isManualOverride: result.isManualOverride ?? false,
-      doNotContactAgain: result.doNotContactAgain ?? false,
+      optedOut: result.optedOut ?? false,
+      contactDisposition: result.contactDisposition ?? null,
       nextContactNote: result.nextContactNote ?? null,
     });
   } catch (error) {

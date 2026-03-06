@@ -454,8 +454,8 @@ export default function InboundParsePage() {
                           <div className="flex flex-wrap gap-3 text-xs text-gray-600">
                             {parseResult.contact.company && <span>Company: {parseResult.contact.company}</span>}
                             {parseResult.contact.pipeline && <span>Pipeline: <span className="font-medium">{parseResult.contact.pipeline}</span></span>}
-                            {parseResult.contact.doNotContactAgain && (
-                              <span className="text-red-600 font-medium">DO NOT CONTACT</span>
+                            {parseResult.contact.optedOut && (
+                              <span className="text-red-600 font-medium">OPTED OUT</span>
                             )}
                           </div>
                         </div>

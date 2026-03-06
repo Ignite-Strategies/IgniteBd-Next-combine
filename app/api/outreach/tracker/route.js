@@ -175,7 +175,8 @@ export async function GET(request) {
             emailCount: activities.length,
             hasResponded: contactResponded,
             isManualOverride: followUpInfo.isManualOverride ?? false,
-            doNotContactAgain: followUpInfo.doNotContactAgain ?? false,
+            optedOut: followUpInfo.optedOut ?? false,
+            contactDisposition: followUpInfo.contactDisposition ?? null,
             nextContactNote: followUpInfo.nextContactNote ?? null,
             emails: activities.map(e => ({
               id: e.id,

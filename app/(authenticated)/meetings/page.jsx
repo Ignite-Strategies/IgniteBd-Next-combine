@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Clock, User, ArrowRight, AlertCircle, RefreshCw, Sparkles, Search } from 'lucide-react';
+import { Calendar, Clock, User, ArrowRight, AlertCircle, RefreshCw, Sparkles, Search, Plus } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
+import LogMeetingModal from '@/components/meetings/LogMeetingModal';
 import api from '@/lib/api';
 
 /**
@@ -20,6 +21,7 @@ export default function MeetingsPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [companyHQId, setCompanyHQId] = useState('');
+  const [showLogMeeting, setShowLogMeeting] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -97,13 +99,22 @@ export default function MeetingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Meetings"
           subtitle="Prep, schedule, and follow up on the conversations that move deals."
           backTo="/growth-dashboard"
           backLabel="Back to Growth Dashboard"
+          actions={
+            <button
+              onClick={() => setShowLogMeeting(true)}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+            >
+              <Plus className="h-4 w-4" />
+              Log Meeting
+            </button>
+          }
         />
 
         {error && (
@@ -189,6 +200,16 @@ export default function MeetingsPage() {
           </div>
         </div>
       </div>
+
+      <LogMeetingModal
+        isOpen={showLogMeeting}
+        onClose={() => setShowLogMeeting(false)}
+        companyHQId={companyHQId}
+        onSaved={() => {
+          setShowLogMeeting(false);
+          // Could refresh a meetings list here when we add one
+        }}
+      />
     </div>
   );
 }

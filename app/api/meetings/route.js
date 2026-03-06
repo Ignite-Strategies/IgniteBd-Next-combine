@@ -1,210 +1,159 @@
-/**
- * GET /api/meetings
- * 
- * Fetch upcoming meetings from Microsoft Graph calendar
- * Matches meetings to contacts by email addresses
- */
-
 import { NextResponse } from 'next/server';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
-import { getCalendarEvents, isMicrosoftConnected } from '@/lib/microsoftGraphClient';
+import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { validatePipeline, snapPipelineOnContact, ensureContactPipeline } from '@/lib/services/pipelineService';
 
-export async function GET(request) {
+const MEETING_TYPES = ['INTRO', 'FOLLOW_UP', 'PROPOSAL_REVIEW', 'CHECK_IN', 'OTHER'];
+const OUTCOMES = ['POSITIVE', 'NEUTRAL', 'NEGATIVE', 'NO_SHOW'];
+
+/**
+ * POST /api/meetings
+ * Log a post-meeting.
+ *
+ * Body:
+ * - contactId: string (required)
+ * - companyHQId: string (required)
+ * - meetingDate: string (ISO date "YYYY-MM-DD")
+ * - meetingType: MeetingType
+ * - outcome: MeetingOutcome
+ * - notes: string
+ * - nextAction: string
+ * - nextEngagementDate: string "YYYY-MM-DD"
+ * - pipeline: string (optional, for pipeline update)
+ * - stage: string (optional)
+ */
+export async function POST(request) {
   try {
-    // Verify Firebase token
-    const firebaseUser = await verifyFirebaseToken(request);
-    
-    // Get owner from Firebase ID
-    const owner = await prisma.owners.findUnique({
-      where: { firebaseId: firebaseUser.uid },
-      select: {
-        id: true,
-      },
-    });
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
 
-    if (!owner) {
+  try {
+    const body = await request.json();
+    const {
+      contactId,
+      companyHQId,
+      meetingDate,
+      meetingType,
+      outcome,
+      notes,
+      nextAction,
+      nextEngagementDate,
+      pipeline,
+      stage,
+    } = body ?? {};
+
+    if (!contactId || typeof contactId !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'Owner not found' },
-        { status: 404 }
+        { success: false, error: 'contactId is required' },
+        { status: 400 }
       );
     }
-
-    // Check if Microsoft account is connected (using MicrosoftAccount model)
-    const connected = await isMicrosoftConnected(owner.id);
-    if (!connected) {
+    if (!companyHQId || typeof companyHQId !== 'string') {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Microsoft account not connected',
-          connected: false 
-        },
+        { success: false, error: 'companyHQId is required' },
         { status: 400 }
       );
     }
 
-    // Get query params for date range
-    const { searchParams } = new URL(request.url);
-    const daysAhead = parseInt(searchParams.get('daysAhead') || '30', 10);
-    
-    // Calculate date range (now to N days ahead)
-    const startDateTime = new Date().toISOString();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + daysAhead);
-    const endDateTime = endDate.toISOString();
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      include: { pipelines: true },
+    });
 
-    // Fetch calendar events from Microsoft Graph
-    let calendarData;
-    try {
-      calendarData = await getCalendarEvents(owner.id, {
-        startDateTime,
-        endDateTime,
-        top: 100,
-      });
-    } catch (error) {
-      console.error('Error fetching calendar events:', error);
+    if (!contact) {
+      return NextResponse.json({ success: false, error: 'Contact not found' }, { status: 404 });
+    }
+    if (contact.crmId !== companyHQId) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Failed to fetch calendar events',
-          details: error.message 
-        },
-        { status: 500 }
+        { success: false, error: 'Contact does not belong to this company' },
+        { status: 400 }
       );
     }
 
-    const events = calendarData.events || [];
-
-    // Get all contacts for this owner to match against
-    const companyHQId = request.headers.get('x-company-hq-id');
-    const contactsQuery = {
-      where: {
-        ownerId: owner.id,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        fullName: true,
-      },
-    };
-
-    // If companyHQId is provided, filter by it
-    if (companyHQId) {
-      contactsQuery.where.companyHQId = companyHQId;
+    const company = await prisma.company_hqs.findUnique({
+      where: { id: companyHQId },
+      select: { id: true, ownerId: true, contactOwnerId: true },
+    });
+    if (!company) {
+      return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 });
     }
 
-    const contacts = await prisma.contact.findMany(contactsQuery);
+    const ownerId = company.ownerId ?? company.contactOwnerId;
+    if (!ownerId) {
+      return NextResponse.json(
+        { success: false, error: 'Company has no owner' },
+        { status: 400 }
+      );
+    }
 
-    // Create email -> contact map for quick lookup
-    const emailToContactMap = new Map();
-    contacts.forEach(contact => {
-      if (contact.email) {
-        const emailLower = contact.email.toLowerCase();
-        emailToContactMap.set(emailLower, contact);
-      }
+    const meetingDateParsed = meetingDate
+      ? new Date(String(meetingDate).slice(0, 10))
+      : new Date();
+    const meetingTypeVal = MEETING_TYPES.includes(meetingType) ? meetingType : 'OTHER';
+    const outcomeVal = outcome && OUTCOMES.includes(outcome) ? outcome : null;
+
+    const nextEngagementDateStr =
+      nextEngagementDate && /^\d{4}-\d{2}-\d{2}$/.test(String(nextEngagementDate).slice(0, 10))
+        ? String(nextEngagementDate).slice(0, 10)
+        : null;
+
+    const meeting = await prisma.meeting.create({
+      data: {
+        contactId,
+        ownerId,
+        crmId: companyHQId,
+        meetingDate: meetingDateParsed,
+        meetingType: meetingTypeVal,
+        outcome: outcomeVal,
+        notes: notes?.trim() || null,
+        nextAction: nextAction?.trim() || null,
+        nextEngagementDate: nextEngagementDateStr,
+      },
     });
 
-    // Process events and match to contacts
-    const meetings = events
-      .filter(event => {
-        // Filter out cancelled events
-        if (event.isCancelled) return false;
-        
-        // Only include events with attendees (meetings)
-        return event.attendees && event.attendees.length > 0;
-      })
-      .map(event => {
-        // Extract attendee emails
-        const attendeeEmails = (event.attendees || [])
-          .map(attendee => attendee.emailAddress?.address)
-          .filter(Boolean)
-          .map(email => email.toLowerCase());
+    const contactUpdate = {
+      lastEngagementDate: meetingDateParsed,
+      lastEngagementType: 'MEETING',
+    };
+    if (nextEngagementDateStr) {
+      contactUpdate.nextEngagementDate = nextEngagementDateStr;
+      contactUpdate.nextEngagementPurpose = 'MEETING_FOLLOW_UP';
+    }
 
-        // Find matching contact by email
-        let matchedContact = null;
-        for (const email of attendeeEmails) {
-          if (emailToContactMap.has(email)) {
-            matchedContact = emailToContactMap.get(email);
-            break;
-          }
-        }
+    if (pipeline && stage) {
+      const validation = validatePipeline(pipeline, stage);
+      if (validation.isValid) {
+        await ensureContactPipeline(contactId, { pipeline, stage });
+        await snapPipelineOnContact(contactId, pipeline, stage);
+      }
+    }
 
-        // Parse start/end times
-        const startTime = event.start?.dateTime 
-          ? new Date(event.start.dateTime) 
-          : null;
-        const endTime = event.end?.dateTime 
-          ? new Date(event.end.dateTime) 
-          : null;
-
-        // Format date/time for display
-        const formatDate = (date) => {
-          if (!date) return null;
-          return date.toLocaleDateString('en-US', { 
-            weekday: 'short',
-            month: 'short', 
-            day: 'numeric',
-            year: 'numeric'
-          });
-        };
-
-        const formatTime = (date) => {
-          if (!date) return null;
-          return date.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          });
-        };
-
-        return {
-          id: event.id,
-          subject: event.subject || 'Untitled Meeting',
-          startTime: startTime?.toISOString() || null,
-          endTime: endTime?.toISOString() || null,
-          date: formatDate(startTime),
-          time: startTime ? `${formatTime(startTime)} - ${formatTime(endTime)}` : null,
-          location: event.location?.displayName || null,
-          attendees: event.attendees?.map(a => ({
-            name: a.emailAddress?.name || a.emailAddress?.address,
-            email: a.emailAddress?.address,
-          })) || [],
-          // Contact match
-          contactId: matchedContact?.id || null,
-          contactName: matchedContact?.fullName || matchedContact?.firstName || null,
-          // Raw event data for reference
-          rawEvent: {
-            organizer: event.organizer?.emailAddress?.address,
-            webLink: event.webLink,
-          },
-        };
-      })
-      .sort((a, b) => {
-        // Sort by start time (earliest first)
-        if (!a.startTime) return 1;
-        if (!b.startTime) return -1;
-        return new Date(a.startTime) - new Date(b.startTime);
-      });
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: contactUpdate,
+    });
 
     return NextResponse.json({
       success: true,
-      meetings,
-      count: meetings.length,
-      connected: true,
-    });
-
-  } catch (error) {
-    console.error('❌ Meetings API error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch meetings',
-        details: error.message,
+      meeting: {
+        id: meeting.id,
+        contactId: meeting.contactId,
+        meetingDate: meeting.meetingDate,
+        meetingType: meeting.meetingType,
+        outcome: meeting.outcome,
+        notes: meeting.notes,
+        nextAction: meeting.nextAction,
+        nextEngagementDate: meeting.nextEngagementDate,
+        createdAt: meeting.createdAt,
       },
+    });
+  } catch (error) {
+    console.error('POST /api/meetings error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to create meeting' },
       { status: 500 }
     );
   }
 }
-

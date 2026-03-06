@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       nextEngagementPurpose: string | null;
       lastEngagementDate: Date | null;
       lastEngagementType: string | null;
-      doNotContactAgain: boolean;
+      contactDisposition: string | null;
     } | null = null;
 
     if (parsed.contactEmail && companyHQId) {
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
           nextEngagementPurpose: true,
           lastEngagementDate: true,
           lastEngagementType: true,
-          doNotContactAgain: true,
+          contactDisposition: true,
         },
       });
       if (found) {
@@ -213,7 +213,7 @@ export async function POST(request: Request) {
             company: contact.company,
             title: contact.title,
             pipeline: contact.pipeline,
-            doNotContactAgain: contact.doNotContactAgain,
+            optedOut: contact.contactDisposition === 'OPTED_OUT',
           }
         : null,
       // Step 3

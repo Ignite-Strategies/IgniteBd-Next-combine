@@ -4,12 +4,12 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
  * PUT /api/contacts/[contactId]/next-contact
- * Set manual next contact date and toggles (do not contact again, follow next quarter, etc.)
+ * Set manual next contact date and disposition.
  *
  * Body: {
- *   doNotContactAgain?: boolean   — if true, no follow-up; clears nextContactedAt
- *   nextContactedAt?: string | null  — ISO date when to contact next (e.g. end of quarter)
- *   nextContactNote?: string | null  — e.g. "Follow next quarter", "Do not call - reach out in March"
+ *   contactDisposition?: ContactDisposition  — sets disposition; OPTED_OUT clears nextEngagementDate
+ *   nextEngagementDate?: string | null       — ISO date "YYYY-MM-DD" to contact next
+ *   nextContactNote?: string | null          — e.g. "Follow next quarter", "Reach out in March"
  * }
  */
 export async function PUT(request, { params }) {
@@ -45,38 +45,27 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json();
-    const {
-      doNotContactAgain,
-      nextContactedAt,
-      nextContactNote,
-    } = body ?? {};
+    const { contactDisposition, nextEngagementDate, nextContactNote } = body ?? {};
 
     const data = {};
 
-    if (typeof doNotContactAgain === 'boolean') {
-      data.doNotContactAgain = doNotContactAgain;
-      if (doNotContactAgain) {
-        data.nextContactedAt = null;
+    if (contactDisposition !== undefined) {
+      data.contactDisposition = contactDisposition;
+      // OPTED_OUT is a hard gate — clear the engagement date
+      if (contactDisposition === 'OPTED_OUT') {
+        data.nextEngagementDate = null;
+        data.nextEngagementPurpose = null;
         data.nextContactNote = null;
       }
     }
 
-    if (doNotContactAgain !== true) {
-      if (nextContactedAt !== undefined) {
-        if (nextContactedAt === null) {
-          data.nextContactedAt = null;
-        } else {
-          const date = new Date(nextContactedAt);
-          if (isNaN(date.getTime())) {
-            return NextResponse.json(
-              { success: false, error: 'Invalid nextContactedAt date format' },
-              { status: 400 },
-            );
-          }
-          data.nextContactedAt = date;
-        }
+    if (contactDisposition !== 'OPTED_OUT') {
+      if (nextEngagementDate !== undefined) {
+        data.nextEngagementDate = nextEngagementDate ?? null;
       }
-      if (nextContactNote !== undefined) data.nextContactNote = nextContactNote;
+      if (nextContactNote !== undefined) {
+        data.nextContactNote = nextContactNote ?? null;
+      }
     }
 
     const updated = await prisma.contact.update({
@@ -88,9 +77,9 @@ export async function PUT(request, { params }) {
         lastName: true,
         lastEngagementDate: true,
         lastEngagementType: true,
-        nextContactedAt: true,
+        nextEngagementDate: true,
         nextContactNote: true,
-        doNotContactAgain: true,
+        contactDisposition: true,
       },
     });
 
@@ -99,7 +88,6 @@ export async function PUT(request, { params }) {
       contact: {
         ...updated,
         lastEngagementDate: updated.lastEngagementDate?.toISOString() ?? null,
-        nextContactedAt: updated.nextContactedAt?.toISOString() ?? null,
       },
     });
   } catch (error) {
@@ -117,7 +105,7 @@ export async function PUT(request, { params }) {
 
 /**
  * GET /api/contacts/[contactId]/next-contact
- * Get current next-contact state (snap + toggles)
+ * Get current next-contact state
  */
 export async function GET(request, { params }) {
   try {
@@ -146,9 +134,9 @@ export async function GET(request, { params }) {
         id: true,
         lastEngagementDate: true,
         lastEngagementType: true,
-        nextContactedAt: true,
+        nextEngagementDate: true,
         nextContactNote: true,
-        doNotContactAgain: true,
+        contactDisposition: true,
       },
     });
 
@@ -163,9 +151,10 @@ export async function GET(request, { params }) {
       success: true,
       lastEngagementDate: contact.lastEngagementDate?.toISOString() ?? null,
       lastEngagementType: contact.lastEngagementType ?? null,
-      nextContactedAt: contact.nextContactedAt?.toISOString() ?? null,
+      nextEngagementDate: contact.nextEngagementDate ?? null,
       nextContactNote: contact.nextContactNote ?? null,
-      doNotContactAgain: contact.doNotContactAgain ?? false,
+      contactDisposition: contact.contactDisposition ?? null,
+      optedOut: contact.contactDisposition === 'OPTED_OUT',
     });
   } catch (error) {
     console.error('❌ Get next-contact error:', error);
