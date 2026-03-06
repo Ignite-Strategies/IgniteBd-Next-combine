@@ -745,8 +745,8 @@ export default function ContactDetailPage() {
                 }}
                 className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-600 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="unassigned">Unassigned (default)</option>
-                <option value="no-role">No Role (intentional)</option>
+                <option value="unassigned">Unassigned</option>
+                <option value="no-role">No Role</option>
                 <option value="connector">Connector</option>
                 <option value="prospect">Prospect</option>
                 <option value="client">Client</option>
