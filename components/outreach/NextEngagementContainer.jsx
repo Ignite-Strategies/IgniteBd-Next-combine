@@ -280,9 +280,9 @@ export default function NextEngagementContainer({
                               {r.stage && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">{r.stage}</span>}
                             </div>
                           )}
-                          {r.lastSummary && !compact && (
-                            <p className="mt-0.5 truncate text-xs text-indigo-600/80 italic">
-                              {r.lastSummary.length > 100 ? r.lastSummary.slice(0, 100) + '…' : r.lastSummary}
+                          {r.engagementSummary && !compact && (
+                            <p className="mt-0.5 truncate text-xs font-medium text-indigo-700">
+                              {r.engagementSummary}
                             </p>
                           )}
                         </div>

@@ -173,6 +173,7 @@ export default function ContactDetailPage() {
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [lastEmail, setLastEmail] = useState(null);
   const [synthesizingSummary, setSynthesizingSummary] = useState(false);
+  const [synthesizingContactSummary, setSynthesizingContactSummary] = useState(false);
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
   const [emailHistory, setEmailHistory] = useState([]);
   const [showAddResponseModal, setShowAddResponseModal] = useState(false);
@@ -1054,21 +1055,21 @@ export default function ContactDetailPage() {
           </div>
         </div>
 
-        {/* Engagement Summary */}
+        {/* Contact Summary — rich person narrative */}
         <div className="rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-indigo-600" />
-              Engagement Summary
+              Contact Summary
             </h3>
             <button
               type="button"
               onClick={async () => {
-                setSynthesizingSummary(true);
+                setSynthesizingContactSummary(true);
                 try {
-                  const res = await api.post(`/api/contacts/${contactId}/synthesize-engagement-summary`);
+                  const res = await api.post(`/api/contacts/${contactId}/synthesize-contact-summary`);
                   if (res.data?.success) {
-                    setContact((prev) => ({ ...prev, engagementSummary: res.data.summary }));
+                    setContact((prev) => ({ ...prev, contactSummary: res.data.summary }));
                     if (refreshContacts) refreshContacts();
                   } else {
                     alert(res.data?.error || 'Failed to generate summary');
@@ -1076,34 +1077,77 @@ export default function ContactDetailPage() {
                 } catch (err) {
                   alert(err.response?.data?.error || err.message || 'Failed to generate summary');
                 } finally {
-                  setSynthesizingSummary(false);
+                  setSynthesizingContactSummary(false);
                 }
               }}
-              disabled={synthesizingSummary}
+              disabled={synthesizingContactSummary}
               className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
-              {synthesizingSummary ? (
+              {synthesizingContactSummary ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Synthesizing...
+                  Generating...
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  {contact.engagementSummary ? 'Regenerate' : 'Generate Summary'}
+                  {contact.contactSummary ? 'Regenerate' : 'Generate'}
                 </>
               )}
             </button>
           </div>
-          {contact.engagementSummary ? (
+          {contact.contactSummary ? (
             <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
-              {contact.engagementSummary}
+              {contact.contactSummary}
             </p>
           ) : (
             <p className="text-sm text-gray-500 italic">
-              No engagement summary yet. Click "Generate Summary" to synthesize a narrative from all email interactions.
+              No contact summary yet. Click "Generate" to create a narrative from relationship context and email history.
             </p>
           )}
+
+          {/* Engagement status — 1-sentence, action-oriented */}
+          <div className="mt-4 pt-4 border-t border-indigo-100">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400 mb-1">Engagement status</p>
+                {contact.engagementSummary ? (
+                  <p className="text-sm font-medium text-gray-800">{contact.engagementSummary}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Not generated yet</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setSynthesizingSummary(true);
+                  try {
+                    const res = await api.post(`/api/contacts/${contactId}/synthesize-engagement-summary`);
+                    if (res.data?.success) {
+                      setContact((prev) => ({ ...prev, engagementSummary: res.data.summary }));
+                      if (refreshContacts) refreshContacts();
+                    } else {
+                      alert(res.data?.error || 'Failed to generate');
+                    }
+                  } catch (err) {
+                    alert(err.response?.data?.error || err.message || 'Failed to generate');
+                  } finally {
+                    setSynthesizingSummary(false);
+                  }
+                }}
+                disabled={synthesizingSummary}
+                title={contact.engagementSummary ? 'Regenerate engagement status' : 'Generate engagement status'}
+                className="shrink-0 flex items-center gap-1 rounded-lg border border-indigo-200 px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {synthesizingSummary ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Zap className="h-3 w-3" />
+                )}
+                {contact.engagementSummary ? 'Refresh' : 'Generate'}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-6">

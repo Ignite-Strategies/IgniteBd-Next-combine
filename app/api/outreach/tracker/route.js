@@ -111,6 +111,7 @@ export async function GET(request) {
         lastEngagementDate: true,
         lastEngagementType: true,
         pipelineStageSnap: true,
+        engagementSummary: true,
       },
       take: limit * 2,
       skip: offset,

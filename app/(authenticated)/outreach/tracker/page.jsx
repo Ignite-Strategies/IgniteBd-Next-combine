@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Calendar, Pencil, Check, X } from 'lucide-react';
+import { Calendar, Pencil, Check, X, Send, Loader2, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, dayDiffEST, formatDateEST, formatDateLabelEST } from '@/lib/dateEst';
 
@@ -29,6 +29,13 @@ function OutreachTrackerContent() {
   });
   const [editingNextDate, setEditingNextDate] = useState(null); // { contactId, value: 'YYYY-MM-DD' }
   const [savingDate, setSavingDate] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailRecipientName, setEmailRecipientName] = useState('');
+  const [emailRecipientEmail, setEmailRecipientEmail] = useState('');
+  const [emailCustomMessage, setEmailCustomMessage] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState(null);
+  const [emailSuccess, setEmailSuccess] = useState(false);
 
   const fetchContacts = async () => {
     if (!companyHQId) {
@@ -201,14 +208,107 @@ function OutreachTrackerContent() {
           <h1 className="text-3xl font-bold mb-2">Outreach Tracker</h1>
           <p className="text-gray-600">Track all contacts with email sends — chronological by follow-up date</p>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push('/outreach')}
-          className="text-sm font-medium text-amber-600 hover:text-amber-700"
-        >
-          ← Back to Outreach Dashboard
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowEmailModal(true)}
+            disabled={contacts.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="h-4 w-4" />
+            Email Report
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/outreach')}
+            className="text-sm font-medium text-amber-600 hover:text-amber-700"
+          >
+            ← Back to Outreach Dashboard
+          </button>
+        </div>
       </div>
+
+      {/* Email Report Modal */}
+      {showEmailModal && (() => {
+        const owner = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('owner') || 'null') : null;
+        const senderEmail = owner?.sendgridVerifiedEmail || null;
+        const senderName = owner?.sendgridVerifiedName || null;
+        const hasVerifiedSender = !!senderEmail;
+
+        const handleSend = async () => {
+          if (!emailRecipientEmail) { setEmailError('Recipient email is required'); return; }
+          setSendingEmail(true);
+          setEmailError(null);
+          try {
+            const res = await api.post('/api/outreach/send-next-engagement-email', {
+              recipientEmail: emailRecipientEmail,
+              recipientName: emailRecipientName || undefined,
+              companyHQId,
+              customMessage: emailCustomMessage || undefined,
+            });
+            if (res.data?.success) {
+              setEmailSuccess(true);
+              setTimeout(() => { setShowEmailModal(false); setEmailSuccess(false); setEmailRecipientEmail(''); setEmailRecipientName(''); setEmailCustomMessage(''); }, 2000);
+            } else {
+              setEmailError(res.data?.error || 'Failed to send');
+            }
+          } catch (err) {
+            setEmailError(err.response?.data?.error || err.message || 'Failed to send');
+          } finally {
+            setSendingEmail(false);
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative w-full max-w-md rounded-xl bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <h3 className="text-lg font-semibold text-gray-900">Send Outreach Report</h3>
+                <button type="button" onClick={() => { setShowEmailModal(false); setEmailError(null); setEmailSuccess(false); }} className="text-gray-400 hover:text-gray-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="px-6 py-4 space-y-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">From</p>
+                  {!hasVerifiedSender ? (
+                    <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
+                      <p className="text-sm text-amber-800">Sender email not configured</p>
+                      <a href="/outreach/sender-verify" className="text-sm font-medium text-amber-700 hover:text-amber-800 mt-1 inline-block">Verify sender email →</a>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                      <span className="text-sm text-gray-900">{senderName || senderEmail}</span>
+                      <span className="text-gray-500 text-sm">&lt;{senderEmail}&gt;</span>
+                    </div>
+                  )}
+                </div>
+                {emailSuccess && <div className="rounded-md bg-green-50 border border-green-200 p-3"><p className="text-sm text-green-800">✅ Report sent!</p></div>}
+                {emailError && <div className="rounded-md bg-red-50 border border-red-200 p-3"><p className="text-sm text-red-800">{emailError}</p></div>}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Name (Optional)</label>
+                  <input type="text" value={emailRecipientName} onChange={(e) => setEmailRecipientName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email *</label>
+                  <input type="email" value={emailRecipientEmail} onChange={(e) => setEmailRecipientEmail(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Custom Message (Optional)</label>
+                  <textarea value={emailCustomMessage} onChange={(e) => setEmailCustomMessage(e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button type="button" onClick={handleSend} disabled={sendingEmail || !hasVerifiedSender || !emailRecipientEmail} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {sendingEmail ? <><Loader2 className="h-4 w-4 animate-spin" />Sending...</> : <><Send className="h-4 w-4" />Send Report</>}
+                  </button>
+                  <button type="button" onClick={() => { setShowEmailModal(false); setEmailError(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -368,6 +468,11 @@ function OutreachTrackerContent() {
                                   {contact.companyName && contact.email && ' · '}
                                   {contact.email}
                                 </div>
+                                {contact.engagementSummary && (
+                                  <p className="mt-0.5 text-xs font-medium text-indigo-700 truncate max-w-[260px]">
+                                    {contact.engagementSummary}
+                                  </p>
+                                )}
                               </button>
                             </td>
                             <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
