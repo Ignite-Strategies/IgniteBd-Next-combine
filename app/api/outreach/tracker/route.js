@@ -84,9 +84,7 @@ export async function GET(request) {
         { OR: [{ sentAt: { lte: new Date(sendDateTo) } }, { sentAt: null, createdAt: { lte: new Date(sendDateTo) } }] },
       ];
     }
-    if (hasResponded === 'true') activityWhere.responseFromEmail = { not: null };
-    if (hasResponded === 'false') activityWhere.responseFromEmail = null;
-
+    // hasResponded filter now reads from Contact.lastEngagementType (not responseFromEmail chain)
     const contactWhere = {
       crmId: companyHQId,
       OR: [
@@ -95,6 +93,8 @@ export async function GET(request) {
         { nextContactedAt: { not: null } },
       ],
     };
+    if (hasResponded === 'true')  contactWhere.lastEngagementType = 'CONTACT_RESPONSE';
+    if (hasResponded === 'false') contactWhere.lastEngagementType = { not: 'CONTACT_RESPONSE' };
 
     const contactsWithActivities = await prisma.contact.findMany({
       where: contactWhere,
@@ -135,9 +135,6 @@ export async function GET(request) {
             activityFilter.AND = activityFilter.AND || [];
             activityFilter.AND.push({ OR: [{ sentAt: { lte: new Date(sendDateTo) } }, { sentAt: null, createdAt: { lte: new Date(sendDateTo) } }] });
           }
-          if (hasResponded === 'true') activityFilter.responseFromEmail = { not: null };
-          if (hasResponded === 'false') activityFilter.responseFromEmail = null;
-
           const activities = await prisma.email_activities.findMany({
             where: activityFilter,
             orderBy: { createdAt: 'desc' },
@@ -148,18 +145,8 @@ export async function GET(request) {
               subject: true,
               source: true,
               platform: true,
-              responseFromEmail: true,
             },
           });
-
-          const respIds = activities.map(a => a.responseFromEmail).filter(Boolean);
-          const respRows = respIds.length
-            ? await prisma.email_activities.findMany({
-                where: { id: { in: respIds } },
-                select: { id: true, sentAt: true },
-              })
-            : [];
-          const respAtMap = new Map(respRows.map(r => [r.id, r.sentAt]));
 
           const lastSendDate = await getLastSendDate(contact.id);
           const followUpInfo = await calculateNextSendDate(contact.id);
@@ -172,10 +159,8 @@ export async function GET(request) {
             if (followUpDateTo && followUpDate > new Date(followUpDateTo)) return null;
           }
 
-          const effectiveNextSendDate = nextSendDate;
-
-          const hasAnyResponse = activities.some(a => !!a.responseFromEmail);
-          if (hasResponded === 'true' && !hasAnyResponse) return null;
+          // hasResponded derived from Contact.lastEngagementType — single source of truth
+          const contactResponded = contact.lastEngagementType === 'CONTACT_RESPONSE';
           const sendDate = (a) => toISOStringSafe(a.sentAt ?? a.createdAt);
 
           const { companies: companiesRel, ...contactFields } = contact;
@@ -183,12 +168,12 @@ export async function GET(request) {
             ...contactFields,
             companyName: contactFields.companyName || companiesRel?.companyName || null,
             lastSendDate: toISOStringSafe(lastSendDate),
-            nextSendDate: toISOStringSafe(effectiveNextSendDate),
+            nextSendDate: toISOStringSafe(nextSendDate),
             daysUntilDue: followUpInfo.daysUntilDue,
             relationship: followUpInfo.relationship,
             cadenceDays: followUpInfo.cadenceDays,
             emailCount: activities.length,
-            hasResponded: hasAnyResponse,
+            hasResponded: contactResponded,
             isManualOverride: followUpInfo.isManualOverride ?? false,
             doNotContactAgain: followUpInfo.doNotContactAgain ?? false,
             nextContactNote: followUpInfo.nextContactNote ?? null,
@@ -198,8 +183,6 @@ export async function GET(request) {
               subject: e.subject,
               source: e.source,
               platform: e.platform,
-              hasResponded: !!e.responseFromEmail,
-              respondedAt: toISOStringSafe(respAtMap.get(e.responseFromEmail)),
             })),
           };
         } catch (error) {

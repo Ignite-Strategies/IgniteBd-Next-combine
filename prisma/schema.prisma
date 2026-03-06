@@ -2000,9 +2000,11 @@ enum EngagementType {
 // General attitude of the contact (awareness). Manual for now; future: AI infers from email response.
 // Separate from pipeline — pipeline is source of truth for "where they landed"; this is "happy to receive a note" vs "doesn't care".
 enum ContactDisposition {
-  HAPPY_TO_RECEIVE_NOTE   // Open to / happy to get a note
-  NEUTRAL                 // Indifferent / neutral
-  DOESNT_CARE             // Doesn't care / not receptive
+  ADVOCATE              // Warm advocate — would make introductions, loves to engage
+  HAPPY_TO_RECEIVE_NOTE // Open to / happy to get a note
+  NEUTRAL               // Indifferent / neutral
+  DOESNT_CARE           // Not very receptive
+  OPTED_OUT             // Explicitly asked to stop — hard gate, no follow-up
 }
 
 // Why we're engaging next. Set by cadence or remind-me; no free text.

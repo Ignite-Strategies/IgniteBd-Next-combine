@@ -267,48 +267,20 @@ export default function RecordOffPlatformPage() {
     }
   };
   
-  // Find or create contact by email
-  const findOrCreateContact = async (email) => {
-    if (!email || !email.includes('@')) {
-      return null;
-    }
-    
+  // Find or create contact — single atomic server-side call
+  const findOrCreateContact = async (email, { firstName, lastName, companyName, title } = {}) => {
+    if (!email || !email.includes('@') || !companyHQId) return null;
     try {
-      // Try to find existing contact
-      const response = await api.get(`/api/contacts/by-email?email=${encodeURIComponent(email)}`);
-      if (response.data?.success && response.data.contact) {
-        return response.data.contact.id;
-      }
-      
-      // If 404 (not found), try to create
-      if (response.status === 404 || !response.data?.success) {
-        // Create new contact if not found
-        if (companyHQId) {
-          try {
-            const createResponse = await api.post('/api/contacts/create', {
-              email,
-              companyHQId,
-            });
-            if (createResponse.data?.success && createResponse.data.contact) {
-              return createResponse.data.contact.id;
-            }
-          } catch (createError) {
-            // Log but don't throw - we'll return null
-            console.error('Error creating contact:', createError);
-          }
-        }
-      }
-      
-      return null;
+      const res = await api.post('/api/contacts/find-or-create', {
+        email, companyHQId,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        companyName: companyName || undefined,
+        title: title || undefined,
+      });
+      return res.data?.success ? res.data.contact.id : null;
     } catch (error) {
-      // Handle 500 errors gracefully - don't retry or throw
-      if (error.response?.status === 500) {
-        console.error(`Server error finding contact for ${email}:`, error.response?.data?.error || error.message);
-        return null; // Return null instead of throwing to prevent stack overflow
-      }
-      
-      // For other errors, also return null gracefully
-      console.error('Error finding/creating contact:', error);
+      console.error('find-or-create error:', error.response?.data?.error || error.message);
       return null;
     }
   };
@@ -357,27 +329,16 @@ Best regards"`;
           continue;
         }
         
-        // Find or create contact by email, with firstName/lastName if provided
-        let contactId = await findOrCreateContact(row.email);
+        // Find or create contact — single atomic call with all available fields
+        let contactId = await findOrCreateContact(row.email, {
+          firstName: row.firstName,
+          lastName: row.lastName,
+        });
         
-        // If contact lookup failed, skip this row
         if (!contactId) {
           newErrors.push(`Could not find or create contact for ${row.email}. Please check if the email is valid and try again.`);
           skipped++;
           continue;
-        }
-        
-        // If contact was created and we have firstName/lastName, update it
-        if (contactId && (row.firstName || row.lastName)) {
-          try {
-            await api.put(`/api/contacts/${contactId}`, {
-              firstName: row.firstName || undefined,
-              lastName: row.lastName || undefined,
-            });
-          } catch (updateError) {
-            console.warn('Could not update contact name:', updateError);
-            // Continue anyway - name update is optional
-          }
         }
         
         // Save the email record

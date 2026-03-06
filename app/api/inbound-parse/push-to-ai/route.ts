@@ -92,14 +92,33 @@ export async function POST(request: Request) {
 
     const effectiveContactEmail = contactEmailOverride || parsed.contactEmail;
 
-    // ── 2. Contact Lookup ──
+    // ── 2. Contact find-or-create (never orphan an activity) ──
     let contactId: string | null = null;
-    if (effectiveContactEmail) {
-      const contact = await prisma.contact.findFirst({
-        where: { crmId: companyHQId, email: { equals: effectiveContactEmail, mode: 'insensitive' } },
+    if (effectiveContactEmail && companyHQId) {
+      const normalizedEmail = effectiveContactEmail.trim().toLowerCase();
+      const existing = await prisma.contact.findFirst({
+        where: { crmId: companyHQId, email: { equals: normalizedEmail, mode: 'insensitive' } },
         select: { id: true },
       });
-      if (contact) contactId = contact.id;
+      if (existing) {
+        contactId = existing.id;
+      } else {
+        // Parse name from AI result or from email
+        const nameParts = parsed.contactName?.trim().split(/\s+/) ?? [];
+        const newContact = await prisma.contact.create({
+          data: {
+            crmId: companyHQId,
+            email: normalizedEmail,
+            firstName: nameParts[0] || null,
+            lastName: nameParts.slice(1).join(' ') || null,
+            companyName: parsed.contactCompany || null,
+            title: parsed.contactTitle || null,
+          },
+          select: { id: true },
+        });
+        contactId = newContact.id;
+        console.log(`✅ push-to-ai: created new contact ${contactId} for ${normalizedEmail}`);
+      }
     }
 
     // ── 3. Log Activity (with summary) ──

@@ -1,105 +1,43 @@
 /**
  * OutreachEmailBuilderService
- * 
- * AI-powered email builder that generates outreach emails based on:
- * - Email type (FIRST_TIME vs FOLLOWUP)
- * - Persona
- * - Relationship context
- * - Previous email history (for followups)
- * - Contact information
- * 
- * For FIRST_TIME emails:
- * - Uses persona and relationship context to craft initial outreach
- * 
- * For FOLLOWUP emails:
- * - References previous email subject/content
- * - Uses appropriate followup tone:
- *   - Recent (no response): "Hey just checking back did you see my email"
- *   - Quarterly: "Checking in - I know when we last spoke, you were still using your previous service - wanted to just continue the conversation"
+ *
+ * AI-powered email builder. Email type is derived directly from Contact engagement fields:
+ *   - lastEngagementDate = null          → FIRST_TIME (initial outreach)
+ *   - lastEngagementDate set             → FOLLOWUP
+ *   - lastEngagementType CONTACT_RESPONSE → they replied; follow-up continues conversation
+ *   - lastEngagementType OUTBOUND_EMAIL  → no reply yet; nudge follow-up
+ *   - lastEngagementType MEETING         → post-meeting follow-up
  */
 
 import { OpenAI } from 'openai';
 import { prisma } from '@/lib/prisma';
-import { EmailTypeDeterminationService, EmailTypeContext } from './EmailTypeDeterminationService';
-import { getLastSendDate } from './emailCadenceService';
 
-/**
- * Get seasonal and date context for email personalization
- */
 function getSeasonalContext(month: number, day: number, year: number): string {
-  const contexts: string[] = [];
-  
-  // Seasons (Northern Hemisphere)
-  if (month >= 2 && month <= 4) {
-    contexts.push('Spring season');
-  } else if (month >= 5 && month <= 7) {
-    contexts.push('Summer season');
-  } else if (month >= 8 && month <= 10) {
-    contexts.push('Fall/Autumn season');
-  } else {
-    contexts.push('Winter season');
-  }
-  
-  // Major holidays and occasions
-  if (month === 0 && day === 1) {
-    contexts.push('New Year\'s Day');
-  } else if (month === 0 && (day >= 1 && day <= 7)) {
-    contexts.push('Early January (post-New Year period)');
-  } else if (month === 1 && day === 14) {
-    contexts.push('Valentine\'s Day');
-  } else if (month === 2 && day >= 15 && day <= 21) {
-    // Easter varies, but this covers common range
-    contexts.push('Spring season');
-  } else if (month === 6 && day === 4) {
-    contexts.push('Independence Day (US)');
-  } else if (month === 9 && day === 31) {
-    contexts.push('Halloween');
-  } else if (month === 10 && day >= 20 && day <= 30) {
-    contexts.push('Thanksgiving season');
-  } else if (month === 11 && (day >= 20 && day <= 31)) {
-    contexts.push('Holiday season (December)');
-  } else if (month === 11 && day === 25) {
-    contexts.push('Christmas Day');
-  } else if (month === 11 && day === 31) {
-    contexts.push('New Year\'s Eve');
-  }
-  
-  // Month-specific context
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                       'July', 'August', 'September', 'October', 'November', 'December'];
-  contexts.push(`Current month: ${monthNames[month]}`);
-  
-  // Weather references by season
-  let weatherNote = '';
-  if (month >= 2 && month <= 4) {
-    weatherNote = 'Spring weather (warming up, flowers blooming)';
-  } else if (month >= 5 && month <= 7) {
-    weatherNote = 'Summer weather (warm, sunny)';
-  } else if (month >= 8 && month <= 10) {
-    weatherNote = 'Fall weather (cooling down, leaves changing)';
-  } else {
-    weatherNote = 'Winter weather (cold, holiday season)';
-  }
-  
+  let season = 'Winter season';
+  let weather = 'Winter weather (cold, holiday season)';
+  if (month >= 2 && month <= 4)  { season = 'Spring season'; weather = 'Spring weather (warming up, flowers blooming)'; }
+  if (month >= 5 && month <= 7)  { season = 'Summer season'; weather = 'Summer weather (warm, sunny)'; }
+  if (month >= 8 && month <= 10) { season = 'Fall/Autumn season'; weather = 'Fall weather (cooling down, leaves changing)'; }
+
+  const holidays: string[] = [];
+  if (month === 0 && day <= 7)            holidays.push('Early January (post-New Year)');
+  if (month === 10 && day >= 20)          holidays.push('Thanksgiving season');
+  if (month === 11 && day >= 20)          holidays.push('Holiday season (December)');
+  if (month === 6 && day === 4)           holidays.push('Independence Day (US)');
+
   return `Date: ${monthNames[month]} ${day}, ${year}
-Seasonal Context: ${contexts.join(', ')}
-Weather Context: ${weatherNote}
-Note: Naturally incorporate appropriate seasonal greetings or weather references when it feels authentic and relevant to the relationship.`;
+Season: ${season}${holidays.length ? ` | ${holidays.join(', ')}` : ''}
+Weather: ${weather}
+Note: Incorporate seasonal context naturally when it fits the relationship tone.`;
 }
 
-// Initialize OpenAI client
 let openaiClient: OpenAI | null = null;
-
 function getOpenAIClient(): OpenAI {
-  if (openaiClient) {
-    return openaiClient;
-  }
-
+  if (openaiClient) return openaiClient;
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
-
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
   openaiClient = new OpenAI({ apiKey });
   return openaiClient;
 }
@@ -112,9 +50,6 @@ export interface EmailBuildRequest {
     relationshipRecency?: string;
     companyAwareness?: string;
     formerCompany?: string;
-    primaryWork?: string;
-    relationshipQuality?: string;
-    opportunityType?: string;
   };
   companyHQId?: string;
 }
@@ -129,14 +64,10 @@ export interface EmailBuildResult {
 }
 
 export class OutreachEmailBuilderService {
-  /**
-   * Build an outreach email for a contact
-   */
   static async buildEmail(request: EmailBuildRequest): Promise<EmailBuildResult> {
     try {
       const { contactId, personaSlug, relationshipContext, companyHQId } = request;
-      
-      // Fetch contact
+
       const contact = await prisma.contact.findUnique({
         where: { id: contactId },
         select: {
@@ -147,186 +78,129 @@ export class OutreachEmailBuilderService {
           email: true,
           title: true,
           notes: true,
-          companies: {
-            select: {
-              companyName: true,
-            },
-          },
+          lastEngagementDate: true,
+          lastEngagementType: true,
+          contactSummary: true,
+          companyName: true,
+          companies: { select: { companyName: true } },
         },
       });
-      
-      if (!contact) {
-        return {
-          success: false,
-          error: 'Contact not found',
-        };
-      }
-      
-      // Determine email type
-      const emailTypeContext = await EmailTypeDeterminationService.determineEmailType(
-        contactId,
-        personaSlug,
-        relationshipContext
-      );
-      
-      // Get previous email history for followups (single email_activities table)
-      let previousEmails: any[] = [];
-      let lastEmailResponse: string | null = null;
-      if (emailTypeContext.emailType === 'FOLLOWUP') {
-        const activities = await prisma.email_activities.findMany({
-          where: {
-            contact_id: contactId,
-            OR: [{ event: 'sent' }, { source: 'OFF_PLATFORM', sentAt: { not: null } }],
-          },
+
+      if (!contact) return { success: false, error: 'Contact not found' };
+
+      // ── Engagement state — derived entirely from Contact fields ──
+      const contactEngaged   = !!contact.lastEngagementDate;
+      const contactResponded = contact.lastEngagementType === 'CONTACT_RESPONSE';
+      const hadMeeting       = contact.lastEngagementType === 'MEETING';
+      const daysSince        = contact.lastEngagementDate
+        ? Math.floor((Date.now() - new Date(contact.lastEngagementDate).getTime()) / 86400000)
+        : null;
+      const emailType: 'FIRST_TIME' | 'FOLLOWUP' = contactEngaged ? 'FOLLOWUP' : 'FIRST_TIME';
+
+      // ── Last email subject for follow-up reference ──
+      let lastSubject: string | null = null;
+      if (emailType === 'FOLLOWUP') {
+        const lastActivity = await prisma.email_activities.findFirst({
+          where: { contact_id: contactId },
           orderBy: { createdAt: 'desc' },
-          take: 3,
-          select: {
-            id: true,
-            sentAt: true,
-            createdAt: true,
-            subject: true,
-            body: true,
-            source: true,
-            platform: true,
-            responseFromEmail: true,
-          },
+          select: { subject: true },
         });
-
-        const respIds = activities.map(a => a.responseFromEmail).filter(Boolean) as string[];
-        type ResponseRow = { id: string; body: string | null; subject: string | null };
-        const respRows: ResponseRow[] = respIds.length
-          ? await prisma.email_activities.findMany({
-              where: { id: { in: respIds } },
-              select: { id: true, body: true, subject: true },
-            })
-          : [];
-        const respMap = new Map<string, ResponseRow>(respRows.map(r => [r.id, r]));
-
-        previousEmails = activities.map(a => {
-          const resp: ResponseRow | undefined = a.responseFromEmail ? respMap.get(a.responseFromEmail) : undefined;
-          return {
-            id: a.id,
-            type: a.source === 'PLATFORM' ? 'platform' : 'off-platform',
-            date: (a.sentAt ?? a.createdAt).toISOString(),
-            subject: a.subject,
-            body: a.body,
-            platform: a.platform,
-            hasResponded: !!a.responseFromEmail,
-            contactResponse: resp?.body ?? null,
-            responseSubject: resp?.subject ?? null,
-          };
-        });
-
-        if (activities.length > 0 && activities[0].responseFromEmail) {
-          const firstResp = respMap.get(activities[0].responseFromEmail);
-          if (firstResp?.body) lastEmailResponse = firstResp.body;
-        }
+        lastSubject = lastActivity?.subject ?? null;
       }
-      
-      // Get company context if available
+
+      // ── Company context ──
       let companyContext = '';
       if (companyHQId) {
         const company = await prisma.company_hqs.findUnique({
           where: { id: companyHQId },
-          select: {
-            companyName: true,
-            whatYouDo: true,
-          },
+          select: { companyName: true, whatYouDo: true },
         });
-        if (company) {
-          companyContext = `Company: ${company.companyName}\nWhat We Do: ${company.whatYouDo || 'Not specified'}`;
-        }
+        if (company) companyContext = `Our Company: ${company.companyName}\nWhat We Do: ${company.whatYouDo || 'Not specified'}`;
       }
-      
-      // Get seasonal/date context
+
+      const contactCompany = contact.companyName || contact.companies?.companyName || null;
+
+      // ── Seasonal context ──
       const now = new Date();
-      const month = now.getMonth(); // 0-11
-      const day = now.getDate();
-      const year = now.getFullYear();
-      
-      const seasonalContext = getSeasonalContext(month, day, year);
-      
-      // Build prompt based on email type
+      const seasonalContext = getSeasonalContext(now.getMonth(), now.getDate(), now.getFullYear());
+
+      // ── Build reasoning string (replaces the old service's output) ──
+      let reasoning = emailType === 'FIRST_TIME'
+        ? 'No prior engagement recorded — initial outreach.'
+        : `Last engagement ${daysSince} day${daysSince !== 1 ? 's' : ''} ago (${contact.lastEngagementType ?? 'unknown type'}).`;
+      if (contactResponded) reasoning += ' Contact responded — continuing the conversation.';
+      if (hadMeeting)       reasoning += ' Met in person — following up post-meeting.';
+      if (!contactResponded && !hadMeeting && emailType === 'FOLLOWUP') reasoning += ' No response yet — nudge follow-up.';
+      if (daysSince !== null && daysSince >= 90) reasoning += ' Quarterly check-in cadence.';
+
+      // ── Prompts ──
       const openai = getOpenAIClient();
-      const systemPrompt = `You are an expert at writing personalized business outreach emails. Your task is to generate a professional, authentic email that feels natural and builds relationships.
+      const systemPrompt = `You are an expert at writing personalized business development outreach emails. Write professional, authentic emails that feel natural and build relationships.
 
 Guidelines:
 - Be concise but warm
-- Personalize based on relationship context
-- For followups, reference previous emails naturally
-- Avoid being pushy or salesy
-- Match the tone to the relationship type
-- Naturally incorporate seasonal greetings and context when appropriate (e.g., "Happy New Year", "hope you're enjoying the nice weather", holiday wishes)`;
+- Personalize based on relationship and engagement context
+- For follow-ups, reference prior contact naturally — never robotic
+- Avoid pushy or salesy language
+- Match tone to the relationship type
+- Incorporate seasonal context naturally when appropriate`;
+
+      const contactBlock = `Contact:
+- Name: ${contact.goesBy || `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() || contact.email}
+- Title: ${contact.title || 'Not specified'}
+- Company: ${contactCompany || 'Not specified'}
+${contact.notes ? `- Notes: ${contact.notes}` : ''}
+${contact.contactSummary ? `- Relationship context: ${contact.contactSummary}` : ''}`;
+
+      const contextBlock = [
+        companyContext,
+        personaSlug ? `Persona: ${personaSlug}` : '',
+        relationshipContext ? `Relationship Context:\n${JSON.stringify(relationshipContext, null, 2)}` : '',
+        `Current Date Context:\n${seasonalContext}`,
+      ].filter(Boolean).join('\n\n');
 
       let userPrompt = '';
-      
-      // Build prompt based on email type and conversation state
-      if (emailTypeContext.emailType === 'FIRST_TIME') {
+
+      if (emailType === 'FIRST_TIME') {
         userPrompt = `Write a FIRST-OUTBOUND outreach email for:
 
-Contact:
-- Name: ${contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
-- Title: ${contact.title || 'Not specified'}
-- Company: ${contact.companies?.companyName || 'Not specified'}
-${contact.notes ? `- Notes: ${contact.notes}` : ''}
+${contactBlock}
 
-${companyContext ? `${companyContext}\n` : ''}
-${personaSlug ? `Persona: ${personaSlug}\n` : ''}
-${relationshipContext ? `Relationship Context:\n${JSON.stringify(relationshipContext, null, 2)}\n` : ''}
-
-Current Date Context:
-${seasonalContext}
+${contextBlock}
 
 Generate a subject line and email body that:
-- Introduces yourself/your company naturally
-- References any relationship context (former colleague, prior conversation, etc.)
-- Provides value or opens a conversation
-- Has a clear but soft call-to-action
-- Naturally incorporates seasonal greetings or weather references when appropriate (e.g., "Happy New Year", "hope you're enjoying the spring weather")`;
+- Introduces your company naturally
+- References any relationship context (former colleague, prior conversation, referral, etc.)
+- Opens a conversation with a soft call-to-action`;
       } else {
-        // FOLLOWUP email
-        const lastEmail = previousEmails[0];
-        const daysSince = emailTypeContext.daysSinceLastSend || 0;
-        const hasResponse = emailTypeContext.lastEmailHadResponse === true;
-        const responseText = emailTypeContext.lastEmailResponseText;
-        
+        const followUpTone = contactResponded
+          ? '- Acknowledge their response and continue the conversation naturally\n- Reference what they said'
+          : hadMeeting
+          ? '- Reference the meeting warmly and propose a clear next step'
+          : daysSince !== null && daysSince >= 90
+          ? '- Quarterly check-in tone: "Wanted to continue our conversation and see where things stand"'
+          : daysSince !== null && daysSince >= 7
+          ? '- Friendly nudge: "Just checking back — wanted to make sure this didn\'t get buried"'
+          : '- Recent follow-up with appropriate tone';
+
         userPrompt = `Write a FOLLOWUP outreach email for:
 
-Contact:
-- Name: ${contact.goesBy || `${contact.firstName} ${contact.lastName}`.trim() || contact.email}
-- Title: ${contact.title || 'Not specified'}
-- Company: ${contact.companies?.companyName || 'Not specified'}
-${contact.notes ? `- Notes: ${contact.notes}` : ''}
+${contactBlock}
 
-${companyContext ? `${companyContext}\n` : ''}
-${personaSlug ? `Persona: ${personaSlug}\n` : ''}
-${relationshipContext ? `Relationship Context:\n${JSON.stringify(relationshipContext, null, 2)}\n` : ''}
+${contextBlock}
 
-Previous Email History:
-${lastEmail ? `- Last email sent ${daysSince} days ago\n- Subject: ${lastEmail.subject || 'No subject'}\n- Type: ${lastEmail.type || 'unknown'}\n` : 'No previous emails found'}
-${hasResponse && responseText ? `- Contact responded: "${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}"\n` : hasResponse ? '- Contact responded (response text available)\n' : '- No response to last email yet\n'}
-
-Email Type Context:
-${emailTypeContext.reasoning}
-
-Current Date Context:
-${seasonalContext}
+Follow-up context:
+- Days since last contact: ${daysSince ?? 'unknown'}
+${lastSubject ? `- Previous email subject: "${lastSubject}"` : ''}
+- Engagement type: ${contact.lastEngagementType ?? 'unknown'}
+- Context: ${reasoning}
 
 Generate a subject line and email body that:
-${hasResponse && responseText
-  ? '- Acknowledges their response and continues the conversation naturally'
-  : daysSince >= 90 
-  ? '- Is a quarterly check-in ("Checking in - I know when we last spoke, you were still using your previous service - wanted to just continue the conversation")'
-  : daysSince >= 7
-  ? '- Is a follow-up checking back ("Hey just checking back did you see my email")'
-  : '- Is a recent follow-up with appropriate tone'
-}
-${hasResponse && responseText ? '- References their response appropriately' : '- References the previous email naturally if relevant'}
+${followUpTone}
 - Continues the conversation without being pushy
-- Has a soft call-to-action
-- Naturally incorporates seasonal greetings or weather references when appropriate (e.g., "Happy New Year", "hope you're enjoying the nice weather")`;
+- Has a soft call-to-action`;
       }
-      
+
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         response_format: { type: 'json_object' },
@@ -336,41 +210,29 @@ ${hasResponse && responseText ? '- References their response appropriately' : '-
         ],
         temperature: 0.7,
       });
-      
+
       const responseContent = completion.choices[0]?.message?.content;
-      if (!responseContent) {
-        return {
-          success: false,
-          error: 'No response from AI',
-        };
-      }
-      
-      // Parse JSON response
+      if (!responseContent) return { success: false, error: 'No response from AI' };
+
       let parsedResponse: any;
       try {
         parsedResponse = JSON.parse(responseContent);
-      } catch (parseError) {
+      } catch {
         const jsonMatch = responseContent.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-        if (jsonMatch) {
-          parsedResponse = JSON.parse(jsonMatch[1]);
-        } else {
-          throw parseError;
-        }
+        if (jsonMatch) parsedResponse = JSON.parse(jsonMatch[1]);
+        else throw new Error('Could not parse AI response as JSON');
       }
-      
+
       return {
         success: true,
-        emailType: emailTypeContext.emailType,
+        emailType,
         subject: parsedResponse.subject || '',
         body: parsedResponse.body || '',
-        reasoning: emailTypeContext.reasoning,
+        reasoning,
       };
     } catch (error: any) {
       console.error('Error building email:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to build email',
-      };
+      return { success: false, error: error.message || 'Failed to build email' };
     }
   }
 }
