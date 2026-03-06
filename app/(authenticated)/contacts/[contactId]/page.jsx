@@ -10,7 +10,8 @@ import { formatDeliveryMethodLabel, DELIVERY_METHODS, normalizeDeliveryMethod } 
 import { formatDateEST } from '@/lib/dateEst';
 // Display pipeline/stage from relation or snap; format for read-only view
 function formatPipelineLabel(pipeline) {
-  if (!pipeline) return 'Unassigned';
+  if (!pipeline || pipeline === 'unassigned') return 'Unassigned';
+  if (pipeline === 'no-role') return 'No Role';
   return pipeline.charAt(0).toUpperCase() + pipeline.slice(1).toLowerCase();
 }
 function formatStageLabel(stage) {
@@ -693,9 +694,16 @@ export default function ContactDetailPage() {
           </button>
           {!editingStage ? (
             <>
-              <span className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600">
-                {formatPipelineLabel(contact.pipelines?.pipeline || contact.pipelineSnap || contact.pipeline?.pipeline)}
-              </span>
+              {(() => {
+                const pl = contact.pipelines?.pipeline || contact.pipelineSnap || contact.pipeline?.pipeline;
+                const isNoRole = pl === 'no-role';
+                const isUnassigned = !pl || pl === 'unassigned';
+                return (
+                  <span className={`rounded-full px-3 py-1 font-semibold ${isNoRole ? 'bg-gray-100 text-gray-500 italic' : isUnassigned ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                    {formatPipelineLabel(pl)}
+                  </span>
+                );
+              })()}
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-600">
                   {formatStageLabel(contact.pipelines?.stage || contact.pipelineStageSnap || contact.pipeline?.stage)}
@@ -720,15 +728,16 @@ export default function ContactDetailPage() {
               <select
                 value={selectedPipeline}
                 onChange={(e) => {
-                  setSelectedPipeline(e.target.value);
-                  // Reset stage when pipeline changes (unless it's unassigned)
-                  if (e.target.value === 'unassigned') {
+                  const val = e.target.value;
+                  setSelectedPipeline(val);
+                  // Stage-less pipelines: clear stage
+                  if (val === 'unassigned' || val === 'no-role') {
                     setSelectedStage('');
-                  } else if (e.target.value === 'connector') {
+                  } else if (val === 'connector') {
                     setSelectedStage('forwarded');
-                  } else if (e.target.value === 'prospect') {
+                  } else if (val === 'prospect') {
                     setSelectedStage('need-to-engage');
-                  } else if (e.target.value === 'friend') {
+                  } else if (val === 'friend') {
                     setSelectedStage('awaiting_next_job');
                   } else {
                     setSelectedStage('interest');
@@ -736,7 +745,8 @@ export default function ContactDetailPage() {
                 }}
                 className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-600 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="unassigned">Unassigned</option>
+                <option value="unassigned">Unassigned (default)</option>
+                <option value="no-role">No Role (intentional)</option>
                 <option value="connector">Connector</option>
                 <option value="prospect">Prospect</option>
                 <option value="client">Client</option>
@@ -744,7 +754,7 @@ export default function ContactDetailPage() {
                 <option value="institution">Institution</option>
                 <option value="friend">Friend</option>
               </select>
-              {selectedPipeline !== 'unassigned' && (
+              {selectedPipeline !== 'unassigned' && selectedPipeline !== 'no-role' && (
                 <select
                   value={selectedStage}
                   onChange={(e) => setSelectedStage(e.target.value)}
@@ -801,8 +811,8 @@ export default function ContactDetailPage() {
                   )}
                 </select>
               )}
-              {selectedPipeline === 'unassigned' && (
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600">
+              {(selectedPipeline === 'unassigned' || selectedPipeline === 'no-role') && (
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-500 italic">
                   No Stage
                 </span>
               )}
@@ -812,8 +822,9 @@ export default function ContactDetailPage() {
                     alert('Please select a pipeline');
                     return;
                   }
-                  // Stage is required for all pipelines except unassigned
-                  if (selectedPipeline !== 'unassigned' && !selectedStage) {
+                  // Stage is required for all pipelines except unassigned and no-role
+                  const noStagePipelines = ['unassigned', 'no-role'];
+                  if (!noStagePipelines.includes(selectedPipeline) && !selectedStage) {
                     alert('Please select both pipeline and stage');
                     return;
                   }
@@ -821,10 +832,11 @@ export default function ContactDetailPage() {
                   try {
                     // Use dedicated pipeline route
                     // For unassigned, don't send stage (or send null)
+                    const noStagePipelines = ['unassigned', 'no-role'];
                     const payload = {
                       pipeline: selectedPipeline,
                     };
-                    if (selectedPipeline !== 'unassigned' && selectedStage) {
+                    if (!noStagePipelines.includes(selectedPipeline) && selectedStage) {
                       payload.stage = selectedStage;
                     }
                     const response = await api.put(`/api/contacts/${contactId}/pipeline`, payload);

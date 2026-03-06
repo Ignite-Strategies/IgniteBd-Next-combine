@@ -61,8 +61,9 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Stage is optional for 'unassigned' pipeline, required for others
-    if (pipeline !== 'unassigned' && !stage) {
+    // Stage is optional for 'unassigned' and 'no-role' pipelines, required for others
+    const noStagePipelines = ['unassigned', 'no-role'];
+    if (!noStagePipelines.includes(pipeline) && !stage) {
       return NextResponse.json(
         { success: false, error: 'stage is required for this pipeline' },
         { status: 400 },
@@ -70,8 +71,7 @@ export async function PUT(request, { params }) {
     }
 
     // Validate pipeline and stage values
-    // For unassigned, stage can be null/empty
-    const stageToValidate = pipeline === 'unassigned' ? null : stage;
+    const stageToValidate = noStagePipelines.includes(pipeline) ? null : stage;
     const validation = validatePipeline(pipeline, stageToValidate);
     if (!validation.isValid) {
       return NextResponse.json(
@@ -101,8 +101,8 @@ export async function PUT(request, { params }) {
     const pipelineId = existingPipeline?.id || randomUUID();
 
     // Upsert pipeline
-    // For unassigned pipeline, stage should be null
-    const stageValue = pipeline === 'unassigned' ? null : stage;
+    // For unassigned and no-role pipelines, stage should be null
+    const stageValue = noStagePipelines.includes(pipeline) ? null : stage;
     
     const updatedPipeline = await prisma.pipelines.upsert({
       where: { contactId },

@@ -86,8 +86,8 @@ export async function ensureContactPipeline(
       }
 
       // Update pipeline
-      // For unassigned pipeline, stage should be null
-      const stageValue = finalPipeline === 'unassigned' ? null : (finalStage || null);
+      const noStagePipelines = ['unassigned', 'no-role'];
+      const stageValue = noStagePipelines.includes(finalPipeline) ? null : (finalStage || null);
       
       await prisma.pipelines.update({
         where: { contactId },
@@ -122,8 +122,8 @@ export async function ensureContactPipeline(
   const { randomUUID } = await import('crypto');
   const pipelineId = randomUUID();
   
-  // For unassigned pipeline, stage should be null
-  const stageValue = newPipeline === 'unassigned' ? null : newStage;
+  const noStagePipelines = ['unassigned', 'no-role'];
+  const stageValue = noStagePipelines.includes(newPipeline) ? null : newStage;
   
   await prisma.pipelines.create({
     data: {
