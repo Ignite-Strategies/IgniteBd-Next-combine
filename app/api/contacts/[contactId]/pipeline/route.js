@@ -101,7 +101,6 @@ export async function PUT(request, { params }) {
     const pipelineId = existingPipeline?.id || randomUUID();
 
     // Upsert pipeline
-    // For unassigned and no-role pipelines, stage should be null
     const stageValue = noStagePipelines.includes(pipeline) ? null : stage;
     
     const updatedPipeline = await prisma.pipelines.upsert({

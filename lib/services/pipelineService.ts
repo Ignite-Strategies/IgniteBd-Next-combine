@@ -123,7 +123,7 @@ export async function ensureContactPipeline(
   const pipelineId = randomUUID();
   
   const noStagePipelines = ['unassigned', 'no-role'];
-  const stageValue = noStagePipelines.includes(newPipeline) ? null : newStage;
+  const stageValue = noStagePipelines.includes(newPipeline) ? null : (newStage || null);
   
   await prisma.pipelines.create({
     data: {
