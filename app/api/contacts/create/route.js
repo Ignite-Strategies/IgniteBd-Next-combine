@@ -5,16 +5,19 @@ import { resolveMembership } from '@/lib/membership';
 
 /**
  * POST /api/contacts/create
- * Simple upsert by email - name and email only
+ * Create or update contact by email (if provided) - name required, email optional
  * 
  * Body:
  * - crmId (required) - CompanyHQId
  * - firstName (required)
  * - lastName (required)
- * - email (required) - used for upsert
+ * - email (optional) - if provided, used for upsert; if not, creates new contact
  * 
  * Returns:
  * - contact: Created or updated contact
+ * 
+ * Note: Email is optional to support workflows where contact is created from name only
+ * (e.g., LinkedIn scrape, Apollo enrichment) and email is added later via enrichment.
  */
 export async function POST(request) {
   let firebaseUser;
@@ -104,58 +107,68 @@ export async function POST(request) {
       );
     }
 
-    if (!email) {
-      return NextResponse.json(
-        { success: false, error: 'email is required' },
-        { status: 400 },
-      );
-    }
-
-    // Normalize email
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // CANON: Contacts are CompanyHQ-scoped
-    // Query by email + crmId only (not globally)
-    const existingContact = await prisma.contact.findUnique({
-      where: {
-        email_crmId: {
-          email: normalizedEmail,
-          crmId: crmId,
-        },
-      },
-    });
-
     const now = new Date();
     let contact;
-    
-    if (existingContact) {
-      // Contact already exists in this CompanyHQ - update name fields
-      contact = await prisma.contact.update({
+
+    // If email is provided, use it for upsert; otherwise create new contact
+    if (email && email.trim()) {
+      // Normalize email
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // CANON: Contacts are CompanyHQ-scoped
+      // Query by email + crmId only (not globally)
+      const existingContact = await prisma.contact.findUnique({
         where: {
-          id: existingContact.id,
-        },
-        data: {
-          firstName,
-          lastName,
-          updatedAt: now,
+          email_crmId: {
+            email: normalizedEmail,
+            crmId: crmId,
+          },
         },
       });
-      console.log(`✅ Updated existing contact ${normalizedEmail} in CompanyHQ ${crmId}`);
+
+      if (existingContact) {
+        // Contact already exists in this CompanyHQ - update name fields
+        contact = await prisma.contact.update({
+          where: {
+            id: existingContact.id,
+          },
+          data: {
+            firstName,
+            lastName,
+            updatedAt: now,
+          },
+        });
+        console.log(`✅ Updated existing contact ${normalizedEmail} in CompanyHQ ${crmId}`);
+      } else {
+        // Create new contact in this CompanyHQ with email
+        // CANON: Same email can exist in different CompanyHQs - each CompanyHQ has its own record
+        contact = await prisma.contact.create({
+          data: {
+            crmId,
+            firstName,
+            lastName,
+            email: normalizedEmail,
+            ownerId: owner.id,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        console.log(`✅ Created new contact ${normalizedEmail} in CompanyHQ ${crmId}`);
+      }
     } else {
-      // Create new contact in this CompanyHQ
-      // CANON: Same email can exist in different CompanyHQs - each CompanyHQ has its own record
+      // No email provided - create new contact without email (can be enriched later)
       contact = await prisma.contact.create({
         data: {
           crmId,
           firstName,
           lastName,
-          email: normalizedEmail,
+          email: null,
           ownerId: owner.id,
           createdAt: now,
           updatedAt: now,
         },
       });
-      console.log(`✅ Created new contact ${normalizedEmail} in CompanyHQ ${crmId}`);
+      console.log(`✅ Created new contact ${firstName} ${lastName} (no email) in CompanyHQ ${crmId}`);
     }
 
     return NextResponse.json({
