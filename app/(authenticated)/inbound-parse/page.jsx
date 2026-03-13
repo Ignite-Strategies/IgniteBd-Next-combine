@@ -2,8 +2,39 @@
 
 import { useState, useEffect } from 'react';
 import PageHeader from '@/components/PageHeader';
-import { Inbox, Mail, Calendar, FileText, Trash2, Sparkles, User, Clock, AlertTriangle, CheckCircle, ArrowRight, History, Zap } from 'lucide-react';
+import {
+  Inbox,
+  Mail,
+  Calendar,
+  FileText,
+  Trash2,
+  Sparkles,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  ArrowRight,
+  History,
+  Zap,
+  User,
+} from 'lucide-react';
 import api from '@/lib/api';
+
+const ACTIVITY_TYPE_CONFIG = {
+  inbound_email:  { label: 'Inbound Email',  color: 'bg-blue-100 text-blue-800' },
+  outbound_email: { label: 'Outbound Email', color: 'bg-emerald-100 text-emerald-800' },
+  call_note:      { label: 'Call Note → Meeting', color: 'bg-purple-100 text-purple-800' },
+  meeting_note:   { label: 'Meeting Note → Meeting', color: 'bg-purple-100 text-purple-800' },
+  note:           { label: 'General Note',   color: 'bg-gray-100 text-gray-700' },
+};
+
+function ActivityTypeBadge({ type }) {
+  const config = ACTIVITY_TYPE_CONFIG[type] || { label: type, color: 'bg-gray-100 text-gray-700' };
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs font-medium ${config.color}`}>
+      {config.label}
+    </span>
+  );
+}
 
 /**
  * Inbound Parse Page
@@ -11,7 +42,11 @@ import api from '@/lib/api';
  * Route: /inbound-parse
  *
  * View all emails received via SendGrid Inbound Parse (InboundEmail model).
- * Actions: Delete, Push to AI (parse → create EmailActivity).
+ * Flow: Analyze (parse + AI interpret + contact lookup) → confirm contact → Record Activity.
+ *
+ * The standalone "Parse" button has been retired — the SendGrid webhook already saves
+ * the full raw email at ingest, so there is nothing left to "cleanly save". Analyze
+ * (formerly Interpret) is now the single preview step.
  */
 export default function InboundParsePage() {
   const [emails, setEmails] = useState([]);
@@ -19,7 +54,7 @@ export default function InboundParsePage() {
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [showRaw, setShowRaw] = useState(false);
   const [companyHQId, setCompanyHQId] = useState(null);
-  const [parseLoading, setParseLoading] = useState(false);
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
@@ -27,15 +62,19 @@ export default function InboundParsePage() {
   const [nextEngageOverride, setNextEngageOverride] = useState('');
   const [contactEmailOverride, setContactEmailOverride] = useState('');
   const [contactNameOverride, setContactNameOverride] = useState('');
+  const [contactIdOverride, setContactIdOverride] = useState(null);
+  const [confirmOrphan, setConfirmOrphan] = useState(false);
   const [computeLoading, setComputeLoading] = useState(false);
   const [recordedContactId, setRecordedContactId] = useState(null);
 
   useEffect(() => {
-    // Get companyHQId from localStorage (company-scoped like rest of repo)
-    const crmId = typeof window !== 'undefined' 
-      ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') || null
-      : null;
-    
+    const crmId =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem('companyHQId') ||
+          window.localStorage.getItem('companyId') ||
+          null
+        : null;
+
     if (crmId) {
       setCompanyHQId(crmId);
       fetchInboundEmails(crmId);
@@ -71,8 +110,8 @@ export default function InboundParsePage() {
 
   const extractEmailAddress = (emailString) => {
     if (!emailString) return null;
-    // Extract email from "Name <email@domain.com>" format
-    const match = emailString.match(/<([^>]+)>/) || emailString.match(/([^\s<>]+@[^\s<>]+)/);
+    const match =
+      emailString.match(/<([^>]+)>/) || emailString.match(/([^\s<>]+@[^\s<>]+)/);
     return match ? match[1] : emailString;
   };
 
@@ -80,6 +119,17 @@ export default function InboundParsePage() {
     if (!emailString) return null;
     const match = emailString.match(/^([^<]+)</);
     return match ? match[1].trim() : null;
+  };
+
+  const resetDetailState = () => {
+    setParseResult(null);
+    setContactEmailOverride('');
+    setContactNameOverride('');
+    setContactIdOverride(null);
+    setNextEngageOverride('');
+    setConfirmOrphan(false);
+    setRecordedContactId(null);
+    setActionMessage(null);
   };
 
   const handleDelete = async (e) => {
@@ -92,8 +142,7 @@ export default function InboundParsePage() {
       await api.delete(`/api/inbound-parse/${selectedEmail.id}`);
       setEmails((prev) => prev.filter((x) => x.id !== selectedEmail.id));
       setSelectedEmail(null);
-      setActionMessage({ type: 'success', text: 'Deleted' });
-      setTimeout(() => setActionMessage(null), 3000);
+      resetDetailState();
     } catch (err) {
       setActionMessage({
         type: 'error',
@@ -104,14 +153,17 @@ export default function InboundParsePage() {
     }
   };
 
-  const handleParse = async (e) => {
+  // Single "Analyze" step: parse + AI interpret + contact lookup + name fallback
+  const handleAnalyze = async (e) => {
     e?.stopPropagation?.();
     if (!selectedEmail) return;
     setActionMessage(null);
-    setParseLoading(true);
+    setAnalyzeLoading(true);
     setParseResult(null);
+    setContactIdOverride(null);
+    setConfirmOrphan(false);
     try {
-      const res = await api.post('/api/inbound-parse/parse', {
+      const res = await api.post('/api/inbound-parse/interpret', {
         inboundEmailId: selectedEmail.id,
       });
       if (res.data?.success) {
@@ -120,33 +172,47 @@ export default function InboundParsePage() {
         setContactNameOverride(res.data.parsed?.contactName || '');
         setNextEngageOverride(res.data.nextEngage?.recommended || '');
         if (res.data.alreadyIngested) {
-          setActionMessage({ type: 'error', text: 'This email may already be ingested. Check history below.' });
+          setActionMessage({
+            type: 'error',
+            text: 'This email may already be ingested. Check history below.',
+          });
         }
       } else {
-        setActionMessage({ type: 'error', text: res.data?.error || 'Parse failed' });
+        setActionMessage({ type: 'error', text: res.data?.error || 'Analyze failed' });
       }
     } catch (err) {
       setActionMessage({
         type: 'error',
-        text: err.response?.data?.error || err.message || 'Parse failed',
+        text: err.response?.data?.error || err.message || 'Analyze failed',
       });
     } finally {
-      setParseLoading(false);
+      setAnalyzeLoading(false);
     }
   };
 
   const handlePushToAi = async (e) => {
     e?.stopPropagation?.();
     if (!selectedEmail) return;
+
+    // Orphan gate: no email and no name-match selected → require confirmation
+    const hasContact = contactEmailOverride || contactIdOverride;
+    if (!hasContact && !confirmOrphan) {
+      setConfirmOrphan(true);
+      return;
+    }
+
     setActionMessage(null);
     setPushLoading(true);
     setRecordedContactId(null);
+    setConfirmOrphan(false);
     try {
       const payload = { inboundEmailId: selectedEmail.id };
       if (nextEngageOverride) payload.nextEngagementDate = nextEngageOverride;
       if (contactEmailOverride) payload.contactEmail = contactEmailOverride;
+      if (contactIdOverride) payload.contactIdOverride = contactIdOverride;
+      if (parseResult?.interpretation) payload.interpretation = parseResult.interpretation;
       const res = await api.post('/api/inbound-parse/push-to-ai', payload);
-      const { parsed, contactId } = res.data;
+      const { parsed, contactId, recordType } = res.data;
       if (contactId) setRecordedContactId(contactId);
       setEmails((prev) =>
         prev.map((x) =>
@@ -156,15 +222,18 @@ export default function InboundParsePage() {
       setSelectedEmail((prev) =>
         prev ? { ...prev, ingestionStatus: 'PROMOTED' } : null
       );
-      const msg = parsed?.contactEmail
-        ? `Recorded → EmailActivity. Contact: ${parsed.contactEmail}`
-        : 'Recorded → EmailActivity';
+      const contactLabel = parsed?.contactEmail
+        ? `Contact: ${parsed.contactEmail}`
+        : contactId
+        ? 'Contact linked by name'
+        : 'No contact linked';
+      const recordLabel = recordType || 'Activity';
       const summarySnip = parsed?.summary ? ` | ${parsed.summary.slice(0, 80)}` : '';
       setActionMessage({
         type: 'success',
         text: parsed?.nextEngagementDate
-          ? `${msg} · Next engage: ${parsed.nextEngagementDate}${summarySnip}`
-          : `${msg}${summarySnip}`,
+          ? `Recorded → ${recordLabel}. ${contactLabel} · Next engage: ${parsed.nextEngagementDate}${summarySnip}`
+          : `Recorded → ${recordLabel}. ${contactLabel}${summarySnip}`,
       });
       setTimeout(() => setActionMessage(null), 8000);
     } catch (err) {
@@ -186,13 +255,16 @@ export default function InboundParsePage() {
     try {
       const res = await api.post(`/api/contacts/${cId}/compute-engagement`);
       const { nextEngagementDate, source } = res.data;
-      const sourceLabel = {
-        ai_summary: 'inferred from activity summary',
-        default_cadence: 'default +7 days',
-        already_set: 'already set on contact',
-        do_not_contact: 'do not contact',
-        no_engagement: 'no prior engagement',
-      }[source] || source || '';
+      const sourceLabel =
+        {
+          ai_summary: 'inferred from activity summary',
+          default_cadence: 'default +7 days',
+          already_set: 'already set on contact',
+          do_not_contact: 'do not contact',
+          no_engagement: 'no prior engagement',
+        }[source] ||
+        source ||
+        '';
       setActionMessage({
         type: 'success',
         text: nextEngagementDate
@@ -209,6 +281,9 @@ export default function InboundParsePage() {
       setComputeLoading(false);
     }
   };
+
+  const isPromoted = selectedEmail?.ingestionStatus === 'PROMOTED';
+  const hasContent = !!(selectedEmail?.text || selectedEmail?.html || selectedEmail?.email);
 
   if (loading) {
     return (
@@ -246,7 +321,7 @@ export default function InboundParsePage() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Recent Emails ({emails.length})</h2>
                 <button
-                  onClick={fetchInboundEmails}
+                  onClick={() => fetchInboundEmails(companyHQId)}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   Refresh
@@ -258,9 +333,14 @@ export default function InboundParsePage() {
                 return (
                   <div
                     key={email.id}
-                    onClick={() => { setSelectedEmail(email); setParseResult(null); }}
+                    onClick={() => {
+                      setSelectedEmail(email);
+                      resetDetailState();
+                    }}
                     className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition ${
-                      selectedEmail?.id === email.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                      selectedEmail?.id === email.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'
                     }`}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -299,15 +379,17 @@ export default function InboundParsePage() {
                         </span>
                       )}
                       {email.ingestionStatus && (
-                        <span className={`px-2 py-0.5 rounded text-xs ${
-                          email.ingestionStatus === 'PROMOTED'
-                            ? 'bg-indigo-100 text-indigo-700'
-                            : email.ingestionStatus === 'RECEIVED'
-                            ? 'bg-green-100 text-green-700'
-                            : email.ingestionStatus === 'FAILED'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs ${
+                            email.ingestionStatus === 'PROMOTED'
+                              ? 'bg-indigo-100 text-indigo-700'
+                              : email.ingestionStatus === 'RECEIVED'
+                              ? 'bg-green-100 text-green-700'
+                              : email.ingestionStatus === 'FAILED'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
                           {email.ingestionStatus}
                         </span>
                       )}
@@ -320,6 +402,7 @@ export default function InboundParsePage() {
             {/* Email Detail */}
             {selectedEmail && (
               <div className="border rounded-lg p-6 bg-white">
+                {/* Action bar */}
                 <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Email Details</h3>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -329,50 +412,55 @@ export default function InboundParsePage() {
                     >
                       {showRaw ? 'Show Parsed' : 'Show Raw'}
                     </button>
+
+                    {/* Analyze (formerly Parse + Interpret combined) */}
                     <button
-                      onClick={handleParse}
-                      disabled={
-                        parseLoading ||
-                        selectedEmail.ingestionStatus === 'PROMOTED' ||
-                        !(selectedEmail.text || selectedEmail.html || selectedEmail.email)
-                      }
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleAnalyze}
+                      disabled={analyzeLoading || isPromoted || !hasContent}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Parse + AI interpret in one step. Shows contact match, history, and next engagement before you record."
                     >
-                      <FileText className="h-4 w-4" />
-                      {parseLoading ? 'Parsing…' : 'Parse & Preview'}
+                      <Sparkles className="h-4 w-4" />
+                      {analyzeLoading ? 'Analyzing…' : 'Analyze'}
                     </button>
+
+                    {/* Record Activity */}
                     <button
                       onClick={handlePushToAi}
-                      disabled={
-                        pushLoading ||
-                        selectedEmail.ingestionStatus === 'PROMOTED' ||
-                        !(selectedEmail.text || selectedEmail.html || selectedEmail.email)
-                      }
+                      disabled={pushLoading || isPromoted || !hasContent}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Write email activity to CRM and mark this email as Promoted."
                     >
                       <Sparkles className="h-4 w-4" />
                       {pushLoading ? 'Recording…' : 'Record Activity'}
                     </button>
+
+                    {/* Calculate Engagement (post-record) */}
                     {(recordedContactId || parseResult?.contact?.id) && (
                       <button
                         onClick={handleComputeEngagement}
                         disabled={computeLoading}
                         className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Re-compute the contact's next engagement date from their activity history."
                       >
                         <Zap className="h-4 w-4" />
                         {computeLoading ? 'Computing…' : 'Calculate Engagement'}
                       </button>
                     )}
+
                     <button
                       onClick={handleDelete}
                       disabled={deleteLoading}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                      title="Permanently delete this inbound email record."
                     >
                       <Trash2 className="h-4 w-4" />
                       {deleteLoading ? 'Deleting…' : 'Delete'}
                     </button>
                   </div>
                 </div>
+
+                {/* Action message */}
                 {actionMessage && (
                   <div
                     className={`mb-4 px-3 py-2 rounded text-sm ${
@@ -385,13 +473,61 @@ export default function InboundParsePage() {
                   </div>
                 )}
 
+                {/* View Contact link (shown after successful Record Activity) */}
+                {recordedContactId && (
+                  <a
+                    href={`/contacts/${recordedContactId}`}
+                    className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline mb-4"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    View Contact
+                  </a>
+                )}
+
+                {/* Orphan confirmation gate */}
+                {confirmOrphan && (
+                  <div className="mb-4 p-3 rounded-lg border-2 border-orange-300 bg-orange-50">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-orange-800">No contact linked</p>
+                        <p className="text-xs text-orange-700 mt-0.5">
+                          This activity will be recorded without linking to any contact. You can
+                          link it manually later from the contact record.
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={handlePushToAi}
+                            disabled={pushLoading}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
+                          >
+                            {pushLoading ? 'Recording…' : 'Record anyway'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmOrphan(false)}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-orange-300 text-orange-700 hover:bg-orange-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Analyze preview panel — 4 steps */}
                 {parseResult && (
                   <div className="mb-6 space-y-4">
                     {/* ── Step 1: Parse & Confirm Contact ── */}
                     <div className="p-4 rounded-lg border-2 border-indigo-200 bg-indigo-50/50">
                       <h4 className="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold">1</span>
-                        Parse & Confirm Contact
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold">
+                          1
+                        </span>
+                        Email & Contact Details
+                        {parseResult.parsed?.activityType && (
+                          <ActivityTypeBadge type={parseResult.parsed.activityType} />
+                        )}
                       </h4>
                       <div className="space-y-3 text-sm">
                         <div className="flex flex-wrap items-center gap-2">
@@ -408,7 +544,11 @@ export default function InboundParsePage() {
                           <input
                             type="email"
                             value={contactEmailOverride}
-                            onChange={(e) => setContactEmailOverride(e.target.value)}
+                            onChange={(e) => {
+                              setContactEmailOverride(e.target.value);
+                              // Typing an email clears any name-match selection
+                              if (e.target.value) setContactIdOverride(null);
+                            }}
                             className="px-2 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[200px]"
                           />
                         </div>
@@ -416,6 +556,15 @@ export default function InboundParsePage() {
                           <span className="text-gray-600 font-medium w-28">Subject:</span>
                           <span>{parseResult.parsed?.subject || '(none)'}</span>
                         </div>
+                        {parseResult.parsed?.activityDate && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-gray-600 font-medium w-28">Activity Date:</span>
+                            <span className="text-sm font-medium text-purple-800">
+                              {parseResult.parsed.activityDate}
+                            </span>
+                            <span className="text-xs text-gray-500">(extracted from content — not email received date)</span>
+                          </div>
+                        )}
                         {parseResult.parsed?.isResponse && (
                           <span className="inline-block px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
                             Detected as response to outreach
@@ -423,47 +572,143 @@ export default function InboundParsePage() {
                         )}
                         {parseResult.parsed?.summary && (
                           <div className="p-2 rounded bg-indigo-100/60 border border-indigo-200">
-                            <span className="text-xs font-semibold text-indigo-800">AI Summary:</span>
-                            <div className="text-sm text-indigo-900 mt-0.5">{parseResult.parsed.summary}</div>
+                            <span className="text-xs font-semibold text-indigo-800">
+                              AI Summary:
+                            </span>
+                            <div className="text-sm text-indigo-900 mt-0.5">
+                              {parseResult.parsed.summary}
+                            </div>
                           </div>
                         )}
                         {parseResult.parsed?.body && (
                           <div>
                             <span className="text-gray-600 font-medium">Body:</span>
                             <div className="mt-1 p-2 rounded bg-white/80 text-gray-700 max-h-20 overflow-auto text-xs whitespace-pre-wrap">
-                              {parseResult.parsed.body.slice(0, 300)}{parseResult.parsed.body.length > 300 ? '…' : ''}
+                              {parseResult.parsed.body.slice(0, 300)}
+                              {parseResult.parsed.body.length > 300 ? '…' : ''}
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* ── Step 2: Contact Match ── */}
-                    <div className={`p-4 rounded-lg border-2 ${parseResult.contact ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
-                      <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${parseResult.contact ? 'text-green-900' : 'text-amber-900'}`}>
-                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-xs font-bold ${parseResult.contact ? 'bg-green-600' : 'bg-amber-500'}`}>2</span>
+                    {/* ── Step 2: Contact Lookup ── */}
+                    <div
+                      className={`p-4 rounded-lg border-2 ${
+                        parseResult.contact
+                          ? 'border-green-200 bg-green-50/50'
+                          : parseResult.nameMatches?.length > 0
+                          ? 'border-amber-200 bg-amber-50/50'
+                          : 'border-red-200 bg-red-50/50'
+                      }`}
+                    >
+                      <h4
+                        className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
+                          parseResult.contact
+                            ? 'text-green-900'
+                            : parseResult.nameMatches?.length > 0
+                            ? 'text-amber-900'
+                            : 'text-red-900'
+                        }`}
+                      >
+                        <span
+                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-xs font-bold ${
+                            parseResult.contact
+                              ? 'bg-green-600'
+                              : parseResult.nameMatches?.length > 0
+                              ? 'bg-amber-500'
+                              : 'bg-red-500'
+                          }`}
+                        >
+                          2
+                        </span>
                         Contact Lookup
                       </h4>
+
                       {parseResult.contact ? (
+                        // Exact email match found
                         <div className="space-y-2 text-sm">
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-600" />
-                            <span className="font-medium">{parseResult.contact.name || parseResult.contact.email}</span>
-                            {parseResult.contact.title && <span className="text-gray-500">· {parseResult.contact.title}</span>}
+                            <span className="font-medium">
+                              {parseResult.contact.name || parseResult.contact.email}
+                            </span>
+                            {parseResult.contact.title && (
+                              <span className="text-gray-500">· {parseResult.contact.title}</span>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-3 text-xs text-gray-600">
-                            {parseResult.contact.company && <span>Company: {parseResult.contact.company}</span>}
-                            {parseResult.contact.pipeline && <span>Pipeline: <span className="font-medium">{parseResult.contact.pipeline}</span></span>}
+                            {parseResult.contact.company && (
+                              <span>Company: {parseResult.contact.company}</span>
+                            )}
+                            {parseResult.contact.pipeline && (
+                              <span>
+                                Pipeline:{' '}
+                                <span className="font-medium">{parseResult.contact.pipeline}</span>
+                              </span>
+                            )}
                             {parseResult.contact.optedOut && (
                               <span className="text-red-600 font-medium">OPTED OUT</span>
                             )}
                           </div>
                         </div>
+                      ) : parseResult.nameMatches?.length > 0 ? (
+                        // No email match but name-based candidates found
+                        <div className="space-y-3 text-sm">
+                          <div className="flex items-center gap-2 text-amber-800 text-xs">
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <span>
+                              No exact email match. Select a contact or type their email above.
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {parseResult.nameMatches.map((match) => (
+                              <button
+                                key={match.id}
+                                onClick={() => {
+                                  setContactIdOverride(
+                                    contactIdOverride === match.id ? null : match.id
+                                  );
+                                  // Clear email override when picking by name
+                                  setContactEmailOverride('');
+                                }}
+                                className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
+                                  contactIdOverride === match.id
+                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-800'
+                                    : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-300 hover:bg-indigo-50/50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <User className="h-3 w-3" />
+                                  <span>{match.name}</span>
+                                </div>
+                                {(match.company || match.email) && (
+                                  <div className="text-gray-400 font-normal mt-0.5">
+                                    {match.company || match.email}
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                          {contactIdOverride && (
+                            <div className="flex items-center gap-1.5 text-xs text-indigo-700">
+                              <CheckCircle className="h-3.5 w-3.5" />
+                              Contact selected — will be linked on Record Activity
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <div className="flex items-center gap-2 text-sm text-amber-800">
+                        // Nothing found
+                        <div className="flex items-center gap-2 text-sm text-red-800">
                           <AlertTriangle className="h-4 w-4" />
-                          No matching contact found for &ldquo;{contactEmailOverride || parseResult.parsed?.contactEmail}&rdquo;.
-                          Activity will be created without a linked contact.
+                          <span>
+                            No contact found for &ldquo;
+                            {contactEmailOverride ||
+                              parseResult.parsed?.contactEmail ||
+                              parseResult.parsed?.contactName ||
+                              '(unknown)'}
+                            &rdquo;. Enter their email above or record without a linked contact.
+                          </span>
                         </div>
                       )}
                     </div>
@@ -471,7 +716,9 @@ export default function InboundParsePage() {
                     {/* ── Step 3: Email History ── */}
                     <div className="p-4 rounded-lg border-2 border-slate-200 bg-slate-50/50">
                       <h4 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-600 text-white text-xs font-bold">3</span>
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-600 text-white text-xs font-bold">
+                          3
+                        </span>
                         Email History
                         {parseResult.alreadyIngested && (
                           <span className="ml-2 px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 font-medium">
@@ -482,21 +729,41 @@ export default function InboundParsePage() {
                       {parseResult.emailHistory?.length > 0 ? (
                         <div className="space-y-2 max-h-48 overflow-auto">
                           {parseResult.emailHistory.map((h) => (
-                            <div key={h.id} className="flex items-start gap-2 text-xs p-2 rounded bg-white border border-slate-100">
-                              <span className={`mt-0.5 inline-block w-2 h-2 rounded-full flex-shrink-0 ${h.direction === 'inbound' ? 'bg-blue-400' : 'bg-emerald-400'}`} />
+                            <div
+                              key={h.id}
+                              className="flex items-start gap-2 text-xs p-2 rounded bg-white border border-slate-100"
+                            >
+                              <span
+                                className={`mt-0.5 inline-block w-2 h-2 rounded-full flex-shrink-0 ${
+                                  h.direction === 'inbound' ? 'bg-blue-400' : 'bg-emerald-400'
+                                }`}
+                              />
                               <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-center gap-2">
-                                  <span className="font-medium truncate">{h.subject || '(No subject)'}</span>
-                                  <span className="text-gray-400 whitespace-nowrap">{formatDate(h.date)}</span>
+                                  <span className="font-medium truncate">
+                                    {h.subject || '(No subject)'}
+                                  </span>
+                                  <span className="text-gray-400 whitespace-nowrap">
+                                    {formatDate(h.date)}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-2 mt-0.5 text-gray-500">
                                   <span>{h.direction === 'inbound' ? '← Contact' : '→ Outbound'}</span>
                                   <span>·</span>
                                   <span>{h.type}</span>
-                                  {h.platform && <><span>·</span><span>{h.platform}</span></>}
-                                  {h.hasResponse && <span className="text-green-600 font-medium">Has response</span>}
+                                  {h.platform && (
+                                    <>
+                                      <span>·</span>
+                                      <span>{h.platform}</span>
+                                    </>
+                                  )}
+                                  {h.hasResponse && (
+                                    <span className="text-green-600 font-medium">Has response</span>
+                                  )}
                                 </div>
-                                {h.body && <div className="text-gray-500 mt-1 truncate">{h.body}</div>}
+                                {h.body && (
+                                  <div className="text-gray-500 mt-1 truncate">{h.body}</div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -504,7 +771,9 @@ export default function InboundParsePage() {
                       ) : (
                         <div className="text-sm text-gray-500 flex items-center gap-2">
                           <History className="h-4 w-4" />
-                          {parseResult.contact ? 'No email history for this contact yet' : 'No contact matched — cannot show history'}
+                          {parseResult.contact
+                            ? 'No email history for this contact yet'
+                            : 'No contact matched — select a contact above to see history'}
                         </div>
                       )}
                     </div>
@@ -512,24 +781,28 @@ export default function InboundParsePage() {
                     {/* ── Step 4: Next Engagement ── */}
                     <div className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50">
                       <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold">
+                          4
+                        </span>
                         Next Engagement
                       </h4>
                       <div className="space-y-3 text-sm">
                         {parseResult.nextEngage?.currentOnContact && (
                           <div className="text-xs text-gray-600">
-                            Currently on contact: <span className="font-medium">{parseResult.nextEngage.currentOnContact}</span>
-                            {parseResult.nextEngage.currentPurpose && ` (${parseResult.nextEngage.currentPurpose})`}
+                            Currently on contact:{' '}
+                            <span className="font-medium">
+                              {parseResult.nextEngage.currentOnContact}
+                            </span>
+                            {parseResult.nextEngage.currentPurpose &&
+                              ` (${parseResult.nextEngage.currentPurpose})`}
                           </div>
                         )}
                         {parseResult.nextEngage?.aiSuggested && (
                           <div className="text-xs text-indigo-700">
-                            AI extracted: <span className="font-medium">{parseResult.nextEngage.aiSuggested}</span>
-                          </div>
-                        )}
-                        {!parseResult.nextEngage?.aiSuggested && parseResult.nextEngage?.responseDefault && (
-                          <div className="text-xs text-amber-700">
-                            Response detected, defaulting to +7 days: <span className="font-medium">{parseResult.nextEngage.responseDefault}</span>
+                            AI extracted:{' '}
+                            <span className="font-medium">
+                              {parseResult.nextEngage.aiSuggested}
+                            </span>
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2">
@@ -549,30 +822,39 @@ export default function InboundParsePage() {
                   </div>
                 )}
 
+                {/* Raw / Parsed email view */}
                 {showRaw ? (
                   <div className="space-y-4">
                     {selectedEmail.email && (
                       <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-2">Raw MIME (SendGrid "email" field - full MIME when "Include Raw" enabled)</label>
+                        <label className="text-sm font-semibold text-gray-600 block mb-2">
+                          Raw MIME (SendGrid &ldquo;email&rdquo; field - full MIME when &ldquo;Include Raw&rdquo; enabled)
+                        </label>
                         <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
                           {selectedEmail.email}
                         </pre>
                       </div>
                     )}
                     <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">Headers</label>
+                      <label className="text-sm font-semibold text-gray-600 block mb-2">
+                        Headers
+                      </label>
                       <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
                         {selectedEmail.headers || '(No headers)'}
                       </pre>
                     </div>
                     <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">Text Body</label>
+                      <label className="text-sm font-semibold text-gray-600 block mb-2">
+                        Text Body
+                      </label>
                       <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
                         {selectedEmail.text || '(No text body)'}
                       </pre>
                     </div>
                     <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">HTML Body</label>
+                      <label className="text-sm font-semibold text-gray-600 block mb-2">
+                        HTML Body
+                      </label>
                       <div className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64">
                         {selectedEmail.html ? (
                           <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
@@ -594,7 +876,9 @@ export default function InboundParsePage() {
                           <div className="font-medium">{extractName(selectedEmail.from)}</div>
                         )}
                         <div className="text-sm text-gray-600">
-                          {extractEmailAddress(selectedEmail.from) || selectedEmail.from || '(No sender)'}
+                          {extractEmailAddress(selectedEmail.from) ||
+                            selectedEmail.from ||
+                            '(No sender)'}
                         </div>
                       </div>
                     </div>
@@ -619,7 +903,9 @@ export default function InboundParsePage() {
 
                     {selectedEmail.text && (
                       <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">Text Body</label>
+                        <label className="text-sm font-semibold text-gray-600 block mb-1">
+                          Text Body
+                        </label>
                         <div className="p-3 bg-gray-50 rounded text-sm whitespace-pre-wrap max-h-64 overflow-auto">
                           {selectedEmail.text}
                         </div>
@@ -628,7 +914,9 @@ export default function InboundParsePage() {
 
                     {selectedEmail.html && (
                       <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">HTML Body</label>
+                        <label className="text-sm font-semibold text-gray-600 block mb-1">
+                          HTML Body
+                        </label>
                         <div className="p-3 bg-gray-50 rounded text-sm max-h-64 overflow-auto border">
                           <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
                         </div>
@@ -643,18 +931,25 @@ export default function InboundParsePage() {
                         </label>
                         <div className="rounded border border-amber-200 bg-amber-50 p-2 mb-2">
                           <p className="text-xs text-amber-700">
-                            SendGrid sent this as raw MIME (no parsed text/html). Content is base64-encoded inside the MIME body below. Switch to <strong>Show Raw</strong> for the full MIME.
+                            SendGrid sent this as raw MIME (no parsed text/html). Content is
+                            base64-encoded inside the MIME body below. Switch to{' '}
+                            <strong>Show Raw</strong> for the full MIME.
                           </p>
                         </div>
                         <pre className="p-3 bg-gray-50 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
-                          {selectedEmail.email.substring(0, 2000)}{selectedEmail.email.length > 2000 ? `\n\n... (${selectedEmail.email.length} chars total — click Show Raw for full content)` : ''}
+                          {selectedEmail.email.substring(0, 2000)}
+                          {selectedEmail.email.length > 2000
+                            ? `\n\n... (${selectedEmail.email.length} chars total — click Show Raw for full content)`
+                            : ''}
                         </pre>
                       </div>
                     )}
 
                     {selectedEmail.headers && (
                       <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">Headers</label>
+                        <label className="text-sm font-semibold text-gray-600 block mb-1">
+                          Headers
+                        </label>
                         <pre className="p-3 bg-gray-50 rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap">
                           {selectedEmail.headers}
                         </pre>
@@ -673,18 +968,28 @@ export default function InboundParsePage() {
 
                     {selectedEmail.ingestionStatus && (
                       <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">Status</label>
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          selectedEmail.ingestionStatus === 'PROMOTED'
-                            ? 'bg-indigo-100 text-indigo-700'
-                            : selectedEmail.ingestionStatus === 'RECEIVED'
-                            ? 'bg-green-100 text-green-700'
-                            : selectedEmail.ingestionStatus === 'FAILED'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
+                        <label className="text-sm font-semibold text-gray-600 block mb-1">
+                          Status
+                        </label>
+                        <span
+                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                            selectedEmail.ingestionStatus === 'PROMOTED'
+                              ? 'bg-indigo-100 text-indigo-700'
+                              : selectedEmail.ingestionStatus === 'RECEIVED'
+                              ? 'bg-green-100 text-green-700'
+                              : selectedEmail.ingestionStatus === 'FAILED'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
                           {selectedEmail.ingestionStatus}
                         </span>
+                        {selectedEmail.ingestionStatus === 'PROMOTED' && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            This email has been recorded as a CRM activity. Buttons above are
+                            disabled.
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>

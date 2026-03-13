@@ -2,15 +2,23 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { universalEmailParser } from '@/lib/services/universalEmailParser';
+import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
 
 /**
- * POST /api/inbound-parse/parse
+ * POST /api/inbound-parse/interpret
  *
- * Parse only (dumb extraction) — no AI. Uses universal parser.
- * Returns: parsed structure, contact lookup, email history, next engage context.
+ * Parse (universal) + AI interpretation — the single preview step before Record Activity.
+ * Replaces the old two-step Parse → Interpret flow.
  *
- * For AI interpretation (summary, isResponse, nextEngagementDate), use
- * POST /api/inbound-parse/interpret or run it at record time.
+ * Returns:
+ *   - parsed + interpretation (AI summary, isResponse, nextEngagementDate, contactEmail, contactName)
+ *   - contact: exact email match from DB (or null)
+ *   - nameMatches: name-based fallback candidates when no email match
+ *   - emailHistory: last 20 activities for matched contact
+ *   - alreadyIngested: duplicate check
+ *   - nextEngage: AI-suggested + current-on-contact context
+ *
+ * Body: { inboundEmailId }
  */
 export async function POST(request: Request) {
   try {
@@ -52,8 +60,13 @@ export async function POST(request: Request) {
     const companyHQId = inbound.companyHQId;
     const owner = company?.owners_company_hqs_ownerIdToowners;
     const ownerEmail = (owner?.email || '').toLowerCase().trim();
+    const ownerContext = {
+      name: owner?.name || null,
+      email: owner?.email || null,
+      companyName: company?.companyName || null,
+    };
 
-    // ── 1. Universal parse (dumb, no AI) ──
+    // ── 1. Universal parse (dumb structural extraction) ──
     const parsed = universalEmailParser({
       from: inbound.from,
       to: inbound.to,
@@ -64,19 +77,35 @@ export async function POST(request: Request) {
       headers: inbound.headers,
     });
 
-    // Infer contact: owner forwarded this; contact is the OTHER participant
-    let contactEmail = parsed.fromEmail || parsed.toEmail || '';
-    if (ownerEmail) {
-      if (parsed.fromEmail?.toLowerCase() === ownerEmail) {
-        contactEmail = parsed.toEmail || parsed.fromEmail || '';
+    // ── 2. AI interpretation ──
+    const interpreted = await interpretEngagement(
+      {
+        from: parsed.from,
+        fromEmail: parsed.fromEmail,
+        fromName: parsed.fromName,
+        to: parsed.to,
+        toEmail: parsed.toEmail,
+        toName: parsed.toName,
+        subject: parsed.subject,
+        body: parsed.body,
+        headers: parsed.headers,
+        raw: parsed.raw,
+      },
+      ownerContext,
+    );
+
+    // ── 3. Resolve contact email (same heuristic as parse route) ──
+    let contactEmail = interpreted.contactEmail || '';
+    if (!contactEmail && ownerEmail) {
+      if (parsed.fromEmail?.toLowerCase() !== ownerEmail) {
+        contactEmail = parsed.fromEmail || '';
       } else {
-        contactEmail = parsed.fromEmail || parsed.toEmail || '';
+        contactEmail = parsed.toEmail || '';
       }
     }
-    const contactName = parsed.fromName || parsed.toName || null;
 
-    // ── 2. Contact lookup ──
-    let contact: {
+    // ── 4. Contact lookup — exact email match ──
+    type ContactRow = {
       id: string;
       firstName: string | null;
       lastName: string | null;
@@ -89,13 +118,15 @@ export async function POST(request: Request) {
       lastEngagementDate: Date | null;
       lastEngagementType: string | null;
       contactDisposition: string | null;
-    } | null = null;
+    };
+
+    let contact: ContactRow | null = null;
 
     if (contactEmail && companyHQId) {
       const found = await prisma.contact.findFirst({
         where: {
           crmId: companyHQId,
-          email: { equals: contactEmail, mode: 'insensitive' as const },
+          email: { equals: contactEmail.trim(), mode: 'insensitive' as const },
         },
         select: {
           id: true,
@@ -115,8 +146,75 @@ export async function POST(request: Request) {
       if (found) contact = found;
     }
 
-    // ── 3. Email history (if contact found) ──
-    let emailHistory: Array<{
+    // ── 5. Name-based fallback search (when no email match) ──
+    type NameMatch = {
+      id: string;
+      name: string;
+      email: string | null;
+      company: string | null;
+      pipeline: string | null;
+    };
+
+    let nameMatches: NameMatch[] = [];
+
+    if (!contact && companyHQId) {
+      // Candidate name: AI's contactName (may have been extracted from subject)
+      const candidateName = (interpreted.contactName || '').trim();
+
+      // Also check subject-as-name heuristic: ≤4 words, no colon, not Re:/Fwd:
+      const subject = (inbound.subject || '').trim();
+      const subjectLooksLikeName =
+        subject &&
+        subject.split(/\s+/).length <= 4 &&
+        !subject.includes(':') &&
+        !/^(re|fwd|fw)\b/i.test(subject);
+
+      const nameToSearch = candidateName || (subjectLooksLikeName ? subject : '');
+
+      if (nameToSearch) {
+        const parts = nameToSearch.trim().split(/\s+/).filter(Boolean);
+        const firstName = parts[0] || '';
+        const lastName = parts.slice(1).join(' ') || '';
+
+        const orClauses: Array<Record<string, unknown>> = [];
+        if (firstName) {
+          orClauses.push({ firstName: { contains: firstName, mode: 'insensitive' as const } });
+        }
+        if (lastName) {
+          orClauses.push({ lastName: { contains: lastName, mode: 'insensitive' as const } });
+        }
+        // Also try full name as firstName search (e.g. if only one word)
+        if (nameToSearch.includes(' ')) {
+          orClauses.push({ firstName: { contains: nameToSearch, mode: 'insensitive' as const } });
+        }
+
+        if (orClauses.length > 0) {
+          const candidates = await prisma.contact.findMany({
+            where: { crmId: companyHQId, OR: orClauses },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              company: true,
+              pipeline: true,
+            },
+            take: 5,
+          });
+
+          nameMatches = candidates.map((c) => ({
+            id: c.id,
+            name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Unknown',
+            email: c.email,
+            company: c.company,
+            pipeline: c.pipeline,
+          }));
+        }
+      }
+    }
+
+    // ── 6. Email history (for matched contact) ──
+    type HistoryRow = {
       id: string;
       date: string;
       subject: string | null;
@@ -124,8 +222,11 @@ export async function POST(request: Request) {
       type: string;
       platform: string | null;
       event: string | null;
+      direction: string;
       hasResponse: boolean;
-    }> = [];
+    };
+
+    let emailHistory: HistoryRow[] = [];
     let alreadyIngested = false;
 
     if (contact) {
@@ -168,19 +269,23 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 4. Next engage context (parse does not run AI — no aiSuggested) ──
+    // ── 7. Next engage context ──
     const currentNextEngage = contact?.nextEngagementDate || null;
 
     return NextResponse.json({
       success: true,
       parsed: {
         contactEmail,
-        contactName,
-        subject: parsed.subject || null,
-        body: parsed.body || null,
-        isResponse: null, // Parse does not interpret; use /interpret or record
-        summary: null,
+        contactName: interpreted.contactName,
+        subject: interpreted.subject || parsed.subject || null,
+        body: interpreted.body || parsed.body || null,
+        isResponse: interpreted.isResponse,
+        summary: interpreted.summary,
+        nextEngagementDate: interpreted.nextEngagementDate,
+        activityType: interpreted.activityType,
+        activityDate: interpreted.activityDate,
       },
+      interpretation: interpreted,
       contact: contact
         ? {
             id: contact.id,
@@ -192,22 +297,23 @@ export async function POST(request: Request) {
             optedOut: contact.contactDisposition === 'OPTED_OUT',
           }
         : null,
+      nameMatches,
       emailHistory,
       alreadyIngested,
       nextEngage: {
-        aiSuggested: null,
+        aiSuggested: interpreted.nextEngagementDate || null,
         responseDefault: null,
         currentOnContact: currentNextEngage,
         currentPurpose: contact?.nextEngagementPurpose || null,
-        recommended: currentNextEngage,
+        recommended: interpreted.nextEngagementDate || currentNextEngage,
       },
     });
   } catch (error) {
-    console.error('❌ Parse pipeline error:', error);
+    console.error('❌ Interpret error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to parse email',
+        error: error instanceof Error ? error.message : 'Failed to interpret email',
       },
       { status: 500 }
     );
