@@ -66,6 +66,7 @@ export default function InboundParsePage() {
   const [confirmOrphan, setConfirmOrphan] = useState(false);
   const [computeLoading, setComputeLoading] = useState(false);
   const [recordedContactId, setRecordedContactId] = useState(null);
+  const [createContactLoading, setCreateContactLoading] = useState(false);
 
   useEffect(() => {
     const crmId =
@@ -243,6 +244,68 @@ export default function InboundParsePage() {
       });
     } finally {
       setPushLoading(false);
+    }
+  };
+
+  const handleCreateContact = async () => {
+    const nameParts = (contactNameOverride || parseResult?.parsed?.contactName || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    if (!firstName && !lastName) {
+      setActionMessage({
+        type: 'error',
+        text: 'Please enter a contact name in Step 1 before creating a contact.',
+      });
+      return;
+    }
+
+    const email = contactEmailOverride || parseResult?.parsed?.contactEmail || '';
+    if (!email) {
+      setActionMessage({
+        type: 'error',
+        text: 'Email is required to create a contact. Please enter an email address in Step 1.',
+      });
+      return;
+    }
+
+    setCreateContactLoading(true);
+    setActionMessage(null);
+    try {
+      const res = await api.post('/api/contacts/create', {
+        crmId: companyHQId,
+        firstName,
+        lastName,
+        email,
+      });
+      if (res.data?.success && res.data?.contact) {
+        const newContactId = res.data.contact.id;
+        setContactIdOverride(newContactId);
+        setContactEmailOverride(email);
+        setActionMessage({
+          type: 'success',
+          text: `Contact created: ${firstName} ${lastName} (${email})`,
+        });
+        // Refresh the analyze result to show the new contact
+        setTimeout(() => {
+          handleAnalyze({ stopPropagation: () => {} });
+        }, 1000);
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: res.data?.error || 'Failed to create contact',
+        });
+      }
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err.response?.data?.error || err.message || 'Create contact failed',
+      });
+    } finally {
+      setCreateContactLoading(false);
     }
   };
 
@@ -658,7 +721,8 @@ export default function InboundParsePage() {
                           <div className="flex items-center gap-2 text-amber-800 text-xs">
                             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                             <span>
-                              No exact email match. Select a contact or type their email above.
+                              No exact email match. Select a contact below, type their email above
+                              to create a new contact, or record without linking.
                             </span>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -699,16 +763,45 @@ export default function InboundParsePage() {
                         </div>
                       ) : (
                         // Nothing found
-                        <div className="flex items-center gap-2 text-sm text-red-800">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span>
-                            No contact found for &ldquo;
-                            {contactEmailOverride ||
-                              parseResult.parsed?.contactEmail ||
-                              parseResult.parsed?.contactName ||
-                              '(unknown)'}
-                            &rdquo;. Enter their email above or record without a linked contact.
-                          </span>
+                        <div className="space-y-3 text-sm">
+                          <div className="flex items-center gap-2 text-red-800">
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <span>
+                              No contact found for &ldquo;
+                              {contactEmailOverride ||
+                                parseResult.parsed?.contactEmail ||
+                                parseResult.parsed?.contactName ||
+                                '(unknown)'}
+                              &rdquo;.
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(contactNameOverride || parseResult?.parsed?.contactName) &&
+                              (contactEmailOverride || parseResult?.parsed?.contactEmail) && (
+                                <button
+                                  onClick={handleCreateContact}
+                                  disabled={createContactLoading}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <User className="h-3.5 w-3.5" />
+                                  {createContactLoading ? 'Creating…' : 'Create Contact'}
+                                </button>
+                              )}
+                            {(!contactNameOverride && !parseResult?.parsed?.contactName) && (
+                              <span className="text-xs text-gray-600">
+                                Enter contact name in Step 1 to create a contact.
+                              </span>
+                            )}
+                            {(!contactEmailOverride && !parseResult?.parsed?.contactEmail) && (
+                              <span className="text-xs text-gray-600">
+                                Enter email address in Step 1 to create a contact.
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Or you can record this activity without linking to a contact and link it
+                            manually later.
+                          </div>
                         </div>
                       )}
                     </div>
