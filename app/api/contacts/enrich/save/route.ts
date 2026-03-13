@@ -532,12 +532,14 @@ export async function POST(request: Request) {
               stabilityScore: companyIntelligence.stabilityScore,
               marketPositionScore: companyIntelligence.marketPositionScore,
               readinessScore: companyIntelligence.readinessScore,
-              positioningLabel: finalCompanyPositioning.positioningLabel || companyByDomain.positioningLabel,
-              category: finalCompanyPositioning.category || companyByDomain.category,
-              revenueTier: finalCompanyPositioning.revenueTier || companyByDomain.revenueTier,
-              headcountTier: finalCompanyPositioning.headcountTier || companyByDomain.headcountTier,
-              normalizedIndustry: finalCompanyPositioning.normalizedIndustry || companyByDomain.normalizedIndustry,
-              competitors: finalCompanyPositioning.competitors?.length ? finalCompanyPositioning.competitors : companyByDomain.competitors,
+              ...(skipIntelligence ? {} : {
+                positioningLabel: finalCompanyPositioning?.positioningLabel || companyByDomain.positioningLabel,
+                category: finalCompanyPositioning?.category || companyByDomain.category,
+                revenueTier: finalCompanyPositioning?.revenueTier || companyByDomain.revenueTier,
+                headcountTier: finalCompanyPositioning?.headcountTier || companyByDomain.headcountTier,
+                normalizedIndustry: finalCompanyPositioning?.normalizedIndustry || companyByDomain.normalizedIndustry,
+                competitors: finalCompanyPositioning?.competitors?.length ? finalCompanyPositioning.competitors : companyByDomain.competitors,
+              }),
             } : {}),
             updatedAt: new Date(),
           },
@@ -570,12 +572,14 @@ export async function POST(request: Request) {
               stabilityScore: companyIntelligence.stabilityScore,
               marketPositionScore: companyIntelligence.marketPositionScore,
               readinessScore: companyIntelligence.readinessScore,
-              positioningLabel: finalCompanyPositioning.positioningLabel,
-              category: finalCompanyPositioning.category,
-              revenueTier: finalCompanyPositioning.revenueTier,
-              headcountTier: finalCompanyPositioning.headcountTier,
-              normalizedIndustry: finalCompanyPositioning.normalizedIndustry,
-              competitors: finalCompanyPositioning.competitors || [],
+              ...(skipIntelligence ? {} : {
+                positioningLabel: finalCompanyPositioning?.positioningLabel,
+                category: finalCompanyPositioning?.category,
+                revenueTier: finalCompanyPositioning?.revenueTier,
+                headcountTier: finalCompanyPositioning?.headcountTier,
+                normalizedIndustry: finalCompanyPositioning?.normalizedIndustry,
+                competitors: finalCompanyPositioning?.competitors || [],
+              }),
             } : {}),
             updatedAt: new Date(),
           },
@@ -620,61 +624,14 @@ export async function POST(request: Request) {
             stabilityScore: companyIntelligence.stabilityScore,
             marketPositionScore: companyIntelligence.marketPositionScore,
             readinessScore: companyIntelligence.readinessScore,
-            positioningLabel: companyPositioning.positioningLabel,
-            category: companyPositioning.category,
-            revenueTier: companyPositioning.revenueTier,
-            headcountTier: companyPositioning.headcountTier,
-            normalizedIndustry: companyPositioning.normalizedIndustry,
-            competitors: companyPositioning.competitors || [],
-          } : {}),
-          updatedAt: new Date(),
-        },
-      });
-      
-      // Link the new company to the contact
-      await prisma.contact.update({
-        where: { id: contactId },
-        data: {
-          companyId: newCompanyId,
-          contactCompanyId: newCompanyId,
-        },
-      });
-      
-      console.log(`✅ STEP 2: Created new company from enrichment data (no domain) and linked to contact: ${newCompanyId}`);
-    } else if (normalizedCompany.companyName) {
-      // Contact has no company AND no domain, but we have company name from enrichment
-      // Create a new company from enrichment data
-      const { randomUUID } = await import('crypto');
-      const newCompanyId = randomUUID();
-      
-      const newCompany = await prisma.companies.create({
-        data: {
-          id: newCompanyId,
-          companyHQId: updatedContact.crmId,
-          companyName: normalizedCompany.companyName,
-          domain: normalizedCompany.domain || null,
-          website: normalizedCompany.website,
-          industry: normalizedCompany.industry,
-          headcount: normalizedCompany.headcount,
-          revenue: normalizedCompany.revenue,
-          revenueRange: normalizedCompany.revenueRange,
-          growthRate: normalizedCompany.growthRate,
-          fundingStage: normalizedCompany.fundingStage,
-          lastFundingDate: normalizedCompany.lastFundingDate,
-          lastFundingAmount: normalizedCompany.lastFundingAmount,
-          numberOfFundingRounds: normalizedCompany.numberOfFundingRounds,
-          ...(companyIntelligence ? {
-            companyHealthScore: companyIntelligence.companyHealthScore,
-            growthScore: companyIntelligence.growthScore,
-            stabilityScore: companyIntelligence.stabilityScore,
-            marketPositionScore: companyIntelligence.marketPositionScore,
-            readinessScore: companyIntelligence.readinessScore,
-            positioningLabel: companyPositioning.positioningLabel,
-            category: companyPositioning.category,
-            revenueTier: companyPositioning.revenueTier,
-            headcountTier: companyPositioning.headcountTier,
-            normalizedIndustry: companyPositioning.normalizedIndustry,
-            competitors: companyPositioning.competitors || [],
+            ...(skipIntelligence ? {} : {
+              positioningLabel: finalCompanyPositioning?.positioningLabel,
+              category: finalCompanyPositioning?.category,
+              revenueTier: finalCompanyPositioning?.revenueTier,
+              headcountTier: finalCompanyPositioning?.headcountTier,
+              normalizedIndustry: finalCompanyPositioning?.normalizedIndustry,
+              competitors: finalCompanyPositioning?.competitors || [],
+            }),
           } : {}),
           updatedAt: new Date(),
         },
