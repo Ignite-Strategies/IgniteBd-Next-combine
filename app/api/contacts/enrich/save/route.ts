@@ -262,11 +262,17 @@ export async function POST(request: Request) {
           finalTotalExperienceYears = previewData.totalExperienceYears ?? null;
           finalAvgTenureYears = previewData.avgTenureYears ?? null;
           finalCareerTimeline = previewData.careerTimeline || null;
-          finalCompanyPositioning = previewData.companyPositioning || {};
+          // Ensure finalCompanyPositioning is always an object, never undefined
+          finalCompanyPositioning = previewData.companyPositioning || finalCompanyPositioning || {};
         }
       } catch (error: any) {
         console.warn('⚠️ Could not fetch preview data for inferences (non-critical):', error.message);
       }
+    }
+    
+    // CRITICAL: Ensure finalCompanyPositioning is always an object (never undefined)
+    if (!finalCompanyPositioning || typeof finalCompanyPositioning !== 'object') {
+      finalCompanyPositioning = {};
     }
 
     // Normalize contact fields
@@ -478,12 +484,12 @@ export async function POST(request: Request) {
             
             // Inference layer fields (enrichment data takes precedence, only if not skipping)
             ...(skipIntelligence ? {} : {
-              positioningLabel: finalCompanyPositioning.positioningLabel || existingCompany.positioningLabel,
-              category: finalCompanyPositioning.category || existingCompany.category,
-              revenueTier: finalCompanyPositioning.revenueTier || existingCompany.revenueTier,
-              headcountTier: finalCompanyPositioning.headcountTier || existingCompany.headcountTier,
-              normalizedIndustry: finalCompanyPositioning.normalizedIndustry || existingCompany.normalizedIndustry,
-              competitors: finalCompanyPositioning.competitors?.length ? finalCompanyPositioning.competitors : existingCompany.competitors,
+              positioningLabel: finalCompanyPositioning?.positioningLabel || existingCompany.positioningLabel,
+              category: finalCompanyPositioning?.category || existingCompany.category,
+              revenueTier: finalCompanyPositioning?.revenueTier || existingCompany.revenueTier,
+              headcountTier: finalCompanyPositioning?.headcountTier || existingCompany.headcountTier,
+              normalizedIndustry: finalCompanyPositioning?.normalizedIndustry || existingCompany.normalizedIndustry,
+              competitors: finalCompanyPositioning?.competitors?.length ? finalCompanyPositioning.competitors : existingCompany.competitors,
             }),
             
             updatedAt: new Date(),
