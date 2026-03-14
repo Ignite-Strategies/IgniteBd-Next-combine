@@ -16,6 +16,117 @@ const OUTCOME_TO_DISPOSITION = {
 };
 
 /**
+ * GET /api/meetings
+ * List meetings with optional filters.
+ *
+ * Query params:
+ * - contactId: string (optional) - filter by contact
+ * - crmId: string (optional) - filter by company
+ * - ownerId: string (optional) - filter by owner
+ * - limit: number (optional, default 50) - max results
+ * - orderBy: 'meetingDate' | 'createdAt' (optional, default 'meetingDate')
+ * - order: 'asc' | 'desc' (optional, default 'desc')
+ *
+ * Returns: { success: true, meetings: [...] }
+ */
+export async function GET(request) {
+  try {
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const contactId = searchParams.get('contactId');
+    const crmId = searchParams.get('crmId');
+    const ownerId = searchParams.get('ownerId');
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const orderBy = searchParams.get('orderBy') || 'meetingDate';
+    const order = searchParams.get('order') || 'desc';
+
+    const where = {};
+    if (contactId) where.contactId = contactId;
+    if (crmId) where.crmId = crmId;
+    if (ownerId) where.ownerId = ownerId;
+
+    const orderByField = orderBy === 'createdAt' ? 'createdAt' : 'meetingDate';
+    const orderDirection = order === 'asc' ? 'asc' : 'desc';
+
+    const meetings = await prisma.meeting.findMany({
+      where,
+      include: {
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            fullName: true,
+            email: true,
+            companyName: true,
+          },
+        },
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        [orderByField]: orderDirection,
+      },
+      take: Math.min(limit, 100), // Cap at 100
+    });
+
+    return NextResponse.json({
+      success: true,
+      meetings: meetings.map((m) => ({
+        id: m.id,
+        contactId: m.contactId,
+        ownerId: m.ownerId,
+        crmId: m.crmId,
+        meetingDate: m.meetingDate.toISOString(),
+        meetingType: m.meetingType,
+        outcome: m.outcome,
+        notes: m.notes,
+        summary: m.summary,
+        nextAction: m.nextAction,
+        nextEngagementDate: m.nextEngagementDate,
+        createdAt: m.createdAt.toISOString(),
+        updatedAt: m.updatedAt.toISOString(),
+        contact: m.contact
+          ? {
+              id: m.contact.id,
+              name:
+                m.contact.fullName ||
+                [m.contact.firstName, m.contact.lastName].filter(Boolean).join(' ') ||
+                m.contact.email ||
+                'Unknown',
+              email: m.contact.email,
+              companyName: m.contact.companyName,
+            }
+          : null,
+        owner: m.owner
+          ? {
+              id: m.owner.id,
+              name: m.owner.name,
+              email: m.owner.email,
+            }
+          : null,
+      })),
+    });
+  } catch (error) {
+    console.error('GET /api/meetings error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to fetch meetings' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * POST /api/meetings
  * Log a post-meeting.
  *

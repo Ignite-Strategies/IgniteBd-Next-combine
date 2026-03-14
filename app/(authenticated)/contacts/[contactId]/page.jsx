@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus, Pencil, FileText, BookmarkPlus, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Mail, Phone, Building2, ArrowLeft, Sparkles, X, Edit2, Check, X as XIcon, Loader2, UserCircle, Users, Eye, List, Wand2, Plus, Zap, Linkedin, MessageSquare, UserPlus, Pencil, FileText, BookmarkPlus, ChevronDown, ChevronUp, ExternalLink, Calendar } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { formatDeliveryMethodLabel, DELIVERY_METHODS, normalizeDeliveryMethod } from '@/lib/utils/deliveryMethod';
@@ -182,6 +182,8 @@ export default function ContactDetailPage() {
   const [savingContactSummary, setSavingContactSummary] = useState(false);
   const [loadingLastEmail, setLoadingLastEmail] = useState(false);
   const [emailHistory, setEmailHistory] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(false);
   const [showAddResponseModal, setShowAddResponseModal] = useState(false);
   const [addResponseEmail, setAddResponseEmail] = useState(null);
   const [addResponseContactResponse, setAddResponseContactResponse] = useState('');
@@ -247,9 +249,31 @@ export default function ContactDetailPage() {
       });
   };
 
+  // Load meeting history
+  const loadMeetings = () => {
+    if (!contactId) return;
+    setLoadingMeetings(true);
+    api.get(`/api/meetings?contactId=${contactId}`)
+      .then((response) => {
+        if (response.data?.success && response.data?.meetings) {
+          setMeetings(response.data.meetings);
+        } else {
+          setMeetings([]);
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading meetings:', error);
+        setMeetings([]);
+      })
+      .finally(() => {
+        setLoadingMeetings(false);
+      });
+  };
+
   useEffect(() => {
     if (!contactId) return;
     loadEmailHistory();
+    loadMeetings();
   }, [contactId]);
 
   const handleOpenAddResponse = (email) => {
@@ -2471,6 +2495,115 @@ export default function ContactDetailPage() {
                 <p className="mb-2 text-sm text-gray-600">No emails sent yet.</p>
                 <p className="text-sm text-gray-500">
                   Click &quot;Build Outreach Email&quot; to send your first email, or &quot;Add Email Manually&quot; to record an off-platform email.
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Meeting History Section */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-purple-600" />
+                Meeting History
+              </h3>
+              <button
+                onClick={() => {
+                  const url = companyHQId 
+                    ? `/meetings?contactId=${contactId}&companyHQId=${companyHQId}`
+                    : `/meetings?contactId=${contactId}`;
+                  router.push(url);
+                }}
+                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+              >
+                <Plus className="h-4 w-4" />
+                Log Meeting
+              </button>
+            </div>
+            {loadingMeetings ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading meetings...
+              </div>
+            ) : meetings.length > 0 ? (
+              <div className="space-y-3">
+                {meetings.map((meeting) => {
+                  const meetingDate = new Date(meeting.meetingDate);
+                  const outcomeColors = {
+                    POSITIVE: 'bg-green-100 text-green-800 border-green-300',
+                    NEUTRAL: 'bg-gray-100 text-gray-800 border-gray-300',
+                    NEGATIVE: 'bg-red-100 text-red-800 border-red-300',
+                    NO_SHOW: 'bg-amber-100 text-amber-800 border-amber-300',
+                  };
+                  const typeLabels = {
+                    INTRO: 'Intro',
+                    FOLLOW_UP: 'Follow-up',
+                    PROPOSAL_REVIEW: 'Proposal Review',
+                    CHECK_IN: 'Check-in',
+                    OTHER: 'Other',
+                  };
+                  return (
+                    <div
+                      key={meeting.id}
+                      className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-sm font-semibold text-gray-900">
+                              {formatDateEST(meeting.meetingDate.slice(0, 10), {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                              {typeLabels[meeting.meetingType] || meeting.meetingType}
+                            </span>
+                            {meeting.outcome && (
+                              <span
+                                className={`px-2 py-0.5 rounded text-xs font-medium border ${outcomeColors[meeting.outcome] || 'bg-gray-100 text-gray-800 border-gray-300'}`}
+                              >
+                                {meeting.outcome}
+                              </span>
+                            )}
+                          </div>
+                          {meeting.summary && (
+                            <p className="text-sm text-gray-700 mb-2 italic">{meeting.summary}</p>
+                          )}
+                          {meeting.notes && (
+                            <p className="text-sm text-gray-600 whitespace-pre-wrap line-clamp-2">
+                              {meeting.notes}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
+                            {meeting.nextAction && (
+                              <span>
+                                <span className="font-medium">Next:</span> {meeting.nextAction}
+                              </span>
+                            )}
+                            {meeting.nextEngagementDate && (
+                              <span>
+                                <span className="font-medium">Follow-up:</span>{' '}
+                                {formatDateEST(meeting.nextEngagementDate, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+                <p className="mb-2 text-sm text-gray-600">No meetings logged yet.</p>
+                <p className="text-sm text-gray-500">
+                  Click &quot;Log Meeting&quot; to record a meeting with this contact.
                 </p>
               </div>
             )}
