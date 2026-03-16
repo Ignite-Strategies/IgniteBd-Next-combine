@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Calendar, Clock, User, ArrowRight, AlertCircle, RefreshCw, Sparkles, Search, Plus } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -8,13 +8,9 @@ import LogMeetingModal from '@/components/meetings/LogMeetingModal';
 import api from '@/lib/api';
 
 /**
- * Meetings Page
- * 
- * Features:
- * - Meeting Prep (generate BD Intel prep for a contact)
- * - Upcoming Meetings (coming soon)
+ * Inner component that uses useSearchParams - must be wrapped in Suspense
  */
-export default function MeetingsPage() {
+function MeetingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [contactName, setContactName] = useState('');
@@ -448,5 +444,35 @@ export default function MeetingsPage() {
         }}
       />
     </div>
+  );
+}
+
+/**
+ * Meetings Page
+ * 
+ * Features:
+ * - Meeting Prep (generate BD Intel prep for a contact)
+ * - Meetings List (all/upcoming/past)
+ */
+export default function MeetingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PageHeader
+            title="Meetings"
+            subtitle="Prep, schedule, and follow up on the conversations that move deals."
+            backTo="/growth-dashboard"
+            backLabel="Back to Growth Dashboard"
+          />
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />
+            <span className="ml-2 text-sm text-gray-500">Loading...</span>
+          </div>
+        </div>
+      </div>
+    }>
+      <MeetingsPageContent />
+    </Suspense>
   );
 }
