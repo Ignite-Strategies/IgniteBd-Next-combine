@@ -130,18 +130,6 @@ function buildCSVFromMappedRows(mappedRows) {
   return lines.join('\n');
 }
 
-// Recompute mapped rows from parsed data + mapping (single source of truth for save)
-function computeMappedRows(rows, headers, mapping) {
-  if (!rows?.length || !headers?.length || !mapping?.length) return [];
-  return rows.map((row) => {
-    const out = {};
-    mapping.forEach((m) => {
-      if (m.field && row[m.csvHeader] !== undefined) out[m.field] = row[m.csvHeader] ?? '';
-    });
-    return out;
-  });
-}
-
 const STEPS = ['View', 'Confirm mapping', 'Edit data', 'Looks good — Save', 'Success'];
 
 export default function ContactUploadPage() {
