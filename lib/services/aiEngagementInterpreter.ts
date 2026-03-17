@@ -76,12 +76,18 @@ export async function interpretEngagement(
 
   let ownerBlock = '';
   if (ownerContext?.name || ownerContext?.email || ownerContext?.companyName) {
-    ownerBlock = '\nOWNER/CLIENT CONTEXT (the person who forwarded this — they are NOT the contact):\n';
+    ownerBlock = '\nOWNER/CLIENT CONTEXT (the person who forwarded this to the CRM — they are NOT the contact):\n';
     if (ownerContext.name) ownerBlock += `  Owner name: ${ownerContext.name}\n`;
     if (ownerContext.email) ownerBlock += `  Owner email: ${ownerContext.email}\n`;
     if (ownerContext.companyName) ownerBlock += `  Owner company: ${ownerContext.companyName}\n`;
     ownerBlock +=
       '\nThe CONTACT is the OTHER person in the conversation — the prospect/target. Do NOT return the owner as the contact.\n';
+    ownerBlock +=
+      '\nFORWARDED EMAILS: If the From: header is the owner (they forwarded this), the REAL contact is INSIDE the body. ';
+    ownerBlock +=
+      'Scan the body for: "From: name <email>", "----- Original Message -----", "Begin forwarded message", "From:", etc. ';
+    ownerBlock +=
+      'Extract the contact email and contact name from the FIRST/original sender block (the person the owner is corresponding with), NOT the forwarder.\n';
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);

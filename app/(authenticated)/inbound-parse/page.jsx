@@ -42,11 +42,8 @@ function ActivityTypeBadge({ type }) {
  * Route: /inbound-parse
  *
  * View all emails received via SendGrid Inbound Parse (InboundEmail model).
- * Flow: Analyze (parse + AI interpret + contact lookup) → confirm contact → Record Activity.
- *
- * The standalone "Parse" button has been retired — the SendGrid webhook already saves
- * the full raw email at ingest, so there is nothing left to "cleanly save". Analyze
- * (formerly Interpret) is now the single preview step.
+ * Flow: Parse & Save opens Email activity matcher (AI interpret) → edit fields → Save → email_activities.
+ * Post-save: AI Reasoning stamps contact. contact_id can be null; email_activities.email is persisted for later link.
  */
 export default function InboundParsePage() {
   const [emails, setEmails] = useState([]);
@@ -63,10 +60,12 @@ export default function InboundParsePage() {
   const [contactEmailOverride, setContactEmailOverride] = useState('');
   const [contactNameOverride, setContactNameOverride] = useState('');
   const [contactIdOverride, setContactIdOverride] = useState(null);
-  const [confirmOrphan, setConfirmOrphan] = useState(false);
+  const [subjectOverride, setSubjectOverride] = useState('');
+  const [summaryOverride, setSummaryOverride] = useState('');
   const [computeLoading, setComputeLoading] = useState(false);
   const [recordedContactId, setRecordedContactId] = useState(null);
   const [createContactLoading, setCreateContactLoading] = useState(false);
+  const [listTab, setListTab] = useState('inbox'); // inbox | recorded
 
   useEffect(() => {
     const crmId =
@@ -78,16 +77,16 @@ export default function InboundParsePage() {
 
     if (crmId) {
       setCompanyHQId(crmId);
-      fetchInboundEmails(crmId);
+      fetchInboundEmails(crmId, 'inbox');
     } else {
       setLoading(false);
     }
   }, []);
 
-  const fetchInboundEmails = async (tenantId) => {
+  const fetchInboundEmails = async (tenantId, tab = 'inbox') => {
     try {
       setLoading(true);
-      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}`);
+      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}&tab=${tab}`);
       if (res.data?.success) {
         setEmails(res.data.emails || []);
       }
@@ -128,7 +127,8 @@ export default function InboundParsePage() {
     setContactNameOverride('');
     setContactIdOverride(null);
     setNextEngageOverride('');
-    setConfirmOrphan(false);
+    setSubjectOverride('');
+    setSummaryOverride('');
     setRecordedContactId(null);
     setActionMessage(null);
   };
@@ -154,15 +154,14 @@ export default function InboundParsePage() {
     }
   };
 
-  // Single "Analyze" step: parse + AI interpret + contact lookup + name fallback
-  const handleAnalyze = async (e) => {
+  // Parse & Save: run interpret to open Email activity matcher (contact name/email, subject, summary, date)
+  const handleParseAndSave = async (e) => {
     e?.stopPropagation?.();
     if (!selectedEmail) return;
     setActionMessage(null);
     setAnalyzeLoading(true);
     setParseResult(null);
     setContactIdOverride(null);
-    setConfirmOrphan(false);
     try {
       const res = await api.post('/api/inbound-parse/interpret', {
         inboundEmailId: selectedEmail.id,
@@ -172,6 +171,8 @@ export default function InboundParsePage() {
         setContactEmailOverride(res.data.parsed?.contactEmail || '');
         setContactNameOverride(res.data.parsed?.contactName || '');
         setNextEngageOverride(res.data.nextEngage?.recommended || '');
+        setSubjectOverride(res.data.parsed?.subject || '');
+        setSummaryOverride(res.data.parsed?.summary || '');
         if (res.data.alreadyIngested) {
           setActionMessage({
             type: 'error',
@@ -179,68 +180,62 @@ export default function InboundParsePage() {
           });
         }
       } else {
-        setActionMessage({ type: 'error', text: res.data?.error || 'Analyze failed' });
+        setActionMessage({ type: 'error', text: res.data?.error || 'Parse failed' });
       }
     } catch (err) {
       setActionMessage({
         type: 'error',
-        text: err.response?.data?.error || err.message || 'Analyze failed',
+        text: err.response?.data?.error || err.message || 'Parse failed',
       });
     } finally {
       setAnalyzeLoading(false);
     }
   };
 
-  const handlePushToAi = async (e) => {
+  const handleSave = async (e) => {
     e?.stopPropagation?.();
     if (!selectedEmail) return;
-
-    // Orphan gate: no email and no name-match selected → require confirmation
-    const hasContact = contactEmailOverride || contactIdOverride;
-    if (!hasContact && !confirmOrphan) {
-      setConfirmOrphan(true);
-      return;
-    }
 
     setActionMessage(null);
     setPushLoading(true);
     setRecordedContactId(null);
-    setConfirmOrphan(false);
     try {
       const payload = { inboundEmailId: selectedEmail.id };
       if (nextEngageOverride) payload.nextEngagementDate = nextEngageOverride;
       if (contactEmailOverride) payload.contactEmail = contactEmailOverride;
       if (contactIdOverride) payload.contactIdOverride = contactIdOverride;
-      if (parseResult?.interpretation) payload.interpretation = parseResult.interpretation;
+      if (parseResult?.interpretation) {
+        payload.interpretation = {
+          ...parseResult.interpretation,
+          subject: subjectOverride || parseResult.parsed?.subject,
+          summary: summaryOverride || parseResult.parsed?.summary,
+          contactEmail: contactEmailOverride || parseResult.parsed?.contactEmail,
+          contactName: contactNameOverride || parseResult.parsed?.contactName,
+          nextEngagementDate: nextEngageOverride || parseResult.nextEngage?.recommended,
+        };
+      }
       const res = await api.post('/api/inbound-parse/push-to-ai', payload);
       const { parsed, contactId, recordType } = res.data;
       if (contactId) setRecordedContactId(contactId);
-      setEmails((prev) =>
-        prev.map((x) =>
-          x.id === selectedEmail.id ? { ...x, ingestionStatus: 'PROMOTED' } : x
-        )
-      );
-      setSelectedEmail((prev) =>
-        prev ? { ...prev, ingestionStatus: 'PROMOTED' } : null
-      );
+      setEmails((prev) => prev.filter((x) => x.id !== selectedEmail.id));
       const contactLabel = parsed?.contactEmail
         ? `Contact: ${parsed.contactEmail}`
         : contactId
-        ? 'Contact linked by name'
-        : 'No contact linked';
+        ? 'Contact linked'
+        : 'Saved (no contact linked — link later from contact)';
       const recordLabel = recordType || 'Activity';
       const summarySnip = parsed?.summary ? ` | ${parsed.summary.slice(0, 80)}` : '';
       setActionMessage({
         type: 'success',
         text: parsed?.nextEngagementDate
-          ? `Recorded → ${recordLabel}. ${contactLabel} · Next engage: ${parsed.nextEngagementDate}${summarySnip}`
-          : `Recorded → ${recordLabel}. ${contactLabel}${summarySnip}`,
+          ? `Saved → ${recordLabel}. ${contactLabel} · Next engage: ${parsed.nextEngagementDate}${summarySnip}`
+          : `Saved → ${recordLabel}. ${contactLabel}${summarySnip}`,
       });
       setTimeout(() => setActionMessage(null), 8000);
     } catch (err) {
       setActionMessage({
         type: 'error',
-        text: err.response?.data?.error || err.message || 'Record failed',
+        text: err.response?.data?.error || err.message || 'Save failed',
       });
     } finally {
       setPushLoading(false);
@@ -286,7 +281,7 @@ export default function InboundParsePage() {
         });
         // Refresh the analyze result to show the new contact
         setTimeout(() => {
-          handleAnalyze({ stopPropagation: () => {} });
+          handleParseAndSave({ stopPropagation: () => {} });
         }, 1000);
       } else {
         setActionMessage({
@@ -340,7 +335,6 @@ export default function InboundParsePage() {
     }
   };
 
-  const isPromoted = selectedEmail?.ingestionStatus === 'PROMOTED';
   const hasContent = !!(selectedEmail?.text || selectedEmail?.html || selectedEmail?.email);
 
   if (loading) {
@@ -377,9 +371,23 @@ export default function InboundParsePage() {
             {/* Email List */}
             <div className="space-y-2">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Recent Emails ({emails.length})</h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setListTab('inbox'); fetchInboundEmails(companyHQId, 'inbox'); }}
+                    className={`text-sm font-medium px-2 py-1 rounded ${listTab === 'inbox' ? 'bg-indigo-100 text-indigo-800' : 'text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    Inbox
+                  </button>
+                  <button
+                    onClick={() => { setListTab('recorded'); fetchInboundEmails(companyHQId, 'recorded'); }}
+                    className={`text-sm font-medium px-2 py-1 rounded ${listTab === 'recorded' ? 'bg-indigo-100 text-indigo-800' : 'text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    Recorded
+                  </button>
+                </div>
+                <span className="text-sm text-gray-500">{emails.length} emails</span>
                 <button
-                  onClick={() => fetchInboundEmails(companyHQId)}
+                  onClick={() => fetchInboundEmails(companyHQId, listTab)}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   Refresh
@@ -439,7 +447,7 @@ export default function InboundParsePage() {
                       {email.ingestionStatus && (
                         <span
                           className={`px-2 py-0.5 rounded text-xs ${
-                            email.ingestionStatus === 'PROMOTED'
+                            email.ingestionStatus === 'RECORDED'
                               ? 'bg-indigo-100 text-indigo-700'
                               : email.ingestionStatus === 'RECEIVED'
                               ? 'bg-green-100 text-green-700'
@@ -471,38 +479,27 @@ export default function InboundParsePage() {
                       {showRaw ? 'Show Parsed' : 'Show Raw'}
                     </button>
 
-                    {/* Analyze (formerly Parse + Interpret combined) */}
+                    {/* Parse & Save: opens Email activity matcher */}
                     <button
-                      onClick={handleAnalyze}
-                      disabled={analyzeLoading || isPromoted || !hasContent}
+                      onClick={handleParseAndSave}
+                      disabled={analyzeLoading || !hasContent}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Parse + AI interpret in one step. Shows contact match, history, and next engagement before you record."
+                      title="Parse email and open matcher to review and save to email activity."
                     >
                       <Sparkles className="h-4 w-4" />
-                      {analyzeLoading ? 'Analyzing…' : 'Analyze'}
+                      {analyzeLoading ? 'Parsing…' : 'Parse & Save'}
                     </button>
 
-                    {/* Record Activity */}
-                    <button
-                      onClick={handlePushToAi}
-                      disabled={pushLoading || isPromoted || !hasContent}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Write email activity to CRM and mark this email as Promoted."
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      {pushLoading ? 'Recording…' : 'Record Activity'}
-                    </button>
-
-                    {/* Calculate Engagement (post-record) */}
+                    {/* AI Reasoning (post-save): stamps contact engagement */}
                     {(recordedContactId || parseResult?.contact?.id) && (
                       <button
                         onClick={handleComputeEngagement}
                         disabled={computeLoading}
                         className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Re-compute the contact's next engagement date from their activity history."
+                        title="Re-compute contact next engagement from activity history."
                       >
                         <Zap className="h-4 w-4" />
-                        {computeLoading ? 'Computing…' : 'Calculate Engagement'}
+                        {computeLoading ? 'Running…' : 'AI Reasoning'}
                       </button>
                     )}
 
@@ -542,47 +539,15 @@ export default function InboundParsePage() {
                   </a>
                 )}
 
-                {/* Orphan confirmation gate */}
-                {confirmOrphan && (
-                  <div className="mb-4 p-3 rounded-lg border-2 border-orange-300 bg-orange-50">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-orange-800">No contact linked</p>
-                        <p className="text-xs text-orange-700 mt-0.5">
-                          This activity will be recorded without linking to any contact. You can
-                          link it manually later from the contact record.
-                        </p>
-                        <div className="flex gap-2 mt-3">
-                          <button
-                            onClick={handlePushToAi}
-                            disabled={pushLoading}
-                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
-                          >
-                            {pushLoading ? 'Recording…' : 'Record anyway'}
-                          </button>
-                          <button
-                            onClick={() => setConfirmOrphan(false)}
-                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-orange-300 text-orange-700 hover:bg-orange-50"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Analyze preview panel — 4 steps */}
+                {/* Email activity matcher — editable fields then Save */}
                 {parseResult && (
                   <div className="mb-6 space-y-4">
-                    {/* ── Step 1: Parse & Confirm Contact ── */}
                     <div className="p-4 rounded-lg border-2 border-indigo-200 bg-indigo-50/50">
                       <h4 className="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
                         <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold">
                           1
                         </span>
-                        Email & Contact Details
+                        Email activity matcher
                         {parseResult.parsed?.activityType && (
                           <ActivityTypeBadge type={parseResult.parsed.activityType} />
                         )}
@@ -611,8 +576,13 @@ export default function InboundParsePage() {
                           />
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-gray-600 font-medium w-28">Subject:</span>
-                          <span>{parseResult.parsed?.subject || '(none)'}</span>
+                          <label className="text-gray-600 font-medium w-28">Subject:</label>
+                          <input
+                            type="text"
+                            value={subjectOverride}
+                            onChange={(e) => setSubjectOverride(e.target.value)}
+                            className="px-2 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[200px]"
+                          />
                         </div>
                         {parseResult.parsed?.activityDate && (
                           <div className="flex flex-wrap items-center gap-2">
@@ -628,16 +598,15 @@ export default function InboundParsePage() {
                             Detected as response to outreach
                           </span>
                         )}
-                        {parseResult.parsed?.summary && (
-                          <div className="p-2 rounded bg-indigo-100/60 border border-indigo-200">
-                            <span className="text-xs font-semibold text-indigo-800">
-                              AI Summary:
-                            </span>
-                            <div className="text-sm text-indigo-900 mt-0.5">
-                              {parseResult.parsed.summary}
-                            </div>
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-start gap-2">
+                          <label className="text-gray-600 font-medium w-28 pt-1">Summary:</label>
+                          <textarea
+                            value={summaryOverride}
+                            onChange={(e) => setSummaryOverride(e.target.value)}
+                            rows={3}
+                            className="px-2 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[200px]"
+                          />
+                        </div>
                         {parseResult.parsed?.body && (
                           <div>
                             <span className="text-gray-600 font-medium">Body:</span>
@@ -647,6 +616,16 @@ export default function InboundParsePage() {
                             </div>
                           </div>
                         )}
+                        <div className="mt-4 pt-3 border-t border-indigo-200">
+                          <button
+                            onClick={handleSave}
+                            disabled={pushLoading}
+                            className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Save to email activity. contact_id can be null; email is persisted for later link."
+                          >
+                            {pushLoading ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -1060,7 +1039,7 @@ export default function InboundParsePage() {
                         </label>
                         <span
                           className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                            selectedEmail.ingestionStatus === 'PROMOTED'
+                            selectedEmail.ingestionStatus === 'RECORDED'
                               ? 'bg-indigo-100 text-indigo-700'
                               : selectedEmail.ingestionStatus === 'RECEIVED'
                               ? 'bg-green-100 text-green-700'
@@ -1071,7 +1050,7 @@ export default function InboundParsePage() {
                         >
                           {selectedEmail.ingestionStatus}
                         </span>
-                        {selectedEmail.ingestionStatus === 'PROMOTED' && (
+                        {selectedEmail.ingestionStatus === 'RECORDED' && (
                           <p className="text-xs text-gray-500 mt-1">
                             This email has been recorded as a CRM activity. Buttons above are
                             disabled.

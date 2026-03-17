@@ -21,18 +21,27 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId'); // Company-scoped filtering
+    const tab = searchParams.get('tab') || 'inbox'; // inbox | recorded | all
 
     // Get recent inbound emails (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    const statusFilter =
+      tab === 'inbox'
+        ? { ingestionStatus: 'RECEIVED' }
+        : tab === 'recorded'
+          ? { ingestionStatus: 'RECORDED' }
+          : {};
+
     const inboundEmails = await prisma.inboundEmail.findMany({
       where: {
         createdAt: { gte: thirtyDaysAgo },
-        ...(companyHQId && { companyHQId }), // Filter by company (company-scoped)
+        ...(companyHQId && { companyHQId }),
+        ...statusFilter,
       },
       orderBy: { createdAt: 'desc' },
-      take: 100, // Limit to recent 100
+      take: 100,
     });
 
     return NextResponse.json({

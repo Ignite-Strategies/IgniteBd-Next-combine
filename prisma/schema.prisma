@@ -749,7 +749,7 @@ model InboundEmail {
   companyHQId     String?  // FK to company_hqs (company-scoped like rest of repo)
   company_hqs     company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
-  ingestionStatus String   @default("RECEIVED") // RECEIVED | PROCESSING | PROMOTED | FAILED
+  ingestionStatus String   @default("RECEIVED") // RECEIVED | PROCESSING | RECORDED | FAILED
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

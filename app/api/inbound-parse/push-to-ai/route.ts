@@ -157,23 +157,8 @@ export async function POST(request: Request) {
       });
       if (existing) {
         contactId = existing.id;
-      } else {
-        const nameParts = (interpreted.contactName || '')
-          .trim()
-          .split(/\s+/)
-          .filter(Boolean);
-        const newContact = await prisma.contact.create({
-          data: {
-            crmId: companyHQId,
-            email: normalizedEmail,
-            firstName: nameParts[0] || null,
-            lastName: nameParts.slice(1).join(' ') || null,
-          },
-          select: { id: true },
-        });
-        contactId = newContact.id;
-        console.log(`✅ push-to-ai: created new contact ${contactId} for ${normalizedEmail}`);
       }
+      // If no match: leave contactId null. email_activities.email is persisted for later link-by-email.
     }
 
     const effectiveNextEngagementDate =
@@ -329,7 +314,7 @@ export async function POST(request: Request) {
     // ── 6. Mark ingested ──
     await prisma.inboundEmail.update({
       where: { id: inboundEmailId },
-      data: { ingestionStatus: 'PROMOTED' },
+      data: { ingestionStatus: 'RECORDED' },
     });
 
     return NextResponse.json({
