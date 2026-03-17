@@ -365,7 +365,6 @@ model company_hqs {
   blogs                                         blogs[]
   campaigns                                     campaigns[]
   InboundEmail                                  InboundEmail[]
-  RawMeetingNotes                               RawMeetingNotes[]
   companies                                     companies[]
   contacts_company_hqs_contactOwnerIdTocontacts Contact?                        @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
@@ -726,6 +725,11 @@ model email_activities {
   @@index([emailSequenceOrder])
 }
 
+enum InboundType {
+  OUTREACH  // slug@crm.domain → email ingest
+  MEETING   // slug.meeting@crm.domain → meeting notes ingest
+}
+
 model InboundEmail {
   id              String   @id @default(cuid())
 
@@ -750,32 +754,14 @@ model InboundEmail {
   companyHQId     String?  // FK to company_hqs (company-scoped like rest of repo)
   company_hqs     company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
+  inboundType     InboundType @default(OUTREACH) // OUTREACH = email; MEETING = meeting notes (slug.meeting@crm.domain)
   ingestionStatus String   @default("RECEIVED") // RECEIVED | PROCESSING | RECORDED | FAILED
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([companyHQId])
-}
-
-/// Raw meeting notes from SendGrid (slug.meeting@crm.domain). RECEIVED = to process; RECORDED = saved to Meeting.
-model RawMeetingNotes {
-  id          String   @id @default(cuid())
-  companyHQId String?
-  from        String?
-  to          String?
-  subject     String?
-  text        String?  @db.Text
-  html        String?  @db.Text
-  email       String?  @db.Text // raw MIME
-  status      String   @default("RECEIVED") // RECEIVED | RECORDED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  company_hqs company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-
-  @@index([companyHQId])
-  @@index([status])
+  @@index([inboundType])
 }
 
 model email_sequences {

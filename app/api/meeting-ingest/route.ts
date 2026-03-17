@@ -30,13 +30,14 @@ export async function GET(request: Request) {
 
     const statusFilter =
       tab === 'inbox'
-        ? { status: 'RECEIVED' }
+        ? { ingestionStatus: 'RECEIVED' }
         : tab === 'recorded'
-          ? { status: 'RECORDED' }
+          ? { ingestionStatus: 'RECORDED' }
           : {};
 
-    const notes = await prisma.rawMeetingNotes.findMany({
+    const notes = await prisma.inboundEmail.findMany({
       where: {
+        inboundType: 'MEETING',
         createdAt: { gte: since },
         ...(companyHQId && { companyHQId }),
         ...statusFilter,

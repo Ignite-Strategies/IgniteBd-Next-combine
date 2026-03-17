@@ -72,36 +72,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // STEP 5: Branch by inbound type — meeting ingest vs email ingest
-    if (recipient?.inboundType === 'meeting' && companyHQId) {
-      const rawMeeting = await prisma.rawMeetingNotes.create({
-        data: {
-          companyHQId,
-          from,
-          to,
-          subject,
-          text: text ?? null,
-          html: html ?? null,
-          email: email ?? null,
-          status: 'RECEIVED',
-        },
-      });
-      console.log('RawMeetingNotes stored:', rawMeeting.id, {
-        hasText: !!text,
-        hasHtml: !!html,
-        hasRawMime: !!email,
-      });
-      return NextResponse.json(
-        { success: true, meetingIngestId: rawMeeting.id },
-        { status: 200 }
-      );
-    }
-
-    // Email path (or null/unknown recipient with company): save to InboundEmail
     if (!companyHQId) {
       console.log('Inbound: no company for slug, returning 200');
       return NextResponse.json({ success: true }, { status: 200 });
     }
+
+    const inboundType = recipient?.inboundType === 'meeting' ? 'MEETING' : 'OUTREACH';
 
     const inboundEmail = await prisma.inboundEmail.create({
       data: {
@@ -122,17 +98,17 @@ export async function POST(req: Request) {
         attachment_info,
         email: email ?? null,
         companyHQId,
+        inboundType,
         ingestionStatus: 'RECEIVED',
       },
     });
 
-    console.log('InboundEmail stored:', inboundEmail.id, {
-      hasText: !!text,
-      hasHtml: !!html,
-      hasRawMime: !!email,
-    });
+    console.log('InboundEmail stored:', inboundEmail.id, { inboundType, hasText: !!text, hasHtml: !!html, hasRawMime: !!email });
 
-    return NextResponse.json({ success: true, inboundEmailId: inboundEmail.id }, { status: 200 });
+    return NextResponse.json(
+      { success: true, inboundEmailId: inboundEmail.id, inboundType },
+      { status: 200 }
+    );
 
   } catch (err) {
     console.error('InboundEmail ingestion error:', err);

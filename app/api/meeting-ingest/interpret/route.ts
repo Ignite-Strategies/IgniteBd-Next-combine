@@ -8,7 +8,7 @@ import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
  *
  * Parse + AI interpretation of raw meeting notes.
  * Returns: interpretation (contactEmail, contactName, activityDate, summary), contact match, nameMatches.
- * Body: { rawMeetingNotesId }
+ * Body: { rawMeetingNotesId } (inboundEmailId for MEETING-type InboundEmail)
  */
 export async function POST(request: Request) {
   try {
@@ -27,8 +27,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const raw = await prisma.rawMeetingNotes.findUnique({
-      where: { id: rawMeetingNotesId },
+    const raw = await prisma.inboundEmail.findFirst({
+      where: { id: rawMeetingNotesId, inboundType: 'MEETING' },
       include: {
         company_hqs: {
           select: {
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     if (!raw) {
       return NextResponse.json(
-        { success: false, error: 'RawMeetingNotes not found' },
+        { success: false, error: 'Meeting ingest record not found' },
         { status: 404 }
       );
     }

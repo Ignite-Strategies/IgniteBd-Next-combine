@@ -38,8 +38,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const raw = await prisma.rawMeetingNotes.findUnique({
-      where: { id: rawMeetingNotesId },
+    const raw = await prisma.inboundEmail.findFirst({
+      where: { id: rawMeetingNotesId, inboundType: 'MEETING' },
       include: {
         company_hqs: {
           select: {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
     if (!raw) {
       return NextResponse.json(
-        { success: false, error: 'RawMeetingNotes not found' },
+        { success: false, error: 'Meeting ingest record not found' },
         { status: 404 }
       );
     }
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     const companyHQId = raw.companyHQId;
     if (!companyHQId) {
       return NextResponse.json(
-        { success: false, error: 'RawMeetingNotes has no company' },
+        { success: false, error: 'Inbound record has no company' },
         { status: 400 }
       );
     }
@@ -144,9 +144,9 @@ export async function POST(request: Request) {
       },
     });
 
-    await prisma.rawMeetingNotes.update({
+    await prisma.inboundEmail.update({
       where: { id: rawMeetingNotesId },
-      data: { status: 'RECORDED' },
+      data: { ingestionStatus: 'RECORDED' },
     });
 
     return NextResponse.json({
