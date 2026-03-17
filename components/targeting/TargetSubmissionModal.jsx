@@ -68,12 +68,12 @@ const CSV_HEADERS = [
   'Company',
   'Title',
   'LinkedIn',
-  'Notes',
   'Last contact',
   'Knows your business?',
   'Using competitor?',
   'Worked together at',
   'Prior work together?',
+  'Additional Context',
 ];
 const CSV_TEMPLATE = CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,,,,,,,,\n';
 
@@ -135,7 +135,8 @@ const COLUMN_MAP = [
   { key: 'company',        aliases: ['company', 'org', 'employer', 'organization'] },
   { key: 'title',          aliases: ['title', 'position', 'role', 'job', 'job title'] },
   { key: 'linkedin',       aliases: ['linkedin', 'linkedin url', 'url', 'profile', 'linkedin profile'] },
-  { key: 'notes',          aliases: ['notes', 'note', 'description', 'context', 'relationship notes'] },
+  { key: 'notes',          aliases: ['notes', 'note', 'description', 'context', 'relationship notes', 'additional context'] },
+  { key: 'notesFromLastEngagement', aliases: ['notes (from last engagement)', 'notes from last engagement', 'last engagement notes'] },
   { key: 'relationship',   aliases: ['relationship', 'how met', 'howmet', 'relationship context', 'connection'] },
   { key: 'lastContact',    aliases: ['last contact', 'lastcontact', 'when last contact', 'last spoke'] },
   { key: 'awareOfBusiness',aliases: ['knows your business', 'aware of business', 'aware', 'knows business'] },
@@ -195,7 +196,7 @@ function parseCSVText(text) {
     .map((l) => parseCSVLine(l))
     .filter((p) => p.some((v) => v))
     .map((parts) => {
-      const notes = get(parts, pos('notes', 4));
+      const notes = (get(parts, pos('notes', 4)) || get(parts, idx('notesFromLastEngagement'))).trim();
       const relationship = get(parts, idx('relationship')) || inferRelationshipFromNotes(notes);
       return {
         name:             get(parts, pos('name', 0)),
@@ -365,9 +366,9 @@ function SingleContactCard({ contact, index, total, onChange, onDelete }) {
         </div>
       </div>
 
-      {/* Notes — full width, drives relationship inference */}
+      {/* Engagement history — full width, drives relationship inference */}
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">Notes</label>
+        <label className="mb-1 block text-xs font-medium text-gray-600">Engagement history</label>
         <textarea
           value={contact.notes}
           onChange={(e) => update('notes', e.target.value)}
@@ -434,14 +435,14 @@ function SingleContactCard({ contact, index, total, onChange, onDelete }) {
         </div>
       </div>
 
-      {/* Relationship Context — auto-filled from notes */}
+      {/* Relationship Context — auto-filled from engagement history */}
       <div>
         <div className="mb-1 flex items-center gap-2">
           <label className="text-xs font-medium text-gray-600">Relationship Context</label>
           {inferredRelationship && (
             <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
               <Sparkles className="h-3 w-3" />
-              Auto-detected from notes
+              Auto-detected from engagement history
             </span>
           )}
         </div>
@@ -553,7 +554,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
     if (!inputText.trim()) { setParseError('Paste some contacts first.'); return; }
     const parsed = parseStructuredPaste(inputText);
     if (!parsed.length) {
-      setParseError('Could not parse contacts. Use: Name | Company | Title | LinkedIn | Notes (one per line).');
+      setParseError('Could not parse contacts. Use: Name | Company | Title | LinkedIn | Additional Context (one per line).');
       return;
     }
     goToReview(parsed);
@@ -786,7 +787,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                   <div className="font-semibold text-gray-900">Paste Structured</div>
                   <div className="text-sm text-gray-500">
                     Copy rows from a spreadsheet or use{' '}
-                    <span className="font-mono text-xs">Name | Company | Title | LinkedIn | Notes</span>
+                    <span className="font-mono text-xs">Name | Company | Title | LinkedIn | Additional Context</span>
                   </div>
                 </div>
               </button>
@@ -810,7 +811,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
             <div className="space-y-5">
               <div className="flex items-start justify-between rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <p className="text-sm text-blue-800">
-                  Expected columns: <strong>Name, Company, Title, LinkedIn URL, Relationship Context, Notes</strong>
+                  Expected columns: <strong>Name, Company, Title, LinkedIn URL, Relationship Context, Additional Context</strong>
                 </p>
                 <button
                   onClick={downloadTemplate}
@@ -880,7 +881,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
               />
               <p className="text-xs text-gray-400">
-                Relationship context is inferred from your notes automatically. Refine it in the next step.
+                Relationship context is inferred from your engagement history automatically. Refine it in the next step.
               </p>
               {parseError && (
                 <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -979,7 +980,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                   <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Suggested Persona</p>
                   {loadingSuggestion ? (
                     <div className="flex items-center gap-2 text-sm text-indigo-600">
-                      <Sparkles className="h-4 w-4 animate-pulse" /> Analysing notes…
+                      <Sparkles className="h-4 w-4 animate-pulse" /> Analysing engagement history…
                     </div>
                   ) : personaSuggestion ? (
                     <>
@@ -1003,7 +1004,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                       </button>
                     </>
                   ) : (
-                    <p className="text-sm text-indigo-600 italic">No suggestion — add notes to the contact for a better result.</p>
+                    <p className="text-sm text-indigo-600 italic">No suggestion — add engagement history to the contact for a better result.</p>
                   )}
                 </div>
               )}

@@ -2043,10 +2043,10 @@ export default function ContactDetailPage() {
             )}
           </section>
 
-          {/* Notes Section (source for both persona and relationship context) */}
+          {/* Engagement history (source for both persona and relationship context) */}
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Notes</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Engagement history</h3>
               <div className="flex items-center gap-2">
                 {!editingNotes && (contact?.notes || notesText.trim()) && (
                   <>
@@ -2054,7 +2054,7 @@ export default function ContactDetailPage() {
                       onClick={handleSuggestPersona}
                       disabled={suggestingPersona}
                       className="flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Generate persona from notes"
+                      title="Generate persona from engagement history"
                     >
                       {suggestingPersona ? (
                         <>
@@ -2072,7 +2072,7 @@ export default function ContactDetailPage() {
                       onClick={handleGenerateRelationshipContext}
                       disabled={generatingRelationshipContext}
                       className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Generate relationship context from notes"
+                      title="Generate relationship context from engagement history"
                     >
                       {generatingRelationshipContext ? (
                         <>
@@ -2095,7 +2095,7 @@ export default function ContactDetailPage() {
                       setNotesText(contact.notes || '');
                     }}
                     className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                    title="Edit notes"
+                    title="Edit engagement history"
                   >
                     <Edit2 className="h-4 w-4" />
                   </button>
@@ -2114,7 +2114,7 @@ export default function ContactDetailPage() {
                     }}
                     className="w-full rounded-lg border-2 border-dashed border-gray-200 p-4 text-left text-sm text-gray-400 hover:border-gray-300 hover:text-gray-500 transition"
                   >
-                    + Add notes — relationship context, how you met, former company, key signals. Used to generate persona and contact summary.
+                    + Add engagement history — relationship context, how you met, former company, key signals. Used to generate persona and contact summary.
                   </button>
                 )}
               </div>
@@ -2213,7 +2213,7 @@ export default function ContactDetailPage() {
             )}
           </section>
 
-          {/* Relationship Context Section (hydrated from Notes buttons above) */}
+          {/* Relationship Context Section (hydrated from Engagement history buttons above) */}
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Relationship Context</h3>
@@ -2321,8 +2321,8 @@ export default function ContactDetailPage() {
               <div>
                 <p className="text-sm text-gray-400 italic mb-3">
                   {contact?.notes
-                    ? 'Use "Generate Context" on the Notes section above to extract relationship details here.'
-                    : 'Add notes above, then use Generate Persona and Generate Context to fill this section.'}
+                    ? 'Use "Generate Context" on the Engagement history section above to extract relationship details here.'
+                    : 'Add engagement history above, then use Generate Persona and Generate Context to fill this section.'}
                 </p>
               </div>
             )}

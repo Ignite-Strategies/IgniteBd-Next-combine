@@ -14,6 +14,7 @@ const HEADER_ROW_HINTS = new Set([
   'url', 'linkedin', 'linkedin url', 'linkedinurl', 'profile url', 'profileurl', 'profile',
   'connected on', 'connectedon', 'date connected', 'phone', 'phone number', 'phonenumber', 'mobile',
   'notes', 'note', 'description', 'pipeline', 'stage',
+  'notes (from last engagement)', 'notes from last engagement', 'last engagement notes', 'additional context',
 ]);
 
 // Client-side CSV parse: preserve original header casing, strip BOM. If first line doesn't look like headers, treat it as data and use Column 1, Column 2, ...
@@ -110,6 +111,10 @@ const HEADER_TO_FIELD = {
   notes: 'notes',
   note: 'notes',
   description: 'notes',
+  'notes (from last engagement)': 'notes',
+  'notes from last engagement': 'notes',
+  'last engagement notes': 'notes',
+  'additional context': 'notes',
   pipeline: 'pipeline',
   stage: 'stage',
 };
@@ -123,7 +128,7 @@ const FIELD_LABELS = {
   linkedinUrl: 'URL (LinkedIn)',
   linkedinConnectedOn: 'Connected On',
   phone: 'Phone',
-  notes: 'Notes',
+  notes: 'Engagement history',
   pipeline: 'Pipeline',
   stage: 'Stage',
 };
@@ -188,7 +193,7 @@ const FIELD_TO_CANONICAL_HEADER = {
   linkedinUrl: 'URL',
   linkedinConnectedOn: 'Connected On',
   phone: 'Phone',
-  notes: 'Notes',
+  notes: 'Engagement history',
   pipeline: 'Pipeline',
   stage: 'Stage',
 };
@@ -452,7 +457,7 @@ export default function ContactUploadPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Upload CSV</h2>
               <p className="text-gray-600">
-                Required: First Name, Last Name. Optional: URL, Email, Company, Position, Connected On, Notes, Pipeline, Stage.
+                Required: First Name, Last Name. Optional: URL, Email, Company, Position, Connected On, Engagement history, Pipeline, Stage.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">

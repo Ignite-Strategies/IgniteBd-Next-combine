@@ -145,6 +145,10 @@ export async function POST(request) {
         'mobile': 'phone',
         'notes': 'notes',
         'note': 'notes',
+        'notes (from last engagement)': 'notes',
+        'notes from last engagement': 'notes',
+        'last engagement notes': 'notes',
+        'additional context': 'notes',
         'pipeline': 'pipeline',
         'stage': 'stage',
       };

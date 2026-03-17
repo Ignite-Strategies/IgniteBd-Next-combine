@@ -569,7 +569,7 @@ export default function ContactManualPage() {
             <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 <FileText className="mr-1 inline h-4 w-4" />
-                Notes
+                Engagement history
               </label>
               <textarea
                 value={contactData.notes}
