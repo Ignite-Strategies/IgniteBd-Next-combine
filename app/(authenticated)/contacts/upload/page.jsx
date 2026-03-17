@@ -5,68 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Upload, User, X, ChevronRight, Download } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import { auth } from '@/lib/firebase';
-
-// Known header phrases: if the first line has any of these (lowercased), we treat it as a header row
-const HEADER_ROW_HINTS = new Set([
-  'first name', 'last name', 'firstname', 'lastname', 'first', 'last', 'fname', 'lname',
-  'given name', 'family name', 'surname', 'email', 'email address', 'company', 'company name',
-  'companyname', 'organization', 'org', 'title', 'job title', 'jobtitle', 'position', 'role',
-  'url', 'linkedin', 'linkedin url', 'linkedinurl', 'profile url', 'profileurl', 'profile',
-  'connected on', 'connectedon', 'date connected', 'phone', 'phone number', 'phonenumber', 'mobile',
-  'notes', 'note', 'description', 'pipeline', 'stage',
-  'notes (from last engagement)', 'notes from last engagement', 'last engagement notes', 'additional context',
-]);
-
-// Client-side CSV parse: preserve original header casing, strip BOM. If first line doesn't look like headers, treat it as data and use Column 1, Column 2, ...
-function parseCSVClient(csvText) {
-  const normalized = (typeof csvText === 'string' ? csvText : '').replace(/^\uFEFF/, '');
-  const lines = normalized.split(/\r?\n/).filter((line) => line.trim());
-  if (lines.length === 0) return { headers: [], rows: [], errors: [] };
-  const parseLine = (line) => {
-    const out = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      const next = line[i + 1];
-      if (c === '"') {
-        if (inQuotes && next === '"') {
-          cur += '"';
-          i++;
-        } else inQuotes = !inQuotes;
-      } else if ((c === ',' && !inQuotes) || (c === '\t' && !inQuotes)) {
-        out.push(cur.trim());
-        cur = '';
-      } else cur += c;
-    }
-    out.push(cur.trim());
-    return out;
-  };
-  const firstLineVals = parseLine(lines[0]).map((h) => h.trim()).filter(Boolean);
-  const firstLineLower = firstLineVals.map((c) => c.toLowerCase());
-  const looksLikeHeader = firstLineLower.some((cell) => cell && HEADER_ROW_HINTS.has(cell));
-  const noHeaderRow = !looksLikeHeader;
-  const headers = looksLikeHeader
-    ? firstLineVals
-    : firstLineVals.map((_, i) => `Column ${i + 1}`);
-  const dataStartIndex = looksLikeHeader ? 1 : 0;
-  const rows = [];
-  const errors = [];
-  for (let i = dataStartIndex; i < lines.length; i++) {
-    const vals = parseLine(lines[i]);
-    if (vals.every((v) => !v.trim())) continue;
-    if (vals.length !== headers.length) {
-      errors.push(`Row ${i + 1}: expected ${headers.length} columns, got ${vals.length}`);
-      continue;
-    }
-    const row = {};
-    headers.forEach((h, j) => {
-      row[h] = vals[j]?.trim() ?? '';
-    });
-    rows.push(row);
-  }
-  return { headers, rows, errors, noHeaderRow };
-}
+import { parseCSVClient, inferMapping as inferMappingFromLib, computeMappedRows } from '@/lib/csvMapper';
+import ConfirmMappingStep from '@/components/csv/ConfirmMappingStep.jsx';
 
 // Same as batch API: CSV header (any case) → our field key
 const HEADER_TO_FIELD = {
@@ -134,54 +74,30 @@ const FIELD_LABELS = {
 };
 
 
-// Infer field from header name only
-function inferFieldFromHeader(header) {
-  const key = (header || '').toLowerCase().trim();
-  return HEADER_TO_FIELD[key] || null;
-}
-
-// Infer field from sample values (first N rows of this column)
+// Infer field from sample values (first N rows of this column) — used by universal mapper
 function inferFieldFromValues(values) {
   if (!values?.length) return null;
   const joined = values.slice(0, 10).join(' ').trim();
   const first = (values[0] || '').trim();
   if (!first) return null;
-  // LinkedIn or profile URL
   if (/linkedin\.com|profile.*url|^https?:\/\//i.test(first) || /linkedin\.com/i.test(joined)) return 'linkedinUrl';
-  // Email
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(first)) return 'email';
-  // Date (e.g. "22 Feb 2024", "2024-02-22", "Feb 22, 2024")
   if (/^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i.test(first) ||
       /^\d{4}-\d{2}-\d{2}$/.test(first) ||
       /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}$/i.test(first)) return 'linkedinConnectedOn';
-  // Long text → notes
   if (first.length > 80 || (first.includes('.') && first.split(/[.!?]/).length >= 2)) return 'notes';
-  // Job title keywords (position/title)
   if (/\b(VP|Vice President|Director|Manager|Counsel|General Counsel|Chief|CEO|CFO|COO|President|Partner|Associate|Analyst|Engineer|Lead|Head of)\b/i.test(first) ||
       /\b(Deputy|Senior|Junior|Principal|Staff)\s+\w+/i.test(first)) return 'title';
-  // Multi-word or longer string, no @, no URL → likely company name
   const wordCount = first.split(/\s+/).length;
   if (!first.includes('@') && !/^https?:\/\//i.test(first) && first.length > 10 && first.length < 80 && wordCount >= 2 && wordCount <= 5) return 'companyName';
   return null;
 }
 
-// Build full mapping: prefer header match, then infer from column values for unmapped columns
-function inferMapping(csvHeaders, rows) {
-  const headerBased = csvHeaders.map((h) => {
-    const field = inferFieldFromHeader(h);
-    return { csvHeader: h, field, label: field ? FIELD_LABELS[field] || field : null };
-  });
-  const usedFields = new Set(headerBased.map((m) => m.field).filter(Boolean));
-  const columnValues = csvHeaders.map((h) => rows.map((r) => r[h]).filter((v) => v != null && String(v).trim() !== ''));
-  return headerBased.map((m, i) => {
-    if (m.field) return { ...m, label: m.label || FIELD_LABELS[m.field] || m.field };
-    const inferred = inferFieldFromValues(columnValues[i]);
-    const field = inferred && !usedFields.has(inferred) ? inferred : null;
-    if (field) usedFields.add(field);
-    const label = field ? FIELD_LABELS[field] || field : '—';
-    return { csvHeader: m.csvHeader, field, label };
-  });
-}
+const CONTACT_MAPPER_CONFIG = {
+  headerToField: HEADER_TO_FIELD,
+  fieldLabels: FIELD_LABELS,
+  inferFromValues: inferFieldFromValues,
+};
 
 const FIELD_ORDER = ['firstName', 'lastName', 'email', 'companyName', 'title', 'linkedinUrl', 'linkedinConnectedOn', 'phone', 'notes', 'pipeline', 'stage'];
 const FIELD_TO_CANONICAL_HEADER = {
@@ -232,7 +148,7 @@ export default function ContactUploadPage() {
   const router = useRouter();
   const [file, setFile] = useState(null);
   const [csvText, setCsvText] = useState('');
-  const [parsed, setParsed] = useState({ headers: [], rows: [], errors: [] });
+  const [parsed, setParsed] = useState({ headers: [], rows: [], errors: [], noHeaderRow: false });
   const [step, setStep] = useState(0);
   const [mapping, setMapping] = useState([]);
   const [mappedRows, setMappedRows] = useState([]);
@@ -257,7 +173,7 @@ export default function ContactUploadPage() {
     setCsvText(text);
     const result = parseCSVClient(text);
     setParsed(result);
-    const inferred = inferMapping(result.headers, result.rows);
+    const inferred = inferMappingFromLib(result.headers, result.rows, CONTACT_MAPPER_CONFIG);
     setMapping(inferred);
     const mapped = result.rows.map((row) => {
       const out = {};
@@ -548,50 +464,14 @@ export default function ContactUploadPage() {
               )}
 
               {step === 1 && (
-                <>
-                  {parsed.rows.length === 0 && (
-                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                      This file has no data rows—only headers. You can still confirm mapping for future uploads, but there will be nothing to edit or save until you use a CSV with at least one row of data.
-                    </div>
-                  )}
-                  <p className="mb-3 text-gray-600">Confirm how your columns map to contact fields. Change any dropdown if needed.</p>
-                  <div className="overflow-x-auto border rounded-lg">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-semibold text-gray-700">CSV column</th>
-                          <th className="px-3 py-2 text-left font-semibold text-gray-700">Maps to</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mapping.map((m, i) => (
-                          <tr key={i} className="border-t border-gray-200">
-                            <td className="px-3 py-2 text-gray-800 font-medium">{m.csvHeader}</td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={m.field || ''}
-                                onChange={(e) => {
-                                  const v = e.target.value || null;
-                                  setMapping((prev) => {
-                                    const next = [...prev];
-                                    next[i] = { ...next[i], field: v, label: v ? (FIELD_LABELS[v] || v) : '—' };
-                                    return next;
-                                  });
-                                }}
-                                className="rounded border border-gray-300 px-2 py-1 text-gray-800"
-                              >
-                                <option value="">— Don’t import</option>
-                                {Object.entries(FIELD_LABELS).map(([k, label]) => (
-                                  <option key={k} value={k}>{label}</option>
-                                ))}
-                              </select>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+                <ConfirmMappingStep
+                  mapping={mapping}
+                  setMapping={setMapping}
+                  fieldLabels={FIELD_LABELS}
+                  title="Confirm how your columns map to contact fields. Change any dropdown if needed."
+                  hasDataRows={parsed.rows.length > 0}
+                  noDataMessage="This file has no data rows—only headers. You can still confirm mapping for future uploads, but there will be nothing to edit or save until you use a CSV with at least one row of data."
+                />
               )}
 
               {step === 2 && (
@@ -756,7 +636,7 @@ export default function ContactUploadPage() {
                   onClick={() => {
                     setFile(null);
                     setCsvText('');
-                    setParsed({ headers: [], rows: [], errors: [] });
+                    setParsed({ headers: [], rows: [], errors: [], noHeaderRow: false });
                     setStep(0);
                     setMapping([]);
                     setMappedRows([]);

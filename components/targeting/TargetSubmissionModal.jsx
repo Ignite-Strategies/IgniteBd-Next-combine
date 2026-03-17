@@ -16,10 +16,28 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { auth } from '@/lib/firebase';
+import { parseCSVClient, inferMapping as inferMappingFromLib, computeMappedRows } from '@/lib/csvMapper';
+import ConfirmMappingStep from '@/components/csv/ConfirmMappingStep.jsx';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS = ['Choose', 'Add Contacts', 'Review Targets', 'Confirm', 'Done', 'Outreach'];
+const STEPS = ['Choose', 'Add Contacts', 'Confirm Mapping', 'Review Targets', 'Confirm', 'Done', 'Outreach'];
+
+const TARGET_FIELD_LABELS = {
+  name: 'Name',
+  company: 'Company',
+  title: 'Title',
+  linkedin: 'LinkedIn',
+  email: 'Email (if known)',
+  notes: 'Engagement history',
+  notesFromLastEngagement: 'Notes (from last engagement)',
+  relationship: 'Relationship',
+  lastContact: 'Last contact',
+  awareOfBusiness: 'Knows your business?',
+  usingCompetitor: 'Using competitor?',
+  workedTogetherAt: 'Worked together at',
+  priorEngagement: 'Prior work together?',
+};
 
 // ─── Template hydration ────────────────────────────────────────────────────────
 // Fills {{variable}} slots with real contact data so the template is ready to copy.
@@ -242,6 +260,36 @@ function parseStructuredPaste(text) {
       };
     })
     .filter(Boolean);
+}
+
+function getYN(v) {
+  const s = (v || '').toLowerCase().trim();
+  if (['y', 'yes', '1', 'true'].includes(s)) return 'y';
+  if (['n', 'no', '0', 'false'].includes(s)) return 'n';
+  return '';
+}
+
+/** Convert universal-mapper rows (from computeMappedRows) to target contact shape. */
+function convertMappedRowsToContacts(mappedRows) {
+  return mappedRows
+    .map((row) => {
+      const notes = [row.notes, row.notesFromLastEngagement].filter(Boolean).join(' ').trim();
+      return {
+        name: (row.name || '').trim(),
+        company: (row.company || '').trim(),
+        title: (row.title || '').trim(),
+        linkedin: (row.linkedin || '').trim(),
+        email: (row.email || '').trim(),
+        relationship: row.relationship || inferRelationshipFromNotes(notes),
+        notes,
+        lastContact: (row.lastContact || '').trim(),
+        awareOfBusiness: getYN(row.awareOfBusiness),
+        usingCompetitor: getYN(row.usingCompetitor),
+        workedTogetherAt: (row.workedTogetherAt || '').trim(),
+        priorEngagement: getYN(row.priorEngagement),
+      };
+    })
+    .filter((c) => c.name);
 }
 
 function parseFreeformText(text) {
@@ -486,7 +534,9 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
   const [method, setMethod] = useState(null); // 'csv' | 'paste' | 'freeform'
   const [inputText, setInputText] = useState('');
   const [contacts, setContacts] = useState([]);
-  const [currentIdx, setCurrentIdx] = useState(0); // which card is shown in step 2
+  const [currentIdx, setCurrentIdx] = useState(0); // which card is shown in review step
+  const [csvParsed, setCsvParsed] = useState(null); // { headers, rows } when using universal mapper
+  const [csvMapping, setCsvMapping] = useState([]);
   const [parseError, setParseError] = useState('');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
@@ -535,6 +585,8 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
     setParseError('');
     setSaving(false);
     setResult(null);
+    setCsvParsed(null);
+    setCsvMapping([]);
     resetOutreach();
   };
 
@@ -550,36 +602,70 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
     setContacts(parsed);
     setCurrentIdx(0);
     setParseError('');
+    setStep(3); // Review Targets
+  };
+
+  const goToConfirmMapping = (headers, rows, mapping) => {
+    setCsvParsed({ headers, rows });
+    setCsvMapping(mapping);
+    setParseError('');
     setStep(2);
   };
 
-  // CSV
+  const handleConfirmMappingDone = () => {
+    if (!csvParsed?.rows?.length || !csvParsed?.headers?.length || !csvMapping?.length) return;
+    const mapped = computeMappedRows(csvParsed.rows, csvParsed.headers, csvMapping);
+    const contactsFromMapper = convertMappedRowsToContacts(mapped);
+    if (!contactsFromMapper.length) {
+      setParseError('No contacts with a name. Map at least one column to Name.');
+      return;
+    }
+    setContacts(contactsFromMapper);
+    setCurrentIdx(0);
+    setParseError('');
+    setStep(3);
+  };
+
+  // CSV: use universal mapper → Confirm mapping → Review
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const parsed = parseCSVText(text);
-    if (!parsed.length) {
+    const result = parseCSVClient(text);
+    if (!result.rows?.length) {
       setParseError('No contacts found. Download the template to see the expected format.');
       return;
     }
-    goToReview(parsed);
+    const mapping = inferMappingFromLib(result.headers, result.rows, {
+      columnMap: COLUMN_MAP,
+      fieldLabels: TARGET_FIELD_LABELS,
+    });
+    goToConfirmMapping(result.headers, result.rows, mapping);
   };
 
-  // Structured paste: try CSV mapper first (header-based), then fall back to position-based
+  // Structured paste: try universal mapper first (header-based), then parseCSVText, then position-based
   const handleParseStructured = () => {
     if (!inputText.trim()) { setParseError('Paste some contacts first.'); return; }
-    const csvParsed = parseCSVText(inputText);
-    if (csvParsed.length > 0) {
-      goToReview(csvParsed);
+    const result = parseCSVClient(inputText);
+    if (result.rows?.length > 0 && result.headers?.length > 0 && !result.noHeaderRow) {
+      const mapping = inferMappingFromLib(result.headers, result.rows, {
+        columnMap: COLUMN_MAP,
+        fieldLabels: TARGET_FIELD_LABELS,
+      });
+      goToConfirmMapping(result.headers, result.rows, mapping);
       return;
     }
-    const parsed = parseStructuredPaste(inputText);
-    if (!parsed.length) {
+    const parsed = parseCSVText(inputText);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      goToReview(parsed);
+      return;
+    }
+    const structured = parseStructuredPaste(inputText);
+    if (!structured.length) {
       setParseError('Could not parse contacts. Paste CSV with headers, or use: Name | Company | Title | LinkedIn | Additional Context (one per line).');
       return;
     }
-    goToReview(parsed);
+    goToReview(structured);
   };
 
   // Freeform
@@ -620,7 +706,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
 
   // Auto-load persona suggestion when entering step 5 or navigating to a new contact
   useEffect(() => {
-    if (step !== 5 || !outreachContact?.id) return;
+    if (step !== 6 || !outreachContact?.id) return;
     resetOutreach();
     setLoadingSuggestion(true);
 
@@ -743,7 +829,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Save failed');
       setResult(data);
-      setStep(4);
+      setStep(5);
       onSuccess?.();
     } catch (err) {
       setParseError(err.message);
@@ -913,8 +999,27 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
             </div>
           )}
 
-          {/* ── Step 2: One-at-a-time review ── */}
-          {step === 2 && currentContact && (
+          {/* ── Step 2: Confirm mapping (universal mapper) ── */}
+          {step === 2 && (
+            <div className="space-y-4">
+              {parseError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />{parseError}
+                </div>
+              )}
+              <ConfirmMappingStep
+                mapping={csvMapping}
+                setMapping={setCsvMapping}
+                fieldLabels={TARGET_FIELD_LABELS}
+                title="Let's make sure your CSV maps correctly — please confirm."
+                hasDataRows={csvParsed?.rows?.length > 0}
+                noDataMessage="No data rows in this file. Go back and upload a CSV with at least one row."
+              />
+            </div>
+          )}
+
+          {/* ── Step 3: One-at-a-time review ── */}
+          {step === 3 && currentContact && (
             <SingleContactCard
               key={currentIdx}
               contact={currentContact}
@@ -924,7 +1029,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
               onDelete={handleDelete}
             />
           )}
-          {step === 2 && !currentContact && (
+          {step === 3 && !currentContact && (
             <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
               <p className="text-gray-500 text-sm">No contacts left. Add one below.</p>
               <button onClick={handleAddBlank} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
@@ -933,8 +1038,8 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
             </div>
           )}
 
-          {/* ── Step 3: Confirm ── */}
-          {step === 3 && (
+          {/* ── Step 4: Confirm ── */}
+          {step === 4 && (
             <div className="space-y-5">
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 Ready to save <strong>{validContacts.length} target{validContacts.length !== 1 ? 's' : ''}</strong>. Each will be queued for template generation.
@@ -964,8 +1069,8 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
             </div>
           )}
 
-          {/* ── Step 4: Done ── */}
-          {step === 4 && result && (
+          {/* ── Step 5: Done ── */}
+          {step === 5 && result && (
             <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
                 <CheckCircle className="h-9 w-9 text-green-600" />
@@ -985,8 +1090,8 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
             </div>
           )}
 
-          {/* ── Step 5: Outreach Prep ── */}
-          {step === 5 && (
+          {/* ── Step 6: Outreach Prep ── */}
+          {step === 6 && (
             <div className="space-y-5">
               {/* Contact navigator */}
               {outreachContacts.length > 1 && (
@@ -1160,21 +1265,26 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
         </div>
 
         {/* ── Footer ── */}
-        {step < 4 && (
+        {step < 5 && (
           <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4 flex-shrink-0">
             {/* Left: Back */}
             <div>
-              {step > 0 && !(step === 2 && !isFirstCard) && (
+              {step > 0 && !(step === 3 && !isFirstCard) && (
                 <button
-                  onClick={() => { setParseError(''); if (step === 2) { setCurrentIdx(0); setStep(1); } else setStep((s) => s - 1); }}
+                  onClick={() => {
+                    setParseError('');
+                    if (step === 2) setStep(1);
+                    else if (step === 3) { setCurrentIdx(0); setStep(csvParsed ? 2 : 1); }
+                    else if (step === 4) setStep(3);
+                    else setStep((s) => s - 1);
+                  }}
                   className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Back
                 </button>
               )}
-              {/* In step 2, prev card */}
-              {step === 2 && !isFirstCard && (
+              {step === 3 && !isFirstCard && (
                 <button
                   onClick={() => setCurrentIdx((i) => i - 1)}
                   className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
@@ -1191,22 +1301,28 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                 Cancel
               </button>
 
-              {/* Step 1 structured */}
               {step === 1 && method === 'paste' && (
                 <button onClick={handleParseStructured} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                   Parse Contacts <ChevronRight className="h-4 w-4" />
                 </button>
               )}
 
-              {/* Step 1 freeform */}
               {step === 1 && method === 'freeform' && (
                 <button onClick={handleParseFreeform} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">
                   Extract contacts <ChevronRight className="h-4 w-4" />
                 </button>
               )}
 
-              {/* Step 2: next card OR advance to confirm */}
-              {step === 2 && currentContact && !isLastCard && (
+              {step === 2 && (
+                <button
+                  onClick={handleConfirmMappingDone}
+                  className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  Looks good — continue <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
+
+              {step === 3 && currentContact && !isLastCard && (
                 <button
                   disabled={!currentContact.name?.trim()}
                   onClick={() => setCurrentIdx((i) => i + 1)}
@@ -1215,7 +1331,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                   Next contact <ChevronRight className="h-4 w-4" />
                 </button>
               )}
-              {step === 2 && currentContact && isLastCard && (
+              {step === 3 && currentContact && isLastCard && (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleAddBlank}
@@ -1225,7 +1341,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                   </button>
                   <button
                     disabled={!validContacts.length}
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(4)}
                     className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Review {validContacts.length} <ChevronRight className="h-4 w-4" />
@@ -1233,8 +1349,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                 </div>
               )}
 
-              {/* Step 3: save */}
-              {step === 3 && (
+              {step === 4 && (
                 <button
                   disabled={saving || !validContacts.length}
                   onClick={handleSave}
@@ -1247,14 +1362,14 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="flex justify-center border-t border-gray-200 px-6 py-4 flex-shrink-0 gap-3 flex-wrap">
             <button onClick={reset} className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
               Submit more
             </button>
             {result?.savedContacts?.length > 0 && (
               <button
-                onClick={() => { setOutreachIdx(0); setStep(5); }}
+                onClick={() => { setOutreachIdx(0); setStep(6); }}
                 className="flex items-center gap-2 rounded-lg bg-purple-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
               >
                 <Sparkles className="h-4 w-4" />
@@ -1268,7 +1383,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
           </div>
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4 flex-shrink-0">
             <div className="flex items-center gap-2">
               {outreachIdx > 0 && (
