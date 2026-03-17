@@ -53,6 +53,7 @@ const EMPTY_CONTACT = {
   company: '',
   title: '',
   linkedin: '',
+  email: '',
   relationship: '',
   notes: '',
   lastContact: '',
@@ -73,9 +74,10 @@ const CSV_HEADERS = [
   'Using competitor?',
   'Worked together at',
   'Prior work together?',
+  'Email (if known)',
   'Additional Context',
 ];
-const CSV_TEMPLATE = CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,,,,,,,,\n';
+const CSV_TEMPLATE = CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,,,,,,,,,\n';
 
 function downloadTemplate() {
   const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
@@ -135,6 +137,7 @@ const COLUMN_MAP = [
   { key: 'company',        aliases: ['company', 'org', 'employer', 'organization'] },
   { key: 'title',          aliases: ['title', 'position', 'role', 'job', 'job title'] },
   { key: 'linkedin',       aliases: ['linkedin', 'linkedin url', 'url', 'profile', 'linkedin profile'] },
+  { key: 'email',          aliases: ['email', 'email address', 'e-mail', 'email if known'] },
   { key: 'notes',          aliases: ['notes', 'note', 'description', 'context', 'relationship notes', 'additional context'] },
   { key: 'notesFromLastEngagement', aliases: ['notes (from last engagement)', 'notes from last engagement', 'last engagement notes'] },
   { key: 'relationship',   aliases: ['relationship', 'how met', 'howmet', 'relationship context', 'connection'] },
@@ -178,13 +181,6 @@ function parseCSVText(text) {
     dataLines = lines.slice(1);
   }
 
-  const idx = (key) => headers ? findColumnIndex(headers, key) : -1;
-  const pos = (key, fallback) => {
-    const i = idx(key);
-    return i >= 0 ? i : fallback;
-  };
-
-  const get = (parts, i) => (i >= 0 && i < parts.length ? (parts[i] || '').trim() : '');
   const getYN = (v) => {
     const s = (v || '').toLowerCase().trim();
     if (['y', 'yes', '1', 'true'].includes(s)) return 'y';
@@ -196,20 +192,28 @@ function parseCSVText(text) {
     .map((l) => parseCSVLine(l))
     .filter((p) => p.some((v) => v))
     .map((parts) => {
-      const notes = (get(parts, pos('notes', 4)) || get(parts, idx('notesFromLastEngagement'))).trim();
-      const relationship = get(parts, idx('relationship')) || inferRelationshipFromNotes(notes);
+      const getField = (key, fallbackPos = -1) => {
+        if (headers) {
+          const i = findColumnIndex(headers, key);
+          return i >= 0 && i < parts.length ? (parts[i] || '').trim() : '';
+        }
+        return fallbackPos >= 0 && fallbackPos < parts.length ? (parts[fallbackPos] || '').trim() : '';
+      };
+      const notes = (getField('notes', 4) || getField('notesFromLastEngagement')).trim();
+      const relationship = getField('relationship') || inferRelationshipFromNotes(notes);
       return {
-        name:             get(parts, pos('name', 0)),
-        company:          get(parts, pos('company', 1)),
-        title:            get(parts, pos('title', 2)),
-        linkedin:         get(parts, pos('linkedin', 3)),
+        name:             getField('name', 0),
+        company:          getField('company', 1),
+        title:            getField('title', 2),
+        linkedin:         getField('linkedin', 3),
+        email:            getField('email'),
         relationship,
         notes,
-        lastContact:      get(parts, idx('lastContact')),
-        awareOfBusiness:  getYN(get(parts, idx('awareOfBusiness'))),
-        usingCompetitor:  getYN(get(parts, idx('usingCompetitor'))),
-        workedTogetherAt: get(parts, idx('workedTogetherAt')),
-        priorEngagement:  getYN(get(parts, idx('priorEngagement'))),
+        lastContact:      getField('lastContact'),
+        awareOfBusiness:  getYN(getField('awareOfBusiness')),
+        usingCompetitor:  getYN(getField('usingCompetitor')),
+        workedTogetherAt: getField('workedTogetherAt'),
+        priorEngagement:  getYN(getField('priorEngagement')),
       };
     })
     .filter((c) => c.name);
@@ -361,6 +365,17 @@ function SingleContactCard({ contact, index, total, onChange, onDelete }) {
             type="text"
             value={contact.linkedin}
             onChange={(e) => update('linkedin', e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Email <span className="font-normal text-gray-400">(if known)</span>
+          </label>
+          <input
+            type="email"
+            value={contact.email || ''}
+            onChange={(e) => update('email', e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
