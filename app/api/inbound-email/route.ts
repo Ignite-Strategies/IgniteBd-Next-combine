@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { extractCompanySlugFromAddress } from '@/lib/utils/parseEmailAddress';
+import { parseInboundRecipient, extractCompanySlugFromAddress } from '@/lib/utils/parseEmailAddress';
 import { simpleParser } from 'mailparser';
 
 /**
@@ -58,29 +58,58 @@ export async function POST(req: Request) {
       }
     }
 
-    // STEP 4: Resolve companyHQId from recipient address slug
+    // STEP 4: Parse recipient to get company slug and type (meeting vs email)
+    const recipient = to ? parseInboundRecipient(to) : null;
     let companyHQId: string | null = null;
-    if (to) {
-      const companySlug = extractCompanySlugFromAddress(to);
-      if (companySlug) {
-        const company = await prisma.company_hqs.findUnique({
-          where: { slug: companySlug },
-          select: { id: true },
-        });
-        if (company) {
-          companyHQId = company.id;
-        }
+    const slug = recipient?.companySlug ?? (to ? extractCompanySlugFromAddress(to) : null);
+    if (slug) {
+      const company = await prisma.company_hqs.findUnique({
+        where: { slug },
+        select: { id: true },
+      });
+      if (company) {
+        companyHQId = company.id;
       }
     }
 
-    // STEP 5: Store everything
+    // STEP 5: Branch by inbound type — meeting ingest vs email ingest
+    if (recipient?.inboundType === 'meeting' && companyHQId) {
+      const rawMeeting = await prisma.rawMeetingNotes.create({
+        data: {
+          companyHQId,
+          from,
+          to,
+          subject,
+          text: text ?? null,
+          html: html ?? null,
+          email: email ?? null,
+          status: 'RECEIVED',
+        },
+      });
+      console.log('RawMeetingNotes stored:', rawMeeting.id, {
+        hasText: !!text,
+        hasHtml: !!html,
+        hasRawMime: !!email,
+      });
+      return NextResponse.json(
+        { success: true, meetingIngestId: rawMeeting.id },
+        { status: 200 }
+      );
+    }
+
+    // Email path (or null/unknown recipient with company): save to InboundEmail
+    if (!companyHQId) {
+      console.log('Inbound: no company for slug, returning 200');
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+
     const inboundEmail = await prisma.inboundEmail.create({
       data: {
         from,
         to,
         subject,
-        text,            // either from SendGrid or parsed from MIME
-        html,            // either from SendGrid or parsed from MIME
+        text: text ?? null,
+        html: html ?? null,
         headers,
         sender_ip,
         envelope,
@@ -91,7 +120,7 @@ export async function POST(req: Request) {
         charsets,
         attachments,
         attachment_info,
-        email,           // raw MIME always preserved
+        email: email ?? null,
         companyHQId,
         ingestionStatus: 'RECEIVED',
       },

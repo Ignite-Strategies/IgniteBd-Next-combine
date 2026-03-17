@@ -65,8 +65,6 @@ export default function InboundParsePage() {
   const [computeLoading, setComputeLoading] = useState(false);
   const [recordedContactId, setRecordedContactId] = useState(null);
   const [createContactLoading, setCreateContactLoading] = useState(false);
-  const [listTab, setListTab] = useState('inbox'); // inbox | recorded
-
   useEffect(() => {
     const crmId =
       typeof window !== 'undefined'
@@ -77,16 +75,16 @@ export default function InboundParsePage() {
 
     if (crmId) {
       setCompanyHQId(crmId);
-      fetchInboundEmails(crmId, 'inbox');
+      fetchInboundEmails(crmId);
     } else {
       setLoading(false);
     }
   }, []);
 
-  const fetchInboundEmails = async (tenantId, tab = 'inbox') => {
+  const fetchInboundEmails = async (tenantId) => {
     try {
       setLoading(true);
-      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}&tab=${tab}`);
+      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}`);
       if (res.data?.success) {
         setEmails(res.data.emails || []);
       }
@@ -95,6 +93,32 @@ export default function InboundParsePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Group emails by date for section headers: Today, Yesterday, This week, Earlier
+  const groupEmailsByDate = (list) => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - 7);
+
+    const groups = { today: [], yesterday: [], thisWeek: [], earlier: [] };
+    list.forEach((email) => {
+      const d = new Date(email.createdAt);
+      const t = d.getTime();
+      if (t >= todayStart.getTime()) groups.today.push(email);
+      else if (t >= yesterdayStart.getTime()) groups.yesterday.push(email);
+      else if (t >= weekStart.getTime()) groups.thisWeek.push(email);
+      else groups.earlier.push(email);
+    });
+    return [
+      { key: 'today', label: 'Today', emails: groups.today },
+      { key: 'yesterday', label: 'Yesterday', emails: groups.yesterday },
+      { key: 'thisWeek', label: 'This week', emails: groups.thisWeek },
+      { key: 'earlier', label: 'Earlier', emails: groups.earlier },
+    ].filter((g) => g.emails.length > 0);
   };
 
   const formatDate = (dateString) => {
@@ -368,101 +392,62 @@ export default function InboundParsePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Email List */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => { setListTab('inbox'); fetchInboundEmails(companyHQId, 'inbox'); }}
-                    className={`text-sm font-medium px-2 py-1 rounded ${listTab === 'inbox' ? 'bg-indigo-100 text-indigo-800' : 'text-gray-600 hover:bg-gray-100'}`}
-                  >
-                    Inbox
-                  </button>
-                  <button
-                    onClick={() => { setListTab('recorded'); fetchInboundEmails(companyHQId, 'recorded'); }}
-                    className={`text-sm font-medium px-2 py-1 rounded ${listTab === 'recorded' ? 'bg-indigo-100 text-indigo-800' : 'text-gray-600 hover:bg-gray-100'}`}
-                  >
-                    Recorded
-                  </button>
-                </div>
-                <span className="text-sm text-gray-500">{emails.length} emails</span>
+            {/* Email List — To process only (RECEIVED), date-grouped */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-lg font-semibold">To process ({emails.length})</h2>
                 <button
-                  onClick={() => fetchInboundEmails(companyHQId, listTab)}
+                  onClick={() => fetchInboundEmails(companyHQId)}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   Refresh
                 </button>
               </div>
-              {emails.map((email) => {
-                const fromEmail = extractEmailAddress(email.from);
-                const fromName = extractName(email.from);
-                return (
-                  <div
-                    key={email.id}
-                    onClick={() => {
-                      setSelectedEmail(email);
-                      resetDetailState();
-                    }}
-                    className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition ${
-                      selectedEmail?.id === email.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm truncate">
-                          {fromName || fromEmail || 'Unknown'}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {fromEmail || email.from || 'No sender'}
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-400 ml-2 whitespace-nowrap">
-                        {formatDate(email.createdAt)}
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-700 truncate">
-                      {email.subject || '(No subject)'}
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                      {email.text && (
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          Text
-                        </span>
-                      )}
-                      {email.html && (
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          HTML
-                        </span>
-                      )}
-                      {email.email && (
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          Raw MIME
-                        </span>
-                      )}
-                      {email.ingestionStatus && (
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs ${
-                            email.ingestionStatus === 'RECORDED'
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : email.ingestionStatus === 'RECEIVED'
-                              ? 'bg-green-100 text-green-700'
-                              : email.ingestionStatus === 'FAILED'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {email.ingestionStatus}
-                        </span>
-                      )}
-                    </div>
+              {groupEmailsByDate(emails).map((group) => (
+                <div key={group.key} className="space-y-1">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-1 pb-0.5">
+                    {group.label}
                   </div>
-                );
-              })}
+                  {group.emails.map((email) => {
+                    const fromEmail = extractEmailAddress(email.from);
+                    const fromName = extractName(email.from);
+                    return (
+                      <div
+                        key={email.id}
+                        onClick={() => {
+                          setSelectedEmail(email);
+                          resetDetailState();
+                        }}
+                        className={`px-3 py-2 border rounded cursor-pointer hover:bg-gray-50 transition flex items-center gap-2 ${
+                          selectedEmail?.id === email.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-sm font-medium truncate">
+                              {fromName || fromEmail || 'Unknown'}
+                            </span>
+                            <span className="text-xs text-gray-500 truncate flex-1 min-w-0">
+                              {email.subject || '(No subject)'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-400 truncate mt-0.5">
+                            {fromEmail || email.from || 'No sender'}
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                          {formatDate(email.createdAt)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              {emails.length === 0 && (
+                <div className="text-sm text-gray-500 py-4 text-center">
+                  No emails to process.
+                </div>
+              )}
             </div>
 
             {/* Email Detail */}
@@ -880,7 +865,7 @@ export default function InboundParsePage() {
                             className="px-2 py-1 rounded border border-gray-300 text-sm"
                           />
                           <span className="text-xs text-gray-500">
-                            Will update contact when promoted
+                            Will update contact when saved
                           </span>
                         </div>
                       </div>

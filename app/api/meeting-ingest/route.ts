@@ -3,10 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 /**
- * GET /api/inbound-parse
- * 
- * Get all InboundEmail records (raw ingestion bucket).
- * Returns emails received via SendGrid Inbound Parse.
+ * GET /api/meeting-ingest
+ *
+ * List raw meeting notes (from slug.meeting@crm.domain).
+ * Default: RECEIVED only (to process). Optional tab=recorded | all, days=7|30|90.
  */
 export async function GET(request: Request) {
   try {
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId');
-    const tab = searchParams.get('tab') || 'inbox'; // inbox | recorded | all
+    const tab = searchParams.get('tab') || 'inbox';
     const daysParam = searchParams.get('days');
     const days = [7, 30, 90].includes(Number(daysParam)) ? Number(daysParam) : 30;
 
@@ -30,12 +30,12 @@ export async function GET(request: Request) {
 
     const statusFilter =
       tab === 'inbox'
-        ? { ingestionStatus: 'RECEIVED' }
+        ? { status: 'RECEIVED' }
         : tab === 'recorded'
-          ? { ingestionStatus: 'RECORDED' }
+          ? { status: 'RECORDED' }
           : {};
 
-    const inboundEmails = await prisma.inboundEmail.findMany({
+    const notes = await prisma.rawMeetingNotes.findMany({
       where: {
         createdAt: { gte: since },
         ...(companyHQId && { companyHQId }),
@@ -47,15 +47,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      emails: inboundEmails,
-      count: inboundEmails.length,
+      notes,
+      count: notes.length,
     });
   } catch (error) {
-    console.error('❌ Get inbound parse emails error:', error);
+    console.error('❌ Get meeting ingest notes error:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch inbound emails',
+        error: 'Failed to fetch meeting notes',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }

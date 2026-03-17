@@ -365,6 +365,7 @@ model company_hqs {
   blogs                                         blogs[]
   campaigns                                     campaigns[]
   InboundEmail                                  InboundEmail[]
+  RawMeetingNotes                               RawMeetingNotes[]
   companies                                     companies[]
   contacts_company_hqs_contactOwnerIdTocontacts Contact?                        @relation("company_hqs_contactOwnerIdTocontacts", fields: [contactOwnerId], references: [id])
   owners_company_hqs_managerIdToowners          owners?                         @relation("company_hqs_managerIdToowners", fields: [managerId], references: [id])
@@ -755,6 +756,26 @@ model InboundEmail {
   updatedAt       DateTime @updatedAt
 
   @@index([companyHQId])
+}
+
+/// Raw meeting notes from SendGrid (slug.meeting@crm.domain). RECEIVED = to process; RECORDED = saved to Meeting.
+model RawMeetingNotes {
+  id          String   @id @default(cuid())
+  companyHQId String?
+  from        String?
+  to          String?
+  subject     String?
+  text        String?  @db.Text
+  html        String?  @db.Text
+  email       String?  @db.Text // raw MIME
+  status      String   @default("RECEIVED") // RECEIVED | RECORDED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company_hqs company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@index([companyHQId])
+  @@index([status])
 }
 
 model email_sequences {
