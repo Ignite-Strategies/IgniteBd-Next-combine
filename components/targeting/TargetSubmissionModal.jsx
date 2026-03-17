@@ -138,7 +138,7 @@ const COLUMN_MAP = [
   { key: 'title',          aliases: ['title', 'position', 'role', 'job', 'job title'] },
   { key: 'linkedin',       aliases: ['linkedin', 'linkedin url', 'url', 'profile', 'linkedin profile'] },
   { key: 'email',          aliases: ['email', 'email address', 'e-mail', 'email if known'] },
-  { key: 'notes',          aliases: ['notes', 'note', 'description', 'context', 'relationship notes', 'additional context'] },
+  { key: 'notes',          aliases: ['notes', 'note', 'description', 'context', 'relationship notes', 'additional context', 'engagement history'] },
   { key: 'notesFromLastEngagement', aliases: ['notes (from last engagement)', 'notes from last engagement', 'last engagement notes'] },
   { key: 'relationship',   aliases: ['relationship', 'how met', 'howmet', 'relationship context', 'connection'] },
   { key: 'lastContact',    aliases: ['last contact', 'lastcontact', 'when last contact', 'last spoke'] },
@@ -230,11 +230,13 @@ function parseStructuredPaste(text) {
       else parts = line.split(',').map((p) => p.trim());
       if (!parts[0]) return null;
       const notes = parts[4] || '';
+      const email = parts[5] || '';
       return {
         name: parts[0] || '',
         company: parts[1] || '',
         title: parts[2] || '',
         linkedin: parts[3] || '',
+        email,
         relationship: inferRelationshipFromNotes(notes),
         notes,
       };
@@ -564,12 +566,17 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
     goToReview(parsed);
   };
 
-  // Structured paste
+  // Structured paste: try CSV mapper first (header-based), then fall back to position-based
   const handleParseStructured = () => {
     if (!inputText.trim()) { setParseError('Paste some contacts first.'); return; }
+    const csvParsed = parseCSVText(inputText);
+    if (csvParsed.length > 0) {
+      goToReview(csvParsed);
+      return;
+    }
     const parsed = parseStructuredPaste(inputText);
     if (!parsed.length) {
-      setParseError('Could not parse contacts. Use: Name | Company | Title | LinkedIn | Additional Context (one per line).');
+      setParseError('Could not parse contacts. Paste CSV with headers, or use: Name | Company | Title | LinkedIn | Additional Context (one per line).');
       return;
     }
     goToReview(parsed);
