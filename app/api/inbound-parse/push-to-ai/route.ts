@@ -4,6 +4,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { universalEmailParser } from '@/lib/services/universalEmailParser';
 import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
 import { generateMeetingSummaryService } from '@/lib/services/generateMeetingSummaryService';
+import { syncEmailSummaryToLog } from '@/lib/services/emailToLogService';
 
 /**
  * POST /api/inbound-parse/push-to-ai
@@ -280,6 +281,11 @@ export async function POST(request: Request) {
             data: { nextEngagementDate: effectiveNextEngagementDate },
           });
         }
+      }
+
+      // Bridge email summary → engagement log (fire-and-forget)
+      if (interpreted.summary && contactId) {
+        syncEmailSummaryToLog(emailActivity.id).catch(() => {});
       }
 
       recordId = emailActivity.id;

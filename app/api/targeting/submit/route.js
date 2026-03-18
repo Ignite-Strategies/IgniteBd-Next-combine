@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { resolveMembership } from '@/lib/membership';
 import { ensureContactPipeline } from '@/lib/services/pipelineService';
+import { serializeSignals } from '@/lib/services/serializeSignalsService';
+import { synthesizeContactSummary } from '@/lib/services/synthesizeContactSummaryService';
 
 /**
  * POST /api/targeting/submit
@@ -163,6 +165,35 @@ export async function POST(request) {
           defaultPipeline: 'prospect',
           defaultStage: 'need-to-engage',
         });
+
+        // Build INITIAL engagement log entry: notes + howMet + serialized y/n signals
+        const signalsBlock = serializeSignals({
+          lastContact,
+          awareOfBusiness,
+          usingCompetitor,
+          workedTogetherAt,
+          priorEngagement,
+        });
+        const initialNoteParts = [
+          howMet && `Relationship context: ${howMet}`,
+          notes,
+          signalsBlock,
+        ].filter(Boolean);
+
+        if (initialNoteParts.length > 0) {
+          await prisma.contact_engagement_log.create({
+            data: {
+              contactId: contact.id,
+              entryType: 'INITIAL',
+              note: initialNoteParts.join('\n\n'),
+            },
+          });
+        }
+
+        // Fire contactSummary generation in the background (non-blocking)
+        synthesizeContactSummary(contact.id).catch((err) =>
+          console.error(`synthesizeContactSummary failed for ${contact.id}:`, err),
+        );
 
         // Map quick signals → relationship_contexts (plain strings, no enum constraint)
         const hasSignals = lastContact || awareOfBusiness || usingCompetitor || workedTogetherAt || priorEngagement;

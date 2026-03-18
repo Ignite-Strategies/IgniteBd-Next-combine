@@ -135,6 +135,13 @@ export default function ContactDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactId]);
 
+  useEffect(() => {
+    if (!contactId) return;
+    api.get(`/api/contacts/${contactId}/engagement-log`)
+      .then((res) => { if (res.data?.success) setEngagementLog(res.data.entries || []); })
+      .catch(() => {});
+  }, [contactId]);
+
   const [enriching, setEnriching] = useState(false);
   const [enrichError, setEnrichError] = useState('');
   const [enrichingCareer, setEnrichingCareer] = useState(false);
@@ -206,6 +213,10 @@ export default function ContactDetailPage() {
   const [introducedByEmail, setIntroducedByEmail] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupError, setLookupError] = useState('');
+  const [engagementLog, setEngagementLog] = useState([]);
+  const [logEntryType, setLogEntryType] = useState('POST_CALL');
+  const [logEntryNote, setLogEntryNote] = useState('');
+  const [savingLogEntry, setSavingLogEntry] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
   const [savingIntroducedBy, setSavingIntroducedBy] = useState(false);
 
@@ -2103,7 +2114,7 @@ export default function ContactDetailPage() {
               </div>
             </div>
             {!editingNotes ? (
-              <div>
+              <div className="space-y-4">
                 {contact.notes ? (
                   <p className="text-sm text-gray-600 whitespace-pre-wrap">{contact.notes}</p>
                 ) : (
@@ -2117,6 +2128,99 @@ export default function ContactDetailPage() {
                     + Add engagement history — relationship context, how you met, former company, key signals. Used to generate persona and contact summary.
                   </button>
                 )}
+
+                {/* Engagement Log — timestamped entries */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Engagement log</p>
+
+                  {/* Log entry input */}
+                  <div className="flex gap-2">
+                    <select
+                      value={logEntryType}
+                      onChange={(e) => setLogEntryType(e.target.value)}
+                      className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="POST_CALL">After call</option>
+                      <option value="POST_MEETING">After meeting</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={logEntryNote}
+                      onChange={(e) => setLogEntryNote(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && logEntryNote.trim() && !savingLogEntry) {
+                          e.preventDefault();
+                          setSavingLogEntry(true);
+                          try {
+                            const res = await api.post(`/api/contacts/${contactId}/engagement-log`, {
+                              entryType: logEntryType,
+                              note: logEntryNote.trim(),
+                            });
+                            if (res.data?.success) {
+                              setEngagementLog((prev) => [res.data.entry, ...prev]);
+                              setLogEntryNote('');
+                            }
+                          } catch (err) {
+                            console.error('Failed to log entry:', err);
+                          } finally {
+                            setSavingLogEntry(false);
+                          }
+                        }
+                      }}
+                      placeholder="Log a note — press Enter to save"
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      disabled={savingLogEntry}
+                    />
+                    <button
+                      onClick={async () => {
+                        if (!logEntryNote.trim() || savingLogEntry) return;
+                        setSavingLogEntry(true);
+                        try {
+                          const res = await api.post(`/api/contacts/${contactId}/engagement-log`, {
+                            entryType: logEntryType,
+                            note: logEntryNote.trim(),
+                          });
+                          if (res.data?.success) {
+                            setEngagementLog((prev) => [res.data.entry, ...prev]);
+                            setLogEntryNote('');
+                          }
+                        } catch (err) {
+                          console.error('Failed to log entry:', err);
+                        } finally {
+                          setSavingLogEntry(false);
+                        }
+                      }}
+                      disabled={!logEntryNote.trim() || savingLogEntry}
+                      className="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-gray-700 disabled:opacity-40"
+                    >
+                      {savingLogEntry ? '...' : 'Log it'}
+                    </button>
+                  </div>
+
+                  {/* Timeline */}
+                  {engagementLog.length > 0 ? (
+                    <div className="space-y-2 mt-1">
+                      {engagementLog.map((entry) => {
+                        const dateStr = new Date(entry.loggedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        const typeLabel = entry.entryType === 'INITIAL' ? 'Import' : entry.entryType === 'POST_CALL' ? 'Call' : entry.entryType === 'POST_MEETING' ? 'Meeting' : 'Email';
+                        const typeDot = entry.entryType === 'EMAIL_RESPONSE' ? 'bg-blue-400' : entry.entryType === 'INITIAL' ? 'bg-gray-300' : 'bg-green-400';
+                        return (
+                          <div key={entry.id} className="flex gap-2.5 text-sm">
+                            <div className="flex flex-col items-center pt-1.5">
+                              <span className={`h-2 w-2 rounded-full flex-shrink-0 ${typeDot}`} />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs text-gray-400">{dateStr} · {typeLabel}</span>
+                              <p className="text-gray-600 whitespace-pre-wrap mt-0.5">{entry.note}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">No log entries yet. Log a call or meeting note above.</p>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-3">

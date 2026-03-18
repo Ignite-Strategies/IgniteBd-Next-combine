@@ -578,6 +578,7 @@ model Contact {
   contact_analyses                                          contact_analyses?
   email_activities                                          email_activities[]
   meetings                                                   Meeting[]
+  engagement_log                                            contact_engagement_log[]
 
   @@unique([email, crmId])
   @@index([companyDomain])
@@ -2080,4 +2081,28 @@ enum TemplatePosition {
   COMPETITOR_FRAME
   TARGET_ASK
   SOFT_CLOSE
+}
+
+// Engagement log entry types — keeps the enum minimal, no overlap with email_activities
+enum EngagementLogEntryType {
+  INITIAL        // Created at ingest from CSV (notes + serialized y/n signals)
+  POST_CALL      // Manual note logged after a phone/verbal conversation
+  POST_MEETING   // Manual note logged after an in-person or video meeting
+  EMAIL_RESPONSE // Auto-created by emailToLogService from email_activities.summary
+}
+
+// Single source of truth for all engagement history per contact.
+// synthesizeContactSummary reads ONLY this table — nothing else.
+model contact_engagement_log {
+  id              String                 @id @default(cuid())
+  contactId       String
+  entryType       EngagementLogEntryType @default(INITIAL)
+  note            String                 @db.Text
+  emailActivityId String?                @unique  // dedup: one log entry per email_activity row
+  loggedAt        DateTime               @default(now())
+  createdAt       DateTime               @default(now())
+  contact         Contact                @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, loggedAt])
+  @@map("contact_engagement_log")
 }

@@ -28,7 +28,7 @@ const TARGET_FIELD_LABELS = {
   company: 'Company',
   title: 'Title',
   linkedin: 'LinkedIn',
-  email: 'Email (if known)',
+  email: 'Email',
   notes: 'Engagement history',
   notesFromLastEngagement: 'Notes (from last engagement)',
   relationship: 'Relationship',

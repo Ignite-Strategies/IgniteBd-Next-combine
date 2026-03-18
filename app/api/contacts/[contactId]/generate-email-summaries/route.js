@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { OpenAI } from 'openai';
+import { syncEmailSummaryToLog } from '@/lib/services/emailToLogService';
 
 /**
  * POST /api/contacts/[contactId]/generate-email-summaries
@@ -86,6 +87,8 @@ export async function POST(request, { params }) {
             data: { summary },
           });
           generated++;
+          // Bridge summary → engagement log (fire-and-forget)
+          syncEmailSummaryToLog(activity.id).catch(() => {});
         }
       } catch (err) {
         console.error(`❌ Failed to summarize activity ${activity.id}:`, err.message);
