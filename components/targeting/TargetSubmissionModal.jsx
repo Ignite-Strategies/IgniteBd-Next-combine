@@ -27,16 +27,17 @@ const TARGET_FIELD_LABELS = {
   name: 'Name',
   company: 'Company',
   title: 'Title',
-  linkedin: 'LinkedIn',
+  linkedin: 'LinkedIn URL',
   email: 'Email',
-  notes: 'Engagement history',
-  notesFromLastEngagement: 'Notes (from last engagement)',
+  notes: 'Engagement History/Context',
+  notesFromLastEngagement: 'Other helpful notes',
   relationship: 'Relationship',
-  lastContact: 'Last contact',
-  awareOfBusiness: 'Knows your business?',
-  usingCompetitor: 'Using competitor?',
-  workedTogetherAt: 'Worked together at',
-  priorEngagement: 'Prior work together?',
+  lastContact: 'Last Contact',
+  awareOfBusiness: 'Aware of Business (y/n)',
+  usingCompetitor: 'Using Competitor (y/n)',
+  competitorName: 'Competitor Name',
+  workedTogetherAt: 'Worked Together At',
+  priorEngagement: 'Connected Since Working Together (y/n)',
 };
 
 // ─── Template hydration ────────────────────────────────────────────────────────
@@ -77,25 +78,28 @@ const EMPTY_CONTACT = {
   lastContact: '',
   awareOfBusiness: '',   // 'y' | 'n' | ''
   usingCompetitor: '',   // 'y' | 'n' | ''
-  workedTogetherAt: '',  // company name string
-  priorEngagement: '',   // 'y' | 'n' | ''
+  competitorName: '',    // free text when using competitor
+  workedTogetherAt: '',  // company name
+  priorEngagement: '',   // 'y' | 'n' | '' (Connected since working together)
 };
 
 // Human-readable headers only — never db column names. Parser uses COLUMN_MAP to normalize.
+// Engagement History/Context = main raw notes (drives INITIAL log). (y/n) = y or n. Worked Together At = company name.
 const CSV_HEADERS = [
   'Name',
   'Company',
   'Title',
-  'LinkedIn',
-  'Last contact',
-  'Knows your business?',
-  'Using competitor?',
-  'Worked together at',
-  'Prior work together?',
-  'Email (if known)',
-  'Additional Context',
+  'Email',
+  'LinkedIn URL',
+  'Last Contact',
+  'Engagement History/Context',
+  'Aware of Business (y/n)',
+  'Using Competitor (y/n)',
+  'Competitor Name',
+  'Worked Together At',
+  'Connected Since Working Together (y/n)',
 ];
-const CSV_TEMPLATE = CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,,,,,,,,,\n';
+const CSV_TEMPLATE = CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,,,,,,,,,,\n';
 
 function downloadTemplate() {
   const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
@@ -156,14 +160,15 @@ const COLUMN_MAP = [
   { key: 'title',          aliases: ['title', 'position', 'role', 'job', 'job title'] },
   { key: 'linkedin',       aliases: ['linkedin', 'linkedin url', 'url', 'profile', 'linkedin profile'] },
   { key: 'email',          aliases: ['email', 'email address', 'e-mail', 'email if known'] },
-  { key: 'notes',          aliases: ['notes', 'note', 'description', 'context', 'relationship notes', 'additional context', 'engagement history'] },
-  { key: 'notesFromLastEngagement', aliases: ['notes (from last engagement)', 'notes from last engagement', 'last engagement notes'] },
+  { key: 'notes',          aliases: ['notes', 'note', 'engagement history/context', 'engagement history', 'context', 'relationship notes', 'additional context'] },
+  { key: 'notesFromLastEngagement', aliases: ['notes (from last engagement)', 'notes from last engagement', 'last engagement notes', 'other helpful notes'] },
   { key: 'relationship',   aliases: ['relationship', 'how met', 'howmet', 'relationship context', 'connection'] },
   { key: 'lastContact',    aliases: ['last contact', 'lastcontact', 'when last contact', 'last spoke'] },
-  { key: 'awareOfBusiness',aliases: ['knows your business', 'aware of business', 'aware', 'knows business'] },
-  { key: 'usingCompetitor',aliases: ['using competitor', 'competitor', 'using a competitor'] },
+  { key: 'awareOfBusiness',aliases: ['knows your business', 'aware of business', 'aware', 'knows business', 'aware of business y/n'] },
+  { key: 'usingCompetitor',aliases: ['using competitor', 'competitor', 'using a competitor', 'using competitor y/n'] },
+  { key: 'competitorName', aliases: ['competitor name', 'competitor'] },
   { key: 'workedTogetherAt',aliases: ['worked together at', 'worked together', 'worked at', 'prior company'] },
-  { key: 'priorEngagement',aliases: ['prior work together', 'prior engagement', 'prior eng', 'did work together'] },
+  { key: 'priorEngagement',aliases: ['prior work together', 'prior engagement', 'prior eng', 'did work together', 'prior engagement y/n', 'connected since working together', 'connected since working together y/n'] },
 ];
 
 function normalizeHeader(h) {
@@ -230,6 +235,7 @@ function parseCSVText(text) {
         lastContact:      getField('lastContact'),
         awareOfBusiness:  getYN(getField('awareOfBusiness')),
         usingCompetitor:  getYN(getField('usingCompetitor')),
+        competitorName:   getField('competitorName'),
         workedTogetherAt: getField('workedTogetherAt'),
         priorEngagement:  getYN(getField('priorEngagement')),
       };
@@ -269,11 +275,34 @@ function getYN(v) {
   return '';
 }
 
+/** Client-side: build the INITIAL engagement log note (notes + relationship + serialized signals). */
+function buildInitialNote(contact) {
+  const howMet = (contact.relationship || contact.howMet || '').trim();
+  const notes = (contact.notes || '').trim();
+  const lines = [];
+  if (howMet) lines.push(`Relationship context: ${howMet}`);
+  if (notes) lines.push(notes);
+
+  const prior = contact.priorEngagement;
+  if (prior === 'y') lines.push('Connected since working together: Yes');
+  if (prior === 'n') lines.push('Connected since working together: No');
+  if ((contact.lastContact || '').trim()) lines.push(`Last contact: ${contact.lastContact.trim()}`);
+  const comp = contact.usingCompetitor;
+  const compName = (contact.competitorName || '').trim();
+  if (comp === 'y') lines.push(compName ? `Uses a competitor: ${compName}` : 'Uses a competitor');
+  if (comp === 'n') lines.push('No known competitor in use');
+  if (contact.awareOfBusiness === 'y') lines.push('Knows our business: Yes');
+  if (contact.awareOfBusiness === 'n') lines.push('Not aware of our business');
+  if ((contact.workedTogetherAt || '').trim()) lines.push(`Worked together at: ${contact.workedTogetherAt.trim()}`);
+
+  return lines.join('\n\n');
+}
+
 /** Convert universal-mapper rows (from computeMappedRows) to target contact shape. */
 function convertMappedRowsToContacts(mappedRows) {
   return mappedRows
     .map((row) => {
-      const notes = [row.notes, row.notesFromLastEngagement].filter(Boolean).join(' ').trim();
+      const notes = [row.notes, row.notesFromLastEngagement].filter(Boolean).join('\n\n').trim();
       return {
         name: (row.name || '').trim(),
         company: (row.company || '').trim(),
@@ -285,6 +314,7 @@ function convertMappedRowsToContacts(mappedRows) {
         lastContact: (row.lastContact || '').trim(),
         awareOfBusiness: getYN(row.awareOfBusiness),
         usingCompetitor: getYN(row.usingCompetitor),
+        competitorName: (row.competitorName || '').trim(),
         workedTogetherAt: (row.workedTogetherAt || '').trim(),
         priorEngagement: getYN(row.priorEngagement),
       };
@@ -446,7 +476,7 @@ function SingleContactCard({ contact, index, total, onChange, onDelete }) {
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Quick signals <span className="font-normal normal-case text-gray-400">(optional — helps AI pick the right template)</span></p>
 
-        {/* Last contact + Worked together at */}
+        {/* Last contact + Worked together at + Competitor name */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Last contact</label>
@@ -468,14 +498,24 @@ function SingleContactCard({ contact, index, total, onChange, onDelete }) {
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium text-gray-600">Competitor name</label>
+            <input
+              type="text"
+              value={contact.competitorName || ''}
+              onChange={(e) => update('competitorName', e.target.value)}
+              placeholder="If using a competitor, which one? (optional)"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
         </div>
 
         {/* Y/N toggles */}
         <div className="flex flex-wrap gap-4">
           {[
-            { field: 'awareOfBusiness', label: 'Aware of my business?' },
-            { field: 'usingCompetitor', label: 'Using a competitor?' },
-            { field: 'priorEngagement', label: 'Did work together before?' },
+            { field: 'awareOfBusiness', label: 'Aware of Business (y/n)' },
+            { field: 'usingCompetitor', label: 'Using Competitor (y/n)' },
+            { field: 'priorEngagement', label: 'Connected Since Working Together (y/n)' },
           ].map(({ field, label }) => (
             <div key={field} className="flex items-center gap-2">
               <span className="text-xs text-gray-600">{label}</span>
@@ -540,6 +580,8 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
   const [parseError, setParseError] = useState('');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
+  const [savedContacts, setSavedContacts] = useState([]); // from bulk-create (ids for downstream hydrate)
+  const [hydrating, setHydrating] = useState(false);
 
   // ── Step 5: outreach prep per saved contact ──
   const [outreachIdx, setOutreachIdx] = useState(0);
@@ -585,6 +627,8 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
     setParseError('');
     setSaving(false);
     setResult(null);
+    setSavedContacts([]);
+    setHydrating(false);
     setCsvParsed(null);
     setCsvMapping([]);
     resetOutreach();
@@ -701,7 +745,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
   const isFirstCard = currentIdx === 0;
 
   // Current contact in step 5
-  const outreachContacts = result?.savedContacts || [];
+  const outreachContacts = result?.contacts || result?.savedContacts || [];
   const outreachContact = outreachContacts[outreachIdx] || null;
 
   // Auto-load persona suggestion when entering step 5 or navigating to a new contact
@@ -819,18 +863,54 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
     const user = auth.currentUser;
     if (!user) { setParseError('Please sign in first.'); return; }
     setSaving(true);
+    setParseError('');
     try {
       const token = await user.getIdToken();
-      const res = await fetch('/api/targeting/submit', {
+      const minimalContacts = validContacts.map((c) => ({
+        name: c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || '',
+        company: c.company || c.companyName || '',
+        title: c.title || '',
+        email: c.email || '',
+        linkedin: c.linkedin || c.linkedinUrl || '',
+      }));
+      const res = await fetch('/api/targeting/bulk-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ companyHQId, contacts: validContacts }),
+        body: JSON.stringify({ companyHQId, contacts: minimalContacts }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Save failed');
+      if (!data.success) throw new Error(data.error || 'Bulk create failed');
       setResult(data);
+      setSavedContacts(data.contacts || []);
       setStep(5);
       onSuccess?.();
+
+      // Phase 2: hydrate downstream (engagement log + suggest-persona) per contact, non-blocking
+      setHydrating(true);
+      const created = data.contacts || [];
+      Promise.all(
+        created.map((saved, i) => {
+          const contact = validContacts[i];
+          if (!contact || !saved?.id) return Promise.resolve();
+          const note = buildInitialNote(contact);
+          const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+          const logPromise = note.trim()
+            ? fetch(`/api/contacts/${saved.id}/engagement-log`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ entryType: 'INITIAL', note }),
+              }).catch(() => {})
+            : Promise.resolve();
+          const personaPromise = note.trim()
+            ? fetch(`/api/contacts/${saved.id}/suggest-persona`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ note }),
+              }).catch(() => {})
+            : Promise.resolve();
+          return Promise.all([logPromise, personaPromise]);
+        }),
+      ).finally(() => setHydrating(false));
     } catch (err) {
       setParseError(err.message);
     } finally {
@@ -1081,6 +1161,9 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
               </div>
               <div className="rounded-xl border border-green-200 bg-green-50 px-6 py-4 text-sm text-green-800 w-full max-w-sm">
                 {result.message}
+                {hydrating && (
+                  <p className="mt-2 text-blue-700 text-xs">Adding engagement history and persona per contact…</p>
+                )}
                 {result.errors?.length > 0 && (
                   <p className="mt-2 text-amber-700 font-medium">
                     {result.errors.length} contact{result.errors.length !== 1 ? 's' : ''} had errors

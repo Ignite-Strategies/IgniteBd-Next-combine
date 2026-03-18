@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { synthesizeContactSummary } from '@/lib/services/synthesizeContactSummaryService';
 
-const VALID_ENTRY_TYPES = ['POST_CALL', 'POST_MEETING'];
+const VALID_ENTRY_TYPES = ['INITIAL', 'POST_CALL', 'POST_MEETING'];
 
 /**
  * GET /api/contacts/[contactId]/engagement-log
@@ -35,10 +35,11 @@ export async function GET(request, { params }) {
 
 /**
  * POST /api/contacts/[contactId]/engagement-log
- * Create a manual engagement log entry (POST_CALL or POST_MEETING).
+ * Create an engagement log entry.
+ * INITIAL = from bulk-create hydrate (notes + signals). POST_CALL/POST_MEETING = manual.
  * Fires synthesizeContactSummary in the background after save.
  *
- * Body: { entryType: 'POST_CALL' | 'POST_MEETING', note: string, loggedAt?: string }
+ * Body: { entryType: 'INITIAL' | 'POST_CALL' | 'POST_MEETING', note: string, loggedAt?: string }
  */
 export async function POST(request, { params }) {
   try {

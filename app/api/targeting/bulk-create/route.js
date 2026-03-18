@@ -5,14 +5,13 @@ import { resolveMembership } from '@/lib/membership';
 import { ensureContactPipeline } from '@/lib/services/pipelineService';
 
 /**
- * POST /api/targeting/submit
+ * POST /api/targeting/bulk-create
  *
- * @deprecated Prefer POST /api/targeting/bulk-create (identity only) then client-side
- * hydrate via POST /api/contacts/[id]/engagement-log (INITIAL) and suggest-persona.
- * This route no longer writes notes to Contact or creates engagement_log (avoids dual-write).
+ * Phase 1 only: create/update contacts with identity fields only (no FKs).
+ * Returns contact IDs for downstream hydration (engagement log, suggest-persona).
  *
- * Saves a batch of contacts as Targets (identity + howMet only). Pipeline ensured.
- * Body: { companyHQId, contacts: [{ name?, company?, title?, linkedin?, relationship?, email? }] }
+ * Body: { companyHQId: string, contacts: [{ name?, company?, title?, email?, linkedin? }] }
+ * Returns: { success, contacts: [{ id, firstName, lastName, companyName, isNew }], created, updated, errors }
  */
 export async function POST(request) {
   let firebaseUser;
@@ -55,33 +54,29 @@ export async function POST(request) {
     }
 
     const results = { created: 0, updated: 0, errors: [] };
-    const savedContacts = [];
+    const savedContacts = []; // same length as contacts; null for skipped
 
     for (const [idx, c] of contacts.entries()) {
       try {
-        // Resolve firstName / lastName
         let firstName = (c.firstName || '').trim();
         let lastName = (c.lastName || '').trim();
-
         if (!firstName && !lastName && c.name) {
-          const parts = c.name.trim().split(/\s+/);
+          const parts = (c.name || '').trim().split(/\s+/);
           firstName = parts[0] || '';
           lastName = parts.slice(1).join(' ') || '';
         }
-
         if (!firstName && !lastName) {
           results.errors.push(`Contact ${idx + 1}: name is required`);
+          savedContacts.push(null);
           continue;
         }
 
-        const email = c.email?.trim() || null;
+        const email = (c.email || '').trim() || null;
         const companyName = (c.company || c.companyName || '').trim() || null;
-        const title = c.title?.trim() || null;
+        const title = (c.title || '').trim() || null;
         const linkedinUrl = (c.linkedin || c.linkedinUrl || '').trim() || null;
-        const howMet = (c.relationship || c.howMet || '').trim() || null;
         const fullName = [firstName, lastName].filter(Boolean).join(' ') || null;
 
-        // Try to find existing contact: email match first, then name match
         let existing = null;
         if (email) {
           existing = await prisma.contact.findFirst({
@@ -101,7 +96,6 @@ export async function POST(request) {
         }
 
         let contact;
-
         if (existing) {
           contact = await prisma.contact.update({
             where: { id: existing.id },
@@ -114,7 +108,6 @@ export async function POST(request) {
               ...(companyName && { companyName }),
               ...(title && { title }),
               ...(linkedinUrl && { linkedinUrl }),
-              ...(howMet && { howMet }),
             },
           });
           results.updated++;
@@ -130,13 +123,11 @@ export async function POST(request) {
               ...(companyName && { companyName }),
               ...(title && { title }),
               ...(linkedinUrl && { linkedinUrl }),
-              ...(howMet && { howMet }),
             },
           });
           results.created++;
         }
 
-        // Ensure pipeline record (prospect / need-to-engage)
         await ensureContactPipeline(contact.id, {
           pipeline: 'prospect',
           stage: 'need-to-engage',
@@ -151,11 +142,12 @@ export async function POST(request) {
           fullName: contact.fullName,
           companyName: contact.companyName,
           title: contact.title,
-          howMet: contact.howMet,
+          isNew: !existing,
         });
       } catch (err) {
-        console.error(`Error saving target ${idx + 1}:`, err);
+        console.error(`Error bulk-create target ${idx + 1}:`, err);
         results.errors.push(`Contact ${idx + 1}: ${err.message}`);
+        savedContacts.push(null);
       }
     }
 
@@ -165,13 +157,13 @@ export async function POST(request) {
       updated: results.updated,
       errors: results.errors,
       total: contacts.length,
-      savedContacts,
-      message: `Saved ${results.created + results.updated} targets (${results.created} new, ${results.updated} updated)`,
+      contacts: savedContacts,
+      message: `Created/updated ${savedContacts.length} contacts (${results.created} new, ${results.updated} updated). Hydrate engagement log and persona per contact.`,
     });
   } catch (error) {
-    console.error('❌ TargetingSubmit error:', error);
+    console.error('❌ bulk-create error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to submit targets', details: error.message },
+      { success: false, error: 'Failed to bulk-create targets', details: error.message },
       { status: 500 },
     );
   }
