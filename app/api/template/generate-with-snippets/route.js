@@ -140,6 +140,7 @@ export async function POST(request) {
             title: true,
             companyName: true,
             contactSummary: true,
+            notes: true,
             outreachPersonaSlug: true,
             relationship_contexts: {
               select: {
@@ -153,7 +154,7 @@ export async function POST(request) {
         });
 
         if (contactRecord) {
-          contactNotes = contactRecord.contactSummary || null;
+          contactNotes = contactRecord.contactSummary || contactRecord.notes || null;
 
           contactInfo = {
             name: contactRecord.goesBy || [contactRecord.firstName, contactRecord.lastName].filter(Boolean).join(' ') || null,

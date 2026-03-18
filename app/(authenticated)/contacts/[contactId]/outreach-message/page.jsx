@@ -143,7 +143,7 @@ export default function OutreachMessagePage({ params }) {
         if (res.data?.contact) {
           const c = res.data.contact;
           setContact(c);
-          if (c.contactSummary) setNotes(c.contactSummary);
+          setNotes(c.contactSummary || c.notes || '');
 
           // Load persona display name if slug is present
           if (c.outreachPersonaSlug) {
@@ -354,7 +354,7 @@ export default function OutreachMessagePage({ params }) {
               </button>
               {notesExpanded && (
                 <div className="border-t border-gray-100 px-5 pb-4">
-                  <p className="mb-2 mt-3 text-xs text-gray-400">Pre-filled from contact summary. Edit before generating.</p>
+                  <p className="mb-2 mt-3 text-xs text-gray-400">Pre-filled from contact summary or saved notes. Edit before generating.</p>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
