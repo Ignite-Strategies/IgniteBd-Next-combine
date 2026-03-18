@@ -63,7 +63,7 @@ export default function ContactDetailPage() {
           if (response.data?.success && response.data.contact) {
             setContact(response.data.contact);
             setNotesText(response.data.contact.notes || '');
-            // Load saved relationship context if it exists (from relationship_contexts relation)
+            // Always sync relationship context from API (set null when absent to avoid stale state)
             if (response.data.contact.relationship_contexts) {
               const rc = response.data.contact.relationship_contexts;
               setRelationshipContext({
@@ -72,6 +72,8 @@ export default function ContactDetailPage() {
                 companyAwareness: rc.companyAwareness,
                 formerCompany: rc.formerCompany,
               });
+            } else {
+              setRelationshipContext(null);
             }
             setLoading(false);
             // Don't call refreshContacts here - it causes infinite loops
@@ -465,7 +467,19 @@ export default function ContactDetailPage() {
       });
       
       if (response.data?.success && response.data.relationshipContext) {
-        setRelationshipContext(response.data.relationshipContext);
+        const ctx = response.data.relationshipContext;
+        setRelationshipContext(ctx);
+        // Persist to relationship_contexts so it survives refresh
+        try {
+          await api.put(`/api/contacts/${contactId}`, { relationshipContext: ctx });
+          if (refreshContacts) refreshContacts();
+        } catch (putErr) {
+          console.error('Failed to save relationship context:', putErr);
+          alert('Context generated but could not save. You can save it manually below.');
+          return;
+        }
+        // Success feedback so user knows it was saved
+        alert('Relationship context generated and saved.');
       } else {
         alert(response.data?.error || 'Failed to generate relationship context');
       }
@@ -2218,7 +2232,16 @@ export default function ContactDetailPage() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-400 italic">No log entries yet. Log a call or meeting note above.</p>
+                    <>
+                      {((contact?.notes || notesText) || '').trim() ? (
+                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-sm">
+                          <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1.5">Initial notes</p>
+                          <p className="text-gray-700 whitespace-pre-wrap">{contact?.notes || notesText}</p>
+                          <p className="text-xs text-amber-600 mt-1.5">Add engagement history above, then use Log it to create a log entry from these notes.</p>
+                        </div>
+                      ) : null}
+                      <p className="text-xs text-gray-400 italic">No log entries yet. Log a call or meeting note above.</p>
+                    </>
                   )}
                 </div>
               </div>
