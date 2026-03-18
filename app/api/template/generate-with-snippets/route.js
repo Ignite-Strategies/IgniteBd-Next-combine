@@ -139,7 +139,7 @@ export async function POST(request) {
             goesBy: true,
             title: true,
             companyName: true,
-            notes: true,
+            contactSummary: true,
             outreachPersonaSlug: true,
             relationship_contexts: {
               select: {
@@ -153,7 +153,7 @@ export async function POST(request) {
         });
 
         if (contactRecord) {
-          if (contactRecord.notes) contactNotes = contactRecord.notes;
+          contactNotes = contactRecord.contactSummary || null;
 
           contactInfo = {
             name: contactRecord.goesBy || [contactRecord.firstName, contactRecord.lastName].filter(Boolean).join(' ') || null,
@@ -302,7 +302,7 @@ export async function POST(request) {
     // Tone guidance — derived from persona + relationship context
     const toneGuidance = buildToneGuidance(effectivePersonaSlug, effectiveRelationshipContext);
 
-    const contactNotesDesc = contactNotes ? `\n\n=== CONTACT NOTES ===\n${contactNotes}` : '';
+    const contactNotesDesc = contactNotes ? `\n\n=== CONTACT SUMMARY ===\n${contactNotes}` : '';
     const additionalContextDesc = additionalContext?.trim() ? `\n\n=== ADDITIONAL CONTEXT ===\n${additionalContext.trim()}` : '';
 
     const systemPrompt = `You are an expert at building email outreach templates by selecting and assembling content snippets.

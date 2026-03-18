@@ -87,8 +87,8 @@ export async function POST(request, { params }) {
     },
   });
 
-  // Regenerate contactSummary in the background (non-blocking)
-  synthesizeContactSummary(contactId).catch((err) =>
+  // Regenerate contactSummary before responding (serverless context dies after response)
+  await synthesizeContactSummary(contactId).catch((err) =>
     console.error(`synthesizeContactSummary failed for ${contactId}:`, err),
   );
 

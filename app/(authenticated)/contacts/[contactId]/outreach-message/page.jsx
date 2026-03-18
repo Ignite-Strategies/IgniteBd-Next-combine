@@ -143,7 +143,7 @@ export default function OutreachMessagePage({ params }) {
         if (res.data?.contact) {
           const c = res.data.contact;
           setContact(c);
-          if (c.notes) setNotes(c.notes);
+          if (c.contactSummary) setNotes(c.contactSummary);
 
           // Load persona display name if slug is present
           if (c.outreachPersonaSlug) {
@@ -342,19 +342,19 @@ export default function OutreachMessagePage({ params }) {
         {/* Pre-generation form */}
         {!result && (
           <div className="space-y-4">
-            {/* Notes */}
+            {/* Contact Summary */}
             <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
               <button
                 type="button"
                 onClick={() => setNotesExpanded((v) => !v)}
                 className="flex w-full items-center justify-between px-5 py-3.5 text-left"
               >
-                <span className="text-sm font-semibold text-gray-700">Contact Notes</span>
+                <span className="text-sm font-semibold text-gray-700">Contact Summary</span>
                 {notesExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
               </button>
               {notesExpanded && (
                 <div className="border-t border-gray-100 px-5 pb-4">
-                  <p className="mb-2 mt-3 text-xs text-gray-400">Pre-filled from saved contact notes. Edit before generating.</p>
+                  <p className="mb-2 mt-3 text-xs text-gray-400">Pre-filled from contact summary. Edit before generating.</p>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
