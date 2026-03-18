@@ -99,7 +99,9 @@ const CSV_HEADERS = [
   'Worked Together At',
   'Connected Since Working Together (y/n)',
 ];
-const CSV_TEMPLATE = CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,,,,,,,,,,\n';
+// Sample row: 2 filled cells + (headers.length - 2) empty cells = headers.length columns
+const CSV_TEMPLATE =
+  CSV_HEADERS.join(',') + '\nJane Doe,Acme Corp,' + ','.repeat(Math.max(0, CSV_HEADERS.length - 3)) + '\n';
 
 function downloadTemplate() {
   const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8;' });
@@ -164,11 +166,11 @@ const COLUMN_MAP = [
   { key: 'notesFromLastEngagement', aliases: ['notes (from last engagement)', 'notes from last engagement', 'last engagement notes', 'other helpful notes'] },
   { key: 'relationship',   aliases: ['relationship', 'how met', 'howmet', 'relationship context', 'connection'] },
   { key: 'lastContact',    aliases: ['last contact', 'lastcontact', 'when last contact', 'last spoke'] },
-  { key: 'awareOfBusiness',aliases: ['knows your business', 'aware of business', 'aware', 'knows business', 'aware of business y/n'] },
-  { key: 'usingCompetitor',aliases: ['using competitor', 'competitor', 'using a competitor', 'using competitor y/n'] },
+  { key: 'awareOfBusiness',aliases: ['knows your business', 'aware of business', 'aware', 'knows business', 'aware of business y/n', 'aware of business (y/n)'] },
+  { key: 'usingCompetitor',aliases: ['using competitor', 'competitor', 'using a competitor', 'using competitor y/n', 'using competitor (y/n)'] },
   { key: 'competitorName', aliases: ['competitor name', 'competitor'] },
   { key: 'workedTogetherAt',aliases: ['worked together at', 'worked together', 'worked at', 'prior company'] },
-  { key: 'priorEngagement',aliases: ['prior work together', 'prior engagement', 'prior eng', 'did work together', 'prior engagement y/n', 'connected since working together', 'connected since working together y/n'] },
+  { key: 'priorEngagement',aliases: ['prior work together', 'prior engagement', 'prior eng', 'did work together', 'prior engagement y/n', 'connected since working together', 'connected since working together y/n', 'connected since working together (y/n)'] },
 ];
 
 function normalizeHeader(h) {
