@@ -26,22 +26,28 @@ export async function POST(request) {
     const { contacts, companyHQId } = body ?? {};
 
     if (!companyHQId) {
+      console.error('[bulk-create] Missing companyHQId for uid:', firebaseUser.uid);
       return NextResponse.json({ success: false, error: 'companyHQId is required' }, { status: 400 });
     }
     if (!Array.isArray(contacts) || contacts.length === 0) {
+      console.error('[bulk-create] Empty contacts array for companyHQId:', companyHQId);
       return NextResponse.json({ success: false, error: 'contacts array is required' }, { status: 400 });
     }
+
+    console.log(`[bulk-create] uid=${firebaseUser.uid} companyHQId=${companyHQId} count=${contacts.length}`);
 
     const owner = await prisma.owners.findUnique({
       where: { firebaseId: firebaseUser.uid },
       select: { id: true },
     });
     if (!owner) {
+      console.error('[bulk-create] Owner not found for uid:', firebaseUser.uid);
       return NextResponse.json({ success: false, error: 'Owner not found' }, { status: 404 });
     }
 
     const { membership } = await resolveMembership(owner.id, companyHQId);
     if (!membership) {
+      console.error(`[bulk-create] Forbidden: owner ${owner.id} has no membership for companyHQId ${companyHQId}`);
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
@@ -50,6 +56,7 @@ export async function POST(request) {
       select: { id: true },
     });
     if (!company) {
+      console.error('[bulk-create] Company not found:', companyHQId);
       return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 });
     }
 
@@ -145,10 +152,15 @@ export async function POST(request) {
           isNew: !existing,
         });
       } catch (err) {
-        console.error(`Error bulk-create target ${idx + 1}:`, err);
+        console.error(`[bulk-create] Error on contact ${idx + 1}:`, err.message, err.stack);
         results.errors.push(`Contact ${idx + 1}: ${err.message}`);
         savedContacts.push(null);
       }
+    }
+
+    console.log(`[bulk-create] Done: created=${results.created} updated=${results.updated} errors=${results.errors.length}`);
+    if (results.errors.length > 0) {
+      console.error('[bulk-create] Per-contact errors:', results.errors);
     }
 
     return NextResponse.json({
@@ -161,7 +173,7 @@ export async function POST(request) {
       message: `Created/updated ${savedContacts.length} contacts (${results.created} new, ${results.updated} updated). Hydrate engagement log and persona per contact.`,
     });
   } catch (error) {
-    console.error('❌ bulk-create error:', error);
+    console.error('[bulk-create] Unhandled error:', error.message, error.stack);
     return NextResponse.json(
       { success: false, error: 'Failed to bulk-create targets', details: error.message },
       { status: 500 },

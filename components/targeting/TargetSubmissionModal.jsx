@@ -31,7 +31,6 @@ const TARGET_FIELD_LABELS = {
   email: 'Email',
   notes: 'Engagement History/Context',
   notesFromLastEngagement: 'Other helpful notes',
-  relationship: 'Relationship',
   lastContact: 'Last Contact',
   awareOfBusiness: 'Aware of Business (y/n)',
   usingCompetitor: 'Using Competitor (y/n)',
@@ -54,26 +53,12 @@ function hydrateTemplate(text, contact) {
     .replace(/\{\{title\}\}/gi, contact.title || '');
 }
 
-const RELATIONSHIP_OPTIONS = [
-  '',
-  'Warm intro',
-  'Met recently',
-  'Industry peer',
-  'Cold outreach',
-  'Prior conversation',
-  'Event connection',
-  'Former colleague',
-  'Referral',
-  'Other',
-];
-
 const EMPTY_CONTACT = {
   name: '',
   company: '',
   title: '',
   linkedin: '',
   email: '',
-  relationship: '',
   notes: '',
   lastContact: '',
   awareOfBusiness: '',   // 'y' | 'n' | ''
@@ -111,26 +96,6 @@ function downloadTemplate() {
   a.download = 'ignite-targets-template.csv';
   a.click();
   URL.revokeObjectURL(url);
-}
-
-// ─── Relationship inference (client-side keyword matching) ────────────────────
-// Mirrors the logic in PersonaSuggestionService but runs instantly without an API call.
-// The AI can refine this after the contact is saved.
-
-function inferRelationshipFromNotes(notes) {
-  if (!notes || notes.trim().length < 6) return '';
-  const t = notes.toLowerCase();
-
-  if (/warm.?intro|intro.?from|introduced.?by|connected.?via.*intro/i.test(t)) return 'Warm intro';
-  if (/referral|referred.?by|referred.?me|referred.?us/i.test(t)) return 'Referral';
-  if (/former.?colleague|used.?to.?work|worked.?together|ex.?colleague|old.?colleague|previous.?colleague/i.test(t)) return 'Former colleague';
-  if (/conference|summit|roundtable|meetup|forum|dinner|gala|panel|workshop|event/i.test(t)) return 'Event connection';
-  if (/met.?recently|met.?last|ran.?into|bumped.?into/i.test(t)) return 'Met recently';
-  if (/industry.?peer|same.?industry|same.?space|competitor|same.?sector/i.test(t)) return 'Industry peer';
-  if (/prior.?conversation|spoke.?before|talked.?before|previous.?conversation|chatted.?before/i.test(t)) return 'Prior conversation';
-  if (/cold|haven.?t.?met|never.?met|no.?prior|don.?t.?know/i.test(t)) return 'Cold outreach';
-
-  return '';
 }
 
 // ─── Parsers ──────────────────────────────────────────────────────────────────
@@ -225,14 +190,12 @@ function parseCSVText(text) {
         return fallbackPos >= 0 && fallbackPos < parts.length ? (parts[fallbackPos] || '').trim() : '';
       };
       const notes = (getField('notes', 4) || getField('notesFromLastEngagement')).trim();
-      const relationship = getField('relationship') || inferRelationshipFromNotes(notes);
       return {
         name:             getField('name', 0),
         company:          getField('company', 1),
         title:            getField('title', 2),
         linkedin:         getField('linkedin', 3),
         email:            getField('email'),
-        relationship,
         notes,
         lastContact:      getField('lastContact'),
         awareOfBusiness:  getYN(getField('awareOfBusiness')),
@@ -263,7 +226,6 @@ function parseStructuredPaste(text) {
         title: parts[2] || '',
         linkedin: parts[3] || '',
         email,
-        relationship: inferRelationshipFromNotes(notes),
         notes,
       };
     })
@@ -277,12 +239,10 @@ function getYN(v) {
   return '';
 }
 
-/** Client-side: build the INITIAL engagement log note (notes + relationship + serialized signals). */
+/** Client-side: build the INITIAL engagement log note (notes + serialized signals). */
 function buildInitialNote(contact) {
-  const howMet = (contact.relationship || contact.howMet || '').trim();
   const notes = (contact.notes || '').trim();
   const lines = [];
-  if (howMet) lines.push(`Relationship context: ${howMet}`);
   if (notes) lines.push(notes);
 
   const prior = contact.priorEngagement;
@@ -311,7 +271,6 @@ function convertMappedRowsToContacts(mappedRows) {
         title: (row.title || '').trim(),
         linkedin: (row.linkedin || '').trim(),
         email: (row.email || '').trim(),
-        relationship: row.relationship || inferRelationshipFromNotes(notes),
         notes,
         lastContact: (row.lastContact || '').trim(),
         awareOfBusiness: getYN(row.awareOfBusiness),
@@ -352,7 +311,7 @@ function parseFreeformText(text) {
     }
 
     const notes = fullText.replace(urlMatch ? urlMatch[0] : '', '').trim();
-    return { name, company, title: '', linkedin, relationship: inferRelationshipFromNotes(notes), notes };
+    return { name, company, title: '', linkedin, notes };
   }).filter((c) => c.name || c.notes);
 }
 
@@ -360,27 +319,6 @@ function parseFreeformText(text) {
 
 function SingleContactCard({ contact, index, total, onChange, onDelete }) {
   const update = (field, value) => onChange(index, { ...contact, [field]: value });
-
-  // Auto-infer relationship from notes when notes change (only if not manually set)
-  const [userSetRelationship, setUserSetRelationship] = useState(!!contact.relationship);
-
-  useEffect(() => {
-    if (userSetRelationship) return;
-    const inferred = inferRelationshipFromNotes(contact.notes);
-    if (inferred && inferred !== contact.relationship) {
-      onChange(index, { ...contact, relationship: inferred });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contact.notes]);
-
-  const handleRelationshipChange = (val) => {
-    setUserSetRelationship(true);
-    update('relationship', val);
-  };
-
-  const inferredRelationship = !userSetRelationship && contact.notes
-    ? inferRelationshipFromNotes(contact.notes)
-    : null;
 
   return (
     <div className="space-y-4">
@@ -542,29 +480,6 @@ function SingleContactCard({ contact, index, total, onChange, onDelete }) {
         </div>
       </div>
 
-      {/* Relationship Context — auto-filled from engagement history */}
-      <div>
-        <div className="mb-1 flex items-center gap-2">
-          <label className="text-xs font-medium text-gray-600">Relationship Context</label>
-          {inferredRelationship && (
-            <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
-              <Sparkles className="h-3 w-3" />
-              Auto-detected from engagement history
-            </span>
-          )}
-        </div>
-        <select
-          value={contact.relationship}
-          onChange={(e) => handleRelationshipChange(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          {RELATIONSHIP_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt || '— Select —'}
-            </option>
-          ))}
-        </select>
-      </div>
     </div>
   );
 }
@@ -901,16 +816,9 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ entryType: 'INITIAL', note }),
-              }).catch(() => {})
+              }).catch((err) => console.error(`[modal] engagement-log failed for ${saved.id}:`, err))
             : Promise.resolve();
-          const personaPromise = note.trim()
-            ? fetch(`/api/contacts/${saved.id}/suggest-persona`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ note }),
-              }).catch(() => {})
-            : Promise.resolve();
-          return Promise.all([logPromise, personaPromise]);
+          return logPromise;
         }),
       ).finally(() => setHydrating(false));
     } catch (err) {
@@ -1136,7 +1044,6 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
                       <p className="text-sm font-semibold text-gray-900">{c.name}</p>
                       <p className="text-xs text-gray-500 truncate">
                         {[c.title, c.company].filter(Boolean).join(' · ')}
-                        {c.relationship && <span className="ml-2 font-medium text-blue-600">{c.relationship}</span>}
                       </p>
                       {c.notes && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1 italic">{c.notes}</p>}
                     </div>
@@ -1153,25 +1060,51 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
 
           {/* ── Step 5: Done ── */}
           {step === 5 && result && (
-            <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                <CheckCircle className="h-9 w-9 text-green-600" />
+            <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Targets Submitted</h3>
                 <p className="text-gray-500 mt-1">{result.created} new · {result.updated} updated</p>
-              </div>
-              <div className="rounded-xl border border-green-200 bg-green-50 px-6 py-4 text-sm text-green-800 w-full max-w-sm">
-                {result.message}
                 {hydrating && (
-                  <p className="mt-2 text-blue-700 text-xs">Adding engagement history and persona per contact…</p>
-                )}
-                {result.errors?.length > 0 && (
-                  <p className="mt-2 text-amber-700 font-medium">
-                    {result.errors.length} contact{result.errors.length !== 1 ? 's' : ''} had errors
-                  </p>
+                  <p className="mt-1 text-blue-600 text-xs">Logging engagement history…</p>
                 )}
               </div>
+
+              {/* Contact links */}
+              {savedContacts.filter(Boolean).length > 0 && (
+                <div className="w-full divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white overflow-hidden text-left">
+                  {savedContacts.filter(Boolean).map((c) => (
+                    <a
+                      key={c.id}
+                      href={`/contacts/${c.id}${companyHQId ? `?companyHQId=${companyHQId}` : ''}`}
+                      className="flex items-center justify-between px-4 py-3 text-sm hover:bg-gray-50 transition"
+                      onClick={handleClose}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{c.fullName || [c.firstName, c.lastName].filter(Boolean).join(' ') || '—'}</p>
+                        {c.companyName && <p className="text-xs text-gray-400 truncate">{c.companyName}</p>}
+                      </div>
+                      <span className="ml-3 flex-shrink-0 text-xs font-medium text-blue-600">View →</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* Per-contact errors */}
+              {result.errors?.length > 0 && (
+                <div className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 text-left">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">
+                    {result.errors.length} contact{result.errors.length !== 1 ? 's' : ''} could not be saved
+                  </p>
+                  <ul className="space-y-1">
+                    {result.errors.map((e, i) => (
+                      <li key={i} className="text-xs text-amber-700">{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
@@ -1452,7 +1385,7 @@ export default function TargetSubmissionModal({ isOpen, onClose, onSuccess, comp
             <button onClick={reset} className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
               Submit more
             </button>
-            {result?.savedContacts?.length > 0 && (
+            {savedContacts.filter(Boolean).length > 0 && (
               <button
                 onClick={() => { setOutreachIdx(0); setStep(6); }}
                 className="flex items-center gap-2 rounded-lg bg-purple-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
