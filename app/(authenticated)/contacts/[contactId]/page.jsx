@@ -148,6 +148,8 @@ export default function ContactDetailPage() {
   const [enrichError, setEnrichError] = useState('');
   const [enrichingCareer, setEnrichingCareer] = useState(false);
   const [careerEnrichError, setCareerEnrichError] = useState('');
+  const [getEmailLoading, setGetEmailLoading] = useState(false);
+  const [getEmailError, setGetEmailError] = useState('');
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [rawJSON, setRawJSON] = useState(null);
   const [editingCompany, setEditingCompany] = useState(false);
@@ -688,6 +690,30 @@ export default function ContactDetailPage() {
     }
   };
 
+  const handleGetEmail = async () => {
+    if (!contactId || !contact?.linkedinUrl) {
+      setGetEmailError('Contact must have a LinkedIn URL.');
+      return;
+    }
+    setGetEmailLoading(true);
+    setGetEmailError('');
+    try {
+      const res = await api.post(`/api/contacts/${contactId}/get-email`);
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || res.data?.details || 'Get email failed');
+      }
+      const updatedContactResponse = await api.get(`/api/contacts/${contactId}`);
+      if (updatedContactResponse.data?.success && updatedContactResponse.data?.contact) {
+        setContact(updatedContactResponse.data.contact);
+        if (refreshContacts) refreshContacts();
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.details || err?.response?.data?.error || err?.message || 'Failed to get email';
+      setGetEmailError(msg);
+    } finally {
+      setGetEmailLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1365,12 +1391,54 @@ export default function ContactDetailPage() {
             </div>
           )}
 
+          {/* Get email error */}
+          {getEmailError && (
+            <div className="rounded-xl border-2 border-red-200 bg-red-50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <X className="h-5 w-5 text-red-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-900">Get email failed</p>
+                    <p className="text-xs text-red-700">{getEmailError}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setGetEmailError('')}
+                  className="rounded-lg p-1 text-red-600 transition hover:bg-red-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           <section className="rounded-2xl bg-white p-6 shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
                 Contact Information
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Get email - Apollo by LinkedIn URL only; saves email (and optionally name/title) on contact */}
+                {contact?.linkedinUrl && (
+                  <button
+                    onClick={handleGetEmail}
+                    disabled={getEmailLoading}
+                    className="flex items-center gap-2 rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Fetch email from Apollo using LinkedIn URL"
+                  >
+                    {getEmailLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Getting email...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4" />
+                        Get email
+                      </>
+                    )}
+                  </button>
+                )}
                 {/* Enrich - by email; after success, Build Persona is offered in modal only */}
                 <button
                   onClick={handleEnrichContact}
