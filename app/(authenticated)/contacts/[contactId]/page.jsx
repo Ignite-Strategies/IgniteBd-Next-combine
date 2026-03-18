@@ -690,8 +690,10 @@ export default function ContactDetailPage() {
     }
   };
 
+  const contactLinkedInUrl = contact?.linkedinUrl || contact?.linkedin_url;
+
   const handleGetEmail = async () => {
-    if (!contactId || !contact?.linkedinUrl) {
+    if (!contactId || !contactLinkedInUrl) {
       setGetEmailError('Contact must have a LinkedIn URL.');
       return;
     }
@@ -1418,27 +1420,25 @@ export default function ContactDetailPage() {
                 Contact Information
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Get email - Apollo by LinkedIn URL only; saves email (and optionally name/title) on contact */}
-                {contact?.linkedinUrl && (
-                  <button
-                    onClick={handleGetEmail}
-                    disabled={getEmailLoading}
-                    className="flex items-center gap-2 rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Fetch email from Apollo using LinkedIn URL"
-                  >
-                    {getEmailLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Getting email...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="h-4 w-4" />
-                        Get email
-                      </>
-                    )}
-                  </button>
-                )}
+                {/* Get email - Apollo by LinkedIn URL; always visible, disabled when no LinkedIn URL */}
+                <button
+                  onClick={handleGetEmail}
+                  disabled={getEmailLoading || !contactLinkedInUrl}
+                  className="flex items-center gap-2 rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={contactLinkedInUrl ? 'Fetch email from Apollo using LinkedIn URL' : 'Add a LinkedIn URL to this contact to fetch email'}
+                >
+                  {getEmailLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Getting email...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4" />
+                      Get email
+                    </>
+                  )}
+                </button>
                 {/* Enrich - by email; after success, Build Persona is offered in modal only */}
                 <button
                   onClick={handleEnrichContact}
