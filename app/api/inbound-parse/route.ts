@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
     const inboundEmails = await prisma.inboundEmail.findMany({
       where: {
-        inboundType: 'OUTREACH',
+        OR: [{ inboundType: 'OUTREACH' }, { inboundType: null }],
         createdAt: { gte: since },
         ...(companyHQId && { companyHQId }),
         ...statusFilter,

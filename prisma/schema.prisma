@@ -755,7 +755,7 @@ model InboundEmail {
   companyHQId     String?  // FK to company_hqs (company-scoped like rest of repo)
   company_hqs     company_hqs? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
-  inboundType     InboundType @default(OUTREACH) // OUTREACH = email; MEETING = meeting notes (slug.meeting@crm.domain)
+  inboundType     InboundType? // OUTREACH = email; MEETING = meeting notes (slug.meeting@crm.domain). Null = legacy; treat as OUTREACH in list.
   ingestionStatus String   @default("RECEIVED") // RECEIVED | PROCESSING | RECORDED | FAILED
 
   createdAt       DateTime @default(now())

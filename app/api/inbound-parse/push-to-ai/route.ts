@@ -317,10 +317,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 6. Mark ingested ──
+    // ── 6. Mark ingested (and backfill legacy null inboundType so row is no longer legacy) ──
     await prisma.inboundEmail.update({
       where: { id: inboundEmailId },
-      data: { ingestionStatus: 'RECORDED' },
+      data: {
+        ingestionStatus: 'RECORDED',
+        inboundType: 'OUTREACH',
+      },
     });
 
     return NextResponse.json({

@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       firstName: string | null;
       lastName: string | null;
       email: string | null;
-      company: string | null;
+      companyName: string | null;
       title: string | null;
       pipeline: string | null;
       nextEngagementDate: string | null;
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
           firstName: true,
           lastName: true,
           email: true,
-          company: true,
+          companyName: true,
           title: true,
           pipeline: true,
           nextEngagementDate: true,
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
               firstName: true,
               lastName: true,
               email: true,
-              company: true,
+              companyName: true,
               pipeline: true,
             },
             take: 5,
@@ -206,7 +206,7 @@ export async function POST(request: Request) {
             id: c.id,
             name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Unknown',
             email: c.email,
-            company: c.company,
+            company: c.companyName,
             pipeline: c.pipeline,
           }));
         }
@@ -291,7 +291,7 @@ export async function POST(request: Request) {
             id: contact.id,
             name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || null,
             email: contact.email,
-            company: contact.company,
+            company: contact.companyName,
             title: contact.title,
             pipeline: contact.pipeline,
             optedOut: contact.contactDisposition === 'OPTED_OUT',
