@@ -123,10 +123,8 @@ export default function OutreachMessagePage({ params }) {
   // Generation
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
-  // result.body = hydrated by server; result.rawBody = original with {{snippet:...}} refs for template save
+  // result from build-email: subject, body, rawBody (= body), reasoning
   const [result, setResult] = useState(null);
-  const [snippetContentMap, setSnippetContentMap] = useState({}); // { slug: text } for variable bank display
-  const [snippetCount, setSnippetCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -161,13 +159,6 @@ export default function OutreachMessagePage({ params }) {
       .catch((err) => console.error('Failed to load contact:', err))
       .finally(() => setLoading(false));
 
-    if (companyHQId) {
-      api.get(`/api/outreach/content-snips?companyHQId=${companyHQId}&activeOnly=true`)
-        .then((res) => {
-          if (res.data?.success) setSnippetCount(res.data.snips?.length || 0);
-        })
-        .catch(() => {});
-    }
   }, [contactId, companyHQId]);
 
   // Load variable schema — all catalogue variables with their resolved values for this contact/owner context
@@ -246,38 +237,28 @@ export default function OutreachMessagePage({ params }) {
       setError('Company context required. Make sure a company is selected.');
       return;
     }
-    if (snippetCount === 0) {
-      setError('No active content snippets found. Create snippets first.');
-      return;
-    }
 
     setGenerating(true);
     setError('');
     setResult(null);
 
     try {
-      const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
-      const res = await api.post('/api/template/generate-with-snippets', {
+      const notesText = [notes.trim(), additionalContext.trim()].filter(Boolean).join('\n\n');
+      const res = await api.post(`/api/contacts/${contactId}/build-email`, {
         companyHQId,
-        intent: notes.trim() || additionalContext.trim(),
-        ownerId,
-        contactId,
-        // Pass additional context separately so AI gets both
-        ...(additionalContext.trim() && { additionalContext: additionalContext.trim() }),
-        // Relationship context and persona come from the DB via contactId — no need to pass via URL
+        personaSlug: contact?.outreachPersonaSlug || undefined,
+        relationshipContext: contact?.relationship_contexts || undefined,
+        notes: notesText || undefined,
       });
 
       if (res.data?.success) {
-        // Server already hydrated body/subject via variableMapperService (same as compose/campaigns).
-        // rawBody keeps {{snippet:...}} refs intact for the optional "Save as Template" path.
-        setSnippetContentMap(res.data.snippetContentMap || {});
         setResult({
-          subject: res.data.template.subject,       // hydrated
-          body: res.data.template.body,             // hydrated — ready to copy/send
-          rawBody: res.data.template.rawBody,       // original — for template save
-          rawSubject: res.data.template.rawSubject,
+          subject: res.data.subject,
+          body: res.data.body,
+          rawBody: res.data.body,
+          rawSubject: res.data.subject,
           reasoning: res.data.reasoning,
-          selectedSnippets: res.data.selectedSnippets || [],
+          selectedSnippets: [],
         });
       } else {
         setError(res.data?.error || 'Generation failed');
@@ -380,14 +361,10 @@ export default function OutreachMessagePage({ params }) {
               />
             </div>
 
-            {snippetCount > 0 && (
-              <p className="text-xs text-green-600 font-medium px-1">✓ {snippetCount} active content snippets available</p>
-            )}
-
             <button
               type="button"
               onClick={handleGenerate}
-              disabled={generating || (!notes.trim() && !additionalContext.trim()) || snippetCount === 0}
+              disabled={generating || (!notes.trim() && !additionalContext.trim())}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 py-3.5 text-white font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {generating ? (
@@ -413,17 +390,6 @@ export default function OutreachMessagePage({ params }) {
               <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-start gap-2">
                 <Sparkles className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
                 <p className="text-sm text-purple-800">{result.reasoning}</p>
-              </div>
-            )}
-
-            {/* Selected snippets */}
-            {result.selectedSnippets.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 px-1">
-                {result.selectedSnippets.map((s) => (
-                  <span key={s} className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs font-mono text-amber-800">
-                    <Check className="h-3 w-3" />{s}
-                  </span>
-                ))}
               </div>
             )}
 
@@ -482,21 +448,6 @@ export default function OutreachMessagePage({ params }) {
                         </div>
                       );
                     })}
-
-                    {/* Snippets used in this generation */}
-                    {result && snippetContentMap && Object.keys(snippetContentMap).length > 0 && (
-                      <div className="mt-2 border-t border-gray-200 pt-2">
-                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Snippets used</p>
-                        <div className="flex flex-col gap-1">
-                          {Object.entries(snippetContentMap).map(([slug, text]) => (
-                            <div key={slug} className="flex items-start gap-2 rounded-md border border-blue-100 bg-white px-2 py-1.5">
-                              <span className="font-mono text-[10px] text-blue-500 shrink-0 mt-0.5">{slug}</span>
-                              <span className="text-xs text-gray-600 line-clamp-2">{text}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

@@ -1,12 +1,16 @@
 /**
  * OutreachEmailBuilderService
  *
- * AI-powered email builder. Email type is derived directly from Contact engagement fields:
- *   - lastEngagementDate = null          → FIRST_TIME (initial outreach)
- *   - lastEngagementDate set             → FOLLOWUP
+ * Single path for building outreach emails: contact notes (or notesOverride) + persona hint
+ * + relationship context + company context → AI-generated subject and body.
+ * No snippet assembly, no template fetch; used by POST /api/contacts/[contactId]/build-email.
+ *
+ * Email type is derived from Contact engagement fields:
+ *   - lastEngagementDate = null           → FIRST_TIME (initial outreach)
+ *   - lastEngagementDate set              → FOLLOWUP
  *   - lastEngagementType CONTACT_RESPONSE → they replied; follow-up continues conversation
- *   - lastEngagementType OUTBOUND_EMAIL  → no reply yet; nudge follow-up
- *   - lastEngagementType MEETING         → post-meeting follow-up
+ *   - lastEngagementType OUTBOUND_EMAIL   → no reply yet; nudge follow-up
+ *   - lastEngagementType MEETING          → post-meeting follow-up
  */
 
 import { OpenAI } from 'openai';
@@ -45,6 +49,8 @@ function getOpenAIClient(): OpenAI {
 export interface EmailBuildRequest {
   contactId: string;
   personaSlug?: string | null;
+  /** When set, used as the notes/context in the contact block instead of contact.notes/contactSummary */
+  notesOverride?: string | null;
   relationshipContext?: {
     contextOfRelationship?: string;
     relationshipRecency?: string;
@@ -66,7 +72,7 @@ export interface EmailBuildResult {
 export class OutreachEmailBuilderService {
   static async buildEmail(request: EmailBuildRequest): Promise<EmailBuildResult> {
     try {
-      const { contactId, personaSlug, relationshipContext, companyHQId } = request;
+      const { contactId, personaSlug, notesOverride, relationshipContext, companyHQId } = request;
 
       const contact = await prisma.contact.findUnique({
         where: { id: contactId },
@@ -145,12 +151,14 @@ Guidelines:
 - Match tone to the relationship type
 - Incorporate seasonal context naturally when appropriate`;
 
+      const notesOrSummary = (notesOverride != null && notesOverride.trim() !== '')
+        ? notesOverride.trim()
+        : [contact.notes, contact.contactSummary].filter(Boolean).join('\n\n') || '';
       const contactBlock = `Contact:
 - Name: ${contact.goesBy || `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() || contact.email}
 - Title: ${contact.title || 'Not specified'}
 - Company: ${contactCompany || 'Not specified'}
-${contact.notes ? `- Notes: ${contact.notes}` : ''}
-${contact.contactSummary ? `- Relationship context: ${contact.contactSummary}` : ''}`;
+${notesOrSummary ? `- Notes / context: ${notesOrSummary}` : ''}`;
 
       const contextBlock = [
         companyContext,

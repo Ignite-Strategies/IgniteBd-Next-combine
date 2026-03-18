@@ -5,7 +5,8 @@ import { OutreachEmailBuilderService } from '@/lib/services/OutreachEmailBuilder
 /**
  * POST /api/contacts/[contactId]/build-email
  * Build an AI-generated outreach email for a contact
- * Body: { personaSlug?, relationshipContext?, companyHQId? }
+ * Body: { personaSlug?, relationshipContext?, companyHQId?, notes?, intent? }
+ * When notes or intent is provided, it overrides contact.notes/contactSummary in the prompt.
  */
 export async function POST(request, { params }) {
   try {
@@ -30,11 +31,13 @@ export async function POST(request, { params }) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { personaSlug, relationshipContext, companyHQId } = body;
+    const { personaSlug, relationshipContext, companyHQId, notes, intent } = body;
+    const notesOverride = notes ?? intent ?? undefined;
 
     const result = await OutreachEmailBuilderService.buildEmail({
       contactId,
       personaSlug: personaSlug || null,
+      notesOverride: notesOverride != null && notesOverride !== '' ? notesOverride : undefined,
       relationshipContext: relationshipContext || undefined,
       companyHQId: companyHQId || undefined,
     });

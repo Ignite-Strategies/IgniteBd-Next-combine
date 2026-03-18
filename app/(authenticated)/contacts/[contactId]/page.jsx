@@ -522,9 +522,13 @@ export default function ContactDetailPage() {
   };
 
   const handleSavePersonaTemplate = async () => {
+    if (!companyHQId?.trim()) {
+      setSaveTemplateError('Select a company first.');
+      return false;
+    }
     if (!newTemplateTitle.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
       setSaveTemplateError('Title, subject, and body are all required.');
-      return;
+      return false;
     }
     setSavingNewTemplate(true);
     setSaveTemplateError('');
@@ -545,11 +549,14 @@ export default function ContactDetailPage() {
         setShowSaveTemplateForm(false);
         setSaveTemplateSuccess(true);
         setTimeout(() => setSaveTemplateSuccess(false), 3000);
+        return true;
       } else {
         setSaveTemplateError(res.data?.error || 'Failed to save template.');
+        return false;
       }
     } catch (err) {
       setSaveTemplateError(err.response?.data?.error || 'Failed to save template.');
+      return false;
     } finally {
       setSavingNewTemplate(false);
     }
@@ -3181,8 +3188,8 @@ export default function ContactDetailPage() {
               <div className="flex items-center gap-2 pt-1">
                 <button
                   onClick={async () => {
-                    await handleSavePersonaTemplate();
-                    if (!saveTemplateError) setMakeTemplateEmail(null);
+                    const ok = await handleSavePersonaTemplate();
+                    if (ok) setMakeTemplateEmail(null);
                   }}
                   disabled={savingNewTemplate}
                   className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"

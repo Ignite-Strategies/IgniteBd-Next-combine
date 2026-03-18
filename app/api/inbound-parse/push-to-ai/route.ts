@@ -283,6 +283,37 @@ export async function POST(request: Request) {
         }
       }
 
+      // Silent template save on outbound ingest: when we record an owner-sent email, save as template with contact's persona
+      if (
+        activityType === 'outbound_email' &&
+        contactId &&
+        (interpreted.subject?.trim() || interpreted.body?.trim()) &&
+        (interpreted.body?.trim()?.length ?? 0) >= 20
+      ) {
+        try {
+          const contactRow = await prisma.contact.findUnique({
+            where: { id: contactId },
+            select: { outreachPersonaSlug: true },
+          });
+          const subject = (interpreted.subject || inbound.subject || 'No subject').trim();
+          const body = (interpreted.body || '').trim();
+          await prisma.templates.create({
+            data: {
+              companyHQId,
+              ownerId,
+              title: subject.slice(0, 200) || 'From inbound',
+              subject,
+              body,
+              ...(contactRow?.outreachPersonaSlug
+                ? { personaSlug: contactRow.outreachPersonaSlug }
+                : {}),
+            },
+          });
+        } catch (templateErr) {
+          console.warn('⚠️ push-to-ai: template save skipped:', (templateErr as Error)?.message);
+        }
+      }
+
       // Bridge email summary → engagement log (fire-and-forget)
       if (interpreted.summary && contactId) {
         syncEmailSummaryToLog(emailActivity.id).catch(() => {});
