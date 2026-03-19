@@ -2052,6 +2052,7 @@ enum NextEngagementPurpose {
   UNRESPONSIVE          // No response after last send → 7d
   PERIODIC_CHECK_IN     // Responded + in category (e.g. connector/forwarded) → 7d
   REFERRAL_NO_CONTACT   // Referral, no contact yet
+  FOLLOW_UP            // General follow-up (after email, call, etc.)
   MEETING_FOLLOW_UP     // Post-meeting follow-up
 }
 

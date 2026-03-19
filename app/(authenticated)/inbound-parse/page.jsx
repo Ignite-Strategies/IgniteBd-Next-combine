@@ -14,7 +14,6 @@ import {
   CheckCircle,
   ArrowRight,
   History,
-  Zap,
   User,
 } from 'lucide-react';
 import api from '@/lib/api';
@@ -62,9 +61,9 @@ export default function InboundParsePage() {
   const [contactIdOverride, setContactIdOverride] = useState(null);
   const [subjectOverride, setSubjectOverride] = useState('');
   const [summaryOverride, setSummaryOverride] = useState('');
-  const [computeLoading, setComputeLoading] = useState(false);
   const [recordedContactId, setRecordedContactId] = useState(null);
   const [createContactLoading, setCreateContactLoading] = useState(false);
+  const [inboundTab, setInboundTab] = useState('inbox'); // inbox | recorded | all
 
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
@@ -91,7 +90,7 @@ export default function InboundParsePage() {
 
     if (crmId) {
       setCompanyHQId(crmId);
-      fetchInboundEmails(crmId);
+      fetchInboundEmails(crmId, 'inbox');
       fetchMeetingNotes(crmId);
     } else {
       setLoading(false);
@@ -99,10 +98,11 @@ export default function InboundParsePage() {
     }
   }, []);
 
-  const fetchInboundEmails = async (tenantId) => {
+  const fetchInboundEmails = async (tenantId, tab = inboundTab) => {
+    if (!tenantId) return;
     try {
       setLoading(true);
-      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}`);
+      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}&tab=${tab}`);
       if (res.data?.success) {
         setEmails(res.data.emails || []);
       }
@@ -368,6 +368,8 @@ export default function InboundParsePage() {
       const { parsed, contactId, recordType } = res.data;
       if (contactId) setRecordedContactId(contactId);
       setEmails((prev) => prev.filter((x) => x.id !== selectedEmail.id));
+      setInboundTab('recorded');
+      fetchInboundEmails(companyHQId, 'recorded');
       const contactLabel = parsed?.contactEmail
         ? `Contact: ${parsed.contactEmail}`
         : contactId
@@ -449,42 +451,6 @@ export default function InboundParsePage() {
     }
   };
 
-  const handleComputeEngagement = async (e) => {
-    e?.stopPropagation?.();
-    const cId = recordedContactId || parseResult?.contact?.id;
-    if (!cId) return;
-    setComputeLoading(true);
-    setActionMessage(null);
-    try {
-      const res = await api.post(`/api/contacts/${cId}/compute-engagement`);
-      const { nextEngagementDate, source } = res.data;
-      const sourceLabel =
-        {
-          ai_summary: 'inferred from activity summary',
-          default_cadence: 'default +7 days',
-          already_set: 'already set on contact',
-          do_not_contact: 'do not contact',
-          no_engagement: 'no prior engagement',
-        }[source] ||
-        source ||
-        '';
-      setActionMessage({
-        type: 'success',
-        text: nextEngagementDate
-          ? `Engagement → ${nextEngagementDate} (${sourceLabel})`
-          : `No engagement date computed (${sourceLabel})`,
-      });
-      setTimeout(() => setActionMessage(null), 6000);
-    } catch (err) {
-      setActionMessage({
-        type: 'error',
-        text: err.response?.data?.error || err.message || 'Compute failed',
-      });
-    } finally {
-      setComputeLoading(false);
-    }
-  };
-
   const hasContent = !!(selectedEmail?.text || selectedEmail?.html || selectedEmail?.email);
 
   if (loading && meetingLoading) {
@@ -515,10 +481,52 @@ export default function InboundParsePage() {
               <Mail className="h-5 w-5 text-blue-600" />
               Outreach Updates
             </h2>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">To process ({emails.length})</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInboundTab('inbox');
+                    fetchInboundEmails(companyHQId, 'inbox');
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                    inboundTab === 'inbox' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Inbox
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInboundTab('recorded');
+                    fetchInboundEmails(companyHQId, 'recorded');
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                    inboundTab === 'recorded' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Saved
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInboundTab('all');
+                    fetchInboundEmails(companyHQId, 'all');
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                    inboundTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  All
+                </button>
+              </div>
+              <span className="text-sm text-gray-600">
+                {inboundTab === 'inbox' && `To process (${emails.length})`}
+                {inboundTab === 'recorded' && `Saved (${emails.length})`}
+                {inboundTab === 'all' && `All (${emails.length})`}
+              </span>
               <button
-                onClick={() => fetchInboundEmails(companyHQId)}
+                onClick={() => fetchInboundEmails(companyHQId, inboundTab)}
                 className="text-sm text-blue-600 hover:underline"
               >
                 Refresh
@@ -526,8 +534,24 @@ export default function InboundParsePage() {
             </div>
             {emails.length === 0 ? (
               <div className="py-8 text-center text-sm text-gray-500 rounded-lg bg-gray-50">
-                <Inbox className="h-10 w-10 mx-auto mb-2 text-gray-400" />
-                No inbound emails to process.
+                {inboundTab === 'inbox' && (
+                  <>
+                    <Inbox className="h-10 w-10 mx-auto mb-2 text-gray-400" />
+                    No inbound emails to process.
+                  </>
+                )}
+                {inboundTab === 'recorded' && (
+                  <>
+                    <CheckCircle className="h-10 w-10 mx-auto mb-2 text-gray-400" />
+                    No saved emails yet. Record an email from Inbox to see it here.
+                  </>
+                )}
+                {inboundTab === 'all' && (
+                  <>
+                    <Mail className="h-10 w-10 mx-auto mb-2 text-gray-400" />
+                    No inbound emails in this period.
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-1 max-h-[280px] overflow-auto">
@@ -596,19 +620,6 @@ export default function InboundParsePage() {
                       <Sparkles className="h-4 w-4" />
                       {analyzeLoading ? 'Parsing…' : 'Parse & Save'}
                     </button>
-
-                    {/* AI Reasoning (post-save): stamps contact engagement */}
-                    {(recordedContactId || parseResult?.contact?.id) && (
-                      <button
-                        onClick={handleComputeEngagement}
-                        disabled={computeLoading}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Re-compute contact next engagement from activity history."
-                      >
-                        <Zap className="h-4 w-4" />
-                        {computeLoading ? 'Running…' : 'AI Reasoning'}
-                      </button>
-                    )}
 
                     <button
                       onClick={handleDelete}

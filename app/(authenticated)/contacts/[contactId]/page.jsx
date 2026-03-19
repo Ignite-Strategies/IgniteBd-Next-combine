@@ -170,8 +170,6 @@ export default function ContactDetailPage() {
   const [nextEngagementDateEdit, setNextEngagementDateEdit] = useState('');
   const [nextEngagementPurposeEdit, setNextEngagementPurposeEdit] = useState('');
   const [savingNextEngagement, setSavingNextEngagement] = useState(false);
-  const [computingEngagement, setComputingEngagement] = useState(false);
-  const [computeResult, setComputeResult] = useState(null);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -203,6 +201,7 @@ export default function ContactDetailPage() {
   const [savingAddResponse, setSavingAddResponse] = useState(false);
   const [addResponseError, setAddResponseError] = useState('');
   const [showEditEmailModal, setShowEditEmailModal] = useState(false);
+  const [viewMessageEmail, setViewMessageEmail] = useState(null);
   const [editEmail, setEditEmail] = useState(null);
   const [editEmailSubject, setEditEmailSubject] = useState('');
   const [editEmailBody, setEditEmailBody] = useState('');
@@ -1073,7 +1072,9 @@ export default function ContactDetailPage() {
                         {contact.nextEngagementPurpose === 'UNRESPONSIVE' && 'Unresponsive'}
                         {contact.nextEngagementPurpose === 'PERIODIC_CHECK_IN' && 'Periodic check-in'}
                         {contact.nextEngagementPurpose === 'REFERRAL_NO_CONTACT' && 'Referral (no contact)'}
-                        {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
+                        {contact.nextEngagementPurpose === 'FOLLOW_UP' && 'Follow-up'}
+                        {contact.nextEngagementPurpose === 'MEETING_FOLLOW_UP' && 'Meeting follow-up'}
+                        {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT', 'FOLLOW_UP', 'MEETING_FOLLOW_UP'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
                       </span>
                     )}
                   </>
@@ -1092,42 +1093,6 @@ export default function ContactDetailPage() {
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
-                <button
-                  type="button"
-                  disabled={computingEngagement}
-                  onClick={async () => {
-                    setComputingEngagement(true);
-                    setComputeResult(null);
-                    try {
-                      const res = await api.post(`/api/contacts/${contactId}/compute-engagement`);
-                      if (res.data?.success) {
-                        setComputeResult(res.data);
-                        // Reload contact to surface updated disposition, pipeline, and date
-                        const contactRes = await api.get(`/api/contacts/${contactId}`);
-                        if (contactRes.data?.contact) {
-                          setContact(contactRes.data.contact);
-                          if (refreshContacts) refreshContacts();
-                        }
-                      } else {
-                        alert(res.data?.error || 'Failed to compute');
-                      }
-                    } catch (err) {
-                      alert(err.response?.data?.error || err.message || 'Failed to compute');
-                    } finally {
-                      setComputingEngagement(false);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
-                  title="AI inference: set disposition, pipeline stage, and next engagement date from email history"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {computingEngagement ? 'Calculating...' : 'Calculate'}
-                </button>
-                {computeResult && (
-                  <span className="text-xs text-green-600 font-medium">
-                    ✓ {computeResult.source === 'ai_full_inference' ? `AI inferred · ${computeResult.reasoning || ''}` : computeResult.source?.replace(/_/g, ' ')}
-                  </span>
-                )}
               </>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
@@ -1144,6 +1109,8 @@ export default function ContactDetailPage() {
                 >
                   <option value="">—</option>
                   <option value="GENERAL_CHECK_IN">General check-in</option>
+                  <option value="FOLLOW_UP">Follow-up</option>
+                  <option value="MEETING_FOLLOW_UP">Meeting follow-up</option>
                   <option value="UNRESPONSIVE">Unresponsive</option>
                   <option value="PERIODIC_CHECK_IN">Periodic check-in</option>
                   <option value="REFERRAL_NO_CONTACT">Referral (no contact)</option>
@@ -2650,6 +2617,13 @@ export default function ContactDetailPage() {
                               ) : (
                                 <>
                                   <button
+                                    onClick={() => setViewMessageEmail(email)}
+                                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                    title="View full message"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
                                     onClick={() => handleOpenEditEmail(email)}
                                     className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                                     title="Edit this email record"
@@ -2827,6 +2801,39 @@ export default function ContactDetailPage() {
           {/* This is a special UX that should be handled in a dedicated client portal management area */}
         </div>
 
+
+        {/* View full message modal (raw / what was actually said) */}
+        {viewMessageEmail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Full message</h3>
+                <button
+                  type="button"
+                  onClick={() => setViewMessageEmail(null)}
+                  className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="px-4 py-2 border-b border-gray-100 text-sm text-gray-600">
+                <span className="font-medium">{viewMessageEmail.subject || 'No subject'}</span>
+                <span className="mx-2">·</span>
+                {formatDateEST(viewMessageEmail.date?.slice(0, 10), { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 bg-gray-50 rounded-lg p-4 min-h-[120px]">
+                  {viewMessageEmail.emailRawText || viewMessageEmail.notes || viewMessageEmail.body || 'No content.'}
+                </pre>
+                {viewMessageEmail.emailRawText && viewMessageEmail.summary && (
+                  <p className="mt-3 text-xs text-gray-500">
+                    <span className="font-medium">Summary:</span> {viewMessageEmail.summary}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Raw JSON Modal */}
         {showRawJSON && rawJSON && (

@@ -122,7 +122,7 @@ Interpret:
 1. Contact email — who is the prospect/target? (NOT the owner)
 2. Contact name — the prospect's name if visible. If the subject line looks like a person's name (short, no colon, not a typical email topic), treat it as the contact's name.
 3. Subject — use parsed subject (may clean up Re:/Fwd:)
-4. Body — brief summary of the most recent message content
+4. Body — CONTEXTUAL summary: what the contact actually said (key points, tone, or short quotes). Include buyer/forwarding signals (e.g. "I'll forward your stuff", "not the right person", "happy to connect", "we're not looking now"). Then the immediate next step. Not just the action — include context so we can see if they're a buyer or a pass-through.
 5. Next engagement date — be AGGRESSIVE. Today is ${todayStr}. Examples:
    - "follow up in 3-6 months" → midpoint (~4.5 months from today)
    - "later this year" → ~6 months from today
@@ -130,21 +130,21 @@ Interpret:
    - Any specific date mentioned → use that date
    - "not interested" with no follow-up → null
 6. isResponse — is the contact responding to the owner's outreach?
-7. Summary — 1-2 sentences: what happened, contact's disposition (interested, not interested, deferred), actionable next steps. Used for cadence logic.
+7. Summary — 1-2 sentences WITH CONTEXT: what the contact said (e.g. buyer vs will-forward, interested vs not), disposition, and next steps. Include enough so we know if they're a buyer or just forwarding. Used for cadence logic.
 8. activityType — one of: "inbound_email", "outbound_email", "call_note", "meeting_note", "note"
 9. activityDate — "YYYY-MM-DD" if the described event happened on a specific past date, else null
 
 Return EXACTLY this JSON:
 {
   "subject": "...",
-  "body": "brief summary of exchange",
+  "body": "contextual summary: what contact said + signals + next step",
   "contactEmail": "prospect email, NOT owner",
   "contactName": "prospect name" or null,
   "nextEngagementDate": "YYYY-MM-DD" or null,
   "inReplyTo": "Message-ID" or null,
   "references": ["Message-ID1"] or null,
   "isResponse": true or false,
-  "summary": "1-2 sentence engagement summary",
+  "summary": "1-2 sentences with context (what they said, buyer/forward, next step)",
   "activityType": "inbound_email" | "outbound_email" | "call_note" | "meeting_note" | "note",
   "activityDate": "YYYY-MM-DD" or null
 }
