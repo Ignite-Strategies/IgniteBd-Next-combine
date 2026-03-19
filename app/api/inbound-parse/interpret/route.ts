@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       email: string | null;
       companyName: string | null;
       title: string | null;
-      pipeline: string | null;
+      pipelineSnap: string | null;
       nextEngagementDate: string | null;
       nextEngagementPurpose: string | null;
       lastEngagementDate: Date | null;
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
           email: true,
           companyName: true,
           title: true,
-          pipeline: true,
+          pipelineSnap: true,
           nextEngagementDate: true,
           nextEngagementPurpose: true,
           lastEngagementDate: true,
@@ -152,7 +152,8 @@ export async function POST(request: Request) {
       name: string;
       email: string | null;
       company: string | null;
-      pipeline: string | null;
+      pipelineSnap: string | null;
+      pipeline: string | null; // same as pipelineSnap, for API/UI
     };
 
     let nameMatches: NameMatch[] = [];
@@ -197,7 +198,7 @@ export async function POST(request: Request) {
               lastName: true,
               email: true,
               companyName: true,
-              pipeline: true,
+              pipelineSnap: true,
             },
             take: 5,
           });
@@ -207,7 +208,8 @@ export async function POST(request: Request) {
             name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Unknown',
             email: c.email,
             company: c.companyName,
-            pipeline: c.pipeline,
+            pipelineSnap: c.pipelineSnap,
+            pipeline: c.pipelineSnap, // API shape for UI
           }));
         }
       }
@@ -293,7 +295,7 @@ export async function POST(request: Request) {
             email: contact.email,
             company: contact.companyName,
             title: contact.title,
-            pipeline: contact.pipeline,
+            pipeline: contact.pipelineSnap,
             optedOut: contact.contactDisposition === 'OPTED_OUT',
           }
         : null,
