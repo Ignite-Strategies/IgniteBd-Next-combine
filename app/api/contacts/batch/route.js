@@ -184,6 +184,8 @@ export async function POST(request) {
         'awaiting-outreach': 'need-to-engage',
         'not-contacted': 'need-to-engage',
         'to-contact': 'need-to-engage',
+        'not-now': 'not-now',
+        'not now': 'not-now',
         interest: 'interest',
         interested: 'interest',
         meeting: 'meeting',

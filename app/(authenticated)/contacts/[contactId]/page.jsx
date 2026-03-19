@@ -525,19 +525,23 @@ export default function ContactDetailPage() {
       setSaveTemplateError('Select a company first.');
       return false;
     }
-    if (!newTemplateTitle.trim() || !newTemplateSubject.trim() || !newTemplateBody.trim()) {
-      setSaveTemplateError('Title, subject, and body are all required.');
+    const subject = newTemplateSubject?.trim() || '';
+    const body = newTemplateBody?.trim() || '';
+    if (!subject || !body) {
+      setSaveTemplateError('Subject and body are required.');
       return false;
     }
+    // API requires title; derive from subject when user left title empty
+    const title = (newTemplateTitle?.trim() || subject).slice(0, 200) || 'Untitled template';
     setSavingNewTemplate(true);
     setSaveTemplateError('');
     setSaveTemplateSuccess(false);
     try {
       const res = await api.post('/api/templates', {
         companyHQId,
-        title: newTemplateTitle.trim(),
-        subject: newTemplateSubject.trim(),
-        body: newTemplateBody.trim(),
+        title,
+        subject,
+        body,
         personaSlug: contact.outreachPersonaSlug,
       });
       if (res.data?.success) {
@@ -852,6 +856,7 @@ export default function ContactDetailPage() {
                   {selectedPipeline === 'prospect' && (
                     <>
                       <option value="need-to-engage">Need to Engage</option>
+                      <option value="not-now">Not Now</option>
                       <option value="engaged-awaiting-response">Engaged Awaiting Response</option>
                       <option value="interest">Interest</option>
                       <option value="meeting">Meeting</option>
@@ -1833,7 +1838,7 @@ export default function ContactDetailPage() {
                   <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600">
                       Body
-                      <span className="ml-2 font-normal text-gray-400">Use {'{{first_name}}'} and {'{{company_name}}'} for variable slots</span>
+                      <span className="ml-2 font-normal text-gray-400">Optional: use {'{{first_name}}'} and {'{{company_name}}'} to auto-fill for other contacts. Save as-is and the outreach generator will personalize for each contact.</span>
                     </label>
                     <textarea
                       value={newTemplateBody}
@@ -3152,7 +3157,7 @@ export default function ContactDetailPage() {
               </div>
 
               <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-700">
-                Replace contact-specific names with <code className="font-mono bg-indigo-100 px-1 rounded">{'{{first_name}}'}</code> and <code className="font-mono bg-indigo-100 px-1 rounded">{'{{company_name}}'}</code> before saving so this template works for any future contact with this persona.
+                Optional: use <code className="font-mono bg-indigo-100 px-1 rounded">{'{{first_name}}'}</code> and <code className="font-mono bg-indigo-100 px-1 rounded">{'{{company_name}}'}</code> to auto-fill for other contacts. You can also save as-is; the outreach generator will personalize for each contact.
               </div>
 
               <div className="space-y-3">
