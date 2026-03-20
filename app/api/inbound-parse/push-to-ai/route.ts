@@ -278,8 +278,25 @@ export async function POST(request: Request) {
         if (effectiveNextEngagementDate) {
           await prisma.contact.update({
             where: { id: contactId },
-            data: { nextEngagementDate: effectiveNextEngagementDate },
+            data: {
+              nextEngagementDate: effectiveNextEngagementDate,
+              nextEngagementPurpose: activityType === 'inbound_email' ? 'FOLLOW_UP' : 'GENERAL_CHECK_IN',
+            },
           });
+        } else {
+          // Contact responded but no new next-engage date: clear stale next engagement if it's in the past
+          const contactRow = await prisma.contact.findUnique({
+            where: { id: contactId },
+            select: { nextEngagementDate: true },
+          });
+          const nextStr = contactRow?.nextEngagementDate;
+          const nextDate = nextStr ? new Date(nextStr) : null;
+          if (nextDate && nextDate < sentAt) {
+            await prisma.contact.update({
+              where: { id: contactId },
+              data: { nextEngagementDate: null, nextEngagementPurpose: null },
+            });
+          }
         }
       }
 

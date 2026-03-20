@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseInboundRecipient, extractCompanySlugFromAddress } from '@/lib/utils/parseEmailAddress';
 import { simpleParser } from 'mailparser';
+import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
 
 /**
  * POST /api/inbound-email
@@ -16,6 +17,11 @@ import { simpleParser } from 'mailparser';
  * - Stores all raw SendGrid fields as-is
  * - If 'email' MIME field is present, parses it with mailparser to extract
  *   readable text/html (handles forwarded Outlook emails that skip parsed fields)
+ *
+ * inboundType (MEETING vs OUTREACH):
+ * - If To is slug.meeting@crm.domain → MEETING (separate meeting slug).
+ * - Else (e.g. single slug slug@crm.domain): infer from content via AI; meeting_note/call_note → MEETING, else OUTREACH.
+ * So one email address can be used for both; meeting notes are typed as MEETING and show in Meeting Updates.
  */
 export async function POST(req: Request) {
   try {
@@ -77,7 +83,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
-    const inboundType = recipient?.inboundType === 'meeting' ? 'MEETING' : 'OUTREACH';
+    // Type from slug (meeting@...) or infer from content when using single email slug
+    let inboundType: 'MEETING' | 'OUTREACH' =
+      recipient?.inboundType === 'meeting' ? 'MEETING' : 'OUTREACH';
+
+    if (inboundType === 'OUTREACH') {
+      const bodyText =
+        (text || '').trim() ||
+        (html || '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 8000);
+      if (bodyText || (subject || '').trim()) {
+        try {
+          const interpreted = await interpretEngagement(
+            {
+              from,
+              to,
+              subject: subject || null,
+              body: bodyText || null,
+              raw: bodyText || null,
+            },
+            null,
+          );
+          if (
+            interpreted.activityType === 'meeting_note' ||
+            interpreted.activityType === 'call_note'
+          ) {
+            inboundType = 'MEETING';
+          }
+        } catch (interpretErr) {
+          console.warn('Inbound: type inference failed (non-fatal):', (interpretErr as Error)?.message);
+        }
+      }
+    }
 
     const inboundEmail = await prisma.inboundEmail.create({
       data: {

@@ -16,6 +16,7 @@ function formatPipelineLabel(pipeline) {
 }
 function formatStageLabel(stage) {
   if (!stage) return 'No Stage';
+  if (stage === 'forwarded-not-interested') return 'Forwarded – Not Interested';
   return stage.replace(/-/g, ' ').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 import { useContactsContext } from '@/hooks/useContacts';
@@ -850,6 +851,7 @@ export default function ContactDetailPage() {
                   {selectedPipeline === 'connector' && (
                     <>
                       <option value="forwarded">Forwarded</option>
+                      <option value="forwarded-not-interested">Forwarded – Not Interested</option>
                       <option value="introduction-made">Introduction Made</option>
                     </>
                   )}

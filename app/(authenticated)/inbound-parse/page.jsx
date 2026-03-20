@@ -201,6 +201,12 @@ export default function InboundParsePage() {
   const groupEmailsByDate = (list) =>
     groupByDate(list, 'createdAt').map((g) => ({ ...g, emails: g.items }));
 
+  // Inbox must show only to-process (RECEIVED); safety net in case API returns RECORDED
+  const displayEmails =
+    inboundTab === 'inbox'
+      ? emails.filter((e) => e.ingestionStatus !== 'RECORDED')
+      : emails;
+
   const groupNotesByDate = (list) =>
     groupByDate(list, 'createdAt').map((g) => ({ ...g, notes: g.items }));
 
@@ -332,7 +338,11 @@ export default function InboundParsePage() {
   const handleDelete = async (e) => {
     e?.stopPropagation?.();
     if (!selectedEmail) return;
-    if (!confirm('Delete this inbound email? This cannot be undone.')) return;
+    const alreadySaved = selectedEmail.ingestionStatus === 'RECORDED';
+    const confirmMsg = alreadySaved
+      ? 'This was already saved to the CRM. Deleting only removes the inbound copy; the saved activity stays. Continue?'
+      : 'Delete this inbound email? This cannot be undone.';
+    if (!confirm(confirmMsg)) return;
     setActionMessage(null);
     setDeleteLoading(true);
     try {
@@ -610,9 +620,9 @@ export default function InboundParsePage() {
                 </button>
               </div>
               <span className="text-sm text-gray-600">
-                {inboundTab === 'inbox' && `To process (${emails.length})`}
-                {inboundTab === 'recorded' && `Saved (${emails.length})`}
-                {inboundTab === 'all' && `All (${emails.length})`}
+                {inboundTab === 'inbox' && `To process (${displayEmails.length})`}
+                {inboundTab === 'recorded' && `Saved (${displayEmails.length})`}
+                {inboundTab === 'all' && `All (${displayEmails.length})`}
               </span>
               <button
                 onClick={() => fetchInboundEmails(companyHQId, inboundTab)}
@@ -621,7 +631,7 @@ export default function InboundParsePage() {
                 Refresh
               </button>
             </div>
-            {emails.length === 0 ? (
+            {displayEmails.length === 0 ? (
               <div className="py-8 text-center text-sm text-gray-500 rounded-lg bg-gray-50">
                 {inboundTab === 'inbox' && (
                   <>
@@ -644,7 +654,7 @@ export default function InboundParsePage() {
               </div>
             ) : (
               <div className="space-y-1 max-h-[280px] overflow-auto">
-                {groupEmailsByDate(emails).map((group) => (
+                {groupEmailsByDate(displayEmails).map((group) => (
                   <div key={group.key} className="space-y-1">
                     <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-1 pb-0.5">
                       {group.label}
@@ -754,7 +764,7 @@ export default function InboundParsePage() {
                         <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold">
                           1
                         </span>
-                        Email activity matcher
+                        What happened
                         {parseResult.parsed?.activityType && (
                           <ActivityTypeBadge type={parseResult.parsed.activityType} />
                         )}
@@ -813,6 +823,16 @@ export default function InboundParsePage() {
                             rows={3}
                             className="px-2 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[200px]"
                           />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="text-gray-600 font-medium w-28">Next engagement:</label>
+                          <input
+                            type="date"
+                            value={nextEngageOverride}
+                            onChange={(e) => setNextEngageOverride(e.target.value)}
+                            className="px-2 py-1 rounded border border-gray-300 text-sm"
+                          />
+                          <span className="text-xs text-gray-500">Updates contact when saved</span>
                         </div>
                         {parseResult.parsed?.body && (
                           <div>
@@ -1428,11 +1448,11 @@ export default function InboundParsePage() {
                   <div className="space-y-4 p-4 rounded-lg border-2 border-purple-200 bg-purple-50/50">
                     <h4 className="text-sm font-semibold text-purple-900 flex items-center gap-2">
                       <span className="inline-flex justify-center w-5 h-5 rounded-full bg-purple-600 text-white text-xs font-bold">1</span>
-                      Meeting matcher
+                      What happened
                     </h4>
                     <div className="space-y-3 text-sm">
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="text-gray-600 font-medium w-28">Contact name:</label>
+                        <label className="text-gray-600 font-medium w-28">Contact Name:</label>
                         <input
                           type="text"
                           value={meetingContactNameOverride}
@@ -1441,7 +1461,7 @@ export default function InboundParsePage() {
                         />
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="text-gray-600 font-medium w-28">Contact email:</label>
+                        <label className="text-gray-600 font-medium w-28">Contact Email:</label>
                         <input
                           type="email"
                           value={meetingContactEmailOverride}
@@ -1450,15 +1470,6 @@ export default function InboundParsePage() {
                             if (e.target.value) setMeetingContactIdOverride(null);
                           }}
                           className="px-2 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[200px]"
-                        />
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label className="text-gray-600 font-medium w-28">Meeting date:</label>
-                        <input
-                          type="date"
-                          value={meetingDateOverride}
-                          onChange={(e) => setMeetingDateOverride(e.target.value)}
-                          className="px-2 py-1 rounded border border-gray-300 text-sm"
                         />
                       </div>
                       <div className="flex flex-wrap items-start gap-2">
@@ -1471,6 +1482,16 @@ export default function InboundParsePage() {
                         />
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
+                        <label className="text-gray-600 font-medium w-28">When:</label>
+                        <input
+                          type="date"
+                          value={meetingDateOverride}
+                          onChange={(e) => setMeetingDateOverride(e.target.value)}
+                          className="px-2 py-1 rounded border border-gray-300 text-sm"
+                        />
+                        <span className="text-xs text-gray-500">Meeting date</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
                         <label className="text-gray-600 font-medium w-28">Next engagement:</label>
                         <input
                           type="date"
@@ -1478,6 +1499,7 @@ export default function InboundParsePage() {
                           onChange={(e) => setMeetingNextEngageOverride(e.target.value)}
                           className="px-2 py-1 rounded border border-gray-300 text-sm"
                         />
+                        <span className="text-xs text-gray-500">Updates contact when saved</span>
                       </div>
                     </div>
                     <div className="pt-3 border-t border-purple-200">
@@ -1531,8 +1553,9 @@ export default function InboundParsePage() {
                         onClick={handleMeetingSave}
                         disabled={meetingPushLoading || !(meetingContactIdOverride || meetingParseResult?.contact?.id)}
                         className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Save as meeting"
                       >
-                        {meetingPushLoading ? 'Saving…' : 'Save to Meeting'}
+                        {meetingPushLoading ? 'Saving…' : 'Save'}
                       </button>
                     </div>
                   </div>

@@ -21,13 +21,15 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const companyHQId = searchParams.get('companyHQId');
-    const tab = searchParams.get('tab') || 'inbox'; // inbox | recorded | all
+    const tabRaw = (searchParams.get('tab') || 'inbox').trim().toLowerCase();
+    const tab = ['inbox', 'recorded', 'all'].includes(tabRaw) ? tabRaw : 'inbox';
     const daysParam = searchParams.get('days');
     const days = [7, 30, 90].includes(Number(daysParam)) ? Number(daysParam) : 30;
 
     const since = new Date();
     since.setDate(since.getDate() - days);
 
+    // Inbox = to process only (RECEIVED). Saved = RECORDED only. All = no status filter.
     const statusFilter =
       tab === 'inbox'
         ? { ingestionStatus: 'RECEIVED' }
