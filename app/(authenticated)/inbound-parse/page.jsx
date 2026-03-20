@@ -64,6 +64,8 @@ export default function InboundParsePage() {
   const [recordedContactId, setRecordedContactId] = useState(null);
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [inboundTab, setInboundTab] = useState('inbox'); // inbox | recorded | all
+  const [selectedContactEmailHistory, setSelectedContactEmailHistory] = useState(null);
+  const [selectedContactEmailHistoryLoading, setSelectedContactEmailHistoryLoading] = useState(false);
 
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
@@ -97,6 +99,48 @@ export default function InboundParsePage() {
       setMeetingLoading(false);
     }
   }, []);
+
+  // When user selects a contact from name matches, fetch that contact's email history for Step 3
+  useEffect(() => {
+    if (!contactIdOverride) {
+      setSelectedContactEmailHistory(null);
+      return;
+    }
+    let cancelled = false;
+    setSelectedContactEmailHistoryLoading(true);
+    api
+      .get(`/api/contacts/${contactIdOverride}/email-history`)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data?.success && res.data.activities?.length) {
+          const mapped = res.data.activities
+            .filter((a) => !a.isDraft)
+            .map((a) => ({
+              id: a.id,
+              date: a.date,
+              subject: a.subject,
+              body: a.notes || a.body || null,
+              type: a.type === 'off-platform' ? 'off-platform' : 'platform',
+              platform: a.platform,
+              event: a.event,
+              direction: a.sequenceOrder === 'CONTACT_SEND' ? 'inbound' : 'outbound',
+              hasResponse: a.hasResponded,
+            }));
+          setSelectedContactEmailHistory(mapped);
+        } else {
+          setSelectedContactEmailHistory([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedContactEmailHistory([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSelectedContactEmailHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contactIdOverride]);
 
   const fetchInboundEmails = async (tenantId, tab = inboundTab) => {
     if (!tenantId) return;
@@ -193,6 +237,7 @@ export default function InboundParsePage() {
     setSummaryOverride('');
     setRecordedContactId(null);
     setActionMessage(null);
+    setSelectedContactEmailHistory(null);
   };
 
   const resetMeetingDetailState = () => {
@@ -370,6 +415,8 @@ export default function InboundParsePage() {
       setEmails((prev) => prev.filter((x) => x.id !== selectedEmail.id));
       setInboundTab('recorded');
       fetchInboundEmails(companyHQId, 'recorded');
+      setSelectedEmail(null);
+      resetDetailState();
       const contactLabel = parsed?.contactEmail
         ? `Contact: ${parsed.contactEmail}`
         : contactId
@@ -910,9 +957,28 @@ export default function InboundParsePage() {
                           </span>
                         )}
                       </h4>
-                      {parseResult.emailHistory?.length > 0 ? (
+                      {(() => {
+                        const hasExactMatch = !!parseResult.contact;
+                        const hasSelectedMatch = !!contactIdOverride;
+                        const historyFromExact = parseResult.emailHistory;
+                        const historyFromSelected = selectedContactEmailHistory;
+                        const loadingSelected = selectedContactEmailHistoryLoading;
+                        const emailHistoryToShow = hasExactMatch
+                          ? historyFromExact
+                          : hasSelectedMatch
+                            ? historyFromSelected
+                            : null;
+                        if (loadingSelected) {
+                          return (
+                            <div className="text-sm text-gray-500 flex items-center gap-2">
+                              <History className="h-4 w-4" />
+                              Loading email history…
+                            </div>
+                          );
+                        }
+                        return emailHistoryToShow?.length > 0 ? (
                         <div className="space-y-2 max-h-48 overflow-auto">
-                          {parseResult.emailHistory.map((h) => (
+                          {emailHistoryToShow.map((h) => (
                             <div
                               key={h.id}
                               className="flex items-start gap-2 text-xs p-2 rounded bg-white border border-slate-100"
@@ -955,11 +1021,12 @@ export default function InboundParsePage() {
                       ) : (
                         <div className="text-sm text-gray-500 flex items-center gap-2">
                           <History className="h-4 w-4" />
-                          {parseResult.contact
+                          {parseResult.contact || contactIdOverride
                             ? 'No email history for this contact yet'
-                            : 'No contact matched — select a contact above to see history'}
+                            : 'Select a contact above (or create one) to see their email history'}
                         </div>
-                      )}
+                      );
+                      })()}
                     </div>
 
                     {/* ── Step 4: Next Engagement ── */}
