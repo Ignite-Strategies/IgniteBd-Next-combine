@@ -66,6 +66,7 @@ export default function InboundParsePage() {
   const [inboundTab, setInboundTab] = useState('inbox'); // inbox | recorded | all
   const [selectedContactEmailHistory, setSelectedContactEmailHistory] = useState(null);
   const [selectedContactEmailHistoryLoading, setSelectedContactEmailHistoryLoading] = useState(false);
+  const [lookupContactLoading, setLookupContactLoading] = useState(false);
 
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
@@ -441,24 +442,51 @@ export default function InboundParsePage() {
     }
   };
 
-  const handleCreateContact = async () => {
-    const nameParts = (contactNameOverride || parseResult?.parsed?.contactName || '')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
-
-    if (!firstName && !lastName) {
+  const handleLookupContact = async () => {
+    const email = (contactEmailOverride || parseResult?.parsed?.contactEmail || '').trim();
+    if (!email || !companyHQId) return;
+    setLookupContactLoading(true);
+    setActionMessage(null);
+    try {
+      const res = await api.get(
+        `/api/contacts/lookup-by-email?email=${encodeURIComponent(email)}&crmId=${encodeURIComponent(companyHQId)}`
+      );
+      if (res.data?.success && res.data.contact) {
+        setParseResult((prev) => (prev ? { ...prev, contact: res.data.contact } : prev));
+        setContactIdOverride(null);
+        setActionMessage({ type: 'success', text: 'Contact found by email.' });
+        setTimeout(() => setActionMessage(null), 3000);
+      }
+    } catch (err) {
       setActionMessage({
         type: 'error',
-        text: 'Please enter a contact name in Step 1 before creating a contact.',
+        text: err.response?.data?.error || err.message || 'Lookup failed',
+      });
+    } finally {
+      setLookupContactLoading(false);
+    }
+  };
+
+  const handleCreateContact = async () => {
+    const nameInput = (contactNameOverride || parseResult?.parsed?.contactName || '').trim();
+    const email = (contactEmailOverride || parseResult?.parsed?.contactEmail || '').trim();
+    const nameParts = nameInput ? nameInput.split(/\s+/).filter(Boolean) : [];
+    let firstName = nameParts[0] || '';
+    let lastName = nameParts.slice(1).join(' ') || '';
+    if (!firstName && email) {
+      const local = email.split('@')[0] || '';
+      firstName = local.replace(/[._]/g, ' ') || 'Unknown';
+      lastName = '';
+    }
+    if (!firstName) {
+      setActionMessage({
+        type: 'error',
+        text: 'Enter a contact name in Step 1 or an email to create a contact.',
       });
       return;
     }
 
-    // Email is optional - contact can be enriched later via Apollo/LinkedIn
-    const email = contactEmailOverride || parseResult?.parsed?.contactEmail || '';
+    // Email optional when we have a name; when creating from email-only we use it
 
     setCreateContactLoading(true);
     setActionMessage(null);
@@ -471,17 +499,31 @@ export default function InboundParsePage() {
       });
       if (res.data?.success && res.data?.contact) {
         const newContactId = res.data.contact.id;
+        const displayName = [firstName, lastName].filter(Boolean).join(' ') || email || 'Unknown';
         setContactIdOverride(newContactId);
         if (email) setContactEmailOverride(email);
+        setParseResult((prev) =>
+          prev
+            ? {
+                ...prev,
+                contact: {
+                  id: newContactId,
+                  name: displayName,
+                  email: email || null,
+                  company: null,
+                  title: null,
+                  pipeline: null,
+                  optedOut: false,
+                },
+              }
+            : prev
+        );
         const emailLabel = email ? ` (${email})` : ' (no email — can be enriched later)';
         setActionMessage({
           type: 'success',
-          text: `Contact created: ${firstName} ${lastName}${emailLabel}`,
+          text: `Contact created: ${displayName}${emailLabel}`,
         });
-        // Refresh the analyze result to show the new contact
-        setTimeout(() => {
-          handleParseAndSave({ stopPropagation: () => {} });
-        }, 1000);
+        setTimeout(() => setActionMessage(null), 5000);
       } else {
         setActionMessage({
           type: 'error',
@@ -857,12 +899,22 @@ export default function InboundParsePage() {
                       ) : parseResult.nameMatches?.length > 0 ? (
                         // No email match but name-based candidates found
                         <div className="space-y-3 text-sm">
-                          <div className="flex items-center gap-2 text-amber-800 text-xs">
+                          <div className="flex flex-wrap items-center gap-2 text-amber-800 text-xs">
                             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                             <span>
-                              No exact email match. Select a contact below, type their email above
-                              to create a new contact, or record without linking.
+                              No exact email match. Select a contact below, look up by email, type
+                              their email above to create a new contact, or record without linking.
                             </span>
+                            {(contactEmailOverride || parseResult?.parsed?.contactEmail) && companyHQId && (
+                              <button
+                                type="button"
+                                onClick={handleLookupContact}
+                                disabled={lookupContactLoading}
+                                className="ml-1 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                              >
+                                {lookupContactLoading ? 'Looking up…' : 'Look up contact'}
+                              </button>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {parseResult.nameMatches.map((match) => (
@@ -903,7 +955,7 @@ export default function InboundParsePage() {
                       ) : (
                         // Nothing found
                         <div className="space-y-3 text-sm">
-                          <div className="flex items-center gap-2 text-red-800">
+                          <div className="flex flex-wrap items-center gap-2 text-red-800">
                             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                             <span>
                               No contact found for &ldquo;
@@ -913,9 +965,19 @@ export default function InboundParsePage() {
                                 '(unknown)'}
                               &rdquo;.
                             </span>
+                            {(contactEmailOverride || parseResult?.parsed?.contactEmail) && companyHQId && (
+                              <button
+                                type="button"
+                                onClick={handleLookupContact}
+                                disabled={lookupContactLoading}
+                                className="ml-1 inline-flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                              >
+                                {lookupContactLoading ? 'Looking up…' : 'Look up contact'}
+                              </button>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-2 items-center">
-                            {(contactNameOverride || parseResult?.parsed?.contactName) ? (
+                            {(contactNameOverride || parseResult?.parsed?.contactName) || (contactEmailOverride || parseResult?.parsed?.contactEmail) ? (
                               <button
                                 onClick={handleCreateContact}
                                 disabled={createContactLoading}
@@ -926,7 +988,7 @@ export default function InboundParsePage() {
                               </button>
                             ) : (
                               <span className="text-xs text-gray-600">
-                                Enter contact name in Step 1 to create a contact.
+                                Enter contact name or email in Step 1 to create a contact.
                               </span>
                             )}
                             {(!contactEmailOverride && !parseResult?.parsed?.contactEmail) &&

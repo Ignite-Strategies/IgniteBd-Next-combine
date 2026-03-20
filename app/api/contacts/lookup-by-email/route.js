@@ -37,12 +37,12 @@ export async function GET(request) {
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const trimmedEmail = email.trim();
 
     const contact = await prisma.contact.findFirst({
       where: {
-        email: normalizedEmail,
         crmId,
+        email: { equals: trimmedEmail, mode: 'insensitive' },
       },
       select: {
         id: true,
@@ -51,14 +51,15 @@ export async function GET(request) {
         goesBy: true,
         fullName: true,
         email: true,
+        companyName: true,
+        title: true,
+        pipelineSnap: true,
+        contactDisposition: true,
       },
     });
 
     if (!contact) {
-      return NextResponse.json(
-        { success: false, error: 'Contact not found with that email in this workspace' },
-        { status: 404 },
-      );
+      return NextResponse.json({ success: true, contact: null });
     }
 
     const displayName =
@@ -72,8 +73,13 @@ export async function GET(request) {
       success: true,
       contact: {
         id: contact.id,
+        name: displayName,
         displayName,
         email: contact.email,
+        company: contact.companyName ?? null,
+        title: contact.title ?? null,
+        pipeline: contact.pipelineSnap ?? null,
+        optedOut: contact.contactDisposition === 'OPTED_OUT',
       },
     });
   } catch (error) {

@@ -103,6 +103,7 @@ export async function POST(request: Request) {
         contactEmail = parsed.toEmail || '';
       }
     }
+    contactEmail = contactEmail.trim().toLowerCase();
 
     // ── 4. Contact lookup — exact email match ──
     type ContactRow = {
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
       const found = await prisma.contact.findFirst({
         where: {
           crmId: companyHQId,
-          email: { equals: contactEmail.trim(), mode: 'insensitive' as const },
+          email: { equals: contactEmail, mode: 'insensitive' as const },
         },
         select: {
           id: true,
