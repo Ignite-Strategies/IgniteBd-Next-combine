@@ -51,6 +51,12 @@ try {
   console.log('✅ Migrations completed successfully');
 } catch (error) {
   console.error('❌ Migration failed:', error.message);
+  console.error(
+    '\nIf you see P1001 (cannot reach DB on :5432), try HTTP-based apply against Neon:\n' +
+      '  npm run migrate:neon-http\n' +
+      'Then mark the migration applied when Prisma can connect:\n' +
+      '  npx prisma migrate resolve --applied 20260328130000_next_engagement_purpose_refactor\n',
+  );
   process.exit(1);
 }
 

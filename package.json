@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "build:full": "prisma generate && npm run migrate && npm run build",
     "migrate": "node scripts/migrate-deploy.js",
+    "migrate:neon-http": "node scripts/migrate-via-neon-http.mjs",
     "start": "next start",
     "lint": "eslint",
     "prisma": "prisma",
@@ -46,6 +47,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "@tailwindcss/postcss": "^4",
     "@types/react": "19.2.4",
     "eslint": "^9",
