@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { parseInboundRecipient, extractCompanySlugFromAddress } from '@/lib/utils/parseEmailAddress';
 import { simpleParser } from 'mailparser';
 import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
+import { universalEmailParser } from '@/lib/services/universalEmailParser';
+import {
+  bumpProspectNeedToEngageToEngaged,
+  resolveOutreachContactIdForWave1,
+} from '@/lib/services/inboundProspectBump';
 
 /**
  * POST /api/inbound-email
@@ -144,6 +149,45 @@ export async function POST(req: Request) {
     });
 
     console.log('InboundEmail stored:', inboundEmail.id, { inboundType, hasText: !!text, hasHtml: !!html, hasRawMime: !!email });
+
+    // Wave 1 — prospect need-to-engage → engaged-awaiting-response (header/email match only, no interpret)
+    if (inboundType === 'OUTREACH') {
+      try {
+        const companyRow = await prisma.company_hqs.findUnique({
+          where: { id: companyHQId },
+          select: {
+            owners_company_hqs_ownerIdToowners: { select: { email: true } },
+          },
+        });
+        const ownerEmailLower =
+          (companyRow?.owners_company_hqs_ownerIdToowners?.email || '')
+            .toLowerCase()
+            .trim() || null;
+        const parsed = universalEmailParser({
+          from,
+          to,
+          subject,
+          text: text ?? undefined,
+          html: html ?? undefined,
+          headers: headers ?? undefined,
+          email: email ?? undefined,
+        });
+        const waveContactId = await resolveOutreachContactIdForWave1({
+          companyHQId,
+          ownerEmailLower,
+          fromEmail: parsed.fromEmail,
+          toEmail: parsed.toEmail,
+        });
+        if (waveContactId) {
+          const bumped = await bumpProspectNeedToEngageToEngaged(waveContactId);
+          if (bumped) {
+            console.log('✅ Inbound wave1 pipeline bump for contact', waveContactId);
+          }
+        }
+      } catch (waveErr) {
+        console.warn('Inbound wave1 bump skipped:', (waveErr as Error)?.message);
+      }
+    }
 
     return NextResponse.json(
       { success: true, inboundEmailId: inboundEmail.id, inboundType },

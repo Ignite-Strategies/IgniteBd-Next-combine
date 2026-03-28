@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { universalEmailParser } from '@/lib/services/universalEmailParser';
 import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
+import { suggestInboundPipelineMatch } from '@/lib/services/inboundPipelineMatchService';
 
 /**
  * POST /api/inbound-parse/interpret
@@ -18,7 +19,7 @@ import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
  *   - alreadyIngested: duplicate check
  *   - nextEngage: AI-suggested + current-on-contact context
  *
- * Body: { inboundEmailId }
+ * Body: { inboundEmailId, generatePipelineMatch? }
  */
 export async function POST(request: Request) {
   try {
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const inboundEmailId = body?.inboundEmailId;
+    const generatePipelineMatch = body?.generatePipelineMatch === true;
     if (!inboundEmailId || typeof inboundEmailId !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Missing inboundEmailId' },
@@ -275,6 +277,28 @@ export async function POST(request: Request) {
     // ── 7. Next engage context ──
     const currentNextEngage = contact?.nextEngagementDate || null;
 
+    let pipelineMatch = null;
+    if (contact && generatePipelineMatch) {
+      try {
+        const hasSched =
+          interpreted.nextEngagementPurpose === 'SCHEDULED_MEETING' &&
+          !!interpreted.nextEngagementDate;
+        pipelineMatch = await suggestInboundPipelineMatch({
+          contactId: contact.id,
+          engagement: {
+            activityType: interpreted.activityType,
+            summary: interpreted.summary || '',
+            hasScheduledMeeting: hasSched,
+            nextEngagementDate: interpreted.nextEngagementDate || null,
+            subject: interpreted.subject || parsed.subject,
+            bodySnippet: interpreted.body || parsed.body || null,
+          },
+        });
+      } catch (e) {
+        console.warn('interpret pipelineMatch:', (e as Error)?.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       parsed: {
@@ -312,6 +336,7 @@ export async function POST(request: Request) {
         currentPurpose: contact?.nextEngagementPurpose || null,
         recommended: interpreted.nextEngagementDate || currentNextEngage,
       },
+      pipelineMatch,
     });
   } catch (error) {
     console.error('❌ Interpret error:', error);

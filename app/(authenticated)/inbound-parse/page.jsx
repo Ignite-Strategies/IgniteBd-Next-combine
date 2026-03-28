@@ -72,6 +72,8 @@ export default function InboundParsePage() {
   const [selectedContactEmailHistory, setSelectedContactEmailHistory] = useState(null);
   const [selectedContactEmailHistoryLoading, setSelectedContactEmailHistoryLoading] = useState(false);
   const [lookupContactLoading, setLookupContactLoading] = useState(false);
+  const [generatePipelineMatch, setGeneratePipelineMatch] = useState(true);
+  const [applyPipelineMatch, setApplyPipelineMatch] = useState(false);
 
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
@@ -377,6 +379,7 @@ export default function InboundParsePage() {
     try {
       const res = await api.post('/api/inbound-parse/interpret', {
         inboundEmailId: selectedEmail.id,
+        generatePipelineMatch,
       });
       if (res.data?.success) {
         setParseResult(res.data);
@@ -441,6 +444,8 @@ export default function InboundParsePage() {
             : {}),
         };
       }
+      if (generatePipelineMatch) payload.generatePipelineMatch = true;
+      if (applyPipelineMatch) payload.applyPipelineMatch = true;
       const res = await api.post('/api/inbound-parse/push-to-ai', payload);
       const { parsed, contactId, recordType } = res.data;
       if (contactId) setRecordedContactId(contactId);
@@ -737,6 +742,14 @@ export default function InboundParsePage() {
                     </button>
 
                     {/* Parse & Save: opens Email activity matcher */}
+                    <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={generatePipelineMatch}
+                        onChange={(e) => setGeneratePipelineMatch(e.target.checked)}
+                      />
+                      Pipeline match
+                    </label>
                     <button
                       onClick={handleParseAndSave}
                       disabled={analyzeLoading || !hasContent}
@@ -876,6 +889,36 @@ export default function InboundParsePage() {
                             ))}
                           </select>
                         </div>
+                        {generatePipelineMatch && parseResult.pipelineMatch && (
+                          <div className="rounded-lg border border-violet-200 bg-violet-50/80 p-3 text-xs space-y-2">
+                            <p className="font-semibold text-violet-900">Pipeline match (preview)</p>
+                            <div className="text-violet-800 space-y-1">
+                              <p>
+                                Role: {parseResult.pipelineMatch.signals?.roleHint ?? '—'} · Referral:{' '}
+                                {parseResult.pipelineMatch.signals?.referralIntroduced ? 'yes' : 'no'}
+                              </p>
+                              {parseResult.pipelineMatch.proposal ? (
+                                <p>
+                                  Suggested: {parseResult.pipelineMatch.proposal.targetPipeline} /{' '}
+                                  {parseResult.pipelineMatch.proposal.targetStage} (
+                                  {parseResult.pipelineMatch.proposal.confidence}%){' '}
+                                  — {parseResult.pipelineMatch.proposal.rationale}
+                                </p>
+                              ) : (
+                                <p className="text-gray-600">No pipeline change suggested.</p>
+                              )}
+                            </div>
+                            <label className="inline-flex items-center gap-2 cursor-pointer text-violet-900">
+                              <input
+                                type="checkbox"
+                                checked={applyPipelineMatch}
+                                onChange={(e) => setApplyPipelineMatch(e.target.checked)}
+                                disabled={!parseResult.pipelineMatch.proposal}
+                              />
+                              Apply suggestion when saving (e.g. move to connector)
+                            </label>
+                          </div>
+                        )}
                         {parseResult.parsed?.body && (
                           <div>
                             <span className="text-gray-600 font-medium">Body:</span>

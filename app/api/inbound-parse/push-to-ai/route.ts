@@ -10,6 +10,14 @@ import {
 } from '@/lib/constants/nextEngagementPurpose';
 import { generateMeetingSummaryService } from '@/lib/services/generateMeetingSummaryService';
 import { syncEmailSummaryToLog } from '@/lib/services/emailToLogService';
+import {
+  bumpProspectNeedToEngageToEngaged,
+  resolveOutreachContactIdForWave1,
+} from '@/lib/services/inboundProspectBump';
+import {
+  applyInboundPipelineMatchProposal,
+  suggestInboundPipelineMatch,
+} from '@/lib/services/inboundPipelineMatchService';
 
 /**
  * POST /api/inbound-parse/push-to-ai
@@ -17,7 +25,7 @@ import { syncEmailSummaryToLog } from '@/lib/services/emailToLogService';
  * Record: Parse (universal) → Interpret (AI, once) → Log activity → Stamp engagement.
  * Accepts optional preInterpreted to avoid double AI when UI already ran interpret.
  *
- * Body: { inboundEmailId, contactEmail?, contactIdOverride?, nextEngagementDate?, nextEngagementPurpose?, interpretation? }
+ * Body: { inboundEmailId, contactEmail?, contactIdOverride?, nextEngagementDate?, nextEngagementPurpose?, interpretation?, generatePipelineMatch?, applyPipelineMatch? }
  *
  * contactIdOverride: if provided, skips email-based find-or-create and directly links
  * the specified contact. Used when the user selected a name-match candidate in the UI.
@@ -53,6 +61,8 @@ export async function POST(request: Request) {
         ? body.nextEngagementPurpose.trim()
         : null;
     const preInterpreted = body?.interpretation ?? null;
+    const generatePipelineMatch = body?.generatePipelineMatch === true;
+    const applyPipelineMatch = body?.applyPipelineMatch === true;
 
     if (!inboundEmailId || typeof inboundEmailId !== 'string') {
       return NextResponse.json(
@@ -118,6 +128,27 @@ export async function POST(request: Request) {
       headers: inbound.headers,
     });
 
+    const ownerEmailLower = (owner?.email || '').toLowerCase().trim() || null;
+
+    // Wave 1 — need-to-engage → engaged-awaiting-response (no interpret gate)
+    try {
+      if (contactIdOverride) {
+        await bumpProspectNeedToEngageToEngaged(contactIdOverride);
+      } else {
+        const preId = await resolveOutreachContactIdForWave1({
+          companyHQId,
+          ownerEmailLower,
+          fromEmail: parsed.fromEmail,
+          toEmail: parsed.toEmail,
+        });
+        if (preId) {
+          await bumpProspectNeedToEngageToEngaged(preId);
+        }
+      }
+    } catch (bumpErr) {
+      console.warn('⚠️ Wave1 prospect bump (pre-interpret):', (bumpErr as Error)?.message);
+    }
+
     // ── 2. Interpret (AI, once — or use preInterpreted) ──
     // Re-interpret if preInterpreted is missing activityType or nextEngagementPurpose key (old clients)
     let interpreted = preInterpreted;
@@ -170,6 +201,14 @@ export async function POST(request: Request) {
         contactId = existing.id;
       }
       // If no match: leave contactId null. email_activities.email is persisted for later link-by-email.
+    }
+
+    try {
+      if (contactId) {
+        await bumpProspectNeedToEngageToEngaged(contactId);
+      }
+    } catch (bump2) {
+      console.warn('⚠️ Wave1 prospect bump (post-resolve):', (bump2 as Error)?.message);
     }
 
     const effectiveNextEngagementDate =
@@ -428,30 +467,15 @@ export async function POST(request: Request) {
       recordType = 'EmailActivity';
     }
 
-    // ── 5. Pipeline shift (for both paths) ──
+    // ── 5. Pipeline — scheduled meeting → prospect/meeting (wave-1 bump already applied above)
+    let pipe = contactId
+      ? await prisma.pipelines.findUnique({ where: { contactId } })
+      : null;
     if (contactId) {
       try {
         const { snapPipelineOnContact } = await import(
           '@/lib/services/pipelineService'
         );
-        let pipe = await prisma.pipelines.findUnique({
-          where: { contactId },
-        });
-        if (pipe?.pipeline === 'prospect' && pipe?.stage === 'need-to-engage') {
-          await prisma.pipelines.update({
-            where: { contactId },
-            data: { stage: 'engaged-awaiting-response', updatedAt: new Date() },
-          });
-          await snapPipelineOnContact(
-            contactId,
-            pipe.pipeline,
-            'engaged-awaiting-response',
-          );
-          pipe = {
-            ...pipe,
-            stage: 'engaged-awaiting-response',
-          };
-        }
         if (isScheduledMeetingPurpose) {
           const contactQuick = await prisma.contact.findUnique({
             where: { id: contactId },
@@ -469,11 +493,55 @@ export async function POST(request: Request) {
               data: { stage: 'meeting', updatedAt: new Date() },
             });
             await snapPipelineOnContact(contactId, pipe.pipeline, 'meeting');
+            pipe = { ...pipe, stage: 'meeting' };
             console.log('✅ push-to-ai: prospect pipeline → meeting (scheduled)');
           }
         }
       } catch (e) {
         console.warn('⚠️ Pipeline shift skipped:', (e as Error)?.message);
+      }
+    }
+
+    // ── 5b. Optional pipeline match (referral / connector) — second service
+    let pipelineMatch: {
+      signals: import('@/lib/services/inboundPipelineMatchService').InboundPipelineMatchSignals;
+      proposal: import('@/lib/services/inboundPipelineMatchService').InboundPipelineMatchProposal | null;
+      applied: boolean;
+    } | null = null;
+
+    if (contactId && generatePipelineMatch) {
+      try {
+        const hasSchedFlag =
+          isScheduledMeetingPurpose && activityType === 'inbound_email';
+        const match = await suggestInboundPipelineMatch({
+          contactId,
+          engagement: {
+            activityType,
+            summary: interpreted.summary || '',
+            hasScheduledMeeting: hasSchedFlag,
+            nextEngagementDate: effectiveNextEngagementDate,
+            subject: interpreted.subject || inbound.subject,
+            bodySnippet: interpreted.body || parsed.body || null,
+          },
+        });
+        let applied = false;
+        if (applyPipelineMatch && match.proposal) {
+          const fresh = await prisma.pipelines.findUnique({
+            where: { contactId },
+          });
+          const pipelineChanged =
+            match.proposal.targetPipeline !== fresh?.pipeline;
+          // Apply pipeline changes (e.g. prospect → connector); avoid downgrading meeting stage via stage-only noise
+          if (pipelineChanged) {
+            applied = await applyInboundPipelineMatchProposal(
+              contactId,
+              match.proposal,
+            );
+          }
+        }
+        pipelineMatch = { ...match, applied };
+      } catch (pmErr) {
+        console.warn('⚠️ pipelineMatch:', (pmErr as Error)?.message);
       }
     }
 
@@ -491,6 +559,7 @@ export async function POST(request: Request) {
       recordId,
       recordType,
       contactId,
+      pipelineMatch,
       parsed: {
         contactEmail: effectiveContactEmail,
         contactName: interpreted.contactName,
