@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Sparkles,
@@ -14,6 +14,7 @@ import {
   ChevronUp,
   X,
   ExternalLink,
+  FileText,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -51,7 +52,7 @@ function ContactHeader({ contact }) {
   );
 }
 
-function ContextChips({ rc, personaName }) {
+function ContextChips({ rc }) {
   const chips = [];
 
   if (rc?.contextOfRelationship && isDefined(rc.contextOfRelationship)) {
@@ -86,33 +87,21 @@ function ContextChips({ rc, personaName }) {
     orange: 'bg-orange-50 border-orange-200 text-orange-800',
   };
 
+  if (chips.length === 0) {
+    return <p className="text-xs text-gray-400 italic">No relationship context saved yet.</p>;
+  }
+
   return (
-    <div className="space-y-3">
-      {personaName && (
-        <div className="flex items-center gap-2">
-          <Tag className="h-3.5 w-3.5 shrink-0 text-purple-500" />
-          <span className="text-xs font-medium text-gray-500">Persona:</span>
-          <span className="rounded-full bg-purple-100 border border-purple-200 px-2.5 py-0.5 text-xs font-semibold text-purple-800">
-            {personaName}
-          </span>
-        </div>
-      )}
-      {chips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {chips.map((chip) => (
-            <span
-              key={chip.label}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${colorMap[chip.color]}`}
-            >
-              <span className="font-medium opacity-70">{chip.label}:</span>
-              {chip.value}
-            </span>
-          ))}
-        </div>
-      )}
-      {chips.length === 0 && !personaName && (
-        <p className="text-xs text-gray-400 italic">No relationship context saved yet.</p>
-      )}
+    <div className="flex flex-wrap gap-1.5">
+      {chips.map((chip) => (
+        <span
+          key={chip.label}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${colorMap[chip.color]}`}
+        >
+          <span className="font-medium opacity-70">{chip.label}:</span>
+          {chip.value}
+        </span>
+      ))}
     </div>
   );
 }
@@ -128,16 +117,29 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
   const router = useRouter();
   const isModal = layout === 'modal';
 
+  // ── Contact ──
   const [contact, setContact] = useState(null);
-  const [persona, setPersona] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ── Persona ──
+  const [allPersonas, setAllPersonas] = useState([]);
+  const [selectedPersonaSlug, setSelectedPersonaSlug] = useState(null);
+  const [savingPersona, setSavingPersona] = useState(false);
+
+  // ── Templates ──
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // ── Form ──
   const [notes, setNotes] = useState('');
   const [additionalContext, setAdditionalContext] = useState('');
   const [notesExpanded, setNotesExpanded] = useState(true);
 
+  // ── Variables ──
   const [variableSchema, setVariableSchema] = useState([]);
 
+  // ── Generation ──
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -154,11 +156,10 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
     router.push(`/contacts/${contactId}${contactQuery}`);
   };
 
+  // ── Load contact ──
   useEffect(() => {
     if (!contactId) return;
-
     setLoading(true);
-    setPersona(null);
     api
       .get(`/api/contacts/${contactId}`)
       .then((res) => {
@@ -166,25 +167,44 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
           const c = res.data.contact;
           setContact(c);
           setNotes(c.contactSummary || c.notes || '');
-
-          if (c.outreachPersonaSlug) {
-            api
-              .get(`/api/outreach-personas/${c.outreachPersonaSlug}`)
-              .then((pr) => {
-                if (pr.data?.persona) setPersona(pr.data.persona);
-              })
-              .catch(() => {
-                setPersona({
-                  name: humanize(c.outreachPersonaSlug.replace(/([A-Z])/g, ' $1').trim()),
-                });
-              });
-          }
+          setSelectedPersonaSlug(c.outreachPersonaSlug || null);
         }
       })
       .catch((err) => console.error('Failed to load contact:', err))
       .finally(() => setLoading(false));
   }, [contactId]);
 
+  // ── Load all available personas ──
+  useEffect(() => {
+    api
+      .get('/api/outreach-personas')
+      .then((res) => {
+        if (res.data?.personas) setAllPersonas(res.data.personas);
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Load templates when persona is set ──
+  const fetchTemplates = useCallback(() => {
+    if (!companyHQId || !selectedPersonaSlug) {
+      setTemplates([]);
+      return;
+    }
+    setTemplatesLoading(true);
+    api
+      .get(`/api/templates?companyHQId=${encodeURIComponent(companyHQId)}&personaSlug=${encodeURIComponent(selectedPersonaSlug)}`)
+      .then((res) => {
+        if (res.data?.templates) setTemplates(res.data.templates);
+      })
+      .catch(() => {})
+      .finally(() => setTemplatesLoading(false));
+  }, [companyHQId, selectedPersonaSlug]);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  // ── Load variable schema ──
   useEffect(() => {
     if (!companyHQId || !contactId) return;
     const ownerId = typeof window !== 'undefined' ? localStorage.getItem('ownerId') : null;
@@ -196,6 +216,38 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
       .catch(() => {});
   }, [contactId, companyHQId]);
 
+  // ── Persist persona to contact ──
+  const handlePersonaChange = async (slug) => {
+    setSelectedPersonaSlug(slug || null);
+    setSavingPersona(true);
+    try {
+      const res = await api.put(`/api/contacts/${contactId}`, {
+        outreachPersonaSlug: slug || null,
+      });
+      if (res.data?.contact) {
+        setContact((prev) => ({ ...prev, outreachPersonaSlug: res.data.contact.outreachPersonaSlug }));
+      }
+    } catch (err) {
+      console.error('Failed to save persona:', err);
+    } finally {
+      setSavingPersona(false);
+    }
+  };
+
+  // ── Apply template into editor ──
+  const handleApplyTemplate = (tpl) => {
+    setResult({
+      subject: tpl.subject,
+      body: tpl.body,
+      rawBody: tpl.body,
+      rawSubject: tpl.subject,
+      reasoning: null,
+      selectedSnippets: [],
+    });
+    setShowTemplates(false);
+  };
+
+  // ── Save draft ──
   const handleSave = async () => {
     if (!result || saving) return;
     setSaving(true);
@@ -206,7 +258,6 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
         body: result.body,
         platform: 'ai-draft',
       });
-
       if (draftRes.data?.success) {
         setSaved(true);
         setShowTemplatePrompt(true);
@@ -220,6 +271,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
     }
   };
 
+  // ── Save as template ──
   const handleSaveTemplate = async () => {
     setSavingTemplate(true);
     setError('');
@@ -231,11 +283,12 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
         title: result.subject,
         subject: result.subject,
         body: result.rawBody || result.body,
-        ...(contact?.outreachPersonaSlug && { personaSlug: contact.outreachPersonaSlug }),
+        ...(selectedPersonaSlug && { personaSlug: selectedPersonaSlug }),
       });
       if (res.data?.success) {
         setTemplateSaved(true);
         setShowTemplatePrompt(false);
+        fetchTemplates();
       } else {
         setError(res.data?.error || 'Failed to save template');
       }
@@ -246,6 +299,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
     }
   };
 
+  // ── Generate ──
   const handleGenerate = async () => {
     if (!notes.trim() && !additionalContext.trim()) {
       setError('Add some notes or context to guide the email generation.');
@@ -264,7 +318,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
       const notesText = [notes.trim(), additionalContext.trim()].filter(Boolean).join('\n\n');
       const res = await api.post(`/api/contacts/${contactId}/build-email`, {
         companyHQId,
-        personaSlug: contact?.outreachPersonaSlug || undefined,
+        personaSlug: selectedPersonaSlug || undefined,
         relationshipContext: contact?.relationship_contexts || undefined,
         notes: notesText || undefined,
       });
@@ -289,12 +343,107 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
   };
 
   const rc = contact?.relationship_contexts;
-  const personaName =
-    persona?.name ||
-    (contact?.outreachPersonaSlug
-      ? humanize(contact.outreachPersonaSlug.replace(/([A-Z])/g, ' $1').trim())
-      : null);
+  const selectedPersona = allPersonas.find((p) => p.slug === selectedPersonaSlug);
+  const personaDisplayName = selectedPersona?.name || (selectedPersonaSlug ? humanize(selectedPersonaSlug.replace(/([A-Z])/g, ' $1').trim()) : null);
 
+  // ─── Persona selector block ───────────────────────────────────────────────────
+  const personaSection = (
+    <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4 shadow-sm">
+      <div className="flex items-center gap-2 mb-2">
+        <Tag className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Outreach Persona</span>
+        {savingPersona && <RefreshCw className="h-3 w-3 animate-spin text-purple-400" />}
+        {!savingPersona && selectedPersonaSlug && <Check className="h-3 w-3 text-green-500" />}
+      </div>
+      <select
+        value={selectedPersonaSlug || ''}
+        onChange={(e) => handlePersonaChange(e.target.value || null)}
+        disabled={savingPersona}
+        className="w-full rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:opacity-50"
+      >
+        <option value="">— No persona selected —</option>
+        {allPersonas.map((p) => (
+          <option key={p.slug} value={p.slug}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      {!selectedPersonaSlug && (
+        <p className="mt-1.5 text-xs text-purple-600">
+          Choosing a persona improves tone, email style, and template matching.
+        </p>
+      )}
+    </div>
+  );
+
+  // ─── Templates block ──────────────────────────────────────────────────────────
+  const templatesSection = selectedPersonaSlug && companyHQId ? (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setShowTemplates((v) => !v)}
+        className="flex w-full items-center justify-between px-5 py-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-gray-400" />
+          <span className="text-sm font-semibold text-gray-700">Templates for this persona</span>
+          {templatesLoading && <RefreshCw className="h-3 w-3 animate-spin text-gray-400" />}
+          {!templatesLoading && templates.length > 0 && (
+            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+              {templates.length}
+            </span>
+          )}
+        </div>
+        {showTemplates ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+      </button>
+      {showTemplates && (
+        <div className="border-t border-gray-100 px-4 pb-4">
+          {templates.length === 0 ? (
+            <p className="pt-4 text-xs text-gray-400 italic">
+              No templates saved for this persona yet. Generate and save one below.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {templates.map((tpl) => (
+                <li
+                  key={tpl.id}
+                  className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{tpl.title || tpl.subject}</p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{tpl.subject}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyTemplate(tpl)}
+                    className="shrink-0 rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                  >
+                    Use
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  // ─── Loading state ────────────────────────────────────────────────────────────
+  if (loading) {
+    const loader = (
+      <div className="flex items-center gap-2 text-gray-500">
+        <RefreshCw className="h-5 w-5 animate-spin" />
+        Loading contact...
+      </div>
+    );
+    if (isModal) {
+      return <div className="flex items-center justify-center py-16 px-4 bg-gray-50">{loader}</div>;
+    }
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">{loader}</div>;
+  }
+
+  // ─── Main content ─────────────────────────────────────────────────────────────
   const mainContent = (
     <>
       {!isModal && (
@@ -313,23 +462,28 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
       {!isModal && <h1 className="mb-6 text-2xl font-bold text-gray-900">Build Outreach Message</h1>}
       {isModal && <h1 className="sr-only">Build Outreach Message</h1>}
 
+      {/* Contact card */}
       {contact && (
         <div className="mb-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
           <ContactHeader contact={contact} />
-          {contact.email == null || String(contact.email).trim() === '' ? (
-            <p className="text-xs text-gray-500">
-              No email on record; you can still draft and copy.
-            </p>
+          {!contact.email || String(contact.email).trim() === '' ? (
+            <p className="text-xs text-gray-500">No email on record; you can still draft and copy.</p>
           ) : null}
-          <div className="border-t border-gray-100 pt-3">
-            <div className="flex items-center gap-1.5 mb-2">
+          <div className="border-t border-gray-100 pt-3 space-y-3">
+            <div className="flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5 text-blue-400" />
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Context</span>
             </div>
-            <ContextChips rc={rc} personaName={personaName} />
+            <ContextChips rc={rc} />
           </div>
         </div>
       )}
+
+      {/* Persona selector — always visible, primary step */}
+      <div className="mb-4">{personaSection}</div>
+
+      {/* Templates for current persona */}
+      {templatesSection && <div className="mb-4">{templatesSection}</div>}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -337,6 +491,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
         </div>
       )}
 
+      {/* Pre-generation form */}
       {!result && (
         <div className="space-y-4">
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -404,6 +559,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
         </div>
       )}
 
+      {/* Result */}
       {result && (
         <div className="space-y-4">
           {result.reasoning && (
@@ -493,7 +649,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
               value={additionalContext}
               onChange={(e) => setAdditionalContext(e.target.value)}
               rows={2}
-              placeholder="e.g. no need to explain what happened — the owner stayed, they left · keep it short · mention X"
+              placeholder="e.g. no need to explain what happened — keep it short · mention X"
               className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
             />
           </div>
@@ -578,27 +734,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
     </>
   );
 
-  if (loading) {
-    const loader = (
-      <div className="flex items-center gap-2 text-gray-500">
-        <RefreshCw className="h-5 w-5 animate-spin" />
-        Loading contact...
-      </div>
-    );
-    if (isModal) {
-      return (
-        <div className="flex items-center justify-center py-16 px-4 bg-gray-50">
-          {loader}
-        </div>
-      );
-    }
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        {loader}
-      </div>
-    );
-  }
-
+  // ─── Modal layout ─────────────────────────────────────────────────────────────
   if (isModal) {
     return (
       <div className="flex flex-col max-h-[90vh] bg-gray-50">
@@ -611,9 +747,12 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
           >
             <X className="h-5 w-5" />
           </button>
-          <span className="flex-1 truncate text-center text-base font-bold text-gray-900">
-            Build Outreach Message
-          </span>
+          <div className="flex-1 min-w-0 text-center">
+            <span className="block text-base font-bold text-gray-900 truncate">Build Outreach Message</span>
+            {personaDisplayName && (
+              <span className="block text-xs text-purple-600 font-medium truncate">{personaDisplayName}</span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => router.push(outreachFullPageHref)}
@@ -628,6 +767,7 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
     );
   }
 
+  // ─── Page layout ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-3xl px-4">{mainContent}</div>

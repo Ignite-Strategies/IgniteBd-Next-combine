@@ -124,6 +124,20 @@ export class OutreachEmailBuilderService {
         if (company) companyContext = `Our Company: ${company.companyName}\nWhat We Do: ${company.whatYouDo || 'Not specified'}`;
       }
 
+      // ── Persona hydration — load name + description from DB ──
+      let personaBlock = '';
+      if (personaSlug) {
+        const personaRow = await prisma.outreach_personas.findUnique({
+          where: { slug: personaSlug },
+          select: { name: true, description: true },
+        });
+        if (personaRow) {
+          personaBlock = `Outreach Persona: ${personaRow.name}${personaRow.description ? `\nPersona Guidance: ${personaRow.description}` : ''}`;
+        } else {
+          personaBlock = `Outreach Persona: ${personaSlug}`;
+        }
+      }
+
       const contactCompany = contact.companyName || contact.companies?.companyName || null;
 
       // ── Seasonal context ──
@@ -149,7 +163,9 @@ Guidelines:
 - For follow-ups, reference prior contact naturally — never robotic
 - Avoid pushy or salesy language
 - Match tone to the relationship type
-- Incorporate seasonal context naturally when appropriate`;
+- Incorporate seasonal context naturally when appropriate
+
+You must respond with a JSON object containing exactly two string keys: "subject" (the email subject line) and "body" (the full email body). No other keys. No markdown fences.`;
 
       const notesOrSummary = (notesOverride != null && notesOverride.trim() !== '')
         ? notesOverride.trim()
@@ -162,7 +178,7 @@ ${notesOrSummary ? `- Notes / context: ${notesOrSummary}` : ''}`;
 
       const contextBlock = [
         companyContext,
-        personaSlug ? `Persona: ${personaSlug}` : '',
+        personaBlock,
         relationshipContext ? `Relationship Context:\n${JSON.stringify(relationshipContext, null, 2)}` : '',
         `Current Date Context:\n${seasonalContext}`,
       ].filter(Boolean).join('\n\n');
@@ -179,7 +195,9 @@ ${contextBlock}
 Generate a subject line and email body that:
 - Introduces your company naturally
 - References any relationship context (former colleague, prior conversation, referral, etc.)
-- Opens a conversation with a soft call-to-action`;
+- Opens a conversation with a soft call-to-action
+
+Respond as a JSON object with keys "subject" and "body".`;
       } else {
         const followUpTone = contactResponded
           ? '- Acknowledge their response and continue the conversation naturally\n- Reference what they said'
@@ -206,7 +224,9 @@ ${lastSubject ? `- Previous email subject: "${lastSubject}"` : ''}
 Generate a subject line and email body that:
 ${followUpTone}
 - Continues the conversation without being pushy
-- Has a soft call-to-action`;
+- Has a soft call-to-action
+
+Respond as a JSON object with keys "subject" and "body".`;
       }
 
       const completion = await openai.chat.completions.create({
