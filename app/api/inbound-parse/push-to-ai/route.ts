@@ -115,7 +115,9 @@ export async function POST(request: Request) {
     if (
       !interpreted ||
       typeof interpreted !== 'object' ||
-      !interpreted.activityType
+      !interpreted.activityType ||
+      typeof (interpreted as { hasScheduledMeeting?: unknown }).hasScheduledMeeting !==
+        'boolean'
     ) {
       interpreted = await interpretEngagement(
         {
@@ -164,6 +166,9 @@ export async function POST(request: Request) {
 
     const effectiveNextEngagementDate =
       nextEngagementDateOverride || interpreted.nextEngagementDate || null;
+    const hasScheduledMeetingFlag =
+      (interpreted as { hasScheduledMeeting?: boolean }).hasScheduledMeeting === true &&
+      !!effectiveNextEngagementDate;
 
     // ── 4. Route by activity type ──
     const isMeetingOrCall =
@@ -280,7 +285,11 @@ export async function POST(request: Request) {
             where: { id: contactId },
             data: {
               nextEngagementDate: effectiveNextEngagementDate,
-              nextEngagementPurpose: activityType === 'inbound_email' ? 'FOLLOW_UP' : 'GENERAL_CHECK_IN',
+              nextEngagementPurpose: hasScheduledMeetingFlag
+                ? 'SCHEDULED_MEETING'
+                : activityType === 'inbound_email'
+                  ? 'FOLLOW_UP'
+                  : 'GENERAL_CHECK_IN',
             },
           });
         } else {
@@ -297,6 +306,59 @@ export async function POST(request: Request) {
               data: { nextEngagementDate: null, nextEngagementPurpose: null },
             });
           }
+        }
+      }
+
+      // Scheduled meeting from inbound — create Meeting row for /meetings upcoming (deduped)
+      if (
+        contactId &&
+        hasScheduledMeetingFlag &&
+        activityType === 'inbound_email' &&
+        effectiveNextEngagementDate
+      ) {
+        const dateStr = effectiveNextEngagementDate.slice(0, 10);
+        const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
+        const dayEnd = new Date(`${dateStr}T23:59:59.999Z`);
+        const existingMeet = await prisma.meeting.findFirst({
+          where: {
+            contactId,
+            meetingDate: { gte: dayStart, lte: dayEnd },
+          },
+          select: { id: true },
+        });
+        if (!existingMeet) {
+          const noteText =
+            inbound.text || inbound.html?.replace(/<[^>]+>/g, ' ').trim() || null;
+          const meetingDateParsed = new Date(`${dateStr}T12:00:00.000Z`);
+          const m = await prisma.meeting.create({
+            data: {
+              contactId,
+              ownerId,
+              crmId: companyHQId,
+              meetingDate: meetingDateParsed,
+              meetingType: 'FOLLOW_UP',
+              notes: noteText,
+              nextAction: interpreted.summary || null,
+              nextEngagementDate: effectiveNextEngagementDate,
+            },
+          });
+          if (noteText && noteText.length >= 20) {
+            try {
+              const summary = await generateMeetingSummaryService(noteText);
+              if (summary) {
+                await prisma.meeting.update({
+                  where: { id: m.id },
+                  data: { summary },
+                });
+              }
+            } catch (err) {
+              console.warn(
+                '⚠️ Meeting summary generation failed:',
+                (err as Error)?.message,
+              );
+            }
+          }
+          console.log(`✅ push-to-ai: created Meeting ${m.id} from scheduled-meeting detect`);
         }
       }
 
@@ -343,7 +405,10 @@ export async function POST(request: Request) {
     // ── 5. Pipeline shift (for both paths) ──
     if (contactId) {
       try {
-        const pipe = await prisma.pipelines.findUnique({
+        const { snapPipelineOnContact } = await import(
+          '@/lib/services/pipelineService'
+        );
+        let pipe = await prisma.pipelines.findUnique({
           where: { contactId },
         });
         if (pipe?.pipeline === 'prospect' && pipe?.stage === 'need-to-engage') {
@@ -351,14 +416,35 @@ export async function POST(request: Request) {
             where: { contactId },
             data: { stage: 'engaged-awaiting-response', updatedAt: new Date() },
           });
-          const { snapPipelineOnContact } = await import(
-            '@/lib/services/pipelineService'
-          );
           await snapPipelineOnContact(
             contactId,
             pipe.pipeline,
             'engaged-awaiting-response',
           );
+          pipe = {
+            ...pipe,
+            stage: 'engaged-awaiting-response',
+          };
+        }
+        if (hasScheduledMeetingFlag && effectiveNextEngagementDate) {
+          const contactQuick = await prisma.contact.findUnique({
+            where: { id: contactId },
+            select: { contactDisposition: true },
+          });
+          const allowedStages = ['interest', 'engaged-awaiting-response'];
+          if (
+            pipe?.pipeline === 'prospect' &&
+            pipe.stage &&
+            allowedStages.includes(pipe.stage) &&
+            contactQuick?.contactDisposition !== 'OPTED_OUT'
+          ) {
+            await prisma.pipelines.update({
+              where: { contactId },
+              data: { stage: 'meeting', updatedAt: new Date() },
+            });
+            await snapPipelineOnContact(contactId, pipe.pipeline, 'meeting');
+            console.log('✅ push-to-ai: prospect pipeline → meeting (scheduled)');
+          }
         }
       } catch (e) {
         console.warn('⚠️ Pipeline shift skipped:', (e as Error)?.message);
@@ -387,6 +473,7 @@ export async function POST(request: Request) {
         summary: interpreted.summary,
         activityType,
         activityDate,
+        hasScheduledMeeting: hasScheduledMeetingFlag,
       },
     });
   } catch (error) {

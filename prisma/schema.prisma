@@ -2054,6 +2054,7 @@ enum NextEngagementPurpose {
   REFERRAL_NO_CONTACT   // Referral, no contact yet
   FOLLOW_UP            // General follow-up (after email, call, etc.)
   MEETING_FOLLOW_UP     // Post-meeting follow-up
+  SCHEDULED_MEETING     // Next touch is a scheduled meeting/call (date on calendar)
 }
 
 enum MeetingType {

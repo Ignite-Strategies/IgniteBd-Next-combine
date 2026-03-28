@@ -44,6 +44,7 @@ export async function GET(request) {
     const followUpDateTo = searchParams.get('followUpDateTo');
     const hasResponded = searchParams.get('hasResponded');
     const limit = parseInt(searchParams.get('limit') || '100', 10);
+    const touchType = searchParams.get('touchType') || 'all'; // all | meeting | email
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     if (!companyHQId) {
@@ -95,6 +96,19 @@ export async function GET(request) {
     };
     if (hasResponded === 'true')  contactWhere.lastEngagementType = 'CONTACT_RESPONSE';
     if (hasResponded === 'false') contactWhere.lastEngagementType = { not: 'CONTACT_RESPONSE' };
+    if (touchType === 'meeting') {
+      contactWhere.nextEngagementPurpose = 'SCHEDULED_MEETING';
+    } else if (touchType === 'email') {
+      contactWhere.AND = [
+        ...(contactWhere.AND || []),
+        {
+          OR: [
+            { nextEngagementPurpose: null },
+            { nextEngagementPurpose: { not: 'SCHEDULED_MEETING' } },
+          ],
+        },
+      ];
+    }
 
     const contactsWithActivities = await prisma.contact.findMany({
       where: contactWhere,
@@ -111,12 +125,13 @@ export async function GET(request) {
         lastEngagementDate: true,
         lastEngagementType: true,
         nextEngagementDate: true,
+        nextEngagementPurpose: true,
         nextContactNote: true,
         contactDisposition: true,
         pipelineStageSnap: true,
         engagementSummary: true,
       },
-      take: limit * 2,
+      take: limit,
       skip: offset,
     });
 
@@ -217,7 +232,7 @@ export async function GET(request) {
       pagination: {
         limit,
         offset,
-        hasMore: offset + filteredContacts.length < totalCount,
+        hasMore: offset + (filteredContacts?.length || 0) < totalCount,
       },
       filters: {
         sendDateFrom,
@@ -225,6 +240,7 @@ export async function GET(request) {
         followUpDateFrom,
         followUpDateTo,
         hasResponded,
+        touchType,
       },
     });
   } catch (error) {

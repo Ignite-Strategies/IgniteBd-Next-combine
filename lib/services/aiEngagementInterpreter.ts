@@ -48,6 +48,8 @@ export interface EngagementInterpretation {
   summary: string; // 1-2 sentence summary of the interaction
   activityType: ActivityType; // What kind of activity this email describes
   activityDate: string | null; // ISO date "YYYY-MM-DD" of when the activity actually happened (may differ from email date)
+  /** True when the contact committed to a future meeting/call and nextEngagementDate is that event (inbound_email path). */
+  hasScheduledMeeting: boolean;
 }
 
 /**
@@ -133,6 +135,7 @@ Interpret:
 7. Summary — 1-2 sentences WITH CONTEXT: what the contact said (e.g. buyer vs will-forward, interested vs not), disposition, and next steps. Include enough so we know if they're a buyer or just forwarding. Used for cadence logic.
 8. activityType — one of: "inbound_email", "outbound_email", "call_note", "meeting_note", "note"
 9. activityDate — "YYYY-MM-DD" if the described event happened on a specific past date, else null
+10. hasScheduledMeeting — true ONLY when activityType is "inbound_email" AND the contact clearly agreed to or proposed a specific future meeting, call, or video chat on a date that you also put in nextEngagementDate (e.g. "let\'s meet April 9", "I\'ll send a calendar invite for Tuesday"). False for vague "let\'s connect soon" with no date. false for call_note/meeting_note (owner logs).
 
 Return EXACTLY this JSON:
 {
@@ -146,7 +149,8 @@ Return EXACTLY this JSON:
   "isResponse": true or false,
   "summary": "1-2 sentences with context (what they said, buyer/forward, next step)",
   "activityType": "inbound_email" | "outbound_email" | "call_note" | "meeting_note" | "note",
-  "activityDate": "YYYY-MM-DD" or null
+  "activityDate": "YYYY-MM-DD" or null,
+  "hasScheduledMeeting": true or false
 }
 
 Return JSON only.`;
@@ -194,6 +198,7 @@ Return JSON only.`;
       activityType: result.activityType,
       activityDate: result.activityDate,
       hasNextEngagementDate: !!result.nextEngagementDate,
+      hasScheduledMeeting: result.hasScheduledMeeting,
       isResponse: result.isResponse,
     });
 
@@ -263,5 +268,10 @@ function parseResponse(content: string): EngagementInterpretation {
     summary: String(d.summary ?? parsed.summary ?? ''),
     activityType,
     activityDate,
+    hasScheduledMeeting: (() => {
+      if (activityType !== 'inbound_email') return false;
+      const v = d.hasScheduledMeeting ?? parsed.hasScheduledMeeting;
+      return v === true;
+    })(),
   };
 }

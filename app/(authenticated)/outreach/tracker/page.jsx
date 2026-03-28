@@ -20,6 +20,7 @@ function OutreachTrackerContent() {
     followUpDateFrom: searchParams.get('followUpDateFrom') || '',
     followUpDateTo: searchParams.get('followUpDateTo') || '',
     hasResponded: searchParams.get('hasResponded') || '',
+    touchType: searchParams.get('touchType') || 'all',
   }));
   const [pagination, setPagination] = useState({
     limit: 50,
@@ -58,6 +59,7 @@ function OutreachTrackerContent() {
       if (filters.followUpDateFrom) params.followUpDateFrom = filters.followUpDateFrom;
       if (filters.followUpDateTo) params.followUpDateTo = filters.followUpDateTo;
       if (filters.hasResponded) params.hasResponded = filters.hasResponded;
+      if (filters.touchType && filters.touchType !== 'all') params.touchType = filters.touchType;
 
       const response = await api.get('/api/outreach/tracker', { params });
       const data = response.data;
@@ -169,8 +171,7 @@ function OutreachTrackerContent() {
     return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">Due in {daysUntilDue}d</span>;
   };
 
-  // Group contacts by next follow-up date (labels in EST: Today, Tomorrow, etc.)
-  const contactsByDate = useMemo(() => {
+  const buildDateGroups = (list) => {
     const t = getTodayEST();
     const formatLabel = (isoDate) => {
       const { label } = formatDateLabelEST(t, isoDate);
@@ -178,7 +179,7 @@ function OutreachTrackerContent() {
     };
     const groups = {};
     const noDate = [];
-    for (const c of contacts) {
+    for (const c of list) {
       const dateKey = c.nextSendDate ? new Date(c.nextSendDate).toISOString().slice(0, 10) : null;
       if (!dateKey) {
         noDate.push(c);
@@ -190,7 +191,139 @@ function OutreachTrackerContent() {
     const sorted = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
     if (noDate.length) sorted.push([null, { label: 'No follow-up date', contacts: noDate }]);
     return sorted;
-  }, [contacts]);
+  };
+
+  const trackerLayout = useMemo(() => {
+    const touch = filters.touchType || 'all';
+    if (touch === 'all') {
+      const meetingContacts = contacts.filter((c) => c.nextEngagementPurpose === 'SCHEDULED_MEETING');
+      const emailContacts = contacts.filter((c) => c.nextEngagementPurpose !== 'SCHEDULED_MEETING');
+      return {
+        mode: 'split',
+        meeting: buildDateGroups(meetingContacts),
+        email: buildDateGroups(emailContacts),
+      };
+    }
+    return { mode: 'single', groups: buildDateGroups(contacts) };
+  }, [contacts, filters.touchType]);
+
+  const renderDateGroups = (dateGroups) =>
+    dateGroups.map(([dateKey, { label, contacts: groupContacts }]) => (
+      <div key={dateKey ?? 'none'} className="overflow-hidden">
+        <div className="flex items-center gap-2 bg-gray-50 px-6 py-3 text-sm font-semibold text-gray-700">
+          <Calendar className="h-4 w-4 text-gray-500" />
+          {label}
+        </div>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50/60">
+            <tr>
+              <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+              <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Send</th>
+              <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Follow-Up</th>
+              <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emails</th>
+              <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-2 w-10" />
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-100">
+            {groupContacts.map((contact) => (
+              <tr key={contact.id} className="hover:bg-gray-50">
+                <td className="px-6 py-3">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/contacts/${contact.id}`)}
+                    className="text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 hover:text-amber-600">
+                        {contact.firstName} {contact.lastName}
+                      </span>
+                      {contact.title && (
+                        <span className="text-xs text-gray-400 truncate max-w-[160px]">{contact.title}</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {contact.companyName && <span className="font-medium text-gray-600">{contact.companyName}</span>}
+                      {contact.companyName && contact.email && ' · '}
+                      {contact.email}
+                    </div>
+                    {contact.engagementSummary && (
+                      <p className="mt-0.5 text-xs font-medium text-indigo-700 truncate max-w-[260px]">
+                        {contact.engagementSummary}
+                      </p>
+                    )}
+                  </button>
+                </td>
+                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
+                  {formatDate(contact.lastSendDate)}
+                </td>
+                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
+                  {editingNextDate?.contactId === contact.id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={editingNextDate.value}
+                        onChange={(e) => setEditingNextDate(prev => prev ? { ...prev, value: e.target.value } : null)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                        disabled={savingDate}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => saveNextDate(contact.id)}
+                        disabled={savingDate}
+                        className="rounded p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
+                        title="Save"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEditNextDate}
+                        disabled={savingDate}
+                        className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+                        title="Cancel"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {formatDate(contact.nextSendDate)}
+                      {contact.isManualOverride && (
+                        <span className="ml-2 text-xs text-blue-600">(Manual)</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => startEditNextDate(contact)}
+                        className="ml-2 inline-flex rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600"
+                        title="Fix next follow-up date"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </td>
+                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
+                  {contact.emailCount} email{contact.emailCount !== 1 ? 's' : ''}
+                </td>
+                <td className="px-6 py-3 whitespace-nowrap">
+                  {getStatusBadge(contact)}
+                </td>
+                <td className="px-6 py-3 whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/contacts/${contact.id}`)}
+                    className="text-xs font-medium text-amber-600 hover:text-amber-700"
+                  >
+                    Open
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ));
 
   if (!companyHQId) {
     return (
@@ -206,7 +339,7 @@ function OutreachTrackerContent() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Outreach Tracker</h1>
-          <p className="text-gray-600">Track all contacts with email sends — chronological by follow-up date</p>
+          <p className="text-gray-600">Track sends and next touches — by date, with scheduled meetings called out.</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -371,6 +504,20 @@ function OutreachTrackerContent() {
               <option value="true">Yes</option>
               <option value="false">No</option>
             </select>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Next touch type
+            </label>
+            <select
+              value={filters.touchType}
+              onChange={(e) => handleFilterChange('touchType', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All — split meetings vs email</option>
+              <option value="meeting">Scheduled meetings only</option>
+              <option value="email">Email and other only</option>
+            </select>
+          </div>
           </div>
           <div className="flex items-end">
             <button
@@ -380,6 +527,7 @@ function OutreachTrackerContent() {
                 followUpDateFrom: '',
                 followUpDateTo: '',
                 hasResponded: '',
+                touchType: 'all',
               })}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
             >
@@ -427,125 +575,39 @@ function OutreachTrackerContent() {
               <div className="px-6 py-12 text-center text-gray-500">
                 No contacts found matching your filters.
               </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {contactsByDate.map(([dateKey, { label, contacts: groupContacts }]) => (
-                  <div key={dateKey ?? 'none'} className="overflow-hidden">
-                    <div className="flex items-center gap-2 bg-gray-50 px-6 py-3 text-sm font-semibold text-gray-700">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      {label}
-                    </div>
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50/60">
-                        <tr>
-                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Send</th>
-                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Follow-Up</th>
-                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emails</th>
-                          <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-2 w-10" />
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {groupContacts.map((contact) => (
-                          <tr key={contact.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-3">
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/contacts/${contact.id}`)}
-                                className="text-left"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-gray-900 hover:text-amber-600">
-                                    {contact.firstName} {contact.lastName}
-                                  </span>
-                                  {contact.title && (
-                                    <span className="text-xs text-gray-400 truncate max-w-[160px]">{contact.title}</span>
-                                  )}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {contact.companyName && <span className="font-medium text-gray-600">{contact.companyName}</span>}
-                                  {contact.companyName && contact.email && ' · '}
-                                  {contact.email}
-                                </div>
-                                {contact.engagementSummary && (
-                                  <p className="mt-0.5 text-xs font-medium text-indigo-700 truncate max-w-[260px]">
-                                    {contact.engagementSummary}
-                                  </p>
-                                )}
-                              </button>
-                            </td>
-                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                              {formatDate(contact.lastSendDate)}
-                            </td>
-                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                              {editingNextDate?.contactId === contact.id ? (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="date"
-                                    value={editingNextDate.value}
-                                    onChange={(e) => setEditingNextDate(prev => prev ? { ...prev, value: e.target.value } : null)}
-                                    className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                                    disabled={savingDate}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => saveNextDate(contact.id)}
-                                    disabled={savingDate}
-                                    className="rounded p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
-                                    title="Save"
-                                  >
-                                    <Check className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={cancelEditNextDate}
-                                    disabled={savingDate}
-                                    className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
-                                    title="Cancel"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <>
-                                  {formatDate(contact.nextSendDate)}
-                                  {contact.isManualOverride && (
-                                    <span className="ml-2 text-xs text-blue-600">(Manual)</span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => startEditNextDate(contact)}
-                                    className="ml-2 inline-flex rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600"
-                                    title="Fix next follow-up date"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                </>
-                              )}
-                            </td>
-                            <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                              {contact.emailCount} email{contact.emailCount !== 1 ? 's' : ''}
-                            </td>
-                            <td className="px-6 py-3 whitespace-nowrap">
-                              {getStatusBadge(contact)}
-                            </td>
-                            <td className="px-6 py-3 whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/contacts/${contact.id}`)}
-                                className="text-xs font-medium text-amber-600 hover:text-amber-700"
-                              >
-                                Open
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            ) : trackerLayout.mode === 'split' ? (
+              <div className="space-y-10">
+                <section>
+                  <h2 className="px-6 py-2 text-base font-semibold text-gray-900 bg-amber-50/80 border-b border-amber-100">
+                    Scheduled meetings
+                  </h2>
+                  <div className="divide-y divide-gray-100">
+                    {trackerLayout.meeting.length === 0 ? (
+                      <div className="px-6 py-8 text-center text-sm text-gray-500">
+                        No scheduled meetings on this page.
+                      </div>
+                    ) : (
+                      renderDateGroups(trackerLayout.meeting)
+                    )}
                   </div>
-                ))}
+                </section>
+                <section>
+                  <h2 className="px-6 py-2 text-base font-semibold text-gray-900 bg-gray-50 border-b border-gray-100">
+                    Email and other follow-ups
+                  </h2>
+                  <div className="divide-y divide-gray-100">
+                    {trackerLayout.email.length === 0 ? (
+                      <div className="px-6 py-8 text-center text-sm text-gray-500">
+                        No email follow-ups on this page.
+                      </div>
+                    ) : (
+                      renderDateGroups(trackerLayout.email)
+                    )}
+                  </div>
+                </section>
               </div>
+            ) : (
+              <div className="divide-y divide-gray-100">{renderDateGroups(trackerLayout.groups)}</div>
             )}
           </div>
         </>

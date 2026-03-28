@@ -287,6 +287,7 @@ export async function POST(request: Request) {
         nextEngagementDate: interpreted.nextEngagementDate,
         activityType: interpreted.activityType,
         activityDate: interpreted.activityDate,
+        hasScheduledMeeting: interpreted.hasScheduledMeeting,
       },
       interpretation: interpreted,
       contact: contact

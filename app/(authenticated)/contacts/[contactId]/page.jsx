@@ -1081,7 +1081,8 @@ export default function ContactDetailPage() {
                         {contact.nextEngagementPurpose === 'REFERRAL_NO_CONTACT' && 'Referral (no contact)'}
                         {contact.nextEngagementPurpose === 'FOLLOW_UP' && 'Follow-up'}
                         {contact.nextEngagementPurpose === 'MEETING_FOLLOW_UP' && 'Meeting follow-up'}
-                        {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT', 'FOLLOW_UP', 'MEETING_FOLLOW_UP'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
+                        {contact.nextEngagementPurpose === 'SCHEDULED_MEETING' && 'Scheduled meeting'}
+                        {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT', 'FOLLOW_UP', 'MEETING_FOLLOW_UP', 'SCHEDULED_MEETING'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
                       </span>
                     )}
                   </>
@@ -1118,6 +1119,7 @@ export default function ContactDetailPage() {
                   <option value="GENERAL_CHECK_IN">General check-in</option>
                   <option value="FOLLOW_UP">Follow-up</option>
                   <option value="MEETING_FOLLOW_UP">Meeting follow-up</option>
+                  <option value="SCHEDULED_MEETING">Scheduled meeting</option>
                   <option value="UNRESPONSIVE">Unresponsive</option>
                   <option value="PERIODIC_CHECK_IN">Periodic check-in</option>
                   <option value="REFERRAL_NO_CONTACT">Referral (no contact)</option>

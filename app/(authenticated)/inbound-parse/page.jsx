@@ -418,6 +418,9 @@ export default function InboundParsePage() {
           contactEmail: contactEmailOverride || parseResult.parsed?.contactEmail,
           contactName: contactNameOverride || parseResult.parsed?.contactName,
           nextEngagementDate: nextEngageOverride || parseResult.nextEngage?.recommended,
+          hasScheduledMeeting:
+            parseResult.parsed?.hasScheduledMeeting === true ||
+            parseResult.interpretation?.hasScheduledMeeting === true,
         };
       }
       const res = await api.post('/api/inbound-parse/push-to-ai', payload);
