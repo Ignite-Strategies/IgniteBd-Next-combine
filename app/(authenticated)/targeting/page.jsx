@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Target, Plus, RefreshCw, User, Building2, ExternalLink, Mail } from 'lucide-react';
+import { Target, Plus, RefreshCw, User, Building2, ExternalLink, Sparkles } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import PageHeader from '@/components/PageHeader.jsx';
 import TargetSubmissionModal from '@/components/targeting/TargetSubmissionModal.jsx';
+import OutreachBuilder from '@/components/outreach/OutreachBuilder.jsx';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,26 +36,9 @@ function displayName(t) {
   return t.fullName || [t.firstName, t.lastName].filter(Boolean).join(' ') || '—';
 }
 
-function EmailHint({ email }) {
-  const has = Boolean(email?.trim());
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-        has
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-          : 'border-amber-200 bg-amber-50 text-amber-800'
-      }`}
-      title={has ? email : 'Add email on the contact record'}
-    >
-      <Mail className="h-3 w-3" />
-      {has ? 'Email on file' : 'No email'}
-    </span>
-  );
-}
-
 // ─── Target Queue ──────────────────────────────────────────────────────────────
 
-function TargetQueue({ targets, loading, companyHQId }) {
+function TargetQueue({ targets, loading, companyHQId, onOpenOutreach }) {
   const router = useRouter();
 
   const goToContact = (t) => {
@@ -132,9 +116,26 @@ function TargetQueue({ targets, loading, companyHQId }) {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                <EmailHint email={t.email} />
                 <button
-                  onClick={() => goToContact(t)}
+                  type="button"
+                  disabled={!companyHQId}
+                  title={!companyHQId ? 'Company context required — open Target Cockpit with a company selected' : undefined}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!companyHQId) return;
+                    onOpenOutreach(t.id);
+                  }}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Build outreach
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToContact(t);
+                  }}
                   className="rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition"
                 >
                   Edit
@@ -144,6 +145,7 @@ function TargetQueue({ targets, loading, companyHQId }) {
                     href={t.linkedinUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                     title="Open LinkedIn (new tab)"
                   >
@@ -168,6 +170,7 @@ function TargetCockpitInner() {
   const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [outreachContactId, setOutreachContactId] = useState(null);
 
   // Wait for Firebase auth to resolve — auth.currentUser is null on first render
   useEffect(() => {
@@ -259,9 +262,34 @@ function TargetCockpitInner() {
             </button>
           </div>
 
-          <TargetQueue targets={targets} loading={loading} companyHQId={companyHQId} />
+          <TargetQueue
+            targets={targets}
+            loading={loading}
+            companyHQId={companyHQId}
+            onOpenOutreach={setOutreachContactId}
+          />
         </div>
       </div>
+
+      {outreachContactId && companyHQId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close outreach builder"
+            onClick={() => setOutreachContactId(null)}
+          />
+          <div className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+            <OutreachBuilder
+              key={outreachContactId}
+              contactId={outreachContactId}
+              companyHQId={companyHQId}
+              layout="modal"
+              onClose={() => setOutreachContactId(null)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Submission modal */}
       <TargetSubmissionModal
