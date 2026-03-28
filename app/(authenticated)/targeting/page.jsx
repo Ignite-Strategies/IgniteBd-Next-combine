@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Target, Plus, RefreshCw, User, Building2, ExternalLink, Sparkles, ArrowRight, UserCheck } from 'lucide-react';
+import { Target, Plus, RefreshCw, User, Building2, ExternalLink, Mail } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import PageHeader from '@/components/PageHeader.jsx';
 import TargetSubmissionModal from '@/components/targeting/TargetSubmissionModal.jsx';
@@ -35,26 +35,19 @@ function displayName(t) {
   return t.fullName || [t.firstName, t.lastName].filter(Boolean).join(' ') || '—';
 }
 
-function StatusBadge({ target }) {
-  if (target.outreachPersonaSlug) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
-        <Sparkles className="h-3 w-3" />
-        Ready
-      </span>
-    );
-  }
-  if (target.enrichmentFetchedAt) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-        <UserCheck className="h-3 w-3" />
-        Enriched
-      </span>
-    );
-  }
+function EmailHint({ email }) {
+  const has = Boolean(email?.trim());
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-      Needs setup
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+        has
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          : 'border-amber-200 bg-amber-50 text-amber-800'
+      }`}
+      title={has ? email : 'Add email on the contact record'}
+    >
+      <Mail className="h-3 w-3" />
+      {has ? 'Email on file' : 'No email'}
     </span>
   );
 }
@@ -135,19 +128,11 @@ function TargetQueue({ targets, loading, companyHQId }) {
                       </>
                     )}
                   </div>
-                  {t.outreachPersonaSlug && (
-                    <div className="mt-1">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
-                        <Sparkles className="h-3 w-3" />
-                        {t.outreachPersonaSlug}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                <StatusBadge target={t} />
+                <EmailHint email={t.email} />
                 <button
                   onClick={() => goToContact(t)}
                   className="rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition"
@@ -170,31 +155,6 @@ function TargetQueue({ targets, loading, companyHQId }) {
           ))}
         </div>
       ))}
-    </div>
-  );
-}
-
-// ─── Stats Bar ────────────────────────────────────────────────────────────────
-
-function StatsBar({ targets }) {
-  const total = targets.length;
-  const ready = targets.filter((t) => t.outreachPersonaSlug).length;
-  const needsSetup = total - ready;
-
-  return (
-    <div className="grid grid-cols-3 divide-x divide-gray-200">
-      <div className="px-6 py-4 text-center">
-        <p className="text-2xl font-bold text-gray-900">{total}</p>
-        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">In Queue</p>
-      </div>
-      <div className="px-6 py-4 text-center">
-        <p className="text-2xl font-bold text-purple-600">{ready}</p>
-        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Persona Ready</p>
-      </div>
-      <div className="px-6 py-4 text-center">
-        <p className="text-2xl font-bold text-amber-500">{needsSetup}</p>
-        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wide">Needs Setup</p>
-      </div>
     </div>
   );
 }
@@ -298,13 +258,6 @@ function TargetCockpitInner() {
               Refresh
             </button>
           </div>
-
-          {!loading && targets.length > 0 && (
-            <>
-              <StatsBar targets={targets} />
-              <div className="border-t border-gray-100" />
-            </>
-          )}
 
           <TargetQueue targets={targets} loading={loading} companyHQId={companyHQId} />
         </div>
