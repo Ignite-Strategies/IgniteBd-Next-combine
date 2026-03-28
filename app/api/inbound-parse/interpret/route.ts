@@ -285,9 +285,9 @@ export async function POST(request: Request) {
         isResponse: interpreted.isResponse,
         summary: interpreted.summary,
         nextEngagementDate: interpreted.nextEngagementDate,
+        nextEngagementPurpose: interpreted.nextEngagementPurpose ?? null,
         activityType: interpreted.activityType,
         activityDate: interpreted.activityDate,
-        hasScheduledMeeting: interpreted.hasScheduledMeeting,
       },
       interpretation: interpreted,
       contact: contact
@@ -306,6 +306,7 @@ export async function POST(request: Request) {
       alreadyIngested,
       nextEngage: {
         aiSuggested: interpreted.nextEngagementDate || null,
+        aiSuggestedPurpose: interpreted.nextEngagementPurpose ?? null,
         responseDefault: null,
         currentOnContact: currentNextEngage,
         currentPurpose: contact?.nextEngagementPurpose || null,

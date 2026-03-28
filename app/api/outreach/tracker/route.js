@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { cadenceDaysForDisposition } from '@/lib/services/engagementService';
+import { NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING } from '@/lib/constants/nextEngagementPurpose';
 
 /** Coerce Date, ISO string, or YYYY-MM-DD to ISO string; null/undefined → null. */
 function toISOStringSafe(val) {
@@ -97,14 +98,14 @@ export async function GET(request) {
     if (hasResponded === 'true')  contactWhere.lastEngagementType = 'CONTACT_RESPONSE';
     if (hasResponded === 'false') contactWhere.lastEngagementType = { not: 'CONTACT_RESPONSE' };
     if (touchType === 'meeting') {
-      contactWhere.nextEngagementPurpose = 'SCHEDULED_MEETING';
+      contactWhere.nextEngagementPurpose = NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING;
     } else if (touchType === 'email') {
       contactWhere.AND = [
         ...(contactWhere.AND || []),
         {
           OR: [
             { nextEngagementPurpose: null },
-            { nextEngagementPurpose: { not: 'SCHEDULED_MEETING' } },
+            { nextEngagementPurpose: { not: NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING } },
           ],
         },
       ];

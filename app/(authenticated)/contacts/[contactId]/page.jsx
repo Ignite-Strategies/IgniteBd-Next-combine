@@ -8,6 +8,10 @@ import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 import { formatDeliveryMethodLabel, DELIVERY_METHODS, normalizeDeliveryMethod } from '@/lib/utils/deliveryMethod';
 import { formatDateEST } from '@/lib/dateEst';
+import {
+  NEXT_ENGAGEMENT_PURPOSE_LABELS,
+  NEXT_ENGAGEMENT_PURPOSE_VALUES,
+} from '@/lib/constants/nextEngagementPurpose';
 // Display pipeline/stage from relation or snap; format for read-only view
 function formatPipelineLabel(pipeline) {
   if (!pipeline || pipeline === 'unassigned') return 'Unassigned';
@@ -1075,14 +1079,8 @@ export default function ContactDetailPage() {
                     </span>
                     {contact.nextEngagementPurpose && (
                       <span className="text-gray-500">
-                        {contact.nextEngagementPurpose === 'GENERAL_CHECK_IN' && 'General check-in'}
-                        {contact.nextEngagementPurpose === 'UNRESPONSIVE' && 'Unresponsive'}
-                        {contact.nextEngagementPurpose === 'PERIODIC_CHECK_IN' && 'Periodic check-in'}
-                        {contact.nextEngagementPurpose === 'REFERRAL_NO_CONTACT' && 'Referral (no contact)'}
-                        {contact.nextEngagementPurpose === 'FOLLOW_UP' && 'Follow-up'}
-                        {contact.nextEngagementPurpose === 'MEETING_FOLLOW_UP' && 'Meeting follow-up'}
-                        {contact.nextEngagementPurpose === 'SCHEDULED_MEETING' && 'Scheduled meeting'}
-                        {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT', 'FOLLOW_UP', 'MEETING_FOLLOW_UP', 'SCHEDULED_MEETING'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
+                        {NEXT_ENGAGEMENT_PURPOSE_LABELS[contact.nextEngagementPurpose] ||
+                          contact.nextEngagementPurpose}
                       </span>
                     )}
                   </>
@@ -1116,13 +1114,11 @@ export default function ContactDetailPage() {
                   className="rounded-lg border border-gray-300 px-2 py-1 text-sm min-w-[160px]"
                 >
                   <option value="">—</option>
-                  <option value="GENERAL_CHECK_IN">General check-in</option>
-                  <option value="FOLLOW_UP">Follow-up</option>
-                  <option value="MEETING_FOLLOW_UP">Meeting follow-up</option>
-                  <option value="SCHEDULED_MEETING">Scheduled meeting</option>
-                  <option value="UNRESPONSIVE">Unresponsive</option>
-                  <option value="PERIODIC_CHECK_IN">Periodic check-in</option>
-                  <option value="REFERRAL_NO_CONTACT">Referral (no contact)</option>
+                  {NEXT_ENGAGEMENT_PURPOSE_VALUES.map((v) => (
+                    <option key={v} value={v}>
+                      {NEXT_ENGAGEMENT_PURPOSE_LABELS[v]}
+                    </option>
+                  ))}
                 </select>
                 <button
                   type="button"

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Calendar, Pencil, Check, X, Send, Loader2, CheckCircle2 } from 'lucide-react';
 import api from '@/lib/api';
 import { getTodayEST, dayDiffEST, formatDateEST, formatDateLabelEST } from '@/lib/dateEst';
+import { NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING } from '@/lib/constants/nextEngagementPurpose';
 
 function OutreachTrackerContent() {
   const router = useRouter();
@@ -196,8 +197,12 @@ function OutreachTrackerContent() {
   const trackerLayout = useMemo(() => {
     const touch = filters.touchType || 'all';
     if (touch === 'all') {
-      const meetingContacts = contacts.filter((c) => c.nextEngagementPurpose === 'SCHEDULED_MEETING');
-      const emailContacts = contacts.filter((c) => c.nextEngagementPurpose !== 'SCHEDULED_MEETING');
+      const meetingContacts = contacts.filter(
+        (c) => c.nextEngagementPurpose === NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING,
+      );
+      const emailContacts = contacts.filter(
+        (c) => c.nextEngagementPurpose !== NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING,
+      );
       return {
         mode: 'split',
         meeting: buildDateGroups(meetingContacts),

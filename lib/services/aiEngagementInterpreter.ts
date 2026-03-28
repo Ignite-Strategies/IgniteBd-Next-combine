@@ -5,10 +5,14 @@
  * disposition, next steps. Does NOT do structural parsing (use universalEmailParser for that).
  *
  * Input: Parsed email (from universal parser) + owner context
- * Output: summary, isResponse, nextEngagementDate, contactEmail, contactName
+ * Output: summary, isResponse, nextEngagementDate, nextEngagementPurpose, contactEmail, contactName
  */
 
 import { OpenAI } from 'openai';
+import {
+  NEXT_ENGAGEMENT_PURPOSE_ENUM_FOR_PROMPT,
+  normalizeAiNextEngagementPurpose,
+} from '@/lib/constants/nextEngagementPurpose';
 
 export interface ParsedEmailInput {
   from?: string | null;
@@ -42,14 +46,14 @@ export interface EngagementInterpretation {
   contactEmail: string;
   contactName: string | null;
   nextEngagementDate: string | null; // ISO date "YYYY-MM-DD" or null
+  /** Suggested next touch purpose — must be one of NextEngagementPurpose or null. */
+  nextEngagementPurpose: string | null;
   inReplyTo: string | null;
   references: string[] | null;
   isResponse: boolean;
   summary: string; // 1-2 sentence summary of the interaction
   activityType: ActivityType; // What kind of activity this email describes
   activityDate: string | null; // ISO date "YYYY-MM-DD" of when the activity actually happened (may differ from email date)
-  /** True when the contact committed to a future meeting/call and nextEngagementDate is that event (inbound_email path). */
-  hasScheduledMeeting: boolean;
 }
 
 /**
@@ -93,6 +97,7 @@ export async function interpretEngagement(
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
+  const purposeList = NEXT_ENGAGEMENT_PURPOSE_ENUM_FOR_PROMPT;
 
   const contentBlock = [
     parsedEmail.subject ? `Subject: ${parsedEmail.subject}` : null,
@@ -120,6 +125,26 @@ ACTIVITY TYPE — Determine what kind of activity this email actually describes:
 
 ACTIVITY DATE — If the email describes an event that happened on a DIFFERENT date than today (e.g. "I spoke with him on Monday 3/2"), extract THAT date as activityDate. Today is ${todayStr}. If the event is happening now or no date is mentioned, set null.
 
+NEXT ENGAGEMENT PURPOSE — For activityType "inbound_email" or "outbound_email" (when there is a meaningful next touch), pick exactly ONE token from this list, OR null if no follow-up date / not applicable:
+${purposeList}
+
+Definitions (pick the best single match; use null if unsure or no next touch):
+- POST_WARM_MEETING_NUDGE — contact replied warmly; next step is to get a meeting on the calendar (not vague "catch up").
+- SCHEDULED_MEETING — contact agreed to a specific future meeting/call/video AND nextEngagementDate is that day; calendar invite / concrete time.
+- PURSUE_INTRO — thread is about getting an introduction or referral path.
+- NO_INTRO_REASON_FOLLOW_UP — intro did not happen or was declined; next touch is to understand why / unblock.
+- COMPETITOR_FOLLOW_UP — they say they are "all set" / happy with incumbent vendor; you still plan long-cycle re-engage (competitor/switching angle), often months out.
+- ONE_MORE_TOUCH — one deliberate extra attempt before backing off.
+- GENERAL_CHECK_IN — generic check-in when nothing more specific fits.
+- UNRESPONSIVE — use when interpreting outbound chase context or thread is "no reply yet" (owner logs may use note types; for inbound response analysis prefer other purposes if they replied).
+- PERIODIC_CHECK_IN — routine keep-warm / relationship maintenance.
+- REFERRAL_NO_CONTACT — referral pipeline, no contact with target yet.
+- MEETING_FOLLOW_UP — after a meeting happened; next touch is post-meeting follow-up.
+
+For call_note / meeting_note / note, set nextEngagementPurpose to null unless the note clearly implies one of the above for the NEXT touch.
+
+If activityType is not inbound_email, SCHEDULED_MEETING is almost always wrong (owner logs are not "contact scheduled a meeting" in the same sense).
+
 Interpret:
 1. Contact email — who is the prospect/target? (NOT the owner)
 2. Contact name — the prospect's name if visible. If the subject line looks like a person's name (short, no colon, not a typical email topic), treat it as the contact's name.
@@ -129,13 +154,13 @@ Interpret:
    - "follow up in 3-6 months" → midpoint (~4.5 months from today)
    - "later this year" → ~6 months from today
    - "next quarter" → 3 months from today
-   - Any specific date mentioned → use that date
+   - Any specific date mentioned for a meeting or callback → use that date
    - "not interested" with no follow-up → null
 6. isResponse — is the contact responding to the owner's outreach?
-7. Summary — 1-2 sentences WITH CONTEXT: what the contact said (e.g. buyer vs will-forward, interested vs not), disposition, and next steps. Include enough so we know if they're a buyer or just forwarding. Used for cadence logic.
+7. Summary — 1-2 sentences WITH CONTEXT: what the contact said (e.g. buyer vs will-forward, interested vs not), disposition, and next steps.
 8. activityType — one of: "inbound_email", "outbound_email", "call_note", "meeting_note", "note"
 9. activityDate — "YYYY-MM-DD" if the described event happened on a specific past date, else null
-10. hasScheduledMeeting — true ONLY when activityType is "inbound_email" AND the contact clearly agreed to or proposed a specific future meeting, call, or video chat on a date that you also put in nextEngagementDate (e.g. "let\'s meet April 9", "I\'ll send a calendar invite for Tuesday"). False for vague "let\'s connect soon" with no date. false for call_note/meeting_note (owner logs).
+10. nextEngagementPurpose — EXACTLY one of the listed tokens, or null. Must align with nextEngagementDate when a date is set (e.g. SCHEDULED_MEETING only with a concrete meeting day).
 
 Return EXACTLY this JSON:
 {
@@ -144,13 +169,13 @@ Return EXACTLY this JSON:
   "contactEmail": "prospect email, NOT owner",
   "contactName": "prospect name" or null,
   "nextEngagementDate": "YYYY-MM-DD" or null,
+  "nextEngagementPurpose": "TOKEN_FROM_LIST" or null,
   "inReplyTo": "Message-ID" or null,
   "references": ["Message-ID1"] or null,
   "isResponse": true or false,
   "summary": "1-2 sentences with context (what they said, buyer/forward, next step)",
   "activityType": "inbound_email" | "outbound_email" | "call_note" | "meeting_note" | "note",
-  "activityDate": "YYYY-MM-DD" or null,
-  "hasScheduledMeeting": true or false
+  "activityDate": "YYYY-MM-DD" or null
 }
 
 Return JSON only.`;
@@ -198,7 +223,7 @@ Return JSON only.`;
       activityType: result.activityType,
       activityDate: result.activityDate,
       hasNextEngagementDate: !!result.nextEngagementDate,
-      hasScheduledMeeting: result.hasScheduledMeeting,
+      nextEngagementPurpose: result.nextEngagementPurpose,
       isResponse: result.isResponse,
     });
 
@@ -242,6 +267,15 @@ function parseResponse(content: string): EngagementInterpretation {
       ? rawActivityDate
       : null;
 
+  const rawPurpose = d.nextEngagementPurpose ?? parsed.nextEngagementPurpose;
+  let nextEngagementPurpose = normalizeAiNextEngagementPurpose(rawPurpose);
+  if (
+    nextEngagementPurpose === 'SCHEDULED_MEETING' &&
+    activityType !== 'inbound_email'
+  ) {
+    nextEngagementPurpose = null;
+  }
+
   return {
     subject: String(d.subject ?? parsed.subject ?? ''),
     body: String(d.body ?? parsed.body ?? ''),
@@ -254,6 +288,7 @@ function parseResponse(content: string): EngagementInterpretation {
       typeof (d.nextEngagementDate ?? parsed.nextEngagementDate) === 'string'
         ? (d.nextEngagementDate ?? parsed.nextEngagementDate) as string
         : null,
+    nextEngagementPurpose,
     inReplyTo:
       typeof (d.inReplyTo ?? parsed.inReplyTo) === 'string'
         ? (d.inReplyTo ?? parsed.inReplyTo) as string
@@ -268,10 +303,5 @@ function parseResponse(content: string): EngagementInterpretation {
     summary: String(d.summary ?? parsed.summary ?? ''),
     activityType,
     activityDate,
-    hasScheduledMeeting: (() => {
-      if (activityType !== 'inbound_email') return false;
-      const v = d.hasScheduledMeeting ?? parsed.hasScheduledMeeting;
-      return v === true;
-    })(),
   };
 }

@@ -2048,13 +2048,17 @@ enum ContactDisposition {
 
 // Why we're engaging next. Set by cadence or remind-me; no free text.
 enum NextEngagementPurpose {
-  GENERAL_CHECK_IN      // User set date (remind-me) or generic follow-up
-  UNRESPONSIVE          // No response after last send → 7d
-  PERIODIC_CHECK_IN     // Responded + in category (e.g. connector/forwarded) → 7d
-  REFERRAL_NO_CONTACT   // Referral, no contact yet
-  FOLLOW_UP            // General follow-up (after email, call, etc.)
-  MEETING_FOLLOW_UP     // Post-meeting follow-up
-  SCHEDULED_MEETING     // Next touch is a scheduled meeting/call (date on calendar)
+  GENERAL_CHECK_IN           // User set date (remind-me) or generic check-in
+  UNRESPONSIVE               // No response — chase / still working the thread
+  PERIODIC_CHECK_IN          // Keep-warm cadence
+  REFERRAL_NO_CONTACT        // Referral path, no contact yet
+  POST_WARM_MEETING_NUDGE    // After warm reply — next touch is to lock a meeting (was FOLLOW_UP)
+  PURSUE_INTRO               // Trying to get an intro
+  NO_INTRO_REASON_FOLLOW_UP  // No intro — follow up to understand why
+  ONE_MORE_TOUCH             // Deliberate extra attempt
+  COMPETITOR_FOLLOW_UP      // Incumbent / all-set — long-cycle competitor angle
+  MEETING_FOLLOW_UP          // Post-meeting follow-up
+  SCHEDULED_MEETING          // Next touch is a dated calendar meeting/call
 }
 
 enum MeetingType {

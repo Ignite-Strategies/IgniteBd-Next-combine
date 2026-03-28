@@ -26,6 +26,10 @@ import { auth } from '@/lib/firebase';
 import CompanySelector from '@/components/CompanySelector';
 import { formatDateEST } from '@/lib/dateEst';
 import { useContactsContext } from '@/hooks/useContacts';
+import {
+  NEXT_ENGAGEMENT_PURPOSE_LABELS,
+  NEXT_ENGAGEMENT_PURPOSE_VALUES,
+} from '@/lib/constants/nextEngagementPurpose';
 
 function ContactsViewPageContent() {
   const router = useRouter();
@@ -620,10 +624,11 @@ function ContactsViewPageContent() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   >
                     <option value="">— Leave unchanged —</option>
-                    <option value="GENERAL_CHECK_IN">General check-in</option>
-                    <option value="UNRESPONSIVE">Unresponsive</option>
-                    <option value="PERIODIC_CHECK_IN">Periodic check-in</option>
-                    <option value="REFERRAL_NO_CONTACT">Referral (no contact)</option>
+                    {NEXT_ENGAGEMENT_PURPOSE_VALUES.map((v) => (
+                      <option key={v} value={v}>
+                        {NEXT_ENGAGEMENT_PURPOSE_LABELS[v]}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -869,11 +874,9 @@ function ContactsViewPageContent() {
                             {formatDateEST(contact.nextEngagementDate, { month: 'short', day: 'numeric', year: 'numeric' })}
                             {contact.nextEngagementPurpose && (
                               <span className="ml-1 text-amber-600">
-                                · {contact.nextEngagementPurpose === 'GENERAL_CHECK_IN' && 'General check-in'}
-                                {contact.nextEngagementPurpose === 'UNRESPONSIVE' && 'Unresponsive'}
-                                {contact.nextEngagementPurpose === 'PERIODIC_CHECK_IN' && 'Periodic check-in'}
-                                {contact.nextEngagementPurpose === 'REFERRAL_NO_CONTACT' && 'Referral (no contact)'}
-                                {!['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT'].includes(contact.nextEngagementPurpose) && contact.nextEngagementPurpose}
+                                ·{' '}
+                                {NEXT_ENGAGEMENT_PURPOSE_LABELS[contact.nextEngagementPurpose] ||
+                                  contact.nextEngagementPurpose}
                               </span>
                             )}
                           </span>

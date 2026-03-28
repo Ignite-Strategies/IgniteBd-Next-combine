@@ -17,6 +17,10 @@ import {
   User,
 } from 'lucide-react';
 import api from '@/lib/api';
+import {
+  NEXT_ENGAGEMENT_PURPOSE_LABELS,
+  NEXT_ENGAGEMENT_PURPOSE_VALUES,
+} from '@/lib/constants/nextEngagementPurpose';
 
 const ACTIVITY_TYPE_CONFIG = {
   inbound_email:  { label: 'Inbound Email',  color: 'bg-blue-100 text-blue-800' },
@@ -56,6 +60,7 @@ export default function InboundParsePage() {
   const [actionMessage, setActionMessage] = useState(null);
   const [parseResult, setParseResult] = useState(null);
   const [nextEngageOverride, setNextEngageOverride] = useState('');
+  const [nextEngagementPurposeOverride, setNextEngagementPurposeOverride] = useState('');
   const [contactEmailOverride, setContactEmailOverride] = useState('');
   const [contactNameOverride, setContactNameOverride] = useState('');
   const [contactIdOverride, setContactIdOverride] = useState(null);
@@ -240,6 +245,7 @@ export default function InboundParsePage() {
     setContactNameOverride('');
     setContactIdOverride(null);
     setNextEngageOverride('');
+    setNextEngagementPurposeOverride('');
     setSubjectOverride('');
     setSummaryOverride('');
     setRecordedContactId(null);
@@ -379,6 +385,11 @@ export default function InboundParsePage() {
         setNextEngageOverride(res.data.nextEngage?.recommended || '');
         setSubjectOverride(res.data.parsed?.subject || '');
         setSummaryOverride(res.data.parsed?.summary || '');
+        setNextEngagementPurposeOverride(
+          res.data.parsed?.nextEngagementPurpose ||
+            res.data.interpretation?.nextEngagementPurpose ||
+            '',
+        );
         if (res.data.alreadyIngested) {
           setActionMessage({
             type: 'error',
@@ -408,9 +419,16 @@ export default function InboundParsePage() {
     try {
       const payload = { inboundEmailId: selectedEmail.id };
       if (nextEngageOverride) payload.nextEngagementDate = nextEngageOverride;
+      if (nextEngagementPurposeOverride)
+        payload.nextEngagementPurpose = nextEngagementPurposeOverride;
       if (contactEmailOverride) payload.contactEmail = contactEmailOverride;
       if (contactIdOverride) payload.contactIdOverride = contactIdOverride;
       if (parseResult?.interpretation) {
+        const mergedPurpose =
+          nextEngagementPurposeOverride !== ''
+            ? nextEngagementPurposeOverride
+            : parseResult.interpretation?.nextEngagementPurpose ??
+              parseResult.parsed?.nextEngagementPurpose;
         payload.interpretation = {
           ...parseResult.interpretation,
           subject: subjectOverride || parseResult.parsed?.subject,
@@ -418,9 +436,9 @@ export default function InboundParsePage() {
           contactEmail: contactEmailOverride || parseResult.parsed?.contactEmail,
           contactName: contactNameOverride || parseResult.parsed?.contactName,
           nextEngagementDate: nextEngageOverride || parseResult.nextEngage?.recommended,
-          hasScheduledMeeting:
-            parseResult.parsed?.hasScheduledMeeting === true ||
-            parseResult.interpretation?.hasScheduledMeeting === true,
+          ...(mergedPurpose != null && mergedPurpose !== ''
+            ? { nextEngagementPurpose: mergedPurpose }
+            : {}),
         };
       }
       const res = await api.post('/api/inbound-parse/push-to-ai', payload);
@@ -438,10 +456,16 @@ export default function InboundParsePage() {
         : 'Saved (no contact linked — link later from contact)';
       const recordLabel = recordType || 'Activity';
       const summarySnip = parsed?.summary ? ` | ${parsed.summary.slice(0, 80)}` : '';
+      const purposeSnip =
+        parsed?.nextEngagementPurpose &&
+        (NEXT_ENGAGEMENT_PURPOSE_LABELS[parsed.nextEngagementPurpose] ||
+          parsed.nextEngagementPurpose);
       setActionMessage({
         type: 'success',
         text: parsed?.nextEngagementDate
-          ? `Saved → ${recordLabel}. ${contactLabel} · Next engage: ${parsed.nextEngagementDate}${summarySnip}`
+          ? `Saved → ${recordLabel}. ${contactLabel} · Next engage: ${parsed.nextEngagementDate}${
+              purposeSnip ? ` (${purposeSnip})` : ''
+            }${summarySnip}`
           : `Saved → ${recordLabel}. ${contactLabel}${summarySnip}`,
       });
       setTimeout(() => setActionMessage(null), 8000);
@@ -837,6 +861,21 @@ export default function InboundParsePage() {
                           />
                           <span className="text-xs text-gray-500">Updates contact when saved</span>
                         </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="text-gray-600 font-medium w-28">Next touch purpose:</label>
+                          <select
+                            value={nextEngagementPurposeOverride}
+                            onChange={(e) => setNextEngagementPurposeOverride(e.target.value)}
+                            className="px-2 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[220px] max-w-md"
+                          >
+                            <option value="">— (AI / default)</option>
+                            {NEXT_ENGAGEMENT_PURPOSE_VALUES.map((v) => (
+                              <option key={v} value={v}>
+                                {NEXT_ENGAGEMENT_PURPOSE_LABELS[v]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         {parseResult.parsed?.body && (
                           <div>
                             <span className="text-gray-600 font-medium">Body:</span>
@@ -1141,6 +1180,16 @@ export default function InboundParsePage() {
                             </span>
                           </div>
                         )}
+                        {parseResult.nextEngage?.aiSuggestedPurpose && (
+                          <div className="text-xs text-indigo-700">
+                            AI purpose:{' '}
+                            <span className="font-medium">
+                              {NEXT_ENGAGEMENT_PURPOSE_LABELS[
+                                parseResult.nextEngage.aiSuggestedPurpose
+                              ] || parseResult.nextEngage.aiSuggestedPurpose}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-2">
                           <label className="text-gray-600 font-medium">Set to:</label>
                           <input
@@ -1152,6 +1201,21 @@ export default function InboundParsePage() {
                           <span className="text-xs text-gray-500">
                             Will update contact when saved
                           </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="text-gray-600 font-medium">Purpose:</label>
+                          <select
+                            value={nextEngagementPurposeOverride}
+                            onChange={(e) => setNextEngagementPurposeOverride(e.target.value)}
+                            className="px-2 py-1 rounded border border-gray-300 text-sm flex-1 min-w-[220px] max-w-md"
+                          >
+                            <option value="">— (AI / default)</option>
+                            {NEXT_ENGAGEMENT_PURPOSE_VALUES.map((v) => (
+                              <option key={v} value={v}>
+                                {NEXT_ENGAGEMENT_PURPOSE_LABELS[v]}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     </div>

@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { universalEmailParser } from '@/lib/services/universalEmailParser';
 import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
+import {
+  NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING,
+  isValidNextEngagementPurpose,
+  normalizeAiNextEngagementPurpose,
+} from '@/lib/constants/nextEngagementPurpose';
 import { generateMeetingSummaryService } from '@/lib/services/generateMeetingSummaryService';
 import { syncEmailSummaryToLog } from '@/lib/services/emailToLogService';
 
@@ -12,7 +17,7 @@ import { syncEmailSummaryToLog } from '@/lib/services/emailToLogService';
  * Record: Parse (universal) → Interpret (AI, once) → Log activity → Stamp engagement.
  * Accepts optional preInterpreted to avoid double AI when UI already ran interpret.
  *
- * Body: { inboundEmailId, contactEmail?, contactIdOverride?, nextEngagementDate?, interpretation? }
+ * Body: { inboundEmailId, contactEmail?, contactIdOverride?, nextEngagementDate?, nextEngagementPurpose?, interpretation? }
  *
  * contactIdOverride: if provided, skips email-based find-or-create and directly links
  * the specified contact. Used when the user selected a name-match candidate in the UI.
@@ -42,6 +47,10 @@ export async function POST(request: Request) {
     const contactIdOverride =
       typeof body?.contactIdOverride === 'string' && body.contactIdOverride.trim()
         ? body.contactIdOverride.trim()
+        : null;
+    const nextEngagementPurposeTopLevel =
+      typeof body?.nextEngagementPurpose === 'string' && body.nextEngagementPurpose.trim()
+        ? body.nextEngagementPurpose.trim()
         : null;
     const preInterpreted = body?.interpretation ?? null;
 
@@ -110,15 +119,14 @@ export async function POST(request: Request) {
     });
 
     // ── 2. Interpret (AI, once — or use preInterpreted) ──
-    // Re-interpret if preInterpreted is missing the new activityType field
+    // Re-interpret if preInterpreted is missing activityType or nextEngagementPurpose key (old clients)
     let interpreted = preInterpreted;
-    if (
-      !interpreted ||
-      typeof interpreted !== 'object' ||
-      !interpreted.activityType ||
-      typeof (interpreted as { hasScheduledMeeting?: unknown }).hasScheduledMeeting !==
-        'boolean'
-    ) {
+    const interpretationComplete =
+      interpreted &&
+      typeof interpreted === 'object' &&
+      'activityType' in interpreted &&
+      'nextEngagementPurpose' in interpreted;
+    if (!interpretationComplete) {
       interpreted = await interpretEngagement(
         {
           from: parsed.from,
@@ -166,8 +174,30 @@ export async function POST(request: Request) {
 
     const effectiveNextEngagementDate =
       nextEngagementDateOverride || interpreted.nextEngagementDate || null;
-    const hasScheduledMeetingFlag =
-      (interpreted as { hasScheduledMeeting?: boolean }).hasScheduledMeeting === true &&
+
+    const purposeFromInterpretation = normalizeAiNextEngagementPurpose(
+      (interpreted as { nextEngagementPurpose?: unknown }).nextEngagementPurpose,
+    );
+    const purposeFromBodyTop = normalizeAiNextEngagementPurpose(nextEngagementPurposeTopLevel);
+    let effectiveNextEngagementPurpose =
+      purposeFromBodyTop || purposeFromInterpretation || null;
+
+    if (
+      effectiveNextEngagementPurpose &&
+      !isValidNextEngagementPurpose(effectiveNextEngagementPurpose)
+    ) {
+      effectiveNextEngagementPurpose = null;
+    }
+
+    if (effectiveNextEngagementDate && !effectiveNextEngagementPurpose) {
+      effectiveNextEngagementPurpose =
+        activityType === 'inbound_email'
+          ? 'POST_WARM_MEETING_NUDGE'
+          : 'GENERAL_CHECK_IN';
+    }
+
+    const isScheduledMeetingPurpose =
+      effectiveNextEngagementPurpose === NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING &&
       !!effectiveNextEngagementDate;
 
     // ── 4. Route by activity type ──
@@ -280,16 +310,12 @@ export async function POST(request: Request) {
           },
         });
 
-        if (effectiveNextEngagementDate) {
+        if (effectiveNextEngagementDate && effectiveNextEngagementPurpose) {
           await prisma.contact.update({
             where: { id: contactId },
             data: {
               nextEngagementDate: effectiveNextEngagementDate,
-              nextEngagementPurpose: hasScheduledMeetingFlag
-                ? 'SCHEDULED_MEETING'
-                : activityType === 'inbound_email'
-                  ? 'FOLLOW_UP'
-                  : 'GENERAL_CHECK_IN',
+              nextEngagementPurpose: effectiveNextEngagementPurpose,
             },
           });
         } else {
@@ -312,7 +338,7 @@ export async function POST(request: Request) {
       // Scheduled meeting from inbound — create Meeting row for /meetings upcoming (deduped)
       if (
         contactId &&
-        hasScheduledMeetingFlag &&
+        isScheduledMeetingPurpose &&
         activityType === 'inbound_email' &&
         effectiveNextEngagementDate
       ) {
@@ -426,7 +452,7 @@ export async function POST(request: Request) {
             stage: 'engaged-awaiting-response',
           };
         }
-        if (hasScheduledMeetingFlag && effectiveNextEngagementDate) {
+        if (isScheduledMeetingPurpose) {
           const contactQuick = await prisma.contact.findUnique({
             where: { id: contactId },
             select: { contactDisposition: true },
@@ -469,11 +495,11 @@ export async function POST(request: Request) {
         contactEmail: effectiveContactEmail,
         contactName: interpreted.contactName,
         nextEngagementDate: effectiveNextEngagementDate,
+        nextEngagementPurpose: effectiveNextEngagementPurpose,
         isResponse: interpreted.isResponse,
         summary: interpreted.summary,
         activityType,
         activityDate,
-        hasScheduledMeeting: hasScheduledMeetingFlag,
       },
     });
   } catch (error) {

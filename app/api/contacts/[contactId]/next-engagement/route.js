@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { NEXT_ENGAGEMENT_PURPOSE_VALUES } from '@/lib/constants/nextEngagementPurpose';
 
-const VALID_PURPOSES = ['GENERAL_CHECK_IN', 'UNRESPONSIVE', 'PERIODIC_CHECK_IN', 'REFERRAL_NO_CONTACT', 'FOLLOW_UP', 'MEETING_FOLLOW_UP', 'SCHEDULED_MEETING'];
+const VALID_PURPOSES = [...NEXT_ENGAGEMENT_PURPOSE_VALUES];
 
 /**
  * PATCH /api/contacts/[contactId]/next-engagement
