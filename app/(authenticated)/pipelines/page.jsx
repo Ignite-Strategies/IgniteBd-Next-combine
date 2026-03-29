@@ -1,6 +1,13 @@
 'use client';
 
-import { useMemo, useState, useEffect, Suspense } from 'react';
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  Suspense,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { usePipelinesContext } from './PipelinesContext';
@@ -21,6 +28,8 @@ const PIPELINE_ICONS = {
   collaborator: '🤝',
   institution: '🏛️',
 };
+
+const NO_STAGE_PIPELINES = ['unassigned', 'no-role'];
 
 const formatLabel = (value) =>
   value
@@ -44,41 +53,59 @@ function PipelinesPageContent() {
   const { pipelineConfig, hydrating } = usePipelinesContext();
   const [contacts, setContacts] = useState([]);
   const [contactsHydrating, setContactsHydrating] = useState(false);
-  
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkPipeline, setBulkPipeline] = useState('');
+  const [bulkStage, setBulkStage] = useState('');
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkFeedback, setBulkFeedback] = useState(null);
+  const selectAllRef = useRef(null);
+
   const pipelines = pipelineConfig?.pipelines ?? FALLBACK_PIPELINES;
   const pipelineKeys = Object.keys(pipelines);
   const [activePipeline, setActivePipeline] = useState(pipelineKeys[0] ?? 'prospect');
   const [selectedStage, setSelectedStage] = useState(null); // null = show all stages
 
-  // NO localStorage - always fetch from API
-  useEffect(() => {
+  const fetchContacts = useCallback(async () => {
     if (!companyHQId) {
       setContacts([]);
       return;
     }
 
-    const fetchContacts = async () => {
-      setContactsHydrating(true);
-      try {
-        console.log('🔄 Fetching contacts from API for pipelines, companyHQId:', companyHQId);
-        const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
-        if (response.data?.success && Array.isArray(response.data.contacts)) {
-          console.log('✅ Fetched contacts from API:', response.data.contacts.length);
-          setContacts(response.data.contacts);
-          // NO localStorage - API only
-        } else {
-          setContacts([]);
-        }
-      } catch (error) {
-        console.error('❌ Failed to fetch contacts from API', error);
+    setContactsHydrating(true);
+    try {
+      const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+      if (response.data?.success && Array.isArray(response.data.contacts)) {
+        setContacts(response.data.contacts);
+      } else {
         setContacts([]);
-      } finally {
-        setContactsHydrating(false);
       }
-    };
-
-    fetchContacts();
+    } catch (error) {
+      console.error('Failed to fetch contacts from API', error);
+      setContacts([]);
+    } finally {
+      setContactsHydrating(false);
+    }
   }, [companyHQId]);
+
+  useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [selectedStage, companyHQId]);
+
+  useEffect(() => {
+    if (selectedIds.length === 0) {
+      setBulkFeedback(null);
+      return;
+    }
+    setBulkPipeline(activePipeline);
+    const stages = pipelines[activePipeline] ?? [];
+    setBulkStage(stages[0] ?? '');
+    // Intentionally when selection count or pipeline tab changes — not when `pipelines` identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds.length, activePipeline]);
 
   const contactsByPipeline = useMemo(() => {
     return contacts.reduce((acc, contact) => {
@@ -108,10 +135,114 @@ function PipelinesPageContent() {
     return filtered;
   }, [allActiveContacts, selectedStage]);
   
-  // Reset stage filter when pipeline changes
   const handlePipelineChange = (pipelineId) => {
     setActivePipeline(pipelineId);
-    setSelectedStage(null); // Reset stage filter
+    setSelectedStage(null);
+    setSelectedIds([]);
+  };
+
+  const activeContactIds = useMemo(
+    () => activeContacts.map((c) => c.id).filter(Boolean),
+    [activeContacts],
+  );
+
+  const allRowsSelected =
+    activeContactIds.length > 0 && activeContactIds.every((id) => selectedIds.includes(id));
+
+  useEffect(() => {
+    const el = selectAllRef.current;
+    if (!el) return;
+    const some =
+      activeContactIds.some((id) => selectedIds.includes(id)) && !allRowsSelected;
+    el.indeterminate = some;
+  }, [activeContactIds, selectedIds, allRowsSelected]);
+
+  const toggleRowSelection = (id, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!id) return;
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAll = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (allRowsSelected) {
+      setSelectedIds([]);
+      return;
+    }
+    setSelectedIds([...activeContactIds]);
+  };
+
+  const handleBulkPipelineSelect = (pipelineId) => {
+    setBulkPipeline(pipelineId);
+    const stages = pipelines[pipelineId] ?? [];
+    setBulkStage(stages[0] ?? '');
+  };
+
+  const applyBulkPipeline = async () => {
+    if (!companyHQId || selectedIds.length === 0 || bulkSubmitting) return;
+    if (!bulkPipeline || !pipelineKeys.includes(bulkPipeline)) {
+      setBulkFeedback({ variant: 'error', text: 'Choose a pipeline.' });
+      return;
+    }
+
+    const needsStage = !NO_STAGE_PIPELINES.includes(bulkPipeline);
+    if (needsStage && !bulkStage) {
+      setBulkFeedback({ variant: 'error', text: 'Choose a stage for this pipeline.' });
+      return;
+    }
+
+    setBulkSubmitting(true);
+    setBulkFeedback(null);
+    try {
+      const payload = {
+        companyHQId,
+        contactIds: selectedIds,
+        pipeline: bulkPipeline,
+      };
+      if (needsStage) {
+        payload.stage = bulkStage;
+      }
+
+      const response = await api.post('/api/contacts/pipeline/bulk', payload);
+      const data = response.data;
+
+      if (!data?.success) {
+        setBulkFeedback({
+          variant: 'error',
+          text: data?.error || 'Bulk update failed',
+        });
+        return;
+      }
+
+      const failCount = typeof data.failed === 'number' ? data.failed : 0;
+      const okCount = typeof data.updated === 'number' ? data.updated : 0;
+      if (failCount > 0) {
+        setBulkFeedback({
+          variant: 'warn',
+          text: `Updated ${okCount} contact(s). ${failCount} could not be updated.`,
+        });
+      } else {
+        setBulkFeedback({
+          variant: 'success',
+          text: `Updated ${okCount} contact(s).`,
+        });
+      }
+
+      setSelectedIds([]);
+      await fetchContacts();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Bulk update failed';
+      setBulkFeedback({ variant: 'error', text: msg });
+    } finally {
+      setBulkSubmitting(false);
+    }
   };
 
   return (
@@ -223,10 +354,90 @@ function PipelinesPageContent() {
             </div>
           </div>
 
+          {selectedIds.length > 0 && (
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50/90 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+              <p className="text-sm font-semibold text-gray-900 sm:mr-2">
+                {selectedIds.length} selected — move to
+              </p>
+              <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Pipeline
+                <select
+                  value={bulkPipeline}
+                  onChange={(e) => handleBulkPipelineSelect(e.target.value)}
+                  className="mt-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  {pipelineKeys.map((id) => (
+                    <option key={id} value={id}>
+                      {formatLabel(id)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {(pipelines[bulkPipeline]?.length ?? 0) > 0 && (
+                <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Stage
+                  <select
+                    value={bulkStage}
+                    onChange={(e) => setBulkStage(e.target.value)}
+                    className="mt-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    {(pipelines[bulkPipeline] ?? []).map((stageId) => (
+                      <option key={stageId} value={stageId}>
+                        {formatLabel(stageId)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <div className="flex flex-wrap gap-2 sm:ml-auto">
+                <button
+                  type="button"
+                  onClick={applyBulkPipeline}
+                  disabled={bulkSubmitting || !companyHQId}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {bulkSubmitting ? 'Applying…' : 'Apply'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Clear selection
+                </button>
+              </div>
+            </div>
+          )}
+
+          {bulkFeedback && (
+            <p
+              className={`mb-4 text-sm ${
+                bulkFeedback.variant === 'error'
+                  ? 'text-red-700'
+                  : bulkFeedback.variant === 'warn'
+                    ? 'text-amber-800'
+                    : 'text-green-800'
+              }`}
+            >
+              {bulkFeedback.text}
+            </p>
+          )}
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="w-10 px-2 py-3 text-left">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      checked={allRowsSelected}
+                      onChange={toggleSelectAll}
+                      disabled={activeContactIds.length === 0}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      aria-label="Select all contacts in this view"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                     Contact
                   </th>
@@ -244,7 +455,7 @@ function PipelinesPageContent() {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {activeContacts.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-gray-500" colSpan={4}>
+                    <td className="px-4 py-10 text-center text-sm text-gray-500" colSpan={5}>
                       No contacts assigned to this pipeline yet.
                     </td>
                   </tr>
@@ -255,10 +466,13 @@ function PipelinesPageContent() {
                     const displayName = contact.goesBy ||
                       [contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
                       'Unnamed Contact';
+                    const rowSelected = contact.id && selectedIds.includes(contact.id);
                     return (
                       <tr
                         key={contact.id}
-                        className="group cursor-pointer transition-all hover:bg-indigo-50 hover:shadow-sm"
+                        className={`group cursor-pointer transition-all hover:bg-indigo-50 hover:shadow-sm ${
+                          rowSelected ? 'bg-indigo-50/50' : ''
+                        }`}
                         onClick={(e) => {
                           e.preventDefault();
                           if (contact.id) {
@@ -266,6 +480,19 @@ function PipelinesPageContent() {
                           }
                         }}
                       >
+                        <td
+                          className="px-2 py-3"
+                          onClick={(e) => toggleRowSelection(contact.id, e)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(rowSelected)}
+                            readOnly
+                            tabIndex={-1}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            aria-label={`Select ${displayName}`}
+                          />
+                        </td>
                         <td className="px-4 py-3 text-sm font-medium">
                           <span className="text-gray-900 group-hover:text-indigo-600 group-hover:underline transition-colors">
                             {displayName}

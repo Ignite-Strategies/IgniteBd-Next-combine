@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
-import { validatePipeline, snapPipelineOnContact } from '@/lib/services/pipelineService';
-import { applyPipelineTriggers } from '@/lib/services/PipelineTriggerService';
+import { applyContactPipelineUpdate } from '@/lib/services/contactPipelineApply';
 
 /**
  * PUT /api/contacts/[contactId]/pipeline
@@ -53,85 +52,27 @@ export async function PUT(request, { params }) {
     const body = await request.json();
     const { pipeline, stage } = body ?? {};
 
-    // Validate required fields
-    if (!pipeline) {
+    const result = await applyContactPipelineUpdate(contactId, { pipeline, stage });
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, error: 'pipeline is required' },
+        { success: false, error: result.error },
         { status: 400 },
       );
     }
 
-    // Stage is optional for 'unassigned' and 'no-role' pipelines, required for others
-    const noStagePipelines = ['unassigned', 'no-role'];
-    if (!noStagePipelines.includes(pipeline) && !stage) {
-      return NextResponse.json(
-        { success: false, error: 'stage is required for this pipeline' },
-        { status: 400 },
-      );
-    }
-
-    // Validate pipeline and stage values
-    const stageToValidate = noStagePipelines.includes(pipeline) ? null : stage;
-    const validation = validatePipeline(pipeline, stageToValidate);
-    if (!validation.isValid) {
-      return NextResponse.json(
-        { success: false, error: validation.error },
-        { status: 400 },
-      );
-    }
-
-    // Check if pipeline exists
-    const existingPipeline = await prisma.pipelines.findUnique({
-      where: { contactId },
-    });
-
-    // Check for pipeline conversion triggers (prospect → client)
-    const convertedContact = await applyPipelineTriggers(contactId, pipeline, stage);
-    if (convertedContact) {
+    if (result.converted) {
       return NextResponse.json({
         success: true,
-        contact: convertedContact,
+        contact: result.contact,
         converted: true,
-        pipeline: convertedContact.pipelines || convertedContact.pipeline,
+        pipeline: result.pipeline,
       });
     }
 
-    // Generate UUID for new pipeline
-    const { randomUUID } = await import('crypto');
-    const pipelineId = existingPipeline?.id || randomUUID();
-
-    // Upsert pipeline
-    const stageValue = noStagePipelines.includes(pipeline) ? null : stage;
-    
-    const updatedPipeline = await prisma.pipelines.upsert({
-      where: { contactId },
-      update: {
-        pipeline,
-        stage: stageValue,
-      },
-      create: {
-        id: pipelineId,
-        pipeline,
-        stage: stageValue,
-        contacts: { connect: { id: contactId } },
-      },
-    });
-
-    await snapPipelineOnContact(contactId, pipeline, stageValue);
-
-    // Re-fetch contact with pipeline to return complete data
-    const contactWithPipeline = await prisma.contact.findUnique({
-      where: { id: contactId },
-      include: {
-        pipelines: true,
-        companies: true,
-      },
-    });
-
     return NextResponse.json({
       success: true,
-      pipeline: updatedPipeline,
-      contact: contactWithPipeline,
+      pipeline: result.pipeline,
+      contact: result.contact,
     });
   } catch (error) {
     console.error('❌ UpdatePipeline error:', error);
