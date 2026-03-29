@@ -15,6 +15,7 @@ import {
   X,
   ExternalLink,
   FileText,
+  Wand2,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -125,6 +126,8 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
   const [allPersonas, setAllPersonas] = useState([]);
   const [selectedPersonaSlug, setSelectedPersonaSlug] = useState(null);
   const [savingPersona, setSavingPersona] = useState(false);
+  const [suggestingPersona, setSuggestingPersona] = useState(false);
+  const [personaSuggestion, setPersonaSuggestion] = useState(null); // { slug, reasoning, confidence, relationshipContext }
 
   // ── Templates ──
   const [templates, setTemplates] = useState([]);
@@ -216,7 +219,42 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
       .catch(() => {});
   }, [contactId, companyHQId]);
 
-  // ── Persist persona to contact ──
+  // ── AI persona suggestion (calls service which auto-persists) ──
+  const handleSuggestPersona = async () => {
+    setSuggestingPersona(true);
+    setPersonaSuggestion(null);
+    try {
+      const res = await api.post(`/api/contacts/${contactId}/suggest-persona`, {});
+      if (res.data?.success) {
+        setPersonaSuggestion({
+          slug: res.data.suggestedPersonaSlug,
+          reasoning: res.data.reasoning,
+          confidence: res.data.confidence,
+          relationshipContext: res.data.relationshipContext,
+        });
+        // Sync relationship context to contact state if returned
+        if (res.data.relationshipContext) {
+          setContact((prev) => ({ ...prev, relationship_contexts: res.data.relationshipContext }));
+        }
+      } else {
+        setError(res.data?.error || 'Could not suggest a persona');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Persona suggestion failed');
+    } finally {
+      setSuggestingPersona(false);
+    }
+  };
+
+  // ── Accept AI suggestion (already persisted by service, just sync local state) ──
+  const handleAcceptSuggestion = () => {
+    if (!personaSuggestion?.slug) return;
+    setSelectedPersonaSlug(personaSuggestion.slug);
+    setContact((prev) => ({ ...prev, outreachPersonaSlug: personaSuggestion.slug }));
+    setPersonaSuggestion(null);
+  };
+
+  // ── Manual persona override — persist via PUT ──
   const handlePersonaChange = async (slug) => {
     setSelectedPersonaSlug(slug || null);
     setSavingPersona(true);
@@ -346,31 +384,108 @@ export default function OutreachBuilder({ contactId, companyHQId, layout, onClos
   const selectedPersona = allPersonas.find((p) => p.slug === selectedPersonaSlug);
   const personaDisplayName = selectedPersona?.name || (selectedPersonaSlug ? humanize(selectedPersonaSlug.replace(/([A-Z])/g, ' $1').trim()) : null);
 
-  // ─── Persona selector block ───────────────────────────────────────────────────
+  // ─── Persona block (AI-first) ─────────────────────────────────────────────────
   const personaSection = (
-    <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4 shadow-sm">
-      <div className="flex items-center gap-2 mb-2">
-        <Tag className="h-3.5 w-3.5 text-purple-500 shrink-0" />
-        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Outreach Persona</span>
-        {savingPersona && <RefreshCw className="h-3 w-3 animate-spin text-purple-400" />}
-        {!savingPersona && selectedPersonaSlug && <Check className="h-3 w-3 text-green-500" />}
+    <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4 shadow-sm space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Tag className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Outreach Persona</span>
+          {savingPersona && <RefreshCw className="h-3 w-3 animate-spin text-purple-400" />}
+          {!savingPersona && selectedPersonaSlug && !personaSuggestion && (
+            <Check className="h-3 w-3 text-green-500" />
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleSuggestPersona}
+          disabled={suggestingPersona}
+          className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
+          {suggestingPersona ? (
+            <>
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              Analyzing…
+            </>
+          ) : (
+            <>
+              <Wand2 className="h-3 w-3" />
+              {selectedPersonaSlug ? 'Re-analyze' : 'Suggest Persona'}
+            </>
+          )}
+        </button>
       </div>
-      <select
-        value={selectedPersonaSlug || ''}
-        onChange={(e) => handlePersonaChange(e.target.value || null)}
-        disabled={savingPersona}
-        className="w-full rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:opacity-50"
-      >
-        <option value="">— No persona selected —</option>
-        {allPersonas.map((p) => (
-          <option key={p.slug} value={p.slug}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      {!selectedPersonaSlug && (
-        <p className="mt-1.5 text-xs text-purple-600">
-          Choosing a persona improves tone, email style, and template matching.
+
+      {/* Current persona display */}
+      {selectedPersonaSlug && !personaSuggestion && (
+        <p className="text-sm font-medium text-purple-800">
+          {personaDisplayName}
+        </p>
+      )}
+
+      {/* AI suggestion card */}
+      {personaSuggestion && (
+        <div className="rounded-lg border border-purple-200 bg-white px-3 py-3 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">AI Suggestion</p>
+              <p className="text-sm font-semibold text-purple-800">
+                {allPersonas.find((p) => p.slug === personaSuggestion.slug)?.name ||
+                  humanize((personaSuggestion.slug || '').replace(/([A-Z])/g, ' $1').trim())}
+              </p>
+              {typeof personaSuggestion.confidence === 'number' && (
+                <p className="text-xs text-gray-400 mt-0.5">{personaSuggestion.confidence}% confidence</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPersonaSuggestion(null)}
+              className="shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-600"
+              aria-label="Dismiss suggestion"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {personaSuggestion.reasoning && (
+            <p className="text-xs text-gray-600 italic">{personaSuggestion.reasoning}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleAcceptSuggestion}
+            disabled={!personaSuggestion.slug}
+            className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50 transition"
+          >
+            <Check className="h-3 w-3" />
+            Accept
+          </button>
+        </div>
+      )}
+
+      {/* Manual override */}
+      {!personaSuggestion && (
+        <div>
+          <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide font-semibold">
+            {selectedPersonaSlug ? 'Override manually' : 'Or choose manually'}
+          </p>
+          <select
+            value={selectedPersonaSlug || ''}
+            onChange={(e) => handlePersonaChange(e.target.value || null)}
+            disabled={savingPersona}
+            className="w-full rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:opacity-50"
+          >
+            <option value="">— No persona —</option>
+            {allPersonas.map((p) => (
+              <option key={p.slug} value={p.slug}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {!selectedPersonaSlug && !personaSuggestion && (
+        <p className="text-xs text-purple-600">
+          Persona drives tone, email style, and template matching — suggest one from engagement history above.
         </p>
       )}
     </div>

@@ -469,22 +469,13 @@ export default function ContactDetailPage() {
     setGeneratingRelationshipContext(true);
     try {
       const response = await api.post(`/api/contacts/${contactId}/suggest-persona`, {
-        note: editingNotes ? notesText : undefined, // Use current notes text if editing
+        note: editingNotes ? notesText : undefined,
       });
       
       if (response.data?.success && response.data.relationshipContext) {
-        const ctx = response.data.relationshipContext;
-        setRelationshipContext(ctx);
-        // Persist to relationship_contexts so it survives refresh
-        try {
-          await api.put(`/api/contacts/${contactId}`, { relationshipContext: ctx });
-          if (refreshContacts) refreshContacts();
-        } catch (putErr) {
-          console.error('Failed to save relationship context:', putErr);
-          alert('Context generated but could not save. You can save it manually below.');
-          return;
-        }
-        // Success feedback so user knows it was saved
+        // Service already persisted to DB — just update local state and refresh
+        setRelationshipContext(response.data.relationshipContext);
+        if (refreshContacts) refreshContacts();
         alert('Relationship context generated and saved.');
       } else {
         alert(response.data?.error || 'Failed to generate relationship context');
@@ -500,29 +491,13 @@ export default function ContactDetailPage() {
   const handleApplySuggestedPersona = async () => {
     if (!personaSuggestion?.suggestedPersonaSlug || !contactId) return;
     
-    setSavingPersona(true);
-    try {
-      const response = await api.put(`/api/contacts/${contactId}`, {
-        outreachPersonaSlug: personaSuggestion.suggestedPersonaSlug,
-      });
-      
-      if (response.data?.success) {
-        setContact(response.data.contact);
-        setSelectedPersonaSlug(personaSuggestion.suggestedPersonaSlug);
-        setShowPersonaSuggestionModal(false);
-        setPersonaSuggestion(null);
-        if (refreshContacts) {
-          refreshContacts();
-        }
-      } else {
-        alert(response.data?.error || 'Failed to apply persona');
-      }
-    } catch (error) {
-      console.error('Error applying persona:', error);
-      alert(error.response?.data?.error || 'Failed to apply persona');
-    } finally {
-      setSavingPersona(false);
-    }
+    // The suggest-persona service already wrote outreachPersonaSlug to the DB.
+    // Just update local state and close the modal.
+    setSelectedPersonaSlug(personaSuggestion.suggestedPersonaSlug);
+    setContact((prev) => ({ ...prev, outreachPersonaSlug: personaSuggestion.suggestedPersonaSlug }));
+    setShowPersonaSuggestionModal(false);
+    setPersonaSuggestion(null);
+    if (refreshContacts) refreshContacts();
   };
 
   const handleSavePersonaTemplate = async () => {
@@ -2120,7 +2095,7 @@ export default function ContactDetailPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Engagement history</h3>
               <div className="flex items-center gap-2">
-                {!editingNotes && (contact?.notes || notesText.trim()) && (
+                {!editingNotes && (contact?.notes || notesText.trim() || engagementLog.length > 0 || contact?.contactSummary) && (
                   <>
                     <button
                       onClick={handleSuggestPersona}
