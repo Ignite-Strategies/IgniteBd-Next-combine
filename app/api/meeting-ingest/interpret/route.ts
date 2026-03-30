@@ -91,9 +91,9 @@ export async function POST(request: Request) {
       firstName: string | null;
       lastName: string | null;
       email: string | null;
-      company: string | null;
+      companyName: string | null;
       title: string | null;
-      pipeline: string | null;
+      pipelineSnap: string | null;
     };
 
     let contact: ContactRow | null = null;
@@ -108,9 +108,9 @@ export async function POST(request: Request) {
           firstName: true,
           lastName: true,
           email: true,
-          company: true,
+          companyName: true,
           title: true,
-          pipeline: true,
+          pipelineSnap: true,
         },
       });
       if (found) contact = found;
@@ -151,8 +151,8 @@ export async function POST(request: Request) {
               firstName: true,
               lastName: true,
               email: true,
-              company: true,
-              pipeline: true,
+              companyName: true,
+              pipelineSnap: true,
             },
             take: 5,
           });
@@ -160,8 +160,8 @@ export async function POST(request: Request) {
             id: c.id,
             name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Unknown',
             email: c.email,
-            company: c.company,
-            pipeline: c.pipeline,
+            company: c.companyName,
+            pipeline: c.pipelineSnap,
           }));
         }
       }
@@ -183,9 +183,9 @@ export async function POST(request: Request) {
             id: contact.id,
             name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || null,
             email: contact.email,
-            company: contact.company,
+            company: contact.companyName,
             title: contact.title,
-            pipeline: contact.pipeline,
+            pipeline: contact.pipelineSnap,
           }
         : null,
       nameMatches,
