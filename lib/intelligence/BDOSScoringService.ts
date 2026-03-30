@@ -113,8 +113,7 @@ export async function calculateBDOSScore(
       prisma.contact.findUnique({
         where: { id: contactId },
         include: {
-          company: true, // Universal company relation
-          contactCompany: true, // Legacy relation for backward compatibility
+          companies: true,
         },
       }),
       prisma.product.findUnique({
@@ -123,10 +122,9 @@ export async function calculateBDOSScore(
       prisma.contact.findUnique({
         where: { id: contactId },
         include: {
-          company: true,
-          contactCompany: true,
+          companies: true,
         },
-      }).then(c => c?.company || c?.contactCompany || null), // Prefer company, fallback to contactCompany
+      }).then((c) => c?.companies || null),
       personaId
         ? prisma.personas.findUnique({
             where: { id: personaId },
@@ -176,7 +174,8 @@ export async function calculateBDOSScore(
       [contact.firstName, contact.lastName].filter(Boolean).join(' ') ||
       'Unknown';
     const contactRole = contact.title || 'Not specified';
-    const contactOrg = contact.company?.companyName || contact.contactCompany?.companyName || 'Not specified';
+    const contactOrg =
+      contact.companies?.companyName || contact.companyName || 'Not specified';
 
     const promptData: BDOSPromptData = {
       personaFit,

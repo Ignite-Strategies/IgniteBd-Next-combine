@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       email: string | null;
       companyName: string | null;
       title: string | null;
-      pipeline: string | null;
+      pipelineSnap: string | null;
       nextEngagementDate: string | null;
       nextEngagementPurpose: string | null;
       lastEngagementDate: Date | null;
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
             email: contact.email,
             company: contact.companyName,
             title: contact.title,
-            pipeline: contact.pipeline,
+            pipeline: contact.pipelineSnap,
             optedOut: contact.contactDisposition === 'OPTED_OUT',
           }
         : null,

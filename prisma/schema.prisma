@@ -2059,6 +2059,7 @@ enum NextEngagementPurpose {
   COMPETITOR_FOLLOW_UP      // Incumbent / all-set — long-cycle competitor angle
   MEETING_FOLLOW_UP          // Post-meeting follow-up
   SCHEDULED_MEETING          // Next touch is a dated calendar meeting/call
+  DECLINED_NURTURE           // Prospect passed / chose another vendor — polite long-cycle check-in (relationship, not displacement pitch)
 }
 
 enum MeetingType {

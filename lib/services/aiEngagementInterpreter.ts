@@ -128,18 +128,20 @@ ACTIVITY DATE — If the email describes an event that happened on a DIFFERENT d
 NEXT ENGAGEMENT PURPOSE — For activityType "inbound_email" or "outbound_email" (when there is a meaningful next touch), pick exactly ONE token from this list, OR null if no follow-up date / not applicable:
 ${purposeList}
 
-Definitions (pick the best single match; use null if unsure or no next touch):
-- POST_WARM_MEETING_NUDGE — contact replied warmly; next step is to get a meeting on the calendar (not vague "catch up").
-- SCHEDULED_MEETING — contact agreed to a specific future meeting/call/video AND nextEngagementDate is that day; calendar invite / concrete time.
+Definitions (pick the best single match; use null if unsure or no next touch). Every token must be one of: ${purposeList}
+
+- GENERAL_CHECK_IN — generic next touch; nothing more specific fits.
+- UNRESPONSIVE — chase / no reply yet (usually outbound context).
+- PERIODIC_CHECK_IN — routine keep-warm / relationship maintenance on a cadence.
+- REFERRAL_NO_CONTACT — referral path; no direct contact with the target yet.
+- POST_WARM_MEETING_NUDGE — contact replied warmly; next step is to lock a meeting (not vague "catch up").
 - PURSUE_INTRO — thread is about getting an introduction or referral path.
-- NO_INTRO_REASON_FOLLOW_UP — intro did not happen or was declined; next touch is to understand why / unblock.
-- COMPETITOR_FOLLOW_UP — they say they are "all set" / happy with incumbent vendor; you still plan long-cycle re-engage (competitor/switching angle), often months out.
+- NO_INTRO_REASON_FOLLOW_UP — intro did not happen or stalled; next touch is to understand why / unblock.
 - ONE_MORE_TOUCH — one deliberate extra attempt before backing off.
-- GENERAL_CHECK_IN — generic check-in when nothing more specific fits.
-- UNRESPONSIVE — use when interpreting outbound chase context or thread is "no reply yet" (owner logs may use note types; for inbound response analysis prefer other purposes if they replied).
-- PERIODIC_CHECK_IN — routine keep-warm / relationship maintenance.
-- REFERRAL_NO_CONTACT — referral pipeline, no contact with target yet.
-- MEETING_FOLLOW_UP — after a meeting happened; next touch is post-meeting follow-up.
+- COMPETITOR_FOLLOW_UP — they are "all set" with an incumbent or happy with current provider; long-cycle re-engage with a competitor/displacement angle (months out). NOT for "they picked another firm over us."
+- MEETING_FOLLOW_UP — a meeting already occurred and the next touch is normal post-meeting follow-through (status, materials, agreed next step). Do NOT use this when the substance of the message is "they passed / went with someone else."
+- SCHEDULED_MEETING — concrete future meeting/call on the calendar; nextEngagementDate must be that day.
+- DECLINED_NURTURE — they explicitly passed on your firm, chose another provider, or are not moving forward with you, BUT the owner still wants a polite relationship touch later (e.g. 3–6 months). Use with an aggressive nextEngagementDate (midpoint if a range is given). If they asked for no further contact or hard stop, use null for purpose and date.
 
 For call_note / meeting_note / note, set nextEngagementPurpose to null unless the note clearly implies one of the above for the NEXT touch.
 
@@ -155,7 +157,8 @@ Interpret:
    - "later this year" → ~6 months from today
    - "next quarter" → 3 months from today
    - Any specific date mentioned for a meeting or callback → use that date
-   - "not interested" with no follow-up → null
+   - Hard "stop / unsubscribe / do not contact" → null date and null purpose
+   - They declined you but a future polite check-in is implied → pick a future date and set nextEngagementPurpose to DECLINED_NURTURE
 6. isResponse — is the contact responding to the owner's outreach?
 7. Summary — 1-2 sentences WITH CONTEXT: what the contact said (e.g. buyer vs will-forward, interested vs not), disposition, and next steps.
 8. activityType — one of: "inbound_email", "outbound_email", "call_note", "meeting_note", "note"
