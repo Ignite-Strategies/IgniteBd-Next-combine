@@ -18,6 +18,7 @@ import {
   applyInboundPipelineMatchProposal,
   suggestInboundPipelineMatch,
 } from '@/lib/services/inboundPipelineMatchService';
+import { coerceNextEngagementPurposeForPostgres } from '@/lib/services/nextEngagementPurposeDb';
 
 /**
  * POST /api/inbound-parse/push-to-ai
@@ -239,6 +240,12 @@ export async function POST(request: Request) {
       effectiveNextEngagementPurpose === NEXT_ENGAGEMENT_PURPOSE_SCHEDULED_MEETING &&
       !!effectiveNextEngagementDate;
 
+    const purposeForContactEmailPath = effectiveNextEngagementPurpose
+      ? await coerceNextEngagementPurposeForPostgres(prisma, effectiveNextEngagementPurpose)
+      : null;
+
+    let nextEngagementPurposeForResponse: string | null = purposeForContactEmailPath;
+
     // ── 4. Route by activity type ──
     const isMeetingOrCall =
       activityType === 'call_note' || activityType === 'meeting_note';
@@ -289,6 +296,12 @@ export async function POST(request: Request) {
         }
       }
 
+      const meetingFollowUpPurpose = await coerceNextEngagementPurposeForPostgres(
+        prisma,
+        'MEETING_FOLLOW_UP',
+      );
+      nextEngagementPurposeForResponse = meetingFollowUpPurpose;
+
       // Update contact engagement
       await prisma.contact.update({
         where: { id: contactId },
@@ -298,7 +311,9 @@ export async function POST(request: Request) {
           ...(effectiveNextEngagementDate
             ? {
                 nextEngagementDate: effectiveNextEngagementDate,
-                nextEngagementPurpose: 'MEETING_FOLLOW_UP',
+                ...(meetingFollowUpPurpose
+                  ? { nextEngagementPurpose: meetingFollowUpPurpose }
+                  : {}),
               }
             : {}),
         },
@@ -349,12 +364,12 @@ export async function POST(request: Request) {
           },
         });
 
-        if (effectiveNextEngagementDate && effectiveNextEngagementPurpose) {
+        if (effectiveNextEngagementDate && purposeForContactEmailPath) {
           await prisma.contact.update({
             where: { id: contactId },
             data: {
               nextEngagementDate: effectiveNextEngagementDate,
-              nextEngagementPurpose: effectiveNextEngagementPurpose,
+              nextEngagementPurpose: purposeForContactEmailPath,
             },
           });
         } else {
@@ -564,7 +579,8 @@ export async function POST(request: Request) {
         contactEmail: effectiveContactEmail,
         contactName: interpreted.contactName,
         nextEngagementDate: effectiveNextEngagementDate,
-        nextEngagementPurpose: effectiveNextEngagementPurpose,
+        nextEngagementPurpose:
+          nextEngagementPurposeForResponse ?? effectiveNextEngagementPurpose,
         isResponse: interpreted.isResponse,
         summary: interpreted.summary,
         activityType,
