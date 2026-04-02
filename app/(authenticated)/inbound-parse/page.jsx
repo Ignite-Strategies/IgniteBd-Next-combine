@@ -76,6 +76,8 @@ export default function InboundParsePage() {
   const [applyPipelineMatch, setApplyPipelineMatch] = useState(false);
   const [inboundSaveComplete, setInboundSaveComplete] = useState(false);
   const [showOriginalEmail, setShowOriginalEmail] = useState(true);
+  /** After Save all: structured summary + next actions (matcher UI is cleared). */
+  const [lastInboundSave, setLastInboundSave] = useState(null);
 
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
@@ -264,6 +266,7 @@ export default function InboundParsePage() {
     setInboundSaveComplete(false);
     setShowOriginalEmail(true);
     setApplyPipelineMatch(false);
+    setLastInboundSave(null);
   };
 
   const resetMeetingDetailState = () => {
@@ -468,25 +471,35 @@ export default function InboundParsePage() {
       );
       setInboundSaveComplete(true);
       if (companyHQId) fetchInboundEmails(companyHQId, inboundTab);
-      const contactLabel = parsed?.contactEmail
-        ? `Contact: ${parsed.contactEmail}`
-        : contactId
-        ? 'Contact linked'
-        : 'No contact linked (activity saved — link later)';
+
       const recordLabel = recordType || 'Activity';
-      const summarySnip = parsed?.summary ? ` · ${parsed.summary.slice(0, 80)}` : '';
       const purposeSnip =
         parsed?.nextEngagementPurpose &&
         (NEXT_ENGAGEMENT_PURPOSE_LABELS[parsed.nextEngagementPurpose] ||
           parsed.nextEngagementPurpose);
-      setActionMessage({
-        type: 'success',
-        text: parsed?.nextEngagementDate
-          ? `Saved · ${recordLabel} · ${contactLabel} · Next engage: ${parsed.nextEngagementDate}${
-              purposeSnip ? ` (${purposeSnip})` : ''
-            }${summarySnip}`
-          : `Saved · ${recordLabel} · ${contactLabel}${summarySnip}`,
+
+      setLastInboundSave({
+        recordType: recordLabel,
+        contactEmail: parsed?.contactEmail || null,
+        nextEngagementDate: parsed?.nextEngagementDate || null,
+        purposeLabel: purposeSnip || null,
+        summarySnippet: parsed?.summary ? parsed.summary.slice(0, 240) : null,
+        contactId: contactId || null,
+        subject: selectedEmail?.subject || null,
       });
+
+      setParseResult(null);
+      setContactEmailOverride('');
+      setContactNameOverride('');
+      setContactIdOverride(null);
+      setNextEngageOverride('');
+      setNextEngagementPurposeOverride('');
+      setSubjectOverride('');
+      setSummaryOverride('');
+      setSelectedContactEmailHistory(null);
+      setApplyPipelineMatch(false);
+      setShowOriginalEmail(false);
+      setActionMessage(null);
     } catch (err) {
       setActionMessage({
         type: 'error',
@@ -767,77 +780,185 @@ export default function InboundParsePage() {
             )}
             {selectedEmail && (
               <div className="border rounded-lg p-6 bg-white">
-                {/* Action bar */}
+                {/* Action bar — minimal after save (matcher hidden; use next steps below) */}
                 <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
-                  <h3 className="text-lg font-semibold">Email Details</h3>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowRaw(!showRaw)}
-                        className="text-sm text-blue-600 hover:underline"
-                      >
-                        {showRaw ? 'Show Parsed' : 'Show Raw'}
-                      </button>
-                      <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer border-l border-gray-200 pl-3">
-                        <input
-                          type="checkbox"
-                          checked={generatePipelineMatch}
-                          onChange={(e) => setGeneratePipelineMatch(e.target.checked)}
-                          disabled={inboundAlreadyRecorded}
-                        />
-                        Pipeline match
-                      </label>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3 ml-1">
-                      <button
-                        type="button"
-                        onClick={handleParseAndSave}
-                        disabled={
-                          analyzeLoading || !hasContent || inboundAlreadyRecorded
-                        }
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="AI-parse this email (no save yet). Review steps below, then Save all."
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        {analyzeLoading ? 'Parsing…' : 'Parse'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        disabled={deleteLoading}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
-                        title="Permanently delete this inbound email record."
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {deleteLoading ? 'Deleting…' : 'Delete'}
-                      </button>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-semibold">Email Details</h3>
+                    {inboundSaveComplete && (
+                      <span className="text-xs font-semibold uppercase tracking-wide text-green-800 bg-green-100 border border-green-200 px-2 py-0.5 rounded">
+                        Recorded
+                      </span>
+                    )}
                   </div>
+                  {!inboundSaveComplete && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowRaw(!showRaw)}
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          {showRaw ? 'Show Parsed' : 'Show Raw'}
+                        </button>
+                        <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer border-l border-gray-200 pl-3">
+                          <input
+                            type="checkbox"
+                            checked={generatePipelineMatch}
+                            onChange={(e) => setGeneratePipelineMatch(e.target.checked)}
+                            disabled={inboundAlreadyRecorded}
+                          />
+                          Pipeline match
+                        </label>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3 ml-1">
+                        <button
+                          type="button"
+                          onClick={handleParseAndSave}
+                          disabled={
+                            analyzeLoading || !hasContent || inboundAlreadyRecorded
+                          }
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="AI-parse this email (no save yet). Review steps below, then Save all."
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          {analyzeLoading ? 'Parsing…' : 'Parse'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDelete}
+                          disabled={deleteLoading}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                          title="Permanently delete this inbound email record."
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {deleteLoading ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {inboundSaveComplete && (
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={deleteLoading}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 border border-red-100"
+                      title="Remove this inbound copy from the queue (CRM activity stays saved)."
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {deleteLoading ? 'Deleting…' : 'Delete inbound copy'}
+                    </button>
+                  )}
                 </div>
 
-                {/* Action message */}
-                {actionMessage && (
-                  <div
-                    className={`mb-4 px-3 py-2 rounded text-sm border ${
-                      actionMessage.type === 'success'
-                        ? 'bg-green-50 text-green-900 border-green-200 sticky top-0 z-10 shadow-sm'
-                        : 'bg-red-50 text-red-800 border-red-100'
-                    }`}
-                  >
+                {/* Transient errors / success (lookup, etc.) — not the main Save all success card */}
+                {actionMessage && actionMessage.type === 'error' && (
+                  <div className="mb-4 px-3 py-2 rounded text-sm border bg-red-50 text-red-800 border-red-100">
                     {actionMessage.text}
                   </div>
                 )}
+                {actionMessage &&
+                  actionMessage.type === 'success' &&
+                  !inboundSaveComplete && (
+                    <div className="mb-4 px-3 py-2 rounded text-sm border bg-green-50 text-green-900 border-green-200">
+                      {actionMessage.text}
+                    </div>
+                  )}
 
-                {/* View Contact link (shown after successful Record Activity) */}
-                {recordedContactId && (
-                  <a
-                    href={`/contacts/${recordedContactId}`}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:underline mb-4"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                    View Contact
-                  </a>
+                {/* Post-save: collapsed summary + next steps (matcher cleared) */}
+                {inboundSaveComplete && lastInboundSave && (
+                  <div className="mb-4 rounded-xl border border-green-200 bg-gradient-to-b from-green-50 to-white p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="h-9 w-9 text-green-600 shrink-0" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-green-900">Saved to CRM</p>
+                        <p className="text-sm text-gray-800 mt-0.5">
+                          <span className="font-medium">{lastInboundSave.recordType}</span>
+                          {lastInboundSave.subject && (
+                            <span className="text-gray-600"> · {lastInboundSave.subject}</span>
+                          )}
+                        </p>
+                        <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                          {lastInboundSave.contactEmail && (
+                            <li>
+                              <span className="text-gray-500">Contact</span>{' '}
+                              {lastInboundSave.contactEmail}
+                            </li>
+                          )}
+                          {(lastInboundSave.nextEngagementDate || lastInboundSave.purposeLabel) && (
+                            <li>
+                              <span className="text-gray-500">Next engage</span>{' '}
+                              {lastInboundSave.nextEngagementDate || '—'}
+                              {lastInboundSave.purposeLabel
+                                ? ` (${lastInboundSave.purposeLabel})`
+                                : ''}
+                            </li>
+                          )}
+                          {lastInboundSave.summarySnippet && (
+                            <li className="text-gray-600 line-clamp-3">{lastInboundSave.summarySnippet}</li>
+                          )}
+                        </ul>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedEmail(null);
+                              resetDetailState();
+                              if (companyHQId) fetchInboundEmails(companyHQId, 'inbox');
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                          >
+                            Process next email
+                          </button>
+                          {(recordedContactId || lastInboundSave.contactId) && (
+                            <a
+                              href={`/contacts/${recordedContactId || lastInboundSave.contactId}`}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                              View contact
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInboundTab('recorded');
+                              setSelectedEmail(null);
+                              resetDetailState();
+                              if (companyHQId) fetchInboundEmails(companyHQId, 'recorded');
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                          >
+                            Open Saved tab
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedEmail(null);
+                              resetDetailState();
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:underline"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {selectedEmail && (
+                      <details className="mt-3 rounded-lg border border-gray-200 bg-white/80">
+                        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">
+                          View original email
+                        </summary>
+                        <div className="border-t border-gray-100 px-3 py-2 max-h-56 overflow-auto text-xs text-gray-700 whitespace-pre-wrap">
+                          {selectedEmail.text ||
+                            (selectedEmail.html
+                              ? selectedEmail.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+                              : null) ||
+                            (selectedEmail.email ? `${selectedEmail.email.slice(0, 6000)}${selectedEmail.email.length > 6000 ? '…' : ''}` : null) ||
+                            '(No body stored)'}
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 )}
 
                 {/* Email activity matcher — editable fields then Save */}
@@ -1338,8 +1459,9 @@ export default function InboundParsePage() {
                   </div>
                 )}
 
-                {/* Raw / Parsed email view */}
-                {(showOriginalEmail || !parseResult) &&
+                {/* Raw / Parsed email view (hidden after save — use View original in success card) */}
+                {!inboundSaveComplete &&
+                  (showOriginalEmail || !parseResult) &&
                   (showRaw ? (
                   <div className="space-y-4">
                     {selectedEmail.email && (
