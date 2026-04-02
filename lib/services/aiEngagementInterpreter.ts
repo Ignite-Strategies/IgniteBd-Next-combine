@@ -40,6 +40,9 @@ export type ActivityType =
   | 'meeting_note'    // Owner logging an in-person or video meeting
   | 'note';           // General update/note with no specific activity type
 
+/** Default next-touch offset for forwarded proof-of-send outbound (no explicit timing in email). */
+const OUTBOUND_PROOF_DEFAULT_FOLLOWUP_DAYS = 7;
+
 /** Add calendar days to an ISO date string (YYYY-MM-DD), UTC-safe for CRM date-only fields. */
 function addDaysIsoDate(isoDate: string, days: number): string {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -105,7 +108,7 @@ export async function interpretEngagement(
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const oneWeekFromToday = addDaysIsoDate(todayStr, 7);
+  const oneWeekFromToday = addDaysIsoDate(todayStr, OUTBOUND_PROOF_DEFAULT_FOLLOWUP_DAYS);
   const purposeList = NEXT_ENGAGEMENT_PURPOSE_ENUM_FOR_PROMPT;
 
   const contentBlock = [
@@ -269,7 +272,7 @@ function applyOutboundProofFollowUpDefaults(
   if (result.nextEngagementDate) return;
   const p = result.nextEngagementPurpose;
   if (p && p !== 'GENERAL_CHECK_IN' && p !== 'UNRESPONSIVE') return;
-  result.nextEngagementDate = addDaysIsoDate(todayStr, 7);
+  result.nextEngagementDate = addDaysIsoDate(todayStr, OUTBOUND_PROOF_DEFAULT_FOLLOWUP_DAYS);
   result.nextEngagementPurpose = 'UNRESPONSIVE';
 }
 
