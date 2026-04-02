@@ -1071,6 +1071,13 @@ export default function InboundParsePage() {
                         {generatePipelineMatch && parseResult.pipelineMatch && (
                           <div className="rounded-lg border border-violet-200 bg-violet-50/80 p-3 text-xs space-y-2">
                             <p className="font-semibold text-violet-900">Pipeline match (preview)</p>
+                            <p className="text-violet-800/90 leading-snug">
+                              This pass only suggests a <strong>pipeline/stage change</strong> when the email
+                              looks like a <strong>referral or connector handoff</strong> (introducing someone,
+                              &ldquo;not the buyer,&rdquo; forward to X). Normal check-ins and buyer
+                              conversations usually show <strong>no suggestion</strong> — that is expected.
+                              Scheduled-meeting bumps use a separate rule on save.
+                            </p>
                             <div className="text-violet-800 space-y-1">
                               <p>
                                 Role: {parseResult.pipelineMatch.signals?.roleHint ?? '—'} · Referral:{' '}
@@ -1084,7 +1091,10 @@ export default function InboundParsePage() {
                                   — {parseResult.pipelineMatch.proposal.rationale}
                                 </p>
                               ) : (
-                                <p className="text-gray-600">No pipeline change suggested.</p>
+                                <p className="text-gray-700">
+                                  No connector/referral move suggested for this email — your pipeline row is
+                                  unchanged unless you move it elsewhere in CRM.
+                                </p>
                               )}
                             </div>
                             <label className="inline-flex items-center gap-2 cursor-pointer text-violet-900">
@@ -1094,7 +1104,7 @@ export default function InboundParsePage() {
                                 onChange={(e) => setApplyPipelineMatch(e.target.checked)}
                                 disabled={!parseResult.pipelineMatch.proposal}
                               />
-                              Apply suggestion when saving (e.g. move to connector)
+                              Apply suggestion when saving (only when a suggestion appears above)
                             </label>
                           </div>
                         )}
