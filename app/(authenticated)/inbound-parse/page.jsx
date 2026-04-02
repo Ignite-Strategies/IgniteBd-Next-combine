@@ -988,6 +988,17 @@ export default function InboundParsePage() {
                       <p className="text-xs text-indigo-800/90 mb-3">
                         Becomes the email activity and timeline summary when you save.
                       </p>
+                      {parseResult.parsed?.activityType === 'outbound_email' && (
+                        <p className="text-xs text-amber-950 bg-amber-50 border border-amber-200 rounded px-2 py-2 mb-3 leading-snug">
+                          <span className="font-semibold">Outbound / proof-of-send:</span> This looks
+                          like a forwarded copy of their outbound to a prospect (e.g. &ldquo;see I sent
+                          this&rdquo;). We default the next touch to about{' '}
+                          <strong>one week</strong> with purpose{' '}
+                          <strong>Unresponsive</strong> — meaning assume the prospect may not have
+                          replied yet; follow up then. Change the date or purpose if your process
+                          differs.
+                        </p>
+                      )}
                       <div className="space-y-3 text-sm">
                         <div className="flex flex-wrap items-center gap-2">
                           <label className="text-gray-600 font-medium w-28">Contact Name:</label>

@@ -40,6 +40,14 @@ export type ActivityType =
   | 'meeting_note'    // Owner logging an in-person or video meeting
   | 'note';           // General update/note with no specific activity type
 
+/** Add calendar days to an ISO date string (YYYY-MM-DD), UTC-safe for CRM date-only fields. */
+function addDaysIsoDate(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
 export interface EngagementInterpretation {
   subject: string;
   body: string;
@@ -97,6 +105,7 @@ export async function interpretEngagement(
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
+  const oneWeekFromToday = addDaysIsoDate(todayStr, 7);
   const purposeList = NEXT_ENGAGEMENT_PURPOSE_ENUM_FOR_PROMPT;
 
   const contentBlock = [
@@ -122,6 +131,13 @@ ACTIVITY TYPE — Determine what kind of activity this email actually describes:
 - "call_note": The owner is logging/reporting a phone call they had with the contact. Signals: "I spoke with", "called", "on the phone", "spoke to him/her", "had a call"
 - "meeting_note": The owner is logging an in-person or video meeting. Signals: "met with", "had a meeting", "sat down with", "meeting with"
 - "note": A general update or context note with no specific email/call/meeting
+
+OUTBOUND PROOF / RECEIPT (VERY COMMON) — Someone on the team (often the same person) forwards to the CRM inbox a copy of THEIR OWN outbound to a prospect — to log "I sent this" / proof of initial outreach (Fwd:, "see below", "my send to X", original message shows FROM sender TO prospect, no prospect reply in this thread). For this pattern:
+- classify as activityType "outbound_email" (the substantive activity is the outbound to the prospect).
+- isResponse MUST be false (the prospect has not replied in what this thread shows).
+- The contact is the prospect (recipient of that outbound), not the forwarder.
+- If there is no explicit follow-up timing in the email, set nextEngagementDate to ${oneWeekFromToday} (7 calendar days after today) and nextEngagementPurpose to UNRESPONSIVE — meaning "we assume the prospect may not have replied yet; next touch is a check-in / chase after ~1 week." If the email explicitly says a different follow-up window (e.g. 2 weeks), use that instead.
+- If the thread clearly shows the prospect already replied, this is NOT outbound proof — use inbound_email and isResponse true.
 
 ACTIVITY DATE — If the email describes an event that happened on a DIFFERENT date than today (e.g. "I spoke with him on Monday 3/2"), extract THAT date as activityDate. Today is ${todayStr}. If the event is happening now or no date is mentioned, set null.
 
@@ -203,6 +219,7 @@ Return JSON only.`;
     if (!content) throw new Error('No response from OpenAI');
 
     const result = parseResponse(content);
+    applyOutboundProofFollowUpDefaults(result, todayStr);
 
     // Fallback: if AI didn't return contactEmail, use parsed from/to + owner
     if (!result.contactEmail && ownerContext?.email) {
@@ -237,6 +254,23 @@ Return JSON only.`;
       `Failed to interpret engagement: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
+}
+
+/**
+ * Forwarded "proof of send" outbound emails often omit a next date. Default: +7d + UNRESPONSIVE
+ * (assume prospect may not have replied yet; chase in ~1 week).
+ */
+function applyOutboundProofFollowUpDefaults(
+  result: EngagementInterpretation,
+  todayStr: string,
+): void {
+  if (result.activityType !== 'outbound_email') return;
+  if (result.isResponse) return;
+  if (result.nextEngagementDate) return;
+  const p = result.nextEngagementPurpose;
+  if (p && p !== 'GENERAL_CHECK_IN' && p !== 'UNRESPONSIVE') return;
+  result.nextEngagementDate = addDaysIsoDate(todayStr, 7);
+  result.nextEngagementPurpose = 'UNRESPONSIVE';
 }
 
 function parseResponse(content: string): EngagementInterpretation {
