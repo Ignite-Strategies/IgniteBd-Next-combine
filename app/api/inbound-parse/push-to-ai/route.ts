@@ -64,6 +64,7 @@ export async function POST(request: Request) {
     const preInterpreted = body?.interpretation ?? null;
     const generatePipelineMatch = body?.generatePipelineMatch === true;
     const applyPipelineMatch = body?.applyPipelineMatch === true;
+    const updateContactProfile = body?.updateContactProfile === true;
 
     if (!inboundEmailId || typeof inboundEmailId !== 'string') {
       return NextResponse.json(
@@ -384,6 +385,41 @@ export async function POST(request: Request) {
             await prisma.contact.update({
               where: { id: contactId },
               data: { nextEngagementDate: null, nextEngagementPurpose: null },
+            });
+          }
+        }
+
+        if (updateContactProfile) {
+          const rawProfEmail = (
+            typeof body?.newContactEmail === 'string' && body.newContactEmail.trim()
+              ? body.newContactEmail
+              : effectiveContactEmail || ''
+          )
+            .trim()
+            .toLowerCase();
+          if (rawProfEmail.includes('@')) {
+            const at = rawProfEmail.indexOf('@');
+            const derivedDomain = at > 0 ? rawProfEmail.slice(at + 1) : null;
+            const explicitCompany =
+              typeof body?.newCompanyName === 'string' && body.newCompanyName.trim()
+                ? body.newCompanyName.trim()
+                : null;
+            const fromInterpretation =
+              typeof (interpreted as { contactCompany?: unknown }).contactCompany ===
+                'string' && (interpreted as { contactCompany: string }).contactCompany.trim()
+                ? (interpreted as { contactCompany: string }).contactCompany.trim()
+                : null;
+            const resolvedCompanyName = explicitCompany || fromInterpretation;
+
+            await prisma.contact.update({
+              where: { id: contactId },
+              data: {
+                email: rawProfEmail,
+                ...(resolvedCompanyName ? { companyName: resolvedCompanyName } : {}),
+                ...(derivedDomain ? { companyDomain: derivedDomain } : {}),
+                recentJobChange: true,
+                numberOfJobChanges: { increment: 1 },
+              },
             });
           }
         }

@@ -51,11 +51,24 @@ function addDaysIsoDate(isoDate: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** Infer outbound/received email calendar day from RFC Date header (UTC date slice). */
+function extractDateHeaderIso(parsedEmail: ParsedEmailInput): string | null {
+  const h = parsedEmail.headers;
+  if (!h) return null;
+  const m = /^Date:\s*(.+)$/im.exec(h);
+  if (!m) return null;
+  const d = new Date(m[1].trim());
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 export interface EngagementInterpretation {
   subject: string;
   body: string;
   contactEmail: string;
   contactName: string | null;
+  /** Company/firm name for the contact when visible (e.g. signature line). */
+  contactCompany: string | null;
   nextEngagementDate: string | null; // ISO date "YYYY-MM-DD" or null
   /** Suggested next touch purpose — must be one of NextEngagementPurpose or null. */
   nextEngagementPurpose: string | null;
@@ -108,7 +121,11 @@ export async function interpretEngagement(
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const oneWeekFromToday = addDaysIsoDate(todayStr, OUTBOUND_PROOF_DEFAULT_FOLLOWUP_DAYS);
+  const emailSendHintStr = extractDateHeaderIso(parsedEmail) || todayStr;
+  const oneWeekFromSendHint = addDaysIsoDate(
+    emailSendHintStr,
+    OUTBOUND_PROOF_DEFAULT_FOLLOWUP_DAYS,
+  );
   const purposeList = NEXT_ENGAGEMENT_PURPOSE_ENUM_FOR_PROMPT;
 
   const contentBlock = [
@@ -139,10 +156,11 @@ OUTBOUND PROOF / RECEIPT (VERY COMMON) — Someone on the team (often the same p
 - classify as activityType "outbound_email" (the substantive activity is the outbound to the prospect).
 - isResponse MUST be false (the prospect has not replied in what this thread shows).
 - The contact is the prospect (recipient of that outbound), not the forwarder.
-- If there is no explicit follow-up timing in the email, set nextEngagementDate to ${oneWeekFromToday} (7 calendar days after today) and nextEngagementPurpose to UNRESPONSIVE — meaning "we assume the prospect may not have replied yet; next touch is a check-in / chase after ~1 week." If the email explicitly says a different follow-up window (e.g. 2 weeks), use that instead.
+- If there is no explicit follow-up timing in the email, set nextEngagementDate to ${oneWeekFromSendHint} (7 calendar days after the outbound SEND date — use activityDate when it reflects that send, otherwise use the email Date header day ${emailSendHintStr}, never "today when someone parses in the UI") and nextEngagementPurpose to UNRESPONSIVE — meaning "we assume the prospect may not have replied yet; next touch is a check-in / chase after ~1 week from send." If the email explicitly says a different follow-up window (e.g. 2 weeks), use that instead.
 - If the thread clearly shows the prospect already replied, this is NOT outbound proof — use inbound_email and isResponse true.
 
 ACTIVITY DATE — If the email describes an event that happened on a DIFFERENT date than today (e.g. "I spoke with him on Monday 3/2"), extract THAT date as activityDate. Today is ${todayStr}. If the event is happening now or no date is mentioned, set null.
+For activityType "outbound_email" (proof-of-send): when the thread is logging an outbound the owner already sent, set activityDate to the calendar day that outbound was sent when inferrable (Date header, "Sent: …", or forwarded metadata), so follow-up dates can anchor to send time — not to when someone later parses the email.
 
 NEXT ENGAGEMENT PURPOSE — For activityType "inbound_email" or "outbound_email" (when there is a meaningful next touch), pick exactly ONE token from this list, OR null if no follow-up date / not applicable:
 ${purposeList}
@@ -161,6 +179,7 @@ Definitions (pick the best single match; use null if unsure or no next touch). E
 - MEETING_FOLLOW_UP — a meeting already occurred and the next touch is normal post-meeting follow-through (status, materials, agreed next step). Do NOT use this when the substance of the message is "they passed / went with someone else."
 - SCHEDULED_MEETING — concrete future meeting/call on the calendar; nextEngagementDate must be that day.
 - DECLINED_NURTURE — they explicitly passed on your firm, chose another provider, or are not moving forward with you, BUT the owner still wants a polite relationship touch later (e.g. 3–6 months). Use with an aggressive nextEngagementDate (midpoint if a range is given). If they asked for no further contact or hard stop, use null for purpose and date.
+- NEW_JOB_CHECK_IN — contact shows a new employer, new role, or "joined X" signal in signature or body; treat next touch as a fresh opportunity at the new firm (not a routine GENERAL_CHECK_IN).
 
 For call_note / meeting_note / note, set nextEngagementPurpose to null unless the note clearly implies one of the above for the NEXT touch.
 
@@ -169,6 +188,7 @@ If activityType is not inbound_email, SCHEDULED_MEETING is almost always wrong (
 Interpret:
 1. Contact email — who is the prospect/target? (NOT the owner)
 2. Contact name — the prospect's name if visible. If the subject line looks like a person's name (short, no colon, not a typical email topic), treat it as the contact's name.
+2b. Contact company — employer/firm name from signature or visible headers (e.g. "Acme Corp"), or null if unknown.
 3. Subject — use parsed subject (may clean up Re:/Fwd:)
 4. Body — CONTEXTUAL summary: what the contact actually said (key points, tone, or short quotes). Include buyer/forwarding signals (e.g. "I'll forward your stuff", "not the right person", "happy to connect", "we're not looking now"). Then the immediate next step. Not just the action — include context so we can see if they're a buyer or a pass-through.
 5. Next engagement date — be AGGRESSIVE. Today is ${todayStr}. Examples:
@@ -190,6 +210,7 @@ Return EXACTLY this JSON:
   "body": "contextual summary: what contact said + signals + next step",
   "contactEmail": "prospect email, NOT owner",
   "contactName": "prospect name" or null,
+  "contactCompany": "firm from signature" or null,
   "nextEngagementDate": "YYYY-MM-DD" or null,
   "nextEngagementPurpose": "TOKEN_FROM_LIST" or null,
   "inReplyTo": "Message-ID" or null,
@@ -222,7 +243,11 @@ Return JSON only.`;
     if (!content) throw new Error('No response from OpenAI');
 
     const result = parseResponse(content);
-    applyOutboundProofFollowUpDefaults(result, todayStr);
+    const proofBaseDate =
+      result.activityDate ||
+      extractDateHeaderIso(parsedEmail) ||
+      todayStr;
+    applyOutboundProofFollowUpDefaults(result, proofBaseDate);
 
     // Fallback: if AI didn't return contactEmail, use parsed from/to + owner
     if (!result.contactEmail && ownerContext?.email) {
@@ -243,6 +268,7 @@ Return JSON only.`;
     console.log('✅ AI Engagement Interpreter:', {
       contactEmail: result.contactEmail,
       contactName: result.contactName,
+      contactCompany: result.contactCompany,
       activityType: result.activityType,
       activityDate: result.activityDate,
       hasNextEngagementDate: !!result.nextEngagementDate,
@@ -261,18 +287,18 @@ Return JSON only.`;
 
 /**
  * Forwarded "proof of send" outbound emails often omit a next date. Default: +7d + UNRESPONSIVE
- * (assume prospect may not have replied yet; chase in ~1 week).
+ * from the outbound send date (activityDate or Date header), not from "today" at parse time.
  */
 function applyOutboundProofFollowUpDefaults(
   result: EngagementInterpretation,
-  todayStr: string,
+  baseIsoDate: string,
 ): void {
   if (result.activityType !== 'outbound_email') return;
   if (result.isResponse) return;
   if (result.nextEngagementDate) return;
   const p = result.nextEngagementPurpose;
   if (p && p !== 'GENERAL_CHECK_IN' && p !== 'UNRESPONSIVE') return;
-  result.nextEngagementDate = addDaysIsoDate(todayStr, OUTBOUND_PROOF_DEFAULT_FOLLOWUP_DAYS);
+  result.nextEngagementDate = addDaysIsoDate(baseIsoDate, OUTBOUND_PROOF_DEFAULT_FOLLOWUP_DAYS);
   result.nextEngagementPurpose = 'UNRESPONSIVE';
 }
 
@@ -316,6 +342,10 @@ function parseResponse(content: string): EngagementInterpretation {
     nextEngagementPurpose = null;
   }
 
+  const cc = d.contactCompany ?? parsed.contactCompany;
+  const contactCompany =
+    typeof cc === 'string' && cc.trim() ? cc.trim() : null;
+
   return {
     subject: String(d.subject ?? parsed.subject ?? ''),
     body: String(d.body ?? parsed.body ?? ''),
@@ -324,6 +354,7 @@ function parseResponse(content: string): EngagementInterpretation {
       typeof (d.contactName ?? parsed.contactName) === 'string'
         ? (d.contactName ?? parsed.contactName) as string
         : null,
+    contactCompany,
     nextEngagementDate:
       typeof (d.nextEngagementDate ?? parsed.nextEngagementDate) === 'string'
         ? (d.nextEngagementDate ?? parsed.nextEngagementDate) as string

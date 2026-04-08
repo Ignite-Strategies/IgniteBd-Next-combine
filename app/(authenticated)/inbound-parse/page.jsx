@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '@/components/PageHeader';
 import {
   Inbox,
@@ -78,6 +78,8 @@ export default function InboundParsePage() {
   const [showOriginalEmail, setShowOriginalEmail] = useState(true);
   /** After Save all: structured summary + next actions (matcher UI is cleared). */
   const [lastInboundSave, setLastInboundSave] = useState(null);
+  /** User confirmed updating CRM email/company when domain differs from name-match contact. */
+  const [confirmJobChange, setConfirmJobChange] = useState(false);
 
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
@@ -251,6 +253,28 @@ export default function InboundParsePage() {
     return match ? match[1].trim() : null;
   };
 
+  const emailDomainFromAddress = (addr) => {
+    const e = extractEmailAddress(addr);
+    if (!e || !e.includes('@')) return null;
+    return e.split('@')[1].toLowerCase();
+  };
+
+  const jobChangeDetected = useMemo(() => {
+    if (!parseResult?.nameMatches?.length || parseResult.contact || !contactIdOverride) {
+      return false;
+    }
+    const selected = parseResult.nameMatches.find((m) => m.id === contactIdOverride);
+    const incoming = (contactEmailOverride || parseResult.parsed?.contactEmail || '').trim();
+    if (!selected?.email || !incoming) return false;
+    const dNew = emailDomainFromAddress(incoming);
+    const dOld = emailDomainFromAddress(selected.email);
+    return Boolean(dNew && dOld && dNew !== dOld);
+  }, [parseResult, contactIdOverride, contactEmailOverride]);
+
+  useEffect(() => {
+    if (!jobChangeDetected) setConfirmJobChange(false);
+  }, [jobChangeDetected]);
+
   const resetDetailState = () => {
     setParseResult(null);
     setContactEmailOverride('');
@@ -267,6 +291,7 @@ export default function InboundParsePage() {
     setShowOriginalEmail(true);
     setApplyPipelineMatch(false);
     setLastInboundSave(null);
+    setConfirmJobChange(false);
   };
 
   const resetMeetingDetailState = () => {
@@ -392,6 +417,7 @@ export default function InboundParsePage() {
     setAnalyzeLoading(true);
     setParseResult(null);
     setContactIdOverride(null);
+    setConfirmJobChange(false);
     try {
       const res = await api.post('/api/inbound-parse/interpret', {
         inboundEmailId: selectedEmail.id,
@@ -454,6 +480,8 @@ export default function InboundParsePage() {
           summary: summaryOverride || parseResult.parsed?.summary,
           contactEmail: contactEmailOverride || parseResult.parsed?.contactEmail,
           contactName: contactNameOverride || parseResult.parsed?.contactName,
+          contactCompany:
+            parseResult.parsed?.contactCompany ?? parseResult.interpretation?.contactCompany ?? null,
           nextEngagementDate: nextEngageOverride || parseResult.nextEngage?.recommended,
           ...(mergedPurpose != null && mergedPurpose !== ''
             ? { nextEngagementPurpose: mergedPurpose }
@@ -462,6 +490,13 @@ export default function InboundParsePage() {
       }
       if (generatePipelineMatch) payload.generatePipelineMatch = true;
       if (applyPipelineMatch) payload.applyPipelineMatch = true;
+      if (confirmJobChange && jobChangeDetected) {
+        payload.updateContactProfile = true;
+        const ne = (contactEmailOverride || parseResult?.parsed?.contactEmail || '').trim();
+        if (ne) payload.newContactEmail = ne;
+        const nc = (parseResult?.parsed?.contactCompany || '').trim();
+        if (nc) payload.newCompanyName = nc;
+      }
       const res = await api.post('/api/inbound-parse/push-to-ai', payload);
       const { parsed, contactId, recordType } = res.data;
       if (contactId) setRecordedContactId(contactId);
@@ -499,6 +534,7 @@ export default function InboundParsePage() {
       setSelectedContactEmailHistory(null);
       setApplyPipelineMatch(false);
       setShowOriginalEmail(false);
+      setConfirmJobChange(false);
       setActionMessage(null);
     } catch (err) {
       setActionMessage({
@@ -1221,6 +1257,7 @@ export default function InboundParsePage() {
                                   );
                                   // Clear email override when picking by name
                                   setContactEmailOverride('');
+                                  setConfirmJobChange(false);
                                 }}
                                 className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
                                   contactIdOverride === match.id
@@ -1244,6 +1281,54 @@ export default function InboundParsePage() {
                             <div className="flex items-center gap-1.5 text-xs text-indigo-700">
                               <CheckCircle className="h-3.5 w-3.5" />
                               Contact selected — will be linked on Record Activity
+                            </div>
+                          )}
+                          {jobChangeDetected && contactIdOverride && (
+                            <div className="rounded-lg border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-950 space-y-2">
+                              <div className="flex gap-2">
+                                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                <p>
+                                  New email domain vs CRM record (
+                                  <span className="font-mono">
+                                    {emailDomainFromAddress(
+                                      contactEmailOverride || parseResult.parsed?.contactEmail
+                                    )}
+                                  </span>{' '}
+                                  vs{' '}
+                                  <span className="font-mono">
+                                    {emailDomainFromAddress(
+                                      parseResult.nameMatches.find((m) => m.id === contactIdOverride)
+                                        ?.email
+                                    )}
+                                  </span>
+                                  ) — possible job change. Check below to update email, company, and
+                                  domain on save, and use a &ldquo;new firm&rdquo; next-touch purpose.
+                                </p>
+                              </div>
+                              <label className="flex items-start gap-2 cursor-pointer font-medium">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 rounded border-amber-400"
+                                  checked={confirmJobChange}
+                                  onChange={(e) => {
+                                    const on = e.target.checked;
+                                    setConfirmJobChange(on);
+                                    if (on) {
+                                      setNextEngagementPurposeOverride('NEW_JOB_CHECK_IN');
+                                    } else {
+                                      setNextEngagementPurposeOverride(
+                                        parseResult?.parsed?.nextEngagementPurpose ||
+                                          parseResult?.interpretation?.nextEngagementPurpose ||
+                                          ''
+                                      );
+                                    }
+                                  }}
+                                />
+                                <span>
+                                  Update contact email, company, and domain on save; stamp recent job
+                                  change
+                                </span>
+                              </label>
                             </div>
                           )}
                         </div>

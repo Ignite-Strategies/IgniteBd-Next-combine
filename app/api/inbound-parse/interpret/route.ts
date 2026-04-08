@@ -304,6 +304,7 @@ export async function POST(request: Request) {
       parsed: {
         contactEmail,
         contactName: interpreted.contactName,
+        contactCompany: interpreted.contactCompany ?? null,
         subject: interpreted.subject || parsed.subject || null,
         body: interpreted.body || parsed.body || null,
         isResponse: interpreted.isResponse,

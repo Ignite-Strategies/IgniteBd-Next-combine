@@ -2060,6 +2060,7 @@ enum NextEngagementPurpose {
   MEETING_FOLLOW_UP          // Post-meeting follow-up
   SCHEDULED_MEETING          // Next touch is a dated calendar meeting/call
   DECLINED_NURTURE           // Prospect passed / chose another vendor — polite long-cycle check-in (relationship, not displacement pitch)
+  NEW_JOB_CHECK_IN           // Contact at new firm / new role — fresh opportunity (not generic check-in)
 }
 
 enum MeetingType {
