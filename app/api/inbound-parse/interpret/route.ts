@@ -313,6 +313,8 @@ export async function POST(request: Request) {
         nextEngagementPurpose: interpreted.nextEngagementPurpose ?? null,
         activityType: interpreted.activityType,
         activityDate: interpreted.activityDate,
+        priorMeetingDetected: interpreted.priorMeetingDetected,
+        priorMeetingDate: interpreted.priorMeetingDate,
       },
       interpretation: interpreted,
       contact: contact

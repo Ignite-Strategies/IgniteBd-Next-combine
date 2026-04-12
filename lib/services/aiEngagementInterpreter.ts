@@ -78,6 +78,10 @@ export interface EngagementInterpretation {
   summary: string; // 1-2 sentence summary of the interaction
   activityType: ActivityType; // What kind of activity this email describes
   activityDate: string | null; // ISO date "YYYY-MM-DD" of when the activity actually happened (may differ from email date)
+  /** True when the thread body contains signals a meeting/call already occurred before this email. */
+  priorMeetingDetected: boolean;
+  /** ISO date of the prior meeting if inferrable from the thread (e.g. "2026-03-26"), else null. */
+  priorMeetingDate: string | null;
 }
 
 /**
@@ -159,6 +163,10 @@ OUTBOUND PROOF / RECEIPT (VERY COMMON) — Someone on the team (often the same p
 - If there is no explicit follow-up timing in the email, set nextEngagementDate to ${oneWeekFromSendHint} (7 calendar days after the outbound SEND date — use activityDate when it reflects that send, otherwise use the email Date header day ${emailSendHintStr}, never "today when someone parses in the UI") and nextEngagementPurpose to UNRESPONSIVE — meaning "we assume the prospect may not have replied yet; next touch is a check-in / chase after ~1 week from send." If the email explicitly says a different follow-up window (e.g. 2 weeks), use that instead.
 - If the thread clearly shows the prospect already replied, this is NOT outbound proof — use inbound_email and isResponse true.
 
+PRIOR MEETING / CALL IN THREAD — When the email being parsed is a proof-of-send outbound (or any message where the full quoted thread is visible), scan the FULL body (including quoted/forwarded sections) for signals that a prior meeting or call already occurred between the owner and the contact. Positive signals include: "it was a pleasure catching up", "great talking today", "per our discussion", "enjoyed our call", "as discussed", "following our meeting", "following up on our call", "our conversation", "catching up today", "spoke today", "talked today", and similar.
+If you find such a signal, set priorMeetingDetected to true and attempt to extract priorMeetingDate (the calendar day of that meeting/call) from the nearby "Sent:" line or date headers in the quoted block (YYYY-MM-DD).
+When priorMeetingDetected is true, prefer nextEngagementPurpose MEETING_FOLLOW_UP over UNRESPONSIVE — a meeting already occurred; the owner is chasing an agreed next step, not cold-chasing a no-reply to first outreach.
+
 ACTIVITY DATE — If the email describes an event that happened on a DIFFERENT date than today (e.g. "I spoke with him on Monday 3/2"), extract THAT date as activityDate. Today is ${todayStr}. If the event is happening now or no date is mentioned, set null.
 For activityType "outbound_email" (proof-of-send): when the thread is logging an outbound the owner already sent, set activityDate to the calendar day that outbound was sent when inferrable (Date header, "Sent: …", or forwarded metadata), so follow-up dates can anchor to send time — not to when someone later parses the email.
 
@@ -202,7 +210,9 @@ Interpret:
 7. Summary — 1-2 sentences WITH CONTEXT: what the contact said (e.g. buyer vs will-forward, interested vs not), disposition, and next steps.
 8. activityType — one of: "inbound_email", "outbound_email", "call_note", "meeting_note", "note"
 9. activityDate — "YYYY-MM-DD" if the described event happened on a specific past date, else null
-10. nextEngagementPurpose — EXACTLY one of the listed tokens, or null. Must align with nextEngagementDate when a date is set (e.g. SCHEDULED_MEETING only with a concrete meeting day).
+10. priorMeetingDetected — true if the full thread shows a prior meeting/call between owner and contact (see PRIOR MEETING / CALL IN THREAD above), else false
+11. priorMeetingDate — "YYYY-MM-DD" if that prior meeting/call day is inferrable from the thread, else null
+12. nextEngagementPurpose — EXACTLY one of the listed tokens, or null. Must align with nextEngagementDate when a date is set (e.g. SCHEDULED_MEETING only with a concrete meeting day).
 
 Return EXACTLY this JSON:
 {
@@ -218,7 +228,9 @@ Return EXACTLY this JSON:
   "isResponse": true or false,
   "summary": "1-2 sentences with context (what they said, buyer/forward, next step)",
   "activityType": "inbound_email" | "outbound_email" | "call_note" | "meeting_note" | "note",
-  "activityDate": "YYYY-MM-DD" or null
+  "activityDate": "YYYY-MM-DD" or null,
+  "priorMeetingDetected": true or false,
+  "priorMeetingDate": "YYYY-MM-DD" or null
 }
 
 Return JSON only.`;
@@ -243,6 +255,9 @@ Return JSON only.`;
     if (!content) throw new Error('No response from OpenAI');
 
     const result = parseResponse(content);
+    if (result.priorMeetingDetected && result.nextEngagementPurpose === 'UNRESPONSIVE') {
+      result.nextEngagementPurpose = 'MEETING_FOLLOW_UP';
+    }
     const proofBaseDate =
       result.activityDate ||
       extractDateHeaderIso(parsedEmail) ||
@@ -274,6 +289,8 @@ Return JSON only.`;
       hasNextEngagementDate: !!result.nextEngagementDate,
       nextEngagementPurpose: result.nextEngagementPurpose,
       isResponse: result.isResponse,
+      priorMeetingDetected: result.priorMeetingDetected,
+      priorMeetingDate: result.priorMeetingDate,
     });
 
     return result;
@@ -288,6 +305,9 @@ Return JSON only.`;
 /**
  * Forwarded "proof of send" outbound emails often omit a next date. Default: +7d + UNRESPONSIVE
  * from the outbound send date (activityDate or Date header), not from "today" at parse time.
+ *
+ * Skips when nextEngagementPurpose is already something specific (e.g. MEETING_FOLLOW_UP after
+ * prior-meeting-in-thread detection) so we do not overwrite with UNRESPONSIVE.
  */
 function applyOutboundProofFollowUpDefaults(
   result: EngagementInterpretation,
@@ -346,6 +366,16 @@ function parseResponse(content: string): EngagementInterpretation {
   const contactCompany =
     typeof cc === 'string' && cc.trim() ? cc.trim() : null;
 
+  const rawPriorMeetingDate = d.priorMeetingDate ?? parsed.priorMeetingDate;
+  const priorMeetingDate =
+    typeof rawPriorMeetingDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawPriorMeetingDate)
+      ? rawPriorMeetingDate
+      : null;
+
+  const rawPriorMeetingDetected = d.priorMeetingDetected ?? parsed.priorMeetingDetected;
+  const priorMeetingDetected =
+    typeof rawPriorMeetingDetected === 'boolean' ? rawPriorMeetingDetected : false;
+
   return {
     subject: String(d.subject ?? parsed.subject ?? ''),
     body: String(d.body ?? parsed.body ?? ''),
@@ -374,5 +404,7 @@ function parseResponse(content: string): EngagementInterpretation {
     summary: String(d.summary ?? parsed.summary ?? ''),
     activityType,
     activityDate,
+    priorMeetingDetected,
+    priorMeetingDate,
   };
 }

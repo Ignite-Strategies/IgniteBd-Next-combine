@@ -1020,6 +1020,15 @@ export default function InboundParsePage() {
                         {parseResult.parsed?.activityType && (
                           <ActivityTypeBadge type={parseResult.parsed.activityType} />
                         )}
+                        {(parseResult.parsed?.priorMeetingDetected ||
+                          parseResult.interpretation?.priorMeetingDetected) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-800">
+                            <History className="w-3 h-3" /> Prior meeting in thread
+                            {(parseResult.parsed?.priorMeetingDate ||
+                              parseResult.interpretation?.priorMeetingDate) &&
+                              ` · ${parseResult.parsed?.priorMeetingDate || parseResult.interpretation?.priorMeetingDate}`}
+                          </span>
+                        )}
                       </h4>
                       <p className="text-xs text-indigo-800/90 mb-3">
                         Becomes the email activity and timeline summary when you save.
