@@ -694,6 +694,9 @@ export default function ContactDetailPage() {
       if (!res.data?.success) {
         throw new Error(res.data?.error || res.data?.details || 'Get email failed');
       }
+      if (res.data.email === null && res.data.message) {
+        setGetEmailError(res.data.message);
+      }
       const updatedContactResponse = await api.get(`/api/contacts/${contactId}`);
       if (updatedContactResponse.data?.success && updatedContactResponse.data?.contact) {
         setContact(updatedContactResponse.data.contact);
