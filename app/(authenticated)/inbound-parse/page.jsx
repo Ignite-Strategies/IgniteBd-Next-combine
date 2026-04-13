@@ -81,6 +81,9 @@ export default function InboundParsePage() {
   /** User confirmed updating CRM email/company when domain differs from name-match contact. */
   const [confirmJobChange, setConfirmJobChange] = useState(false);
 
+  // Inbound parse pipeline health
+  const [inboundHealth, setInboundHealth] = useState(null);
+
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
   const [meetingLoading, setMeetingLoading] = useState(true);
@@ -112,6 +115,9 @@ export default function InboundParsePage() {
       setLoading(false);
       setMeetingLoading(false);
     }
+    api.get('/api/health/inbound-parse').then((res) => {
+      if (res.data?.success) setInboundHealth(res.data);
+    }).catch(() => {});
   }, []);
 
   // When user selects a contact from name matches, fetch that contact's email history for Step 3
@@ -668,6 +674,33 @@ export default function InboundParsePage() {
           title="Inbound Parse"
           subtitle="Outreach updates (email) and meeting updates (notes) from SendGrid Inbound Parse"
         />
+
+        {inboundHealth && inboundHealth.status !== 'ok' && (
+          <div className={`mb-4 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
+            inboundHealth.status === 'down'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}>
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              {inboundHealth.status === 'down' ? (
+                <>
+                  <span className="font-semibold">Inbound pipeline is down.</span>{' '}
+                  MX record for <code className="text-xs bg-red-100 px-1 rounded">{inboundHealth.host}</code> is missing or not pointing to SendGrid.
+                  Emails sent to your CRM address will not be received until it is restored.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">No emails received recently.</span>{' '}
+                  {inboundHealth.daysSinceLastReceived !== null
+                    ? `Last inbound was ${inboundHealth.daysSinceLastReceived} day${inboundHealth.daysSinceLastReceived === 1 ? '' : 's'} ago.`
+                    : 'No inbound emails found in the database.'}
+                  {' '}MX record looks OK — check SendGrid Inbound Parse settings if you expect activity.
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* ── Left: Outreach Updates (email) ── */}
