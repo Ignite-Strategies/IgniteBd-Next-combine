@@ -51,6 +51,16 @@ export async function POST(req: Request) {
     const attachment_info = (formData.get('attachment-info') as string | null) || null;
     const email           = (formData.get('email')           as string | null) || null; // raw MIME
 
+    console.log('Inbound POST received:', {
+      from,
+      to,
+      subject,
+      hasText: !!text,
+      hasHtml: !!html,
+      hasRawMime: !!email,
+      envelope,
+    });
+
     // STEP 3: Parse MIME if text/html are missing (forwarded emails from Outlook etc.)
     // The 'email' field contains the full RFC 2822 MIME message with base64-encoded body parts.
     if (email && !text && !html) {
@@ -73,6 +83,11 @@ export async function POST(req: Request) {
     const recipient = to ? parseInboundRecipient(to) : null;
     let companyHQId: string | null = null;
     const slug = recipient?.companySlug ?? (to ? extractCompanySlugFromAddress(to) : null);
+    console.log('Inbound slug resolution:', {
+      to,
+      recipientParsed: recipient,
+      slug,
+    });
     if (slug) {
       const company = await prisma.company_hqs.findUnique({
         where: { slug },
@@ -84,7 +99,7 @@ export async function POST(req: Request) {
     }
 
     if (!companyHQId) {
-      console.log('Inbound: no company for slug, returning 200');
+      console.log('Inbound: no company matched for slug — discarding', { slug, to });
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
