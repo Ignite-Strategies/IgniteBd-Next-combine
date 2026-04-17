@@ -5,7 +5,7 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 const INBOUND_PARSE_HOST = 'crm.ignitestrategies.co';
 const EXPECTED_MX = 'mx.sendgrid.net';
-const STALE_DAYS = 7;
+const STALE_DAYS = 1;
 
 /**
  * GET /api/health/inbound-parse

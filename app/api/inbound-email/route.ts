@@ -28,8 +28,26 @@ import {
  * - Else (e.g. single slug slug@crm.domain): infer from content via AI; meeting_note/call_note → MEETING, else OUTREACH.
  * So one email address can be used for both; meeting notes are typed as MEETING and show in Meeting Updates.
  */
+const MAX_SAFE_INBOUND_BYTES = 3.5 * 1024 * 1024; // below Vercel ~4.5MB hard limit
+
 export async function POST(req: Request) {
   try {
+    const contentLength = Number(req.headers.get('content-length') || 0);
+    if (contentLength > MAX_SAFE_INBOUND_BYTES) {
+      console.error('INBOUND_PAYLOAD_TOO_LARGE:', {
+        contentLengthBytes: contentLength,
+        contentLengthMB: (contentLength / 1024 / 1024).toFixed(2),
+        note: 'Email likely has a large attachment. Strip attachments before forwarding.',
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Payload too large — strip attachments before forwarding to CRM',
+        },
+        { status: 200 },
+      );
+    }
+
     // STEP 1: Extract formData (multipart/form-data from SendGrid)
     const formData = await req.formData();
 
