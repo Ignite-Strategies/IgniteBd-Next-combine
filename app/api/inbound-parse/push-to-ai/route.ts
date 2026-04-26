@@ -19,6 +19,7 @@ import {
   suggestInboundPipelineMatch,
 } from '@/lib/services/inboundPipelineMatchService';
 import { coerceNextEngagementPurposeForPostgres } from '@/lib/services/nextEngagementPurposeDb';
+import { isValidStageForPipeline } from '@/lib/config/pipelineConfig';
 
 /**
  * POST /api/inbound-parse/push-to-ai
@@ -596,6 +597,74 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── 5c. Referral source (connector) → introduction-made when a call/meeting is logged
+    // and the AI extracted the introducer's email (e.g. PE warm intro that converted).
+    let connectorIntroductionMadeBump: { contactId: string; email: string } | null = null;
+    const referralRef = interpreted as { referralSourceEmail?: string | null };
+    if (companyHQId && isMeetingOrCall && referralRef.referralSourceEmail) {
+      const refEmail = String(referralRef.referralSourceEmail).trim().toLowerCase();
+      if (refEmail) {
+        try {
+          const { snapPipelineOnContact } = await import(
+            '@/lib/services/pipelineService'
+          );
+          const primaryEmail = contactId
+            ? (
+                await prisma.contact.findUnique({
+                  where: { id: contactId },
+                  select: { email: true },
+                })
+              )?.email?.toLowerCase()
+            : null;
+          if (primaryEmail && primaryEmail === refEmail) {
+            // Model confused connector with prospect — do not bump
+          } else {
+            const connectorRow = await prisma.contact.findFirst({
+              where: {
+                crmId: companyHQId,
+                email: { equals: refEmail, mode: 'insensitive' },
+              },
+              select: { id: true },
+            });
+            if (connectorRow && (!contactId || connectorRow.id !== contactId)) {
+              const connectorPipe = await prisma.pipelines.findUnique({
+                where: { contactId: connectorRow.id },
+              });
+              if (
+                connectorPipe?.pipeline === 'connector' &&
+                connectorPipe.stage &&
+                connectorPipe.stage !== 'introduction-made' &&
+                isValidStageForPipeline('introduction-made', 'connector')
+              ) {
+                await prisma.pipelines.update({
+                  where: { contactId: connectorRow.id },
+                  data: { stage: 'introduction-made', updatedAt: new Date() },
+                });
+                await snapPipelineOnContact(
+                  connectorRow.id,
+                  'connector',
+                  'introduction-made',
+                );
+                connectorIntroductionMadeBump = {
+                  contactId: connectorRow.id,
+                  email: refEmail,
+                };
+                console.log(
+                  '✅ push-to-ai: connector → introduction-made for referral source',
+                  refEmail,
+                );
+              }
+            }
+          }
+        } catch (connErr) {
+          console.warn(
+            '⚠️ connector introduction-made bump:',
+            (connErr as Error)?.message,
+          );
+        }
+      }
+    }
+
     // ── 6. Mark ingested (and backfill legacy null inboundType so row is no longer legacy) ──
     await prisma.inboundEmail.update({
       where: { id: inboundEmailId },
@@ -605,12 +674,17 @@ export async function POST(request: Request) {
       },
     });
 
+    const referralI = interpreted as {
+      referralSourceEmail?: string | null;
+      referralSourceName?: string | null;
+    };
     return NextResponse.json({
       success: true,
       recordId,
       recordType,
       contactId,
       pipelineMatch,
+      connectorIntroductionMadeBump,
       parsed: {
         contactEmail: effectiveContactEmail,
         contactName: interpreted.contactName,
@@ -621,6 +695,8 @@ export async function POST(request: Request) {
         summary: interpreted.summary,
         activityType,
         activityDate,
+        referralSourceEmail: referralI.referralSourceEmail ?? null,
+        referralSourceName: referralI.referralSourceName ?? null,
       },
     });
   } catch (error) {

@@ -62,6 +62,20 @@ function extractDateHeaderIso(parsedEmail: ParsedEmailInput): string | null {
   return d.toISOString().slice(0, 10);
 }
 
+function warnIfNextEngagementDateInPast(
+  nextEngagementDate: string | null,
+  todayStr: string,
+): void {
+  if (!nextEngagementDate) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nextEngagementDate)) return;
+  if (nextEngagementDate < todayStr) {
+    console.warn('⚠️ nextEngagementDate is in the past (explicit date preserved):', {
+      nextEngagementDate,
+      todayStr,
+    });
+  }
+}
+
 export interface EngagementInterpretation {
   subject: string;
   body: string;
@@ -82,6 +96,13 @@ export interface EngagementInterpretation {
   priorMeetingDetected: boolean;
   /** ISO date of the prior meeting if inferrable from the thread (e.g. "2026-03-26"), else null. */
   priorMeetingDate: string | null;
+  /**
+   * Email of the connector / referral source in the thread (e.g. who made the intro), if distinct
+   * from the primary contact and the owner. Not the EA or CC for scheduling.
+   */
+  referralSourceEmail: string | null;
+  /** Name of the referral source when extractable. */
+  referralSourceName: string | null;
 }
 
 /**
@@ -163,9 +184,35 @@ OUTBOUND PROOF / RECEIPT (VERY COMMON) — Someone on the team (often the same p
 - If there is no explicit follow-up timing in the email, set nextEngagementDate to ${oneWeekFromSendHint} (7 calendar days after the outbound SEND date — use activityDate when it reflects that send, otherwise use the email Date header day ${emailSendHintStr}, never "today when someone parses in the UI") and nextEngagementPurpose to UNRESPONSIVE — meaning "we assume the prospect may not have replied yet; next touch is a check-in / chase after ~1 week from send." If the email explicitly says a different follow-up window (e.g. 2 weeks), use that instead.
 - If the thread clearly shows the prospect already replied, this is NOT outbound proof — use inbound_email and isResponse true.
 
-PRIOR MEETING / CALL IN THREAD — When the email being parsed is a proof-of-send outbound (or any message where the full quoted thread is visible), scan the FULL body (including quoted/forwarded sections) for signals that a prior meeting or call already occurred between the owner and the contact. Positive signals include: "it was a pleasure catching up", "great talking today", "per our discussion", "enjoyed our call", "as discussed", "following our meeting", "following up on our call", "our conversation", "catching up today", "spoke today", "talked today", and similar.
-If you find such a signal, set priorMeetingDetected to true and attempt to extract priorMeetingDate (the calendar day of that meeting/call) from the nearby "Sent:" line or date headers in the quoted block (YYYY-MM-DD).
+FORWARDER ANNOTATION — When someone forwards a thread to the CRM, they often prepend a short note BEFORE the first "From: [name]" / "Sent:" / "-----Original Message-----" block. That text is the OWNER'S instruction and takes highest priority over default 7-day outbound rules when it contains dates or activity intent.
+
+Identify the annotation as any text appearing before the first clear "From:" / "Sent:" / "-----Original Message-----" in the body (not part of a signature at the bottom).
+
+Date and follow-up from the annotation:
+- Explicit calendar date ("let's follow up on 4/23", "follow up April 23", "FYI – follow up on 4/23") → set nextEngagementDate to that day in YYYY-MM-DD (infer the year from the thread or use ${todayStr}'s year). Use it even if that date is already in the past — do NOT replace it with the 7-day default.
+- Relative timing ("one-month follow up", "follow up in 2 weeks", "check in next month", "let's set a one-month follow up") → compute nextEngagementDate from today (${todayStr}) (e.g. one month ≈ same calendar day next month; two weeks = +14 days).
+- Range ("1-2 months", "3-6 months") → use midpoint for nextEngagementDate.
+
+Activity type from the annotation (overrides a bare quoted email when the annotation is clearly the owner logging):
+- "I spoke with X today", "Per the below, I spoke/talked/met with X", "Had a call with X", "I spoke with X" at the top → set activityType to "call_note" (the logged event is the call; not proof-of-send outbound).
+- "Met with X", "Had a meeting with X" at the top → set activityType to "meeting_note".
+- If the annotation only says "FYI" or a date with no "I spoke/met", you may still use outbound_email / inbound_email per the thread.
+
+Contact identification from the annotation:
+- If the annotation names a specific person ("I spoke with Lakshmi", "follow up with Joel"), treat that name as the primary contact and match their email from the thread below when multiple non-owner people appear (ignore EAs schedulers unless they are the only path — prefer the decision-maker the owner names).
+
+PRIOR MEETING / CALL IN THREAD — When the email being parsed is a proof-of-send outbound (or any message where the full quoted thread is visible), scan the FULL body (including quoted/forwarded sections) for signals that a prior meeting or call already occurred between the owner and the contact. Positive signals include: "it was a pleasure catching up", "great talking today", "per our discussion", "enjoyed our call", "as discussed", "following our meeting", "following up on our call", "our conversation", "catching up today", "spoke today", "talked today", "thanks for your time today" (in the right sender→recipient context), and similar.
+
+Negative signals — these mean a meeting has NOT yet occurred (parties are still trying to schedule):
+"let me know a good time", "is there a good time", "let's find time", "lets catch up this week", "how about [day/time]", "would you be available", "are you free", "my calendar is open", "happy to suggest some windows", "find us 10 minutes next week" (scheduling, not a completed call). If the only meeting-related language in the thread is scheduling like this, set priorMeetingDetected to false (unless a FORWARDER ANNOTATION or other line explicitly says the owner already spoke/met the contact).
+
+If you find a positive prior-meeting signal (and not negated by scheduling-only), set priorMeetingDetected to true and attempt to extract priorMeetingDate (the calendar day of that meeting/call) from the nearby "Sent:" line or date headers in the quoted block (YYYY-MM-DD).
 When priorMeetingDetected is true, prefer nextEngagementPurpose MEETING_FOLLOW_UP over UNRESPONSIVE — a meeting already occurred; the owner is chasing an agreed next step, not cold-chasing a no-reply to first outreach.
+
+REFERRAL SOURCE — When the thread shows a third-party who introduced the owner to the contact (e.g. "I'd like to introduce you to [owner]", "Intro ||| A & B", "Moving [Name] to BCC", a formal double-intro email to both parties, PE/colleague vouching for the owner to the target):
+- Set referralSourceEmail to the connector's email address (the person who made the intro — NOT the primary prospect, NOT the owner, not a generic noreply).
+- Set referralSourceName to their name if visible.
+- If the thread is a direct 1:1 and no intro party appears, set both to null. Do not confuse the target contact with the referral source.
 
 ACTIVITY DATE — If the email describes an event that happened on a DIFFERENT date than today (e.g. "I spoke with him on Monday 3/2"), extract THAT date as activityDate. Today is ${todayStr}. If the event is happening now or no date is mentioned, set null.
 For activityType "outbound_email" (proof-of-send): when the thread is logging an outbound the owner already sent, set activityDate to the calendar day that outbound was sent when inferrable (Date header, "Sent: …", or forwarded metadata), so follow-up dates can anchor to send time — not to when someone later parses the email.
@@ -213,6 +260,8 @@ Interpret:
 10. priorMeetingDetected — true if the full thread shows a prior meeting/call between owner and contact (see PRIOR MEETING / CALL IN THREAD above), else false
 11. priorMeetingDate — "YYYY-MM-DD" if that prior meeting/call day is inferrable from the thread, else null
 12. nextEngagementPurpose — EXACTLY one of the listed tokens, or null. Must align with nextEngagementDate when a date is set (e.g. SCHEDULED_MEETING only with a concrete meeting day).
+13. referralSourceEmail — connector email or null (see REFERRAL SOURCE)
+14. referralSourceName — connector name or null (see REFERRAL SOURCE)
 
 Return EXACTLY this JSON:
 {
@@ -230,7 +279,9 @@ Return EXACTLY this JSON:
   "activityType": "inbound_email" | "outbound_email" | "call_note" | "meeting_note" | "note",
   "activityDate": "YYYY-MM-DD" or null,
   "priorMeetingDetected": true or false,
-  "priorMeetingDate": "YYYY-MM-DD" or null
+  "priorMeetingDate": "YYYY-MM-DD" or null,
+  "referralSourceEmail": "connector@email" or null,
+  "referralSourceName": "Connector Name" or null
 }
 
 Return JSON only.`;
@@ -263,6 +314,7 @@ Return JSON only.`;
       extractDateHeaderIso(parsedEmail) ||
       todayStr;
     applyOutboundProofFollowUpDefaults(result, proofBaseDate);
+    warnIfNextEngagementDateInPast(result.nextEngagementDate, todayStr);
 
     // Fallback: if AI didn't return contactEmail, use parsed from/to + owner
     if (!result.contactEmail && ownerContext?.email) {
@@ -291,6 +343,8 @@ Return JSON only.`;
       isResponse: result.isResponse,
       priorMeetingDetected: result.priorMeetingDetected,
       priorMeetingDate: result.priorMeetingDate,
+      referralSourceEmail: result.referralSourceEmail,
+      referralSourceName: result.referralSourceName,
     });
 
     return result;
@@ -376,6 +430,21 @@ function parseResponse(content: string): EngagementInterpretation {
   const priorMeetingDetected =
     typeof rawPriorMeetingDetected === 'boolean' ? rawPriorMeetingDetected : false;
 
+  const rawNext = d.nextEngagementDate ?? parsed.nextEngagementDate;
+  let nextEngagementDate: string | null =
+    typeof rawNext === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawNext.trim())
+      ? rawNext.trim()
+      : null;
+
+  const rawRefEmail = d.referralSourceEmail ?? parsed.referralSourceEmail;
+  const rawRefName = d.referralSourceName ?? parsed.referralSourceName;
+  const refEmailStr =
+    typeof rawRefEmail === 'string' && rawRefEmail.trim().includes('@')
+      ? rawRefEmail.trim().toLowerCase()
+      : null;
+  const refNameStr =
+    typeof rawRefName === 'string' && rawRefName.trim() ? rawRefName.trim() : null;
+
   return {
     subject: String(d.subject ?? parsed.subject ?? ''),
     body: String(d.body ?? parsed.body ?? ''),
@@ -385,10 +454,7 @@ function parseResponse(content: string): EngagementInterpretation {
         ? (d.contactName ?? parsed.contactName) as string
         : null,
     contactCompany,
-    nextEngagementDate:
-      typeof (d.nextEngagementDate ?? parsed.nextEngagementDate) === 'string'
-        ? (d.nextEngagementDate ?? parsed.nextEngagementDate) as string
-        : null,
+    nextEngagementDate,
     nextEngagementPurpose,
     inReplyTo:
       typeof (d.inReplyTo ?? parsed.inReplyTo) === 'string'
@@ -406,5 +472,7 @@ function parseResponse(content: string): EngagementInterpretation {
     activityDate,
     priorMeetingDetected,
     priorMeetingDate,
+    referralSourceEmail: refEmailStr,
+    referralSourceName: refNameStr,
   };
 }
