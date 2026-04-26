@@ -189,9 +189,9 @@ FORWARDER ANNOTATION — When someone forwards a thread to the CRM, they often p
 Identify the annotation as any text appearing before the first clear "From:" / "Sent:" / "-----Original Message-----" in the body (not part of a signature at the bottom).
 
 Date and follow-up from the annotation:
-- Explicit calendar date ("let's follow up on 4/23", "follow up April 23", "FYI – follow up on 4/23") → set nextEngagementDate to that day in YYYY-MM-DD (infer the year from the thread or use ${todayStr}'s year). Use it even if that date is already in the past — do NOT replace it with the 7-day default.
-- Relative timing ("one-month follow up", "follow up in 2 weeks", "check in next month", "let's set a one-month follow up") → compute nextEngagementDate from today (${todayStr}) (e.g. one month ≈ same calendar day next month; two weeks = +14 days).
-- Range ("1-2 months", "3-6 months") → use midpoint for nextEngagementDate.
+- Explicit calendar date ("let's follow up on 4/23", "follow up April 23", "FYI – follow up on 4/23") → set nextEngagementDate to that day in YYYY-MM-DD (infer the year from the thread or use the email year from ${emailSendHintStr}). Use it even if that date is already in the past — do NOT replace it with the 7-day default.
+- Relative timing ("one-month follow up", "follow up in 2 weeks", "check in next month", "let's set a one-month follow up", "follow up in six months") → compute nextEngagementDate from the EMAIL SEND DATE ${emailSendHintStr} (from the message Date: header or quoted "Sent:"), NOT from "today" when someone parses the email in the UI (e.g. one month = same calendar day one month after send; six months = ~183 days after send; two weeks = +14 days from send day).
+- Range ("1-2 months", "3-6 months") → use midpoint from ${emailSendHintStr} as the anchor, not the parse date.
 
 Activity type from the annotation (overrides a bare quoted email when the annotation is clearly the owner logging):
 - "I spoke with X today", "Per the below, I spoke/talked/met with X", "Had a call with X", "I spoke with X" at the top → set activityType to "call_note" (the logged event is the call; not proof-of-send outbound).
@@ -227,7 +227,7 @@ Definitions (pick the best single match; use null if unsure or no next touch). E
 - PERIODIC_CHECK_IN — routine keep-warm / relationship maintenance on a cadence.
 - REFERRAL_NO_CONTACT — referral path; no direct contact with the target yet.
 - POST_WARM_MEETING_NUDGE — contact replied warmly; next step is to lock a meeting (not vague "catch up").
-- PURSUE_INTRO — thread is about getting an introduction or referral path.
+- PURSUE_INTRO — the contact is acting as a connector/forwarder rather than the economic buyer. They have passed (or will pass) the owner's name or materials to someone else. Signals: "I sent your name around", "I passed along your info", "I forwarded your details to X", "I mentioned you to our team / our GC / a few people", "I shared your info with", "I'll forward this", "I'll pass this along", "I know someone who might need this", "let me make an intro", "I put you in touch with". The next touch is to follow up on the referral path, not to re-pitch this contact as a direct buyer. (Use REFERRAL_NO_CONTACT only when there is no direct contact with the final target yet.)
 - NO_INTRO_REASON_FOLLOW_UP — intro did not happen or stalled; next touch is to understand why / unblock.
 - ONE_MORE_TOUCH — one deliberate extra attempt before backing off.
 - COMPETITOR_FOLLOW_UP — they are "all set" with an incumbent or happy with current provider; long-cycle re-engage with a competitor/displacement angle (months out). NOT for "they picked another firm over us."
@@ -246,10 +246,11 @@ Interpret:
 2b. Contact company — employer/firm name from signature or visible headers (e.g. "Acme Corp"), or null if unknown.
 3. Subject — use parsed subject (may clean up Re:/Fwd:)
 4. Body — CONTEXTUAL summary: what the contact actually said (key points, tone, or short quotes). Include buyer/forwarding signals (e.g. "I'll forward your stuff", "not the right person", "happy to connect", "we're not looking now"). Then the immediate next step. Not just the action — include context so we can see if they're a buyer or a pass-through.
-5. Next engagement date — be AGGRESSIVE. Today is ${todayStr}. Examples:
-   - "follow up in 3-6 months" → midpoint (~4.5 months from today)
-   - "later this year" → ~6 months from today
-   - "next quarter" → 3 months from today
+5. Next engagement date — be AGGRESSIVE. Anchor ALL relative and range-based windows to the email send day ${emailSendHintStr} (Date header or quoted "Sent:"), never to "today" when someone later parses the email. Examples (anchor = ${emailSendHintStr}):
+   - "follow up in 3-6 months" → midpoint (~4.5 months after send)
+   - "later this year" → ~6 months after send
+   - "next quarter" → 3 months after send
+   - "follow up in six months" or "in 6 months" → six months after send, not after parse time
    - Any specific date mentioned for a meeting or callback → use that date
    - Hard "stop / unsubscribe / do not contact" → null date and null purpose
    - They declined you but a future polite check-in is implied → pick a future date and set nextEngagementPurpose to DECLINED_NURTURE

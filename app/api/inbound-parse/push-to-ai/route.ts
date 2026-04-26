@@ -304,19 +304,15 @@ export async function POST(request: Request) {
       );
       nextEngagementPurposeForResponse = meetingFollowUpPurpose;
 
-      // Update contact engagement
+      // Update contact engagement — always set MEETING_FOLLOW_UP purpose so stale UNRESPONSIVE clears
       await prisma.contact.update({
         where: { id: contactId },
         data: {
           lastEngagementDate: meetingDateParsed,
           lastEngagementType: 'MEETING',
+          ...(meetingFollowUpPurpose ? { nextEngagementPurpose: meetingFollowUpPurpose } : {}),
           ...(effectiveNextEngagementDate
-            ? {
-                nextEngagementDate: effectiveNextEngagementDate,
-                ...(meetingFollowUpPurpose
-                  ? { nextEngagementPurpose: meetingFollowUpPurpose }
-                  : {}),
-              }
+            ? { nextEngagementDate: effectiveNextEngagementDate }
             : {}),
         },
       });
@@ -519,21 +515,29 @@ export async function POST(request: Request) {
       recordType = 'EmailActivity';
     }
 
-    // ── 5. Pipeline — scheduled meeting → prospect/meeting (wave-1 bump already applied above)
+    // ── 5. Pipeline from engagement: prospect → meeting, or → connector/forwarded (PURSUE_INTRO)
     let pipe = contactId
       ? await prisma.pipelines.findUnique({ where: { contactId } })
       : null;
+    const meetingSignaled =
+      isScheduledMeetingPurpose ||
+      isMeetingOrCall ||
+      effectiveNextEngagementPurpose === 'MEETING_FOLLOW_UP';
     if (contactId) {
       try {
         const { snapPipelineOnContact } = await import(
-          '@/lib/services/pipelineService'
+          '@/lib/services/pipelineService',
         );
-        if (isScheduledMeetingPurpose) {
+        if (meetingSignaled) {
           const contactQuick = await prisma.contact.findUnique({
             where: { id: contactId },
             select: { contactDisposition: true },
           });
-          const allowedStages = ['interest', 'engaged-awaiting-response'];
+          const allowedStages = [
+            'need-to-engage',
+            'engaged-awaiting-response',
+            'interest',
+          ];
           if (
             pipe?.pipeline === 'prospect' &&
             pipe.stage &&
@@ -546,7 +550,31 @@ export async function POST(request: Request) {
             });
             await snapPipelineOnContact(contactId, pipe.pipeline, 'meeting');
             pipe = { ...pipe, stage: 'meeting' };
-            console.log('✅ push-to-ai: prospect pipeline → meeting (scheduled)');
+            console.log('✅ push-to-ai: prospect pipeline → meeting (engagement signals)');
+          }
+        }
+
+        const connectorForwardSignaled =
+          !meetingSignaled &&
+          (effectiveNextEngagementPurpose === 'PURSUE_INTRO' ||
+            effectiveNextEngagementPurpose === 'REFERRAL_NO_CONTACT');
+        if (connectorForwardSignaled && pipe?.pipeline === 'prospect' && pipe.stage) {
+          const protectedStages = ['contract', 'contract-signed', 'proposal'];
+          if (
+            !protectedStages.includes(pipe.stage) &&
+            isValidStageForPipeline('forwarded', 'connector')
+          ) {
+            await prisma.pipelines.update({
+              where: { contactId },
+              data: {
+                pipeline: 'connector',
+                stage: 'forwarded',
+                updatedAt: new Date(),
+              },
+            });
+            await snapPipelineOnContact(contactId, 'connector', 'forwarded');
+            pipe = { ...pipe, pipeline: 'connector', stage: 'forwarded' };
+            console.log('✅ push-to-ai: prospect → connector/forwarded (PURSUE_INTRO / referral)');
           }
         }
       } catch (e) {
