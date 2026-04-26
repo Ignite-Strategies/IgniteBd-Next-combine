@@ -75,7 +75,8 @@ export default function InboundParsePage() {
   const [generatePipelineMatch, setGeneratePipelineMatch] = useState(true);
   const [applyPipelineMatch, setApplyPipelineMatch] = useState(false);
   const [inboundSaveComplete, setInboundSaveComplete] = useState(false);
-  const [showOriginalEmail, setShowOriginalEmail] = useState(true);
+  /** View Thread panel: open before parse; auto-collapse after parse / after save; user can re-open. */
+  const [threadOpen, setThreadOpen] = useState(true);
   /** After Save all: structured summary + next actions (matcher UI is cleared). */
   const [lastInboundSave, setLastInboundSave] = useState(null);
   /** User confirmed updating CRM email/company when domain differs from name-match contact. */
@@ -163,10 +164,16 @@ export default function InboundParsePage() {
   }, [contactIdOverride]);
 
   useEffect(() => {
-    if (parseResult) {
-      setShowOriginalEmail(false);
-    }
+    if (parseResult) setThreadOpen(false);
   }, [parseResult]);
+
+  useEffect(() => {
+    if (inboundSaveComplete) setThreadOpen(false);
+  }, [inboundSaveComplete]);
+
+  useEffect(() => {
+    if (selectedEmail?.id) setThreadOpen(true);
+  }, [selectedEmail?.id]);
 
   const fetchInboundEmails = async (tenantId, tab = inboundTab) => {
     if (!tenantId) return;
@@ -294,7 +301,7 @@ export default function InboundParsePage() {
     setActionMessage(null);
     setSelectedContactEmailHistory(null);
     setInboundSaveComplete(false);
-    setShowOriginalEmail(true);
+    setThreadOpen(true);
     setApplyPipelineMatch(false);
     setLastInboundSave(null);
     setConfirmJobChange(false);
@@ -539,7 +546,7 @@ export default function InboundParsePage() {
       setSummaryOverride('');
       setSelectedContactEmailHistory(null);
       setApplyPipelineMatch(false);
-      setShowOriginalEmail(false);
+      setThreadOpen(false);
       setConfirmJobChange(false);
       setActionMessage(null);
     } catch (err) {
@@ -919,6 +926,188 @@ export default function InboundParsePage() {
                   )}
                 </div>
 
+                {/* Full email thread / MIME — always available to verify the AI summary (before & after parse, after save) */}
+                <details
+                  className="mb-4 rounded-lg border border-slate-200 bg-slate-50/80 group"
+                  open={threadOpen}
+                  onToggle={(e) => setThreadOpen(e.currentTarget.open)}
+                >
+                  <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold text-slate-800 flex items-center gap-2 hover:bg-slate-100/80 rounded-lg list-none [&::-webkit-details-marker]:hidden">
+                    <Mail className="h-4 w-4 text-slate-600 shrink-0" />
+                    View email thread
+                    <span className="ml-auto text-xs font-normal text-slate-500 group-open:hidden">
+                      expand
+                    </span>
+                    <span className="ml-auto text-xs font-normal text-slate-500 hidden group-open:inline">
+                      collapse
+                    </span>
+                  </summary>
+                  <div className="border-t border-slate-200 px-3 py-3 space-y-3 text-sm max-h-[min(80vh,32rem)] overflow-y-auto">
+                    {showRaw ? (
+                      <div className="space-y-4">
+                        {selectedEmail.email && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-600 block mb-2">
+                              Raw MIME (SendGrid &ldquo;email&rdquo; field - full MIME when
+                              &ldquo;Include Raw&rdquo; enabled)
+                            </label>
+                            <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
+                              {selectedEmail.email}
+                            </pre>
+                          </div>
+                        )}
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600 block mb-2">
+                            Headers
+                          </label>
+                          <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap">
+                            {selectedEmail.headers || '(No headers)'}
+                          </pre>
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600 block mb-2">
+                            Text body
+                          </label>
+                          <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap">
+                            {selectedEmail.text || '(No text body)'}
+                          </pre>
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600 block mb-2">
+                            HTML body
+                          </label>
+                          <div className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-48">
+                            {selectedEmail.html ? (
+                              <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                            ) : (
+                              '(No HTML body)'
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            From
+                          </label>
+                          <div>
+                            {extractName(selectedEmail.from) && (
+                              <div className="font-medium">{extractName(selectedEmail.from)}</div>
+                            )}
+                            <div className="text-sm text-gray-600">
+                              {extractEmailAddress(selectedEmail.from) ||
+                                selectedEmail.from ||
+                                '(No sender)'}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            To
+                          </label>
+                          <div className="text-sm text-gray-600">
+                            {selectedEmail.to || '(No recipient)'}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Subject
+                          </label>
+                          <div>{selectedEmail.subject || '(No subject)'}</div>
+                        </div>
+                        {selectedEmail.text && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-600 block mb-1">
+                              Thread (text)
+                            </label>
+                            <pre className="p-3 bg-white rounded border text-xs whitespace-pre-wrap max-h-64 overflow-auto">
+                              {selectedEmail.text}
+                            </pre>
+                          </div>
+                        )}
+                        {selectedEmail.html && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-600 block mb-1">
+                              HTML body
+                            </label>
+                            <div className="p-3 bg-white rounded text-xs max-h-48 overflow-auto border">
+                              <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                            </div>
+                          </div>
+                        )}
+                        {!selectedEmail.text && !selectedEmail.html && selectedEmail.email && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-600 block mb-1">
+                              Content (raw MIME — forwarded / no text+html)
+                            </label>
+                            <div className="rounded border border-amber-200 bg-amber-50 p-2 mb-2">
+                              <p className="text-xs text-amber-700">
+                                No parsed text/html. Use <strong>Show Raw</strong> in the header
+                                for full MIME.
+                              </p>
+                            </div>
+                            <pre className="p-3 bg-white rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap border">
+                              {selectedEmail.email.substring(0, 2000)}
+                              {selectedEmail.email.length > 2000
+                                ? `\n\n... (${selectedEmail.email.length} chars — use Show Raw for all)`
+                                : ''}
+                            </pre>
+                          </div>
+                        )}
+                        {selectedEmail.headers && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-600 block mb-1">
+                              Headers
+                            </label>
+                            <pre className="p-3 bg-white rounded text-xs overflow-auto max-h-32 whitespace-pre-wrap border">
+                              {selectedEmail.headers}
+                            </pre>
+                          </div>
+                        )}
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Received
+                          </label>
+                          <div className="text-sm text-gray-600">
+                            {formatDate(selectedEmail.createdAt)}
+                          </div>
+                        </div>
+                        {selectedEmail.ingestionStatus && (
+                          <div>
+                            <label className="text-sm font-semibold text-gray-600 block mb-1">
+                              Status
+                            </label>
+                            <span
+                              className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                selectedEmail.ingestionStatus === 'RECORDED'
+                                  ? 'bg-indigo-100 text-indigo-700'
+                                  : selectedEmail.ingestionStatus === 'RECEIVED'
+                                    ? 'bg-green-100 text-green-700'
+                                    : selectedEmail.ingestionStatus === 'FAILED'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {selectedEmail.ingestionStatus}
+                            </span>
+                            {selectedEmail.ingestionStatus === 'RECORDED' && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                This email has been recorded as a CRM activity. Buttons above are
+                                disabled.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </details>
+
                 {/* Transient errors / success (lookup, etc.) — not the main Save all success card */}
                 {actionMessage && actionMessage.type === 'error' && (
                   <div className="mb-4 px-3 py-2 rounded text-sm border bg-red-50 text-red-800 border-red-100">
@@ -1012,21 +1201,6 @@ export default function InboundParsePage() {
                         </div>
                       </div>
                     </div>
-                    {selectedEmail && (
-                      <details className="mt-3 rounded-lg border border-gray-200 bg-white/80">
-                        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">
-                          View original email
-                        </summary>
-                        <div className="border-t border-gray-100 px-3 py-2 max-h-56 overflow-auto text-xs text-gray-700 whitespace-pre-wrap">
-                          {selectedEmail.text ||
-                            (selectedEmail.html
-                              ? selectedEmail.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-                              : null) ||
-                            (selectedEmail.email ? `${selectedEmail.email.slice(0, 6000)}${selectedEmail.email.length > 6000 ? '…' : ''}` : null) ||
-                            '(No body stored)'}
-                        </div>
-                      </details>
-                    )}
                   </div>
                 )}
 
@@ -1035,15 +1209,9 @@ export default function InboundParsePage() {
                   <div className="mb-6 space-y-4">
                     <p className="text-xs text-gray-600">
                       Review each step, then use <strong>Save all</strong> at the bottom. Parse does not
-                      write to the CRM.
+                      write to the CRM. Use <strong>View email thread</strong> above to compare with the
+                      summary.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowOriginalEmail(!showOriginalEmail)}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      {showOriginalEmail ? 'Hide original email' : 'Show original email'}
-                    </button>
                     <div className="p-4 rounded-lg border-2 border-indigo-200 bg-indigo-50/50">
                       <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold">
@@ -1605,182 +1773,6 @@ export default function InboundParsePage() {
                       </p>
                     </div>
                   </div>
-                )}
-
-                {/* Raw / Parsed email view (hidden after save — use View original in success card) */}
-                {!inboundSaveComplete &&
-                  (showOriginalEmail || !parseResult) &&
-                  (showRaw ? (
-                  <div className="space-y-4">
-                    {selectedEmail.email && (
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-2">
-                          Raw MIME (SendGrid &ldquo;email&rdquo; field - full MIME when &ldquo;Include Raw&rdquo; enabled)
-                        </label>
-                        <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
-                          {selectedEmail.email}
-                        </pre>
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">
-                        Headers
-                      </label>
-                      <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
-                        {selectedEmail.headers || '(No headers)'}
-                      </pre>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">
-                        Text Body
-                      </label>
-                      <pre className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
-                        {selectedEmail.text || '(No text body)'}
-                      </pre>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-2">
-                        HTML Body
-                      </label>
-                      <div className="p-3 bg-gray-100 rounded text-xs overflow-auto max-h-64">
-                        {selectedEmail.html ? (
-                          <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
-                        ) : (
-                          '(No HTML body)'
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        From
-                      </label>
-                      <div>
-                        {extractName(selectedEmail.from) && (
-                          <div className="font-medium">{extractName(selectedEmail.from)}</div>
-                        )}
-                        <div className="text-sm text-gray-600">
-                          {extractEmailAddress(selectedEmail.from) ||
-                            selectedEmail.from ||
-                            '(No sender)'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        To
-                      </label>
-                      <div className="text-sm text-gray-600">
-                        {selectedEmail.to || '(No recipient)'}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Subject
-                      </label>
-                      <div>{selectedEmail.subject || '(No subject)'}</div>
-                    </div>
-
-                    {selectedEmail.text && (
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">
-                          Text Body
-                        </label>
-                        <div className="p-3 bg-gray-50 rounded text-sm whitespace-pre-wrap max-h-64 overflow-auto">
-                          {selectedEmail.text}
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedEmail.html && (
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">
-                          HTML Body
-                        </label>
-                        <div className="p-3 bg-gray-50 rounded text-sm max-h-64 overflow-auto border">
-                          <div dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Forwarded emails (e.g. from Outlook) skip text/html — full content is in the 'email' MIME field */}
-                    {!selectedEmail.text && !selectedEmail.html && selectedEmail.email && (
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">
-                          Content (Raw MIME — forwarded email)
-                        </label>
-                        <div className="rounded border border-amber-200 bg-amber-50 p-2 mb-2">
-                          <p className="text-xs text-amber-700">
-                            SendGrid sent this as raw MIME (no parsed text/html). Content is
-                            base64-encoded inside the MIME body below. Switch to{' '}
-                            <strong>Show Raw</strong> for the full MIME.
-                          </p>
-                        </div>
-                        <pre className="p-3 bg-gray-50 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
-                          {selectedEmail.email.substring(0, 2000)}
-                          {selectedEmail.email.length > 2000
-                            ? `\n\n... (${selectedEmail.email.length} chars total — click Show Raw for full content)`
-                            : ''}
-                        </pre>
-                      </div>
-                    )}
-
-                    {selectedEmail.headers && (
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">
-                          Headers
-                        </label>
-                        <pre className="p-3 bg-gray-50 rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap">
-                          {selectedEmail.headers}
-                        </pre>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-sm font-semibold text-gray-600 block mb-1 flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Received
-                      </label>
-                      <div className="text-sm text-gray-600">
-                        {formatDate(selectedEmail.createdAt)}
-                      </div>
-                    </div>
-
-                    {selectedEmail.ingestionStatus && (
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600 block mb-1">
-                          Status
-                        </label>
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                            selectedEmail.ingestionStatus === 'RECORDED'
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : selectedEmail.ingestionStatus === 'RECEIVED'
-                              ? 'bg-green-100 text-green-700'
-                              : selectedEmail.ingestionStatus === 'FAILED'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {selectedEmail.ingestionStatus}
-                        </span>
-                        {selectedEmail.ingestionStatus === 'RECORDED' && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            This email has been recorded as a CRM activity. Buttons above are
-                            disabled.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
                 )}
               </div>
             )}
