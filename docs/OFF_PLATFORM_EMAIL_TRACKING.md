@@ -551,4 +551,22 @@ followUpCadence Json? // { cold: 7, warm: 3, established: 14, dormant: 30 }
 
 ---
 
+### SendGrid inbound auto-record
+
+Outbound proofs forwarded into the CRM inbox can auto-run the same pipeline as **Record** (`push-to-ai`):
+
+| Env var | Meaning |
+|--------|---------|
+| `AUTO_PROCESS_SENDERS` | Comma-separated sender emails (From). Case-insensitive match |
+| `AUTO_PROCESS_COMPANY_IDS` | Comma-separated `company_hqs.id` values — auto-record **all** OUTREACH from those tenants |
+
+- Webhook: `POST /api/inbound-email` — after storing `InboundEmail`, fires processing when env matches (**OUTREACH** only).
+- Bulk (Firebase-auth’d UI/session token): `POST /api/inbound-parse/process-pending` — body `{ limit?: number, senderEmail?: string }`; processes `RECEIVED` rows (OUTREACH or legacy null type).
+- Core logic: [`lib/services/inboundAutoProcessService.ts`](../lib/services/inboundAutoProcessService.ts); trigger rules: [`lib/utils/inboundAutoProcessTrigger.ts`](../lib/utils/inboundAutoProcessTrigger.ts).
+- Interpretation default: [`lib/agents/inboundEmailAgent.ts`](../lib/agents/inboundEmailAgent.ts) (Vercel AI SDK `ToolLoopAgent` with `lookupContact` + `recordActivity`). Set `INBOUND_USE_LEGACY_INTERPRETER=true` to force the older single-prompt [`interpretEngagement`](../lib/services/aiEngagementInterpreter.ts) path.
+- `InboundEmail.autoProcessed` marks rows recorded by the agent (`markAutoProcessed`).
+- Failures set `ingestionStatus` to `FAILED`; manual **Record** can still retry without `requireReceivedStatus`.
+
+---
+
 **Status:** 🟢 Phase 1-3 Implemented - Ready for Migration & Testing

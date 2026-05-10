@@ -3,11 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { parseInboundRecipient, extractCompanySlugFromAddress } from '@/lib/utils/parseEmailAddress';
 import { simpleParser } from 'mailparser';
 import { interpretEngagement } from '@/lib/services/aiEngagementInterpreter';
+import type { EngagementInterpretation } from '@/lib/services/aiEngagementInterpreter';
 import { universalEmailParser } from '@/lib/services/universalEmailParser';
 import {
   bumpProspectNeedToEngageToEngaged,
   resolveOutreachContactIdForWave1,
 } from '@/lib/services/inboundProspectBump';
+import { autoProcessInboundEmail } from '@/lib/services/inboundAutoProcessService';
+import { shouldAutoProcessInboundEmail } from '@/lib/utils/inboundAutoProcessTrigger';
 
 /**
  * POST /api/inbound-email
@@ -15,7 +18,8 @@ import {
  * SendGrid Inbound Parse webhook endpoint - MVP1 Ingestion
  *
  * Architecture:
- * SendGrid → InboundEmail (raw ingestion + MIME parse) → Future async processor → EmailActivity
+ * SendGrid → InboundEmail (raw) → optional auto-record via inboundAutoProcessService
+ * when AUTO_PROCESS_SENDERS / AUTO_PROCESS_COMPANY_IDS match → EmailActivity + CRM stamps
  *
  * This endpoint is public and does not require authentication (webhook-safe).
  *
@@ -125,6 +129,9 @@ export async function POST(req: Request) {
     let inboundType: 'MEETING' | 'OUTREACH' =
       recipient?.inboundType === 'meeting' ? 'MEETING' : 'OUTREACH';
 
+    /** Reused for MEETING vs OUTREACH typing and optionally passed to auto-process (one OpenAI call). */
+    let outreachInterpretation: EngagementInterpretation | null = null;
+
     if (inboundType === 'OUTREACH') {
       const bodyText =
         (text || '').trim() ||
@@ -135,7 +142,7 @@ export async function POST(req: Request) {
           .slice(0, 8000);
       if (bodyText || (subject || '').trim()) {
         try {
-          const interpreted = await interpretEngagement(
+          outreachInterpretation = await interpretEngagement(
             {
               from,
               to,
@@ -146,8 +153,8 @@ export async function POST(req: Request) {
             null,
           );
           if (
-            interpreted.activityType === 'meeting_note' ||
-            interpreted.activityType === 'call_note'
+            outreachInterpretation.activityType === 'meeting_note' ||
+            outreachInterpretation.activityType === 'call_note'
           ) {
             inboundType = 'MEETING';
           }
@@ -220,6 +227,36 @@ export async function POST(req: Request) {
       } catch (waveErr) {
         console.warn('Inbound wave1 bump skipped:', (waveErr as Error)?.message);
       }
+    }
+
+    // Auto-record pipeline for allowlisted senders / companies (OUTREACH only)
+    if (
+      inboundType === 'OUTREACH' &&
+      shouldAutoProcessInboundEmail({
+        companyHQId,
+        fromHeader: from,
+        inboundType,
+      })
+    ) {
+      void autoProcessInboundEmail(prisma, {
+        inboundEmailId: inboundEmail.id,
+        requireReceivedStatus: true,
+        markAutoProcessed: true,
+        preInterpreted: outreachInterpretation,
+      }).then((autoResult) => {
+        if (autoResult.success === false) {
+          console.warn('Inbound auto-process failed:', {
+            inboundEmailId: inboundEmail.id,
+            error: autoResult.error,
+          });
+        } else {
+          console.log('Inbound auto-process recorded:', {
+            inboundEmailId: inboundEmail.id,
+            recordId: autoResult.recordId,
+            recordType: autoResult.recordType,
+          });
+        }
+      });
     }
 
     return NextResponse.json(

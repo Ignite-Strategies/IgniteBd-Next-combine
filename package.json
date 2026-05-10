@@ -18,6 +18,7 @@
     "db:push:unsafe": "echo '⚠️  WARNING: Using unsafe push. Run npm run db:safety-check first!' && npx prisma db push"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.63",
     "@azure/msal-browser": "^4.26.1",
     "@azure/msal-node": "^3.8.1",
     "@azure/msal-react": "^3.0.21",
@@ -26,6 +27,7 @@
     "@sendgrid/mail": "^8.1.6",
     "@uploadthing/react": "^7.3.3",
     "@upstash/redis": "^1.35.6",
+    "ai": "^6.0.177",
     "axios": "^1.13.2",
     "firebase": "^12.5.0",
     "firebase-admin": "^13.6.0",
@@ -34,7 +36,6 @@
     "mailparser": "^3.9.3",
     "next": "15.4.8",
     "openai": "^6.8.1",
-    "prisma": "^6.19.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "react-hook-form": "^7.66.0",
@@ -53,6 +54,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.4.8",
     "pg": "^8.16.3",
+    "prisma": "^6.19.0",
     "tailwindcss": "^4"
   }
 }
