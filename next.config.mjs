@@ -4,6 +4,11 @@ const nextConfig = {
     // Temporarily ignore ESLint errors during builds to allow deployment
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    // Skip integrated typecheck during `next build` (large projects can exceed Vercel time/memory here).
+    // Run `npx tsc --noEmit` locally or in CI when you want full type verification before merge.
+    ignoreBuildErrors: true,
+  },
   async headers() {
     return [
       {

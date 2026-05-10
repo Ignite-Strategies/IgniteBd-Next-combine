@@ -85,6 +85,10 @@ export default function InboundParsePage() {
   // Inbound parse pipeline health
   const [inboundHealth, setInboundHealth] = useState(null);
 
+  /** Bulk POST /api/inbound-parse/process-pending from inbox toolbar */
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProcessMessage, setBulkProcessMessage] = useState(null);
+
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
   const [meetingLoading, setMeetingLoading] = useState(true);
@@ -305,6 +309,43 @@ export default function InboundParsePage() {
     setApplyPipelineMatch(false);
     setLastInboundSave(null);
     setConfirmJobChange(false);
+  };
+
+  const handleProcessPending = async () => {
+    if (!companyHQId || inboundTab !== 'inbox') return;
+    if (displayEmails.length === 0) return;
+
+    setBulkProcessing(true);
+    setBulkProcessMessage(null);
+    try {
+      const limit = Math.max(displayEmails.length || 12, 1);
+      const res = await api.post('/api/inbound-parse/process-pending', { limit });
+      if (!res.data?.success) {
+        setBulkProcessMessage({
+          type: 'error',
+          text: res.data?.error || 'Bulk process failed',
+        });
+        return;
+      }
+      const summary = res.data.summary || {};
+      const processed = summary.processed ?? 0;
+      const failed = summary.failed ?? 0;
+      const attempted = summary.attempted ?? processed + failed;
+      setBulkProcessMessage({
+        type: failed > 0 ? 'warn' : 'success',
+        text: `Processed ${processed}; failed ${failed} (${attempted} attempted).`,
+      });
+      setSelectedEmail(null);
+      resetDetailState();
+      await fetchInboundEmails(companyHQId, 'inbox');
+    } catch (err) {
+      setBulkProcessMessage({
+        type: 'error',
+        text: err.response?.data?.error || err.message || 'Bulk process failed',
+      });
+    } finally {
+      setBulkProcessing(false);
+    }
   };
 
   const resetMeetingDetailState = () => {
@@ -761,12 +802,38 @@ export default function InboundParsePage() {
                 {inboundTab === 'all' && `All (${displayEmails.length})`}
               </span>
               <button
+                type="button"
                 onClick={() => fetchInboundEmails(companyHQId, inboundTab)}
                 className="text-sm text-blue-600 hover:underline"
               >
                 Refresh
               </button>
+              {inboundTab === 'inbox' && displayEmails.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleProcessPending}
+                  disabled={bulkProcessing || !companyHQId}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-900 shadow-sm transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4 shrink-0" />
+                  {bulkProcessing ? 'Processing…' : 'Auto-process pending'}
+                </button>
+              )}
             </div>
+            {bulkProcessMessage && inboundTab === 'inbox' && (
+              <div
+                role="status"
+                className={`mt-2 rounded-md border px-3 py-2 text-sm ${
+                  bulkProcessMessage.type === 'success'
+                    ? 'border-green-200 bg-green-50 text-green-900'
+                    : bulkProcessMessage.type === 'warn'
+                      ? 'border-amber-200 bg-amber-50 text-amber-900'
+                      : 'border-red-200 bg-red-50 text-red-900'
+                }`}
+              >
+                {bulkProcessMessage.text}
+              </div>
+            )}
             {displayEmails.length === 0 && !selectedEmail ? (
               <div className="py-8 text-center text-sm text-gray-500 rounded-lg bg-gray-50">
                 {inboundTab === 'inbox' && (
