@@ -3,7 +3,7 @@
  * Shared by inboundAutoProcessService and the ToolLoopAgent recordActivity tool.
  */
 
-import type { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import type { MeetingType, NextEngagementPurpose } from '@prisma/client';
 import type { EngagementInterpretation } from '@/lib/services/aiEngagementInterpreter';
 import {
