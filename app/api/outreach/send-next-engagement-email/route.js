@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { listContactsDue } from '@/lib/services/engagementService';
 import { sendEmail } from '@/lib/sendgridClient';
 import { formatNextEngagementEmailHtml, formatNextEngagementEmailText } from '@/lib/email/nextEngagementEmailTemplate';
+import { resolveRecipientToName } from '@/lib/services/nextEngagementDigestRecipients';
 
 /**
  * POST /api/outreach/send-next-engagement-email
@@ -86,6 +87,8 @@ export async function POST(request) {
       );
     }
 
+    const resolvedToName = await resolveRecipientToName(companyHQId, recipientEmail, recipientName);
+
     const subject = `Next Engagement Report - ${new Date().toLocaleDateString()}`;
     const html = formatNextEngagementEmailHtml(nextEngagements, customMessage);
     const text = formatNextEngagementEmailText(nextEngagements, customMessage);
@@ -93,7 +96,7 @@ export async function POST(request) {
     // Send using owner's verified sender (same as 1:1 compose)
     const result = await sendEmail({
       to: recipientEmail,
-      toName: recipientName || recipientEmail.split('@')[0],
+      toName: resolvedToName,
       subject,
       html,
       text,

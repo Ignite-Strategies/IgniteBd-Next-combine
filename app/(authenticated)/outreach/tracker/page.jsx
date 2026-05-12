@@ -39,6 +39,24 @@ function OutreachTrackerContent() {
   const [emailError, setEmailError] = useState(null);
   const [emailSuccess, setEmailSuccess] = useState(false);
 
+  useEffect(() => {
+    if (!showEmailModal || typeof window === 'undefined') return;
+    try {
+      const owner = JSON.parse(window.localStorage.getItem('owner') || 'null');
+      const email = (owner?.email || owner?.sendgridVerifiedEmail || '').trim();
+      if (!email) return;
+      setEmailRecipientEmail((prev) => (prev.trim() ? prev : email));
+      const dn =
+        owner?.sendgridVerifiedName?.trim() ||
+        owner?.name?.trim() ||
+        owner?.firstName?.trim() ||
+        '';
+      setEmailRecipientName((prev) => (prev.trim() ? prev : dn));
+    } catch {
+      /* ignore */
+    }
+  }, [showEmailModal]);
+
   const fetchContacts = async () => {
     if (!companyHQId) {
       setError('Company ID is required');

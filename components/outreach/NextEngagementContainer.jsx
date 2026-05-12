@@ -37,6 +37,25 @@ export default function NextEngagementContainer({
     setResolvedCompanyId(id || null);
   }, [companyHQId]);
 
+  /** Pre-fill recipient when opening modal so owners don't re-type themselves */
+  useEffect(() => {
+    if (!showSendEmailModal || typeof window === 'undefined') return;
+    try {
+      const owner = JSON.parse(window.localStorage.getItem('owner') || 'null');
+      const email = (owner?.email || owner?.sendgridVerifiedEmail || '').trim();
+      if (!email) return;
+      setRecipientEmail((prev) => (prev.trim() ? prev : email));
+      const dn =
+        owner?.sendgridVerifiedName?.trim() ||
+        owner?.name?.trim() ||
+        owner?.firstName?.trim() ||
+        '';
+      setRecipientName((prev) => (prev.trim() ? prev : dn));
+    } catch {
+      /* ignore bad JSON */
+    }
+  }, [showSendEmailModal]);
+
   useEffect(() => {
     if (!resolvedCompanyId) {
       setLoading(false);
