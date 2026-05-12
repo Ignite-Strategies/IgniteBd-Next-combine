@@ -100,6 +100,12 @@ export async function POST(request: Request) {
     recordId?: string;
     recordType?: string;
     contactId?: string | null;
+    contactEmail?: string;
+    contactName?: string | null;
+    activityType?: string;
+    summary?: string;
+    subject?: string;
+    fromPreview?: string;
   }[] = [];
 
   let processed = 0;
@@ -143,7 +149,17 @@ export async function POST(request: Request) {
 
     if (result.success === false) {
       failed += 1;
-      results.push({ id, ok: false, error: result.error });
+      const inboundRow = await prisma.inboundEmail.findUnique({
+        where: { id },
+        select: { subject: true, from: true },
+      });
+      results.push({
+        id,
+        ok: false,
+        error: result.error,
+        subject: inboundRow?.subject ?? undefined,
+        fromPreview: inboundRow?.from ?? undefined,
+      });
     } else {
       processed += 1;
       results.push({
@@ -152,6 +168,10 @@ export async function POST(request: Request) {
         recordId: result.recordId,
         recordType: result.recordType,
         contactId: result.contactId,
+        contactEmail: result.parsed?.contactEmail,
+        contactName: result.parsed?.contactName ?? undefined,
+        activityType: result.parsed?.activityType,
+        summary: result.parsed?.summary,
       });
     }
   }

@@ -621,6 +621,7 @@ export async function applyInboundRecordingCore(
     data: {
       ingestionStatus: 'RECORDED',
       inboundType: 'OUTREACH',
+      processingError: null,
       ...(markAutoProcessed ? { autoProcessed: true } : {}),
     },
   });

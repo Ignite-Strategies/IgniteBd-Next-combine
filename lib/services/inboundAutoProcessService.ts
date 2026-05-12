@@ -277,10 +277,15 @@ export async function autoProcessInboundEmail(
       };
     }
     console.error('❌ autoProcessInboundEmail error:', error);
+    const errMsg =
+      error instanceof Error ? error.message : String(error);
     try {
       await prisma.inboundEmail.update({
         where: { id: inboundEmailId },
-        data: { ingestionStatus: 'FAILED' },
+        data: {
+          ingestionStatus: 'FAILED',
+          processingError: errMsg.slice(0, 500),
+        },
       });
     } catch (updErr) {
       console.warn('⚠️ Failed to mark InboundEmail FAILED:', (updErr as Error)?.message);

@@ -16,6 +16,7 @@ import {
   History,
   User,
 } from 'lucide-react';
+import Link from 'next/link';
 import api from '@/lib/api';
 import {
   NEXT_ENGAGEMENT_PURPOSE_LABELS,
@@ -48,6 +49,15 @@ function ActivityTypeBadge({ type }) {
  * Flow: Parse runs interpret only → edit matcher steps → Save all → email_activities + contact + pipeline (backend).
  * Post-save: AI Reasoning stamps contact. contact_id can be null; email_activities.email is persisted for later link.
  */
+function bulkRecordKindLabel(activityType, recordType) {
+  if (typeof recordType === 'string' && recordType.includes('Meeting')) {
+    return recordType.includes('Call') ? 'Call' : 'Meeting';
+  }
+  if (activityType === 'call_note') return 'Call';
+  if (activityType === 'meeting_note') return 'Meeting';
+  return 'Email';
+}
+
 export default function InboundParsePage() {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +98,8 @@ export default function InboundParsePage() {
   /** Bulk POST /api/inbound-parse/process-pending from inbox toolbar */
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkProcessMessage, setBulkProcessMessage] = useState(null);
+  const [bulkProcessResults, setBulkProcessResults] = useState(null);
+  const [bulkResultsExpanded, setBulkResultsExpanded] = useState(false);
 
   // Meeting ingest (right panel)
   const [notes, setNotes] = useState([]);
@@ -317,6 +329,8 @@ export default function InboundParsePage() {
 
     setBulkProcessing(true);
     setBulkProcessMessage(null);
+    setBulkProcessResults(null);
+    setBulkResultsExpanded(false);
     try {
       const limit = Math.max(displayEmails.length || 12, 1);
       const res = await api.post('/api/inbound-parse/process-pending', { limit });
@@ -331,10 +345,25 @@ export default function InboundParsePage() {
       const processed = summary.processed ?? 0;
       const failed = summary.failed ?? 0;
       const attempted = summary.attempted ?? processed + failed;
+      const results = Array.isArray(res.data.results) ? res.data.results : [];
+      let linked = 0;
+      let unmatched = 0;
+      for (const r of results) {
+        if (r.ok) {
+          if (r.contactId) linked += 1;
+          else unmatched += 1;
+        }
+      }
+      const summaryText =
+        processed > 0
+          ? `Processed ${processed} (${linked} linked${unmatched > 0 ? `, ${unmatched} no contact match` : ''}); failed ${failed} (${attempted} attempted).`
+          : `Processed ${processed}; failed ${failed} (${attempted} attempted).`;
+      const hasIssues = failed > 0 || unmatched > 0;
       setBulkProcessMessage({
-        type: failed > 0 ? 'warn' : 'success',
-        text: `Processed ${processed}; failed ${failed} (${attempted} attempted).`,
+        type: hasIssues ? 'warn' : 'success',
+        text: summaryText,
       });
+      setBulkProcessResults(results);
       setSelectedEmail(null);
       resetDetailState();
       await fetchInboundEmails(companyHQId, 'inbox');
@@ -844,7 +873,100 @@ export default function InboundParsePage() {
                       : 'border-red-200 bg-red-50 text-red-900'
                 }`}
               >
-                {bulkProcessMessage.text}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p>{bulkProcessMessage.text}</p>
+                    {bulkProcessResults?.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setBulkResultsExpanded((v) => !v)}
+                        className="mt-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+                      >
+                        {bulkResultsExpanded ? 'Hide details' : 'Show details'}
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkProcessMessage(null);
+                      setBulkProcessResults(null);
+                      setBulkResultsExpanded(false);
+                    }}
+                    className="shrink-0 rounded px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-black/5"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                {bulkResultsExpanded && bulkProcessResults?.length > 0 && (
+                  <ul className="mt-3 space-y-2 border-t border-black/10 pt-3 text-xs">
+                    {bulkProcessResults.map((r) => (
+                      <li
+                        key={r.id}
+                        className="rounded-md border border-gray-200 bg-white/80 px-2.5 py-2 text-gray-800"
+                      >
+                        {!r.ok ? (
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-900">
+                                Failed
+                              </span>
+                              <span className="font-medium">{r.subject || 'No subject'}</span>
+                            </div>
+                            {r.fromPreview && (
+                              <p className="text-[11px] text-gray-500 line-clamp-2">{r.fromPreview}</p>
+                            )}
+                            <p className="text-red-800 break-words">{r.error}</p>
+                          </div>
+                        ) : r.contactId ? (
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-900">
+                                Linked
+                              </span>
+                              <span className="rounded bg-gray-100 px-1.5 py-0 text-[10px] font-medium text-gray-700">
+                                {bulkRecordKindLabel(r.activityType, r.recordType)}
+                              </span>
+                              <Link
+                                href={`/contacts/${r.contactId}?companyHQId=${encodeURIComponent(companyHQId || '')}`}
+                                className="font-semibold text-blue-700 hover:underline"
+                              >
+                                {r.contactName || r.contactEmail || 'Open contact'}
+                              </Link>
+                              {r.contactEmail && r.contactName && (
+                                <span className="text-gray-500">({r.contactEmail})</span>
+                              )}
+                            </div>
+                            {r.summary && (
+                              <p className="text-gray-600 line-clamp-2 italic">{r.summary}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
+                                No contact match
+                              </span>
+                              <span className="rounded bg-gray-100 px-1.5 py-0 text-[10px] font-medium text-gray-700">
+                                {bulkRecordKindLabel(r.activityType, r.recordType)}
+                              </span>
+                              <span className="font-medium">
+                                {r.contactName || r.contactEmail || 'Prospect email unknown'}
+                              </span>
+                            </div>
+                            {r.summary && (
+                              <p className="text-gray-600 line-clamp-2 italic">{r.summary}</p>
+                            )}
+                            <p className="text-[11px] text-gray-500">
+                              Record may exist without a linked contact. Open this thread from Saved or All, pick the
+                              contact, and save.
+                            </p>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
             {displayEmails.length === 0 && !selectedEmail ? (
@@ -935,6 +1057,11 @@ export default function InboundParsePage() {
                             <div className="text-xs text-gray-400 truncate mt-0.5">
                               {fromEmail || email.from || 'No sender'}
                             </div>
+                            {email.processingError && (
+                              <div className="text-[11px] text-red-800 mt-1 line-clamp-4 whitespace-pre-wrap break-words">
+                                {email.processingError}
+                              </div>
+                            )}
                           </div>
                           <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
                             {formatDate(email.createdAt)}
@@ -1017,6 +1144,13 @@ export default function InboundParsePage() {
                     </button>
                   )}
                 </div>
+
+                {selectedEmail.ingestionStatus === 'FAILED' && selectedEmail.processingError && (
+                  <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                    <p className="font-semibold">Last auto-process error</p>
+                    <p className="mt-1 whitespace-pre-wrap break-words">{selectedEmail.processingError}</p>
+                  </div>
+                )}
 
                 {/* Full email thread / MIME — always available to verify the AI summary (before & after parse, after save) */}
                 <details
