@@ -68,7 +68,7 @@ export default function InboundParsePage() {
   const [summaryOverride, setSummaryOverride] = useState('');
   const [recordedContactId, setRecordedContactId] = useState(null);
   const [createContactLoading, setCreateContactLoading] = useState(false);
-  const [inboundTab, setInboundTab] = useState('inbox'); // inbox | recorded | all
+  const [inboundTab, setInboundTab] = useState('inbox'); // inbox | recorded | failed | all
   const [selectedContactEmailHistory, setSelectedContactEmailHistory] = useState(null);
   const [selectedContactEmailHistoryLoading, setSelectedContactEmailHistoryLoading] = useState(false);
   const [lookupContactLoading, setLookupContactLoading] = useState(false);
@@ -786,6 +786,18 @@ export default function InboundParsePage() {
                 <button
                   type="button"
                   onClick={() => {
+                    setInboundTab('failed');
+                    fetchInboundEmails(companyHQId, 'failed');
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                    inboundTab === 'failed' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Failed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     setInboundTab('all');
                     fetchInboundEmails(companyHQId, 'all');
                   }}
@@ -799,6 +811,7 @@ export default function InboundParsePage() {
               <span className="text-sm text-gray-600">
                 {inboundTab === 'inbox' && `To process (${displayEmails.length})`}
                 {inboundTab === 'recorded' && `Saved (${displayEmails.length})`}
+                {inboundTab === 'failed' && `Failed (${displayEmails.length})`}
                 {inboundTab === 'all' && `All (${displayEmails.length})`}
               </span>
               <button
@@ -846,6 +859,13 @@ export default function InboundParsePage() {
                   <>
                     <CheckCircle className="h-10 w-10 mx-auto mb-2 text-gray-400" />
                     No saved emails yet. Record an email from Inbox to see it here.
+                  </>
+                )}
+                {inboundTab === 'failed' && (
+                  <>
+                    <AlertTriangle className="h-10 w-10 mx-auto mb-2 text-amber-500" />
+                    No failed ingest rows in this period. Failed items drop out of Inbox but stay here and under All —
+                    open one and use Push to AI / Record again after fixing the cause.
                   </>
                 )}
                 {inboundTab === 'all' && (
@@ -906,6 +926,11 @@ export default function InboundParsePage() {
                               <span className="text-xs text-gray-500 truncate flex-1 min-w-0">
                                 {email.subject || '(No subject)'}
                               </span>
+                              {email.ingestionStatus === 'FAILED' && (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-800 bg-red-100 border border-red-200 px-1.5 py-0 rounded shrink-0">
+                                  Failed
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-gray-400 truncate mt-0.5">
                               {fromEmail || email.from || 'No sender'}
