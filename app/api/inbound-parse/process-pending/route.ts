@@ -4,6 +4,25 @@ import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { universalEmailParser } from '@/lib/services/universalEmailParser';
 import { autoProcessInboundEmail } from '@/lib/services/inboundAutoProcessService';
 
+/** Allow bulk processing + OpenAI TPM backoff without cutting the request short on Vercel. */
+export const maxDuration = 300;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Parses "Please try again in 3.036s" from OpenAI error messages. */
+function retryAfterMsFromMessage(msg: string): number {
+  const m = msg.match(/try again in ([\d.]+)\s*s\b/i);
+  if (m) {
+    const sec = Number.parseFloat(m[1]);
+    if (Number.isFinite(sec) && sec >= 0) {
+      return Math.min(Math.ceil(sec * 1000) + 750, 120_000);
+    }
+  }
+  return 62_000;
+}
+
 /**
  * POST /api/inbound-parse/process-pending
  *
@@ -86,12 +105,42 @@ export async function POST(request: Request) {
   let processed = 0;
   let failed = 0;
 
-  for (const id of idsToProcess) {
-    const result = await autoProcessInboundEmail(prisma, {
+  const delayBetweenMs = Math.max(
+    0,
+    Number.parseInt(process.env.INBOUND_PROCESS_PENDING_DELAY_MS ?? '8000', 10) || 8000,
+  );
+  const maxRateLimitRetries = Math.min(
+    8,
+    Math.max(0, Number.parseInt(process.env.INBOUND_PROCESS_PENDING_RATE_LIMIT_RETRIES ?? '6', 10) || 6),
+  );
+
+  for (let i = 0; i < idsToProcess.length; i++) {
+    const id = idsToProcess[i];
+    if (i > 0 && delayBetweenMs > 0) {
+      await sleep(delayBetweenMs);
+    }
+
+    let result = await autoProcessInboundEmail(prisma, {
       inboundEmailId: id,
       requireReceivedStatus: true,
       markAutoProcessed: true,
     });
+
+    let rateRetries = 0;
+    while (
+      result.success === false &&
+      result.status === 429 &&
+      rateRetries < maxRateLimitRetries
+    ) {
+      rateRetries += 1;
+      await sleep(retryAfterMsFromMessage(result.error));
+      result = await autoProcessInboundEmail(prisma, {
+        inboundEmailId: id,
+        requireReceivedStatus: true,
+        markAutoProcessed: true,
+      });
+    }
+
     if (result.success === false) {
       failed += 1;
       results.push({ id, ok: false, error: result.error });

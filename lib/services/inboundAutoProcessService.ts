@@ -73,6 +73,17 @@ export type AutoProcessInboundFailure = {
 
 export type AutoProcessInboundResult = AutoProcessInboundSuccess | AutoProcessInboundFailure;
 
+/** True when OpenAI hit TPM/RPM limits — inbound row should stay RECEIVED for retry. */
+function isOpenAiRateLimitError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const name = error instanceof Error ? error.name : '';
+  return (
+    name === 'AI_RetryError' ||
+    name === 'AI_APICallError' ||
+    /rate_limit_exceeded|Rate limit reached for|tokens per min \(TPM\)/i.test(msg)
+  );
+}
+
 function interpretationComplete(interpreted: unknown): interpreted is EngagementInterpretation {
   return (
     !!interpreted &&
@@ -253,6 +264,18 @@ export async function autoProcessInboundEmail(
 
     return recordingSuccess as AutoProcessInboundSuccess;
   } catch (error) {
+    if (isOpenAiRateLimitError(error)) {
+      const msg = error instanceof Error ? error.message : 'OpenAI rate limit';
+      console.warn(
+        '⚠️ autoProcessInboundEmail: OpenAI rate limited; leaving InboundEmail unchanged for retry:',
+        msg.slice(0, 240),
+      );
+      return {
+        success: false,
+        status: 429,
+        error: msg,
+      };
+    }
     console.error('❌ autoProcessInboundEmail error:', error);
     try {
       await prisma.inboundEmail.update({
