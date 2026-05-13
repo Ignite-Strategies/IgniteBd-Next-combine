@@ -24,7 +24,6 @@ if (fs.existsSync(envLocalPath)) {
 }
 
 // Get environment variables
-const directUrl = process.env.DIRECT_DATABASE_URL;
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
@@ -32,14 +31,19 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-// If DIRECT_DATABASE_URL is set, use it for migrations
-// Otherwise, use DATABASE_URL (may timeout with Neon pooler)
-if (directUrl) {
-  console.log('✅ Using DIRECT_DATABASE_URL for migrations (bypasses pooler)');
-  process.env.DATABASE_URL = directUrl;
-} else {
-  console.log('⚠️  DIRECT_DATABASE_URL not set, using DATABASE_URL');
-  console.log('⚠️  If migrations timeout, set DIRECT_DATABASE_URL in Vercel');
+// prisma/schema.prisma declares directUrl = env("DIRECT_DATABASE_URL"); Prisma CLI
+// still requires that variable to be set. Mirror DATABASE_URL when absent (e.g. Vercel).
+if (!process.env.DIRECT_DATABASE_URL) {
+  process.env.DIRECT_DATABASE_URL = databaseUrl;
+  console.log(
+    '⚠️  DIRECT_DATABASE_URL not set — using DATABASE_URL for schema/directUrl. Add a non-pooler Neon URL if migrate deploy times out.',
+  );
+}
+
+// When both URLs are provided and differ, run migrations on the direct (non-pooler) connection.
+if (process.env.DIRECT_DATABASE_URL !== databaseUrl) {
+  console.log('✅ Using DIRECT_DATABASE_URL for migrate deploy (bypasses pooler)');
+  process.env.DATABASE_URL = process.env.DIRECT_DATABASE_URL;
 }
 
 try {
