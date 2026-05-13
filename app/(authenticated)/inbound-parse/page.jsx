@@ -96,6 +96,8 @@ function InboundParsePageContent() {
 
   // Inbound parse pipeline health
   const [inboundHealth, setInboundHealth] = useState(null);
+  /** List window for GET /api/inbound-parse (7 | 30 | 90). */
+  const [inboundDays, setInboundDays] = useState(90);
 
   /** Bulk POST /api/inbound-parse/process-pending from inbox toolbar */
   const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -125,7 +127,7 @@ function InboundParsePageContent() {
       try {
         setLoading(true);
         const res = await api.get(
-          `/api/inbound-parse?companyHQId=${tenantId}&tab=${effectiveTab}`,
+          `/api/inbound-parse?companyHQId=${tenantId}&tab=${effectiveTab}&days=${inboundDays}`,
         );
         if (res.data?.success) {
           setEmails(res.data.emails || []);
@@ -136,7 +138,7 @@ function InboundParsePageContent() {
         setLoading(false);
       }
     },
-    [inboundTab],
+    [inboundTab, inboundDays],
   );
 
   const fetchMeetingNotes = useCallback(async (tenantId) => {
@@ -177,7 +179,7 @@ function InboundParsePageContent() {
       return;
     }
     fetchInboundEmails(companyHQId, inboundTab);
-  }, [companyHQId, missing, inboundTab, fetchInboundEmails]);
+  }, [companyHQId, missing, inboundTab, inboundDays, fetchInboundEmails]);
 
   // When user selects a contact from name matches, fetch that contact's email history for Step 3
   useEffect(() => {
@@ -785,11 +787,41 @@ function InboundParsePageContent() {
                 </>
               ) : (
                 <>
-                  <span className="font-semibold">No emails received recently.</span>{' '}
-                  {inboundHealth.daysSinceLastReceived !== null
-                    ? `Last inbound was ${inboundHealth.daysSinceLastReceived} day${inboundHealth.daysSinceLastReceived === 1 ? '' : 's'} ago.`
-                    : 'No inbound emails found in the database.'}
-                  {' '}MX record looks OK — check SendGrid Inbound Parse settings if you expect activity.
+                  <span className="font-semibold">Inbound ingest looks quiet.</span>{' '}
+                  {inboundHealth.daysSinceLastReceived !== null ? (
+                    <>
+                      The newest <strong>stored</strong> raw email (any tenant) is{' '}
+                      {inboundHealth.daysSinceLastReceived} day
+                      {inboundHealth.daysSinceLastReceived === 1 ? '' : 's'} old
+                      {inboundHealth.lastIngestionStatus
+                        ? ` — status when saved: ${inboundHealth.lastIngestionStatus}`
+                        : ''}
+                      . That means nothing new has been written to{' '}
+                      <code className="text-xs bg-amber-100 px-1 rounded">InboundEmail</code> since
+                      then (webhook did not complete a save, or no mail arrived).
+                    </>
+                  ) : (
+                    <>
+                      No <code className="text-xs bg-amber-100 px-1 rounded">InboundEmail</code>{' '}
+                      rows exist yet.
+                    </>
+                  )}
+                  {inboundHealth.rollup30dTotal > 0 && (
+                    <>
+                      {' '}
+                      Last {inboundHealth.rollup30dDays ?? 30} days (global):{' '}
+                      {Object.entries(inboundHealth.rollup30dByStatus || {})
+                        .map(([st, n]) => `${st}: ${n}`)
+                        .join(' · ')}
+                      . Failures <strong>after</strong> a row is saved show under the Failed tab and do
+                      not mean “no email received.”
+                    </>
+                  )}
+                  {' '}
+                  MX for <code className="text-xs bg-amber-100 px-1 rounded">{inboundHealth.host}</code>{' '}
+                  looks OK — if you expect traffic, confirm SendGrid Inbound Parse POST URL is{' '}
+                  <code className="text-xs bg-amber-100 px-1 rounded">/api/inbound-email</code> and the
+                  To address matches a company slug.
                 </>
               )}
             </div>
@@ -850,6 +882,21 @@ function InboundParsePageContent() {
                   All
                 </button>
               </div>
+              <span className="text-sm text-gray-600">
+                <label htmlFor="inbound-days" className="mr-1.5 text-gray-500">
+                  List range
+                </label>
+                <select
+                  id="inbound-days"
+                  value={inboundDays}
+                  onChange={(e) => setInboundDays(Number(e.target.value))}
+                  className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-800"
+                >
+                  <option value={7}>7 days</option>
+                  <option value={30}>30 days</option>
+                  <option value={90}>90 days</option>
+                </select>
+              </span>
               <span className="text-sm text-gray-600">
                 {inboundTab === 'inbox' && `To process (${displayEmails.length})`}
                 {inboundTab === 'recorded' && `Saved (${displayEmails.length})`}
