@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
-    "build:full": "prisma generate && npm run migrate && npm run build",
+    "build": "prisma generate && node scripts/migrate-deploy.js && next build",
+    "build:full": "npm run build",
     "migrate": "node scripts/migrate-deploy.js",
     "migrate:neon-http": "node scripts/migrate-via-neon-http.mjs",
     "start": "next start",
