@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { promises as dns } from 'dns';
 import { prisma } from '@/lib/prisma';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
 const INBOUND_PARSE_HOST = 'crm.ignitestrategies.co';
 const EXPECTED_MX = 'mx.sendgrid.net';
@@ -20,14 +19,9 @@ const STALE_DAYS = 1;
  *   lastReceivedAt: ISO string | null
  *   daysSinceLastReceived: number | null
  *   status: 'ok' | 'stale' | 'down'
+ * No Firebase auth: returns only aggregate MX + newest InboundEmail timestamp (no tenant PII).
  */
-export async function GET(request: Request) {
-  try {
-    await verifyFirebaseToken(request);
-  } catch {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
+export async function GET() {
   // MX check
   let mxOk = false;
   let mxRecords: string[] = [];
