@@ -73,14 +73,58 @@ export type AutoProcessInboundFailure = {
 
 export type AutoProcessInboundResult = AutoProcessInboundSuccess | AutoProcessInboundFailure;
 
+/** Flatten AI SDK errors (AI_RetryError wraps AI_APICallError; name may minify to "Error"). */
+function collectOpenAiErrorText(error: unknown, depth = 0): string {
+  if (error == null || depth > 6) return '';
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) {
+    const withCause = error as Error & { cause?: unknown };
+    return [error.name, error.message, collectOpenAiErrorText(withCause.cause, depth + 1)]
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (typeof error !== 'object') return String(error);
+  const o = error as Record<string, unknown>;
+  const bits: string[] = [];
+  if (typeof o.name === 'string') bits.push(o.name);
+  if (typeof o.message === 'string') bits.push(o.message);
+  if (typeof o.responseBody === 'string') bits.push(o.responseBody);
+  if (o.lastError != null) bits.push(collectOpenAiErrorText(o.lastError, depth + 1));
+  if (Array.isArray(o.errors)) {
+    for (const sub of o.errors) bits.push(collectOpenAiErrorText(sub, depth + 1));
+  }
+  if (o.cause != null) bits.push(collectOpenAiErrorText(o.cause, depth + 1));
+  return bits.filter(Boolean).join(' ');
+}
+
+function hasNested429(error: unknown, depth = 0): boolean {
+  if (error == null || depth > 6) return false;
+  if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+    const s = (error as { statusCode: unknown }).statusCode;
+    if (s === 429) return true;
+  }
+  if (error instanceof Error) {
+    const c = (error as Error & { cause?: unknown }).cause;
+    if (hasNested429(c, depth + 1)) return true;
+  }
+  if (typeof error === 'object' && error !== null) {
+    const o = error as Record<string, unknown>;
+    if (o.lastError != null && hasNested429(o.lastError, depth + 1)) return true;
+    if (Array.isArray(o.errors)) {
+      for (const sub of o.errors) {
+        if (hasNested429(sub, depth + 1)) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** True when OpenAI hit TPM/RPM limits — inbound row should stay RECEIVED for retry. */
 function isOpenAiRateLimitError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error);
-  const name = error instanceof Error ? error.name : '';
+  const text = collectOpenAiErrorText(error);
   return (
-    name === 'AI_RetryError' ||
-    name === 'AI_APICallError' ||
-    /rate_limit_exceeded|Rate limit reached for|tokens per min \(TPM\)/i.test(msg)
+    hasNested429(error) ||
+    /\brate_limit_exceeded\b|Rate limit reached for|tokens per min \(TPM\)/i.test(text)
   );
 }
 
@@ -251,15 +295,51 @@ export async function autoProcessInboundEmail(
         opts: recordingOpts,
       });
     } else {
-      recordingSuccess = await runInboundEmailAgentPipeline(prisma, {
-        inboundEmailId,
-        inbound,
-        parsed: parsedUnknown,
-        ownerContext,
-        ownerId,
-        companyHQId,
-        recordingOpts,
-      });
+      // One interpret call before the tool-loop agent cuts TPM for bulk / process-pending (no preInterpreted).
+      let preAgentInterpret: EngagementInterpretation | null = null;
+      try {
+        preAgentInterpret = await interpretEngagement(
+          {
+            from: parsed.from,
+            fromEmail: parsed.fromEmail,
+            fromName: parsed.fromName,
+            to: parsed.to,
+            toEmail: parsed.toEmail,
+            toName: parsed.toName,
+            subject: parsed.subject,
+            body: parsed.body,
+            headers: parsed.headers,
+            raw: parsed.raw,
+          },
+          ownerContext,
+        );
+      } catch (preErr) {
+        console.warn(
+          '⚠️ pre-agent interpretEngagement skipped:',
+          (preErr as Error)?.message?.slice(0, 200),
+        );
+      }
+      if (interpretationComplete(preAgentInterpret)) {
+        recordingSuccess = await applyInboundRecordingCore(prisma, {
+          inboundEmailId,
+          inbound,
+          parsed: parsedUnknown,
+          interpreted: preAgentInterpret,
+          ownerId,
+          companyHQId,
+          opts: recordingOpts,
+        });
+      } else {
+        recordingSuccess = await runInboundEmailAgentPipeline(prisma, {
+          inboundEmailId,
+          inbound,
+          parsed: parsedUnknown,
+          ownerContext,
+          ownerId,
+          companyHQId,
+          recordingOpts,
+        });
+      }
     }
 
     return recordingSuccess as AutoProcessInboundSuccess;

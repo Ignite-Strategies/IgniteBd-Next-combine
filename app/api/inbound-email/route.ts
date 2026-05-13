@@ -34,6 +34,10 @@ import { shouldAutoProcessInboundEmail } from '@/lib/utils/inboundAutoProcessTri
  */
 const MAX_SAFE_INBOUND_BYTES = 3.5 * 1024 * 1024; // below Vercel ~4.5MB hard limit
 
+/** Inbound Parse posts multipart/form-data; Event Webhook posts JSON → /api/webhooks/sendgrid */
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     const contentLength = Number(req.headers.get('content-length') || 0);
@@ -52,8 +56,33 @@ export async function POST(req: Request) {
       );
     }
 
+    const contentType = (req.headers.get('content-type') || '').toLowerCase();
+    // SendGrid Event Webhook is JSON — must use POST /api/webhooks/sendgrid, not this route.
+    if (contentType.includes('application/json')) {
+      console.warn(
+        '[inbound-email] JSON Content-Type: this URL is for Inbound Parse (multipart) only. Configure event POST URL as /api/webhooks/sendgrid'
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Expected multipart/form-data (SendGrid Inbound Parse). Event webhooks belong at /api/webhooks/sendgrid',
+        },
+        { status: 200 }
+      );
+    }
+
     // STEP 1: Extract formData (multipart/form-data from SendGrid)
-    const formData = await req.formData();
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch (parseErr) {
+      console.error('[inbound-email] formData() failed (wrong Content-Type or malformed multipart?)', {
+        contentType,
+        message: (parseErr as Error)?.message,
+      });
+      throw parseErr;
+    }
 
     // STEP 2: Extract SendGrid fields (exact match, case-sensitive)
     const from            = (formData.get('from')            as string | null) || null;

@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
 import PageHeader from '@/components/PageHeader';
+import CompanyKeyMissingError from '@/components/CompanyKeyMissingError';
+import { useCompanyHQId } from '@/hooks/useCompanyHQId';
 import {
   Inbox,
   Mail,
@@ -58,12 +60,12 @@ function bulkRecordKindLabel(activityType, recordType) {
   return 'Email';
 }
 
-export default function InboundParsePage() {
+function InboundParsePageContent() {
+  const { companyHQId, missing } = useCompanyHQId();
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [showRaw, setShowRaw] = useState(false);
-  const [companyHQId, setCompanyHQId] = useState(null);
   const [analyzeLoading, setAnalyzeLoading] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -116,26 +118,66 @@ export default function InboundParsePage() {
   const [meetingPushLoading, setMeetingPushLoading] = useState(false);
   const [meetingActionMessage, setMeetingActionMessage] = useState(null);
 
-  useEffect(() => {
-    const crmId =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('companyHQId') ||
-          window.localStorage.getItem('companyId') ||
-          null
-        : null;
+  const fetchInboundEmails = useCallback(
+    async (tenantId, tab) => {
+      if (!tenantId) return;
+      const effectiveTab = tab ?? inboundTab;
+      try {
+        setLoading(true);
+        const res = await api.get(
+          `/api/inbound-parse?companyHQId=${tenantId}&tab=${effectiveTab}`,
+        );
+        if (res.data?.success) {
+          setEmails(res.data.emails || []);
+        }
+      } catch (error) {
+        console.error('Error fetching inbound parse emails:', error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [inboundTab],
+  );
 
-    if (crmId) {
-      setCompanyHQId(crmId);
-      fetchInboundEmails(crmId, 'inbox');
-      fetchMeetingNotes(crmId);
-    } else {
-      setLoading(false);
+  const fetchMeetingNotes = useCallback(async (tenantId) => {
+    try {
+      setMeetingLoading(true);
+      const res = await api.get(`/api/meeting-ingest?companyHQId=${tenantId}`);
+      if (res.data?.success) {
+        setNotes(res.data.notes || []);
+      }
+    } catch (error) {
+      console.error('Error fetching meeting notes:', error);
+    } finally {
       setMeetingLoading(false);
     }
-    api.get('/api/health/inbound-parse').then((res) => {
-      if (res.data?.success) setInboundHealth(res.data);
-    }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    api
+      .get('/api/health/inbound-parse')
+      .then((res) => {
+        if (res.data?.success) setInboundHealth(res.data);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (missing || !companyHQId) {
+      setMeetingLoading(false);
+      return;
+    }
+    fetchMeetingNotes(companyHQId);
+  }, [companyHQId, missing, fetchMeetingNotes]);
+
+  useEffect(() => {
+    if (missing || !companyHQId) {
+      setLoading(false);
+      setEmails([]);
+      return;
+    }
+    fetchInboundEmails(companyHQId, inboundTab);
+  }, [companyHQId, missing, inboundTab, fetchInboundEmails]);
 
   // When user selects a contact from name matches, fetch that contact's email history for Step 3
   useEffect(() => {
@@ -190,35 +232,6 @@ export default function InboundParsePage() {
   useEffect(() => {
     if (selectedEmail?.id) setThreadOpen(true);
   }, [selectedEmail?.id]);
-
-  const fetchInboundEmails = async (tenantId, tab = inboundTab) => {
-    if (!tenantId) return;
-    try {
-      setLoading(true);
-      const res = await api.get(`/api/inbound-parse?companyHQId=${tenantId}&tab=${tab}`);
-      if (res.data?.success) {
-        setEmails(res.data.emails || []);
-      }
-    } catch (error) {
-      console.error('Error fetching inbound parse emails:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMeetingNotes = async (tenantId) => {
-    try {
-      setMeetingLoading(true);
-      const res = await api.get(`/api/meeting-ingest?companyHQId=${tenantId}`);
-      if (res.data?.success) {
-        setNotes(res.data.notes || []);
-      }
-    } catch (error) {
-      console.error('Error fetching meeting notes:', error);
-    } finally {
-      setMeetingLoading(false);
-    }
-  };
 
   // Group by date for section headers: Today, Yesterday, This week, Earlier
   const groupByDate = (list, dateKey = 'createdAt') => {
@@ -731,6 +744,10 @@ export default function InboundParsePage() {
   const inboundAlreadyRecorded =
     inboundSaveComplete || selectedEmail?.ingestionStatus === 'RECORDED';
 
+  if (missing) {
+    return <CompanyKeyMissingError />;
+  }
+
   if (loading && meetingLoading) {
     return (
       <div className="py-8">
@@ -792,7 +809,6 @@ export default function InboundParsePage() {
                   type="button"
                   onClick={() => {
                     setInboundTab('inbox');
-                    fetchInboundEmails(companyHQId, 'inbox');
                   }}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
                     inboundTab === 'inbox' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
@@ -804,7 +820,6 @@ export default function InboundParsePage() {
                   type="button"
                   onClick={() => {
                     setInboundTab('recorded');
-                    fetchInboundEmails(companyHQId, 'recorded');
                   }}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
                     inboundTab === 'recorded' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
@@ -816,7 +831,6 @@ export default function InboundParsePage() {
                   type="button"
                   onClick={() => {
                     setInboundTab('failed');
-                    fetchInboundEmails(companyHQId, 'failed');
                   }}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
                     inboundTab === 'failed' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
@@ -828,7 +842,6 @@ export default function InboundParsePage() {
                   type="button"
                   onClick={() => {
                     setInboundTab('all');
-                    fetchInboundEmails(companyHQId, 'all');
                   }}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
                     inboundTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
@@ -1408,7 +1421,6 @@ export default function InboundParsePage() {
                               setInboundTab('recorded');
                               setSelectedEmail(null);
                               resetDetailState();
-                              if (companyHQId) fetchInboundEmails(companyHQId, 'recorded');
                             }}
                             className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
                           >
@@ -2239,5 +2251,24 @@ export default function InboundParsePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function InboundParsePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <PageHeader title="Inbound Parse" subtitle="Loading…" />
+            <div className="flex items-center justify-center py-12">
+              <div className="text-sm text-gray-500">Loading…</div>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <InboundParsePageContent />
+    </Suspense>
   );
 }
