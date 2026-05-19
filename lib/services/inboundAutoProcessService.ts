@@ -38,6 +38,7 @@ export type AutoProcessInboundOptions = {
    * Manual push-to-ai omits this so FAILED / duplicate retries stay possible.
    */
   requireReceivedStatus?: boolean;
+  manualOverride?: boolean;
 };
 
 export type AutoProcessInboundSuccess = {
@@ -176,6 +177,7 @@ export async function autoProcessInboundEmail(
   const newCompanyName = opts.newCompanyName ?? null;
   const markAutoProcessed = opts.markAutoProcessed === true;
   const requireReceivedStatus = opts.requireReceivedStatus === true;
+  const manualOverride = opts.manualOverride === true;
 
   const inbound = await prisma.inboundEmail.findUnique({
     where: { id: inboundEmailId },
@@ -186,7 +188,11 @@ export async function autoProcessInboundEmail(
     return { success: false, status: 404, error: 'InboundEmail not found' };
   }
 
-  if (requireReceivedStatus && inbound.ingestionStatus !== 'RECEIVED') {
+  if (
+    requireReceivedStatus &&
+    !manualOverride &&
+    inbound.ingestionStatus !== 'RECEIVED'
+  ) {
     return {
       success: false,
       status: 409,
