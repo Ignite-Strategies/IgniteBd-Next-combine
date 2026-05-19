@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const inboundEmailId = body?.inboundEmailId;
     const generatePipelineMatch = body?.generatePipelineMatch === true;
+    const forceReparse = body?.forceReparse === true;
     if (!inboundEmailId || typeof inboundEmailId !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Missing inboundEmailId' },
@@ -266,7 +267,7 @@ export async function POST(request: Request) {
       }));
 
       const parsedSubject = (parsed.subject || '').toLowerCase().replace(/^re:\s*/i, '').trim();
-      if (parsedSubject) {
+      if (parsedSubject && !forceReparse) {
         alreadyIngested = activities.some((a) => {
           const existingSubject = (a.subject || '').toLowerCase().replace(/^re:\s*/i, '').trim();
           return existingSubject === parsedSubject && a.platform === 'sendgrid_inbound';

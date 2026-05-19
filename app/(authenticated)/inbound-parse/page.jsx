@@ -87,6 +87,8 @@ function InboundParsePageContent() {
   const [generatePipelineMatch, setGeneratePipelineMatch] = useState(true);
   const [applyPipelineMatch, setApplyPipelineMatch] = useState(false);
   const [inboundSaveComplete, setInboundSaveComplete] = useState(false);
+  /** Operator override: Parse / Save on RECORDED rows (silent-failure recovery). */
+  const [manualReparse, setManualReparse] = useState(false);
   /** View Thread panel: open before parse; auto-collapse after parse / after save; user can re-open. */
   const [threadOpen, setThreadOpen] = useState(true);
   /** After Save all: structured summary + next actions (matcher UI is cleared). */
@@ -320,6 +322,7 @@ function InboundParsePageContent() {
   }, [jobChangeDetected]);
 
   const resetDetailState = () => {
+    setManualReparse(false);
     setParseResult(null);
     setContactEmailOverride('');
     setContactNameOverride('');
@@ -520,6 +523,7 @@ function InboundParsePageContent() {
       const res = await api.post('/api/inbound-parse/interpret', {
         inboundEmailId: selectedEmail.id,
         generatePipelineMatch,
+        forceReparse: manualReparse || selectedEmail.ingestionStatus === 'RECORDED',
       });
       if (res.data?.success) {
         setParseResult(res.data);
@@ -560,7 +564,11 @@ function InboundParsePageContent() {
     setPushLoading(true);
     setRecordedContactId(null);
     try {
-      const payload = { inboundEmailId: selectedEmail.id };
+      const payload = {
+        inboundEmailId: selectedEmail.id,
+        manualOverride:
+          manualReparse || selectedEmail.ingestionStatus === 'RECORDED',
+      };
       if (nextEngageOverride) payload.nextEngagementDate = nextEngageOverride;
       if (nextEngagementPurposeOverride)
         payload.nextEngagementPurpose = nextEngagementPurposeOverride;
@@ -743,8 +751,10 @@ function InboundParsePageContent() {
   };
 
   const hasContent = !!(selectedEmail?.text || selectedEmail?.html || selectedEmail?.email);
+  const statusRecorded = selectedEmail?.ingestionStatus === 'RECORDED';
   const inboundAlreadyRecorded =
-    inboundSaveComplete || selectedEmail?.ingestionStatus === 'RECORDED';
+    inboundSaveComplete || (statusRecorded && !manualReparse);
+  const showReparseAnyway = statusRecorded && !inboundSaveComplete && hasContent;
 
   if (missing) {
     return <CompanyKeyMissingError />;
@@ -1166,6 +1176,21 @@ function InboundParsePageContent() {
                         </label>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3 ml-1">
+                        {showReparseAnyway && !manualReparse && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualReparse(true);
+                              setParseResult(null);
+                              setActionMessage(null);
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md border border-amber-300 bg-white text-amber-900 hover:bg-amber-50"
+                            title="Manual recovery — re-run AI even though this row is already marked Recorded."
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            Re-parse anyway
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={handleParseAndSave}
@@ -1173,10 +1198,18 @@ function InboundParsePageContent() {
                             analyzeLoading || !hasContent || inboundAlreadyRecorded
                           }
                           className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="AI-parse this email (no save yet). Review steps below, then Save all."
+                          title={
+                            manualReparse
+                              ? 'Re-run AI on this saved row. Review steps below, then Save all.'
+                              : 'AI-parse this email (no save yet). Review steps below, then Save all.'
+                          }
                         >
                           <Sparkles className="h-4 w-4" />
-                          {analyzeLoading ? 'Parsing…' : 'Parse'}
+                          {analyzeLoading
+                            ? 'Parsing…'
+                            : manualReparse
+                              ? 'Re-parse'
+                              : 'Parse'}
                         </button>
                         <button
                           type="button"
@@ -1383,8 +1416,10 @@ function InboundParsePageContent() {
                             </span>
                             {selectedEmail.ingestionStatus === 'RECORDED' && (
                               <p className="text-xs text-gray-500 mt-1">
-                                This email has been recorded as a CRM activity. Buttons above are
-                                disabled.
+                                Marked Recorded in the ingest queue.
+                                {manualReparse
+                                  ? ' Use Re-parse, then Save all, to recover or redo CRM work.'
+                                  : ' Use Re-parse anyway if auto-processing failed silently.'}
                               </p>
                             )}
                           </div>

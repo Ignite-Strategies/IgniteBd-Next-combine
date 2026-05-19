@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       updateContactProfile: body?.updateContactProfile === true,
       newContactEmail: body?.newContactEmail,
       newCompanyName: body?.newCompanyName,
+      manualOverride: body?.manualOverride === true,
     });
 
     if (result.success === false) {
