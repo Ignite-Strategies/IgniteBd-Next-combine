@@ -164,9 +164,7 @@ export async function GET(request) {
       crmId: companyHQId,
     };
 
-    // Filter by client company ID if provided
-    // NOTE: Only use contactCompanyId (the actual foreign key)
-    // companyId field is enrichment data only, not a foreign key
+    // Query-param companyId filters by employer FK (contactCompanyId), not tenant crmId
     if (companyId) {
       where.contactCompanyId = companyId;
       console.log('🔍 Filtering contacts by contactCompanyId (FK):', companyId);

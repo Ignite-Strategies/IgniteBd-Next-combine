@@ -297,7 +297,6 @@ async function migrateData(localStorageData) {
             buyerDecision: contactData.buyerDecision || null,
             howMet: contactData.howMet || null,
             notes: contactData.notes || null,
-            companyId: contactData.contactCompanyId ? companyMap.get(contactData.contactCompanyId) : null,
             contactCompanyId: contactData.contactCompanyId ? companyMap.get(contactData.contactCompanyId) : null,
           },
         });

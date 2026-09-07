@@ -441,8 +441,8 @@ export async function POST(request: Request) {
     if (skipCompanyCreation) {
       console.log('⏭️ Skipping company creation/update (basic save mode)');
     } else {
-    // Use contactCompanyId (FK) as primary, fallback to companyId param or enrichment companyId field
-    let finalCompanyId = companyId || updatedContact.contactCompanyId || updatedContact.companyId || null;
+    // Employer FK is contactCompanyId; body companyId is an optional existing company to link
+    let finalCompanyId = companyId || updatedContact.contactCompanyId || null;
     
     // If contact has a company, update it with enrichment data
     if (finalCompanyId) {
@@ -513,7 +513,7 @@ export async function POST(request: Request) {
         await prisma.contact.update({
           where: { id: contactId },
           data: {
-            contactCompanyId: companyByDomain.id, // Only set the FK, not companyId (enrichment field)
+            contactCompanyId: companyByDomain.id,
           },
         });
         
@@ -595,7 +595,7 @@ export async function POST(request: Request) {
         await prisma.contact.update({
           where: { id: contactId },
           data: {
-            contactCompanyId: newCompanyId, // Only set the FK, not companyId (enrichment field)
+            contactCompanyId: newCompanyId,
           },
         });
         
@@ -647,7 +647,6 @@ export async function POST(request: Request) {
       await prisma.contact.update({
         where: { id: contactId },
         data: {
-          companyId: newCompanyId,
           contactCompanyId: newCompanyId,
         },
       });

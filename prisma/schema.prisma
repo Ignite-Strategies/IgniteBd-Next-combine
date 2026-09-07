@@ -514,7 +514,6 @@ model Contact {
   careerStabilityScore                                      Int?
   whatTheyreLookingFor                                      String? // Inferred: "growth", "stability", "opportunity", etc.
   careerTimeline                                            Json?
-  companyId                                                 String?
   companyIndustry                                           String?
   companySize                                               String?
   currentRoleStartDate                                      DateTime?
@@ -582,7 +581,6 @@ model Contact {
 
   @@unique([email, crmId])
   @@index([companyDomain])
-  @@index([companyId])
   @@index([domain])
   @@index([email])
   @@index([firebaseUid])
