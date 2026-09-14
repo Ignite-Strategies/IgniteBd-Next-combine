@@ -14,7 +14,7 @@
 
 **Key Principle**: A Contact is a **person**, not a company. Companies are separate entities (`Company` model) that Contacts can be associated with via `contactCompanyId`.
 
-**Multi-Tenancy**: Contacts are scoped to `CompanyHQ` (via `crmId`) - each tenant has their own contact database.
+**Multi-Tenancy**: Contacts are scoped to `CompanyHQ` (via `crmId`) - each tenant has their own contact database. Historical note: tenant column was once named `companyId`; a later ghost `companyId` field caused schema/DB drift (P2022). See [CONTACT_COMPANYID_HISTORY.md](./CONTACT_COMPANYID_HISTORY.md).
 
 **Flexibility**: Contacts can be:
 - **Basic contacts**: Just name and email

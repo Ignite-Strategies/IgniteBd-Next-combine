@@ -45,3 +45,7 @@ After this, `prisma migrate dev` should succeed: the shadow DB will apply only t
 - Use **`npx prisma migrate dev`** for new schema changes; it will create new migrations after the baseline.
 - Use **`npx prisma migrate deploy`** in CI/production to apply pending migrations.
 - Old migration folders remain in `prisma/migrations_archive/` for reference only.
+
+## Schema drift caveat
+
+The baseline snapshot includes columns later removed from production (e.g. `contacts.companyId`). Neon was shaped by `db push` / introspect / resolve-applied, not a full baseline replay. Follow-up migrations must drop obsolete columns (see `20260907160000_drop_contacts_companyId` and [CONTACT_COMPANYID_HISTORY.md](contacts/CONTACT_COMPANYID_HISTORY.md)). Prefer migrate over `db push` on prod.

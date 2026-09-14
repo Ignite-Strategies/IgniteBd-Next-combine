@@ -75,7 +75,7 @@ Update state + localStorage with fresh data
 [
   {
     id: "contact-id",
-    companyId: "companyHQId", // Tenant identifier
+    crmId: "companyHQId", // Tenant identifier (CompanyHQ)
     firstName: "John",
     lastName: "Doe",
     goesBy: "Johnny",
@@ -220,10 +220,10 @@ if (response.data?.success && response.data.contact) {
 **Prisma Query**:
 ```javascript
 const contacts = await prisma.contact.findMany({
-  where: { companyId: companyHQId },
+  where: { crmId: companyHQId },
   include: {
-    pipeline: true,        // Includes pipeline data
-    contactCompany: true,  // Includes company data
+    pipelines: true,
+    companies: true, // employer via contactCompanyId
   },
   orderBy: { createdAt: 'desc' },
 });
@@ -324,7 +324,7 @@ The cache is **not automatically invalidated**. It's updated when:
 
 All contacts are scoped to `companyHQId`:
 
-- **Storage**: Contacts stored with `companyId = companyHQId`
+- **Storage**: Contacts stored with `crmId = companyHQId` (employer FK is `contactCompanyId`)
 - **Hydration**: API queries filter by `companyHQId`
 - **Cache**: localStorage key is `contacts` (shared across all tenants - could be improved)
 - **Security**: API routes verify Firebase token and check companyHQId access

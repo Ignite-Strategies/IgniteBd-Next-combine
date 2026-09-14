@@ -26,10 +26,9 @@
 ### Company Context
 - `companyName` (String?)
 - `companyDomain` (String?, indexed)
-- `companyId` (String?, indexed) - FK to companies
 - `companyIndustry` (String?)
 - `companySize` (String?)
-- `contactCompanyId` (String?) - FK to companies
+- `contactCompanyId` (String?) - FK to `companies` (employer). Tenant is `crmId`, not `companyId` (dropped Sept 2026 — see [CONTACT_COMPANYID_HISTORY.md](contacts/CONTACT_COMPANYID_HISTORY.md))
 
 ### Location
 - `city`, `state`, `country` (String?)

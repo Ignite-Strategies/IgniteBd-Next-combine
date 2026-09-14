@@ -425,7 +425,7 @@ export async function POST(request) {
             await prisma.contact.update({
               where: { id: contact.id },
               data: {
-                contactCompanyId: companyId, // Only set the FK, not companyId (enrichment field)
+                contactCompanyId: companyId,
               },
             });
           }
