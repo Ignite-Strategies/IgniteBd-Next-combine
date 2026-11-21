@@ -19,6 +19,8 @@ import {
   Inbox,
   Crosshair,
   Library,
+  Mail,
+  List,
 } from 'lucide-react';
 
 function Sidebar() {
@@ -78,11 +80,13 @@ function Sidebar() {
       ],
     },
     {
-      name: 'Engage',
+      name: 'BD Engage',
       items: [
         { key: 'people', label: 'People', href: '/people', icon: Users },
         { key: 'contacts', label: 'Contacts', href: '/contacts/view', icon: Contact },
         { key: 'outreach', label: 'Outreach', href: '/outreach', icon: MessageSquare },
+        { key: 'campaigns', label: 'Campaigns', href: '/outreach/campaigns', icon: Mail },
+        { key: 'contact-lists', label: 'Contact lists', href: '/contacts/list-manager', icon: List },
         { key: 'targeting', label: 'Targeting', href: '/targeting', icon: Crosshair },
         { key: 'phrase-library', label: 'Phrase Library', href: '/phrase-library', icon: Library },
         { key: 'inbound-parse', label: 'Inbound Parse', href: '/inbound-parse', icon: Inbox },
@@ -153,7 +157,12 @@ function Sidebar() {
             <ul className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = isActive(item.href);
+                const active =
+                  item.key === 'outreach'
+                    ? pathname === '/outreach' ||
+                      (pathname?.startsWith('/outreach/') &&
+                        !pathname.startsWith('/outreach/campaigns'))
+                    : isActive(item.href);
                 return (
                   <li key={item.key}>
                     <Link
